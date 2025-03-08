@@ -1,16 +1,24 @@
 const express = require('express');
-
-const { register, login } = require('../controllers/User/authController');
-
 const router = express.Router();
+const { verifyToken } = require('../middleware/isAuth');
+const { validateRegister, validateLogin } = require('../middleware/validation/validateUser');
+const {
+    login,
+    register,
+    logout,
+    changePassword
+} = require('../controllers/User/authController');
+const nodemailerController = require('../controllers/nodemailerController');
 
-// Ruta para registro
-router.post('/register', register);
+// Public routes
+router.post('/register', validateRegister, register);
+router.post('/login', validateLogin, login);
+router.post('/forgot-password', nodemailerController.forgotPassword);
+router.post('/reset-password', nodemailerController.resetPassword);
 
-// Ruta para login
-router.post('/login', login);
-
-// Ruta para verificación de rol
-//router.get('/verify-role', checkPermissions(['admin', 'user']), verifyRole);
+// Protected routes
+router.use(verifyToken);
+router.post('/logout', logout);
+router.put('/change-password', changePassword);
 
 module.exports = router;

@@ -2,41 +2,73 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { User } = require('../../data');
 const response = require('../../utils/response');
-const sendMail = require('../../utils/transporter');
+const { transporter } = require('../../utils/transporter');
+const { emailTemplates } = require('../../utils/emailTemplates');
+const { CustomError } = require('../../middleware/error');
 
-exports.forgotPassword = async (req, res) => {
-  const { email } = req.body;
-
+const forgotPassword = async (req, res, next) => {
   try {
-    const user = await User.findOne({ where: { email } });
+    const { email } = req.body;
+
+    // Buscar usuario activo
+    const user = await User.findOne({ 
+      where: { 
+        email,
+        isActive: true,
+        deletedAt: null
+      } 
+    });
 
     if (!user) {
-      return response(res, 404, "Usuario no encontrado");
+      throw new CustomError('Usuario no encontrado', 404);
     }
 
+    // Validar si ya existe una solicitud reciente (15 minutos)
+    if (user.tokenCreatedAt && 
+        Date.now() - new Date(user.tokenCreatedAt).getTime() < 900000) {
+      throw new CustomError(
+        'Ya existe una solicitud reciente. Por favor espera 15 minutos.', 
+        429
+      );
+    }
+
+    // Generar token seguro
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = await bcrypt.hash(resetToken, 10);
 
-    user.passwordResetToken = hashedToken;
-    user.passwordResetExpires = Date.now() + 3600000; // 1 hour
-    await user.save();
+    // Actualizar usuario con token
+    await user.update({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: Date.now() + 3600000, // 1 hora
+      tokenCreatedAt: Date.now()
+    });
 
-    const resetUrl = `${req.protocol}://${req.get('host')}/resetPassword/${resetToken}`;
+    // Crear URL de reset
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-    const message = `Recibió este correo electrónico porque usted (o alguien más) solicitó restablecer la contraseña. Haga clic en el siguiente enlace para restablecer su contraseña: \n\n ${resetUrl}`;
+    try {
+      // Enviar email
+      await transporter.sendMail({
+        from: process.env.SMTP_USER,
+        to: user.email,
+        subject: 'Restablecimiento de contraseña - Balu Hotel',
+        html: emailTemplates.resetPassword(user.first_name, resetUrl)
+      });
 
-    const mailOptions = {
-      from: process.env.SMTP_USER,
-      to: user.email,
-      subject: 'Restablecimiento de contraseña',
-      text: message,
-    };
+      return response(res, 200, "Se ha enviado un correo para restablecer tu contraseña");
+    } catch (emailError) {
+      // Revertir cambios si falla el envío
+      await user.update({
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        tokenCreatedAt: null
+      });
+      throw new CustomError('Error al enviar el correo. Intenta más tarde.', 500);
+    }
 
-    await transporter.sendMail(mailOptions);
-
-    response(res, 200, "Correo electrónico de restablecimiento de contraseña enviado");
   } catch (error) {
-    console.error(error);
-    response(res, 500, "Error al solicitar el restablecimiento de contraseña");
+    next(error);
   }
 };
+
+module.exports = forgotPassword;

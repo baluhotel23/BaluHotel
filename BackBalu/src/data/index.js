@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { Sequelize } = require('sequelize');
+
 const fs = require('fs');
 const path = require('path');
 const {
@@ -51,9 +52,28 @@ sequelize.models = Object.fromEntries(capsEntries);
 
 // En sequelize.models están todos los modelos importados como propiedades
 // Para relacionarlos hacemos un destructuring
-const { User } = sequelize.models;
+const { BasicInventory, ExtraCharge, Reservation, Bill, Room, RoomBasics, User, Purchase, PurchaseItem } = sequelize.models;
 
-// Aca vendrian las relaciones
+Room.belongsToMany(BasicInventory, { through: RoomBasics, foreignKey: 'roomNumber' });
+BasicInventory.belongsToMany(Room, { through: RoomBasics, foreignKey: 'basicId' });
+
+Reservation.belongsTo(Room);
+Room.hasMany(Reservation);
+Reservation.belongsTo(User, { as: 'guest' });
+User.hasMany(Reservation);
+
+Reservation.hasMany(ExtraCharge);
+ExtraCharge.belongsTo(Reservation);
+ExtraCharge.belongsTo(BasicInventory);
+BasicInventory.hasMany(ExtraCharge);
+
+Reservation.hasOne(Bill);
+Bill.belongsTo(Reservation);
+
+Purchase.hasMany(PurchaseItem);
+PurchaseItem.belongsTo(Purchase);
+PurchaseItem.belongsTo(BasicInventory);
+BasicInventory.hasMany(PurchaseItem);
 
 //---------------------------------------------------------------------------------//
 module.exports = {

@@ -1,43 +1,52 @@
 const permisos = {
-    Owner: {
+  owner: {
       nombre: 'Dueño',
       permisos: [
-        'gestionarUsuarios',
-        'gestionarProductos',
-        'verEstadisticas',
-        'gestionarDescuentos',
-        'gestionarInventario',
-        'gestionarVentas',
-        'gestionarCaja'
+          'manageUsers',
+          'manageRooms',
+          'viewDashboard',
+          'manageInventory',
+          'manageExpenses',
+          'managePurchases',
+          'manageBookings',
+          'managePayments',
+          'generateReports',
+          'managePromotions'
       ]
-    },
-    Admin: {
-      nombre: 'Cajero',
+  },
+  admin: {
+      nombre: 'Administrativo',
       permisos: [
-        'realizarVentas',
-        'gestionarInventario',
-        'verProductos',
-        'generarRecibos'
+          'viewDashboard',
+          'manageInventory',
+          'manageExpenses',
+          'managePurchases',
+          'viewReports',
+          'manageBookings'
       ]
-    },
-    Recept: {
-      nombre: 'Distribuidor',
+  },
+  receptionist: {
+      nombre: 'Recepcionista',
       permisos: [
-        'verProductos',
-        'realizarPedidos',
-        'verPedidosPropios',
-        'verPreferenciales'
+          'createBooking',
+          'checkInGuest',
+          'checkOutGuest',
+          'manageExtraCharges',
+          'viewRoomStatus',
+          'processPayments',
+          'viewBasicReports'
       ]
-    },
-    Customer: {
+  },
+  client: {
       nombre: 'Cliente',
       permisos: [
-        'verProductos',
-        'realizarPedidos',
-        'verPedidosPropios'
+          'viewRooms',
+          'createBooking',
+          'viewOwnBookings',
+          'viewPromotions'
       ]
-    }
-  };
+  }
+};
   
   const verificarRol = (rolesPermitidos) => {
     return (req, res, next) => {

@@ -1,19 +1,86 @@
+const { catchedAsync } = require("../utils/catchedAsync");
 
-const { catchedAsync } = require("../utils");
-const {login, register} = require("./User/authController");
-const { forgotPassword } = require("./nodemailerController/forgotPassword.js");
-const { resetPassword } = require("./nodemailerController/resetPassword.js");
-const { sendEmail } = require("./nodemailerController/index.js");
-const checkPermissions = require("../middleware/checkPermissions");
+// Auth controllers
+const { login, register, logout, changePassword } = require("./User/authController");
+
+// Email controllers
+const { 
+    forgotPassword, 
+    resetPassword, 
+    sendEmail 
+} = require("./nodemailerController");
+
+// Inventory controllers
+const {
+    getInventory,
+    createPurchase,
+    updateInventory,
+    getLowStockItems
+} = require("./inventoryController");
+
+// Admin controllers
+const {
+    getAllUsers,
+    createStaffUser,
+    updateUser,
+    deactivateUser
+} = require("./User/adminController");
+
+const {
+  checkAvailability,
+  getRoomTypes,
+  createBooking,
+  getUserBookings,
+  getBookingById,
+  getAllBookings,
+  checkIn,
+  checkOut,
+  addExtraCharges,
+  generateBill,
+  updateBookingStatus,
+  cancelBooking,
+  getOccupancyReport,
+  getRevenueReport
+} = require("./bookingController");
 
 module.exports = {
-  //createProduct: catchedAsync(require("./Products/createProduct")),
- login: catchedAsync(login),
- register: catchedAsync(register),
- forgotPassword: catchedAsync(forgotPassword),
-  resetPassword: catchedAsync(resetPassword),
-  sendEmail: catchedAsync(sendEmail),
-  checkPermissions: catchedAsync(checkPermissions),
- 
+    // Auth endpoints
+    login,
+    register,
+    logout,
+    changePassword,
 
+    // Email endpoints
+    forgotPassword,
+    resetPassword,
+    sendEmail,
+
+    // Inventory endpoints
+    getInventory,
+    createPurchase,
+    updateInventory,
+    getLowStockItems,
+
+    // Admin endpoints
+    getAllUsers,
+    createStaffUser,
+    updateUser,
+    deactivateUser,
+
+
+    // Booking endpoints
+    checkAvailability,
+    getRoomTypes,
+    createBooking,
+    getUserBookings,
+    getBookingById,
+    getAllBookings,
+    checkIn,
+    checkOut,
+    addExtraCharges,
+    generateBill,
+    updateBookingStatus,
+    cancelBooking,
+    getOccupancyReport,
+    getRevenueReport
 };
