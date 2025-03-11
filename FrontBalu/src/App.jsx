@@ -3,6 +3,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from './Redux/Actions/authActions';
 import PrivateRoute from './Components/PrivateRoute';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
+
 
 // Importa tus componentes
 import Login from './Components/Auth/Login';
@@ -30,6 +33,7 @@ function App() {
 
   return (
     <BrowserRouter>
+    <ToastContainer />
       <Routes>
         {/* Rutas públicas */}
         <Route path="/" element={<Landing />} />
