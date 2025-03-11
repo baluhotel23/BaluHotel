@@ -18,6 +18,7 @@ router.post('/reset-password', nodemailerController.resetPassword);
 
 // Protected routes
 router.use(verifyToken);
+
 router.post('/logout', logout);
 router.put('/change-password', changePassword);
 

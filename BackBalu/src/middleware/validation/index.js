@@ -9,4 +9,5 @@ module.exports = {
     validatePasswordReset,
     validateBooking,
     validateExtraCharge
+    
 };

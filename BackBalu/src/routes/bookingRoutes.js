@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/isAuth');
 const { isStaff, allowRoles } = require('../middleware/byRol');
-const { validateBooking, validateExtraCharge } = require('../middleware/validation');
+const validateBooking = require('../middleware/validation/validateBooking');
+const validateExtraCharge = require('../middleware/validation/validateExtraCharge');
 const {
     checkAvailability,
     getRoomTypes,
@@ -32,7 +33,7 @@ router.get('/:id', getBookingById);
 router.post('/:id/cancel', cancelBooking);
 
 // Rutas para clientes y staff
-//router.post('/', validateBooking, createBooking);
+router.post('/', validateBooking, createBooking);
 router.get('/my-bookings', getUserBookings);
 router.get('/:id', getBookingById);
 
@@ -43,7 +44,7 @@ router.use(isStaff);
 router.get('/all', getAllBookings);
 router.put('/:id/check-in', checkIn);
 router.put('/:id/check-out', checkOut);
-//router.post('/:id/extra-charges', validateExtraCharge, addExtraCharges);
+router.post('/:id/extra-charges', validateExtraCharge, addExtraCharges);
 router.get('/:id/bill', generateBill);
 router.put('/:id/status', updateBookingStatus);
 

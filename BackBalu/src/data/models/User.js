@@ -2,11 +2,7 @@ const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
  const User = sequelize.define('User', {
-    id: {
-      type: DataTypes.INTEGER,
-      autoIncrement: true,
-      unique: true
-    },
+
     n_document: {
       type: DataTypes.STRING,
       primaryKey: true,
@@ -98,12 +94,12 @@ tokenCreatedAt: {
     },
     createdAt: {
       type: DataTypes.DATE,
-      allowNull: false,
+      allowNull: true,
       defaultValue: DataTypes.NOW,
     },
     updatedAt: {
       type: DataTypes.DATE,
-      allowNull: false,
+      allowNull: true,
       defaultValue: DataTypes.NOW,
     }
   });

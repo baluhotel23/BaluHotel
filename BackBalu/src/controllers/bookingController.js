@@ -54,10 +54,10 @@ const getRoomTypes = async (req, res) => {
 
 // Client and staff endpoints
 const createBooking = async (req, res) => {
-    const { roomId, checkIn, checkOut, guestDetails } = req.body;
+    const { roomNumber, checkIn, checkOut, guestDetails } = req.body;
     const userId = req.user.id;
 
-    const room = await Room.findByPk(roomId);
+    const room = await Room.findByPk(roomNumber);
     if (!room) {
         throw new CustomError('Habitación no encontrada', 404);
     }
@@ -65,7 +65,7 @@ const createBooking = async (req, res) => {
     // Verificar disponibilidad
     const existingBooking = await Booking.findOne({
         where: {
-            roomId,
+            roomNumber,
             [Op.or]: [
                 {
                     checkIn: {
@@ -87,7 +87,7 @@ const createBooking = async (req, res) => {
 
     const booking = await Booking.create({
         userId,
-        roomId,
+        roomNumber,
         checkIn,
         checkOut,
         guestDetails,

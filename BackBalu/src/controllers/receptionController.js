@@ -155,7 +155,7 @@ const processCheckOut = async (req, res) => {
 // Room Management Controllers
 const getRoomsStatus = async (req, res) => {
     const rooms = await Room.findAll({
-        attributes: ['id', 'number', 'type', 'status', 'floor'],
+        attributes: ['roomNumber',  'description', 'available', "price"],
         order: [['floor', 'ASC'], ['number', 'ASC']]
     });
 
@@ -254,10 +254,10 @@ const getPendingDepartures = async (req, res) => {
 
 // Room Management Additional Controllers
 const markRoomForMaintenance = async (req, res) => {
-    const { roomId } = req.params;
+    const { roomNumber } = req.params;
     const { issue, expectedDuration } = req.body;
 
-    const room = await Room.findByPk(roomId);
+    const room = await Room.findByPk(roomNumber);
     if (!room) {
         throw new CustomError('Habitación no encontrada', 404);
     }

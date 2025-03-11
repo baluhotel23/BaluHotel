@@ -18,7 +18,6 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
-
     isPromo: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
@@ -26,7 +25,6 @@ module.exports = (sequelize) => {
     promotionPrice: {
       type: DataTypes.DECIMAL(10, 2),
     },
-    
     tags: {
       type: DataTypes.ARRAY(DataTypes.STRING),
       defaultValue: [],
@@ -34,7 +32,11 @@ module.exports = (sequelize) => {
     image_url: {
       type: DataTypes.STRING,
     },
-
+    status: {
+      type: DataTypes.ENUM,
+      values: ["Limpia", "Ocupada", "Mantenimiento", "Reservada"],
+      
+    },
     service: {
       type: DataTypes.ENUM,
       values: [
@@ -60,5 +62,4 @@ module.exports = (sequelize) => {
       defaultValue: true,
     },
   });
-  
 };
