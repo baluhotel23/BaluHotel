@@ -36,6 +36,8 @@ const {
     getCombinedReport,
 } = require("../controllers/reportController");
 
+const { createService, updateService, deleteService, getAllServices } = require("../controllers/serviceController");
+
 
 
 router.use(verifyToken);
@@ -68,5 +70,13 @@ router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyRep
  router.get('/reports/revenue', isOwner, getRevenueReport);
  router.get('/reports/inventory-usage', allowRoles(['owner', 'admin']), getInventoryUsageReport);
 router.get('/reports/combined', allowRoles(['owner', 'admin']),getCombinedReport);
+
+
+// Rutas para la gestión de servicios (solo owner y admin)
+router.post("/services", allowRoles(["owner", "admin"]), createService);
+router.put("/services/:id", allowRoles(["owner", "admin"]), updateService);
+router.get("/services", allowRoles(["owner", "admin"]), getAllServices);
+router.delete("/services/:id", allowRoles(["owner", "admin"]), deleteService);
+
 
 module.exports = router;

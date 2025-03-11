@@ -39,27 +39,7 @@ module.exports = (sequelize) => {
       values: ["Limpia", "Ocupada", "Mantenimiento", "Reservada"],
       
     },
-    service: {
-  type: DataTypes.ARRAY(
-    DataTypes.ENUM(
-      "Disponibilidad de cunas",
-      "Kit de amenities",
-      "Tina",
-      "Selección de almohadas",
-      "Televisión por cable",
-      "Canales internacionales",
-      "Caja fuerte digital",
-      "Disponibilidad de cama adicional",
-      "Internet inalámbrico gratuito (Wi-fi)",
-      "Secador de pelo",
-      "Minibar",
-      "Pantuflas (zapatillas)",
-      "Ducha",
-      "Área de estar"
-    )
-  ),
-  allowNull: false,
-    },
+ 
     maxGuests: {  // Campo para definir la cantidad máxima de huéspedes
       type: DataTypes.INTEGER,
       allowNull: false,
