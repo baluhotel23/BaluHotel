@@ -52,10 +52,14 @@ sequelize.models = Object.fromEntries(capsEntries);
 
 // En sequelize.models están todos los modelos importados como propiedades
 // Para relacionarlos hacemos un destructuring
-const { BasicInventory, ExtraCharge, Booking, Bill, Room, RoomBasics, User, Purchase, PurchaseItem } = sequelize.models;
+const { BasicInventory, ExtraCharge, Booking, Bill, Room, RoomBasics, User, Purchase, PurchaseItem, RoomCheckIn} = sequelize.models;
 
 Room.belongsToMany(BasicInventory, { through: RoomBasics, foreignKey: 'roomNumber' });
 BasicInventory.belongsToMany(Room, { through: RoomBasics, foreignKey: 'basicId' });
+
+Room.hasOne(RoomCheckIn, { foreignKey: 'roomNumber', as: 'preparation' });
+RoomCheckIn.belongsTo(Room, { foreignKey: 'roomNumber', as: 'room' });
+
 
 Booking.belongsTo(Room);
 Room.hasMany(Booking);

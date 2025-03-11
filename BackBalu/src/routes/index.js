@@ -10,6 +10,7 @@ const roomRoutes = require('./roomRoutes');
 const bookingRoutes = require('./bookingRoutes');
 const clientRoutes = require('./clientRoutes');
 
+
 // Rutas públicas
 router.use('/auth', authRoutes);
 router.use('/client', clientRoutes);
@@ -21,5 +22,7 @@ router.use('/inventory', inventoryRoutes);
 router.use('/reception', receptionRoutes);
 router.use('/rooms', roomRoutes);
 router.use('/bookings', bookingRoutes);
+
+
 
 module.exports = router;

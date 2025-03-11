@@ -3,8 +3,9 @@ const { DataTypes } = require("sequelize");
 module.exports = (sequelize) => {
   sequelize.define("Room", {
     roomNumber: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
+      type: DataTypes.INTEGER,
+      unique:true,
+      allowNull: false,
       primaryKey: true,
     },
     description: {
@@ -29,33 +30,40 @@ module.exports = (sequelize) => {
       type: DataTypes.ARRAY(DataTypes.STRING),
       defaultValue: [],
     },
-    image_url: {
-      type: DataTypes.STRING,
-    },
+   image_url: {
+    type: DataTypes.ARRAY(DataTypes.STRING),
+    defaultValue: [],
+},
     status: {
       type: DataTypes.ENUM,
       values: ["Limpia", "Ocupada", "Mantenimiento", "Reservada"],
       
     },
     service: {
-      type: DataTypes.ENUM,
-      values: [
-        "Disponibilidad de cunas",
-        "Kit de amenities",
-        "Tina",
-        "Selección de almohadas",
-        "Televisión por cable",
-        "Canales internacionales",
-        "Caja fuerte digital",
-        "Disponibilidad de cama adicional",
-        "Internet inalámbrico gratuito (Wi-fi)",
-        "Secador de pelo",
-        "Minibar",
-        "Pantuflas (zapatillas)",
-        "Ducha",
-        "Área de estar",
-      ],
+  type: DataTypes.ARRAY(
+    DataTypes.ENUM(
+      "Disponibilidad de cunas",
+      "Kit de amenities",
+      "Tina",
+      "Selección de almohadas",
+      "Televisión por cable",
+      "Canales internacionales",
+      "Caja fuerte digital",
+      "Disponibilidad de cama adicional",
+      "Internet inalámbrico gratuito (Wi-fi)",
+      "Secador de pelo",
+      "Minibar",
+      "Pantuflas (zapatillas)",
+      "Ducha",
+      "Área de estar"
+    )
+  ),
+  allowNull: false,
+    },
+    maxGuests: {  // Campo para definir la cantidad máxima de huéspedes
+      type: DataTypes.INTEGER,
       allowNull: false,
+      defaultValue: 1
     },
     isActive: {
       type: DataTypes.BOOLEAN,

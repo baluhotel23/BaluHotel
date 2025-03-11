@@ -1,4 +1,4 @@
-const { HotelSettings, RoomCategory } = require('../data');
+const { HotelSettings } = require('../data');
 
 // GET /settings - Obtiene la configuración del hotel (se asume que es un singleton)
 const getHotelSettings = async (req, res) => {
@@ -13,53 +13,84 @@ const getHotelSettings = async (req, res) => {
   }
 };
 
-// PUT /settings - Actualiza la configuración del hotel
+// PUT /settings - Crea o actualiza la configuración del hotel
 const updateHotelSettings = async (req, res) => {
   try {
-    const { name, address, contactInfo } = req.body;
+    console.log('--- Inicio updateHotelSettings ---');
+    console.log('Body recibido:', req.body);
+    
+    const {
+      name,
+      address,
+      contactInfo,
+      wlegalorganizationtype,
+      sfiscalresponsibilities,
+      sdocno,
+      sdoctype,
+      ssellername,
+      ssellerbrand,
+      scontactperson,
+      saddresszip,
+      wdepartmentcode,
+      wtowncode,
+      scityname,
+      contact_selectronicmail,
+      registration_wdepartmentcode,
+      registration_scityname,
+      registration_saddressline1,
+      registration_scountrycode,
+      registration_wprovincecode,
+      registration_szip,
+      registration_sdepartmentname,
+    } = req.body;
+    
+    const data = {
+      name,
+      address,
+      contactInfo,
+      wlegalorganizationtype,
+      sfiscalresponsibilities,
+      sdocno,
+      sdoctype,
+      ssellername,
+      ssellerbrand,
+      scontactperson,
+      saddresszip,
+      wdepartmentcode,
+      wtowncode,
+      scityname,
+      contact_selectronicmail,
+      registration_wdepartmentcode,
+      registration_scityname,
+      registration_saddressline1,
+      registration_scountrycode,
+      registration_wprovincecode,
+      registration_szip,
+      registration_sdepartmentname,
+    };
+    
+    console.log('Datos a procesar:', data);
+    
     let settings = await HotelSettings.findOne();
     if (!settings) {
-      // Si no existe, se crea uno nuevo
-      settings = await HotelSettings.create({ name, address, contactInfo });
+      console.log('No se encontró configuración existente. Se creará nueva.');
+      settings = await HotelSettings.create(data);
+      console.log('Configuración creada:', settings);
     } else {
-      settings = await settings.update({ name, address, contactInfo });
+      console.log('Configuración existente encontrada:', settings.dataValues);
+      settings = await settings.update(data);
+      console.log('Configuración actualizada:', settings.dataValues);
     }
+    
     res.status(200).json({ error: false, data: settings, message: 'Configuración actualizada correctamente' });
+    console.log('--- Fin updateHotelSettings ---');
   } catch (error) {
+    console.error('Error en updateHotelSettings:', error);
     res.status(500).json({ error: true, message: 'Error al actualizar la configuración', details: error.message });
-  }
-};
-
-// POST /rooms/category - Crea una nueva categoría de habitaciones
-const createRoomCategory = async (req, res) => {
-  try {
-    const { name, description } = req.body;
-    const category = await RoomCategory.create({ name, description });
-    res.status(201).json({ error: false, data: category, message: 'Categoría creada correctamente' });
-  } catch (error) {
-    res.status(500).json({ error: true, message: 'Error al crear la categoría', details: error.message });
-  }
-};
-
-// PUT /rooms/category/:id - Actualiza una categoría de habitaciones existente
-const updateRoomCategory = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, description } = req.body;
-    const category = await RoomCategory.findByPk(id);
-    if (!category) {
-      return res.status(404).json({ error: true, message: 'Categoría no encontrada' });
-    }
-    const updatedCategory = await category.update({ name, description });
-    res.status(200).json({ error: false, data: updatedCategory, message: 'Categoría actualizada correctamente' });
-  } catch (error) {
-    res.status(500).json({ error: true, message: 'Error al actualizar la categoría', details: error.message });
   }
 };
 
 module.exports = {
   getHotelSettings,
   updateHotelSettings,
-  createRoomCategory,
-  updateRoomCategory,
 };

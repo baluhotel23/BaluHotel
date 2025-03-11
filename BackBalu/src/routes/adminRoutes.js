@@ -26,8 +26,7 @@ const {
 const {
   getHotelSettings,
   updateHotelSettings,
-  createRoomCategory,
-  updateRoomCategory,
+  
 } = require("../controllers/hotelController");
 
 const {
@@ -37,7 +36,8 @@ const {
     getCombinedReport,
 } = require("../controllers/reportController");
 
-// Middleware de autenticación para todas las rutas
+
+
 router.use(verifyToken);
 
 // Rutas de gestión de usuarios (solo owner)
@@ -58,18 +58,10 @@ router.get("/expenses", isOwner, getExpenses);
 router.post("/expenses", isOwner, createExpense);
 
 // Rutas de configuración del hotel (owner y admin)
-router.get("/settings", allowRoles(["owner", "admin"]), getHotelSettings);
-router.put("/settings", allowRoles(["owner", "admin"]), updateHotelSettings);
-router.post(
-  "/rooms/category",
-  allowRoles(["owner", "admin"]),
-  createRoomCategory
-);
-router.put(
-  "/rooms/category/:id",
-  allowRoles(["owner", "admin"]),
-  updateRoomCategory
-);
+router.get("/settings/hotel-settings", allowRoles(["owner", "admin"]), getHotelSettings);
+router.put("/settings/hotel-settings", allowRoles(["owner", "admin"]), updateHotelSettings);
+
+
 
 // Rutas de reportes y análisis
 router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyReport);

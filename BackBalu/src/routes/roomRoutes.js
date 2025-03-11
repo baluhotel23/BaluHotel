@@ -2,52 +2,59 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/isAuth');
 const { allowRoles } = require('../middleware/byRol');
-//const { validateRoom } = require('../middleware/validation');
+const {getAllRooms,
+    getRoomTypes,
+    getRoomById,
+    checkAvailability,
+    createRoom,
+    updateRoom,
+    deleteRoom,
+   updateRoomStatus,
+    getRoomAmenities,
+    updateRoomAmenities,
+    getRoomServices,
+    updateRoomServices,
+    getOccupancyReport,
+    getRevenueByRoomType} = require('../controllers/roomController');
 
 // Rutas públicas
-// router.get('/', roomController.getAllRooms);
-// router.get('/types', roomController.getRoomTypes);
-// router.get('/:id', roomController.getRoomById);
-// router.get('/availability/:dates', roomController.checkAvailability);
+router.get('/', getAllRooms);
+router.get('/types', getRoomTypes);
+router.get('/:roomNumber', getRoomById);
+router.get('/availability/:dates', checkAvailability);
 
 // Rutas protegidas
 router.use(verifyToken);
 
 // Gestión de habitaciones (admin y owner)
-// router.post('/', 
-//     allowRoles(['owner', 'admin']), 
-//     validateRoom, 
-//     roomController.createRoom
-// );
-// router.put('/:id', 
-//     allowRoles(['owner', 'admin']), 
-//     validateRoom, 
-//     roomController.updateRoom
-// );
-// router.delete('/:id', 
-//     allowRoles(['owner', 'admin']), 
-//     roomController.deleteRoom
-// );
+router.post('/create', 
+    allowRoles(['owner', 'admin']), 
+    
+    createRoom
+);
+router.put('/:roomNumber', 
+    allowRoles(['owner', 'admin']), 
+    
+    updateRoom
+ );
+router.delete('/:roomNumber', 
+    allowRoles(['owner', 'admin']), 
+    deleteRoom
+);
 
-// Gestión de tipos de habitación
-// router.get('/types/all', allowRoles(['owner', 'admin']), roomController.getAllRoomTypes);
-// router.post('/types', allowRoles(['owner', 'admin']), roomController.createRoomType);
-// router.put('/types/:id', allowRoles(['owner', 'admin']), roomController.updateRoomType);
-
-// // Mantenimiento y estado
-// router.get('/maintenance/history/:id', allowRoles(['owner', 'admin']), roomController.getMaintenanceHistory);
-// router.post('/maintenance/:id', allowRoles(['owner', 'admin']), roomController.createMaintenanceRecord);
-// router.put('/status/:id', allowRoles(['owner', 'admin']), roomController.updateRoomStatus);
+ // Mantenimiento y estado
+// router.get('/maintenance/history/:id', allowRoles(['owner', 'admin']), getMaintenanceHistory);
+// router.post('/maintenance/:id', allowRoles(['owner', 'admin']), createMaintenanceRecord);
+router.put('/status/:roomNumber', allowRoles(['owner', 'admin']), updateRoomStatus);
 
 // Amenities y servicios
-// router.get('/:id/amenities', roomController.getRoomAmenities);
-// router.put('/:id/amenities', allowRoles(['owner', 'admin']), roomController.updateRoomAmenities);
-// router.get('/:id/services', roomController.getRoomServices);
-// router.put('/:id/services', allowRoles(['owner', 'admin']), roomController.updateRoomServices);
+router.get('/:roomNumber/amenities', getRoomAmenities);
+router.put('/:roomNumber/amenities', allowRoles(['owner', 'admin']), updateRoomAmenities);
+router.get('/:roomNumber/services', getRoomServices);
+router.put('/:roomNumber/services', allowRoles(['owner', 'admin']), updateRoomServices);
 
 // // Reportes
-// router.get('/reports/occupancy', allowRoles(['owner', 'admin']), roomController.getOccupancyReport);
-// router.get('/reports/revenue', allowRoles(['owner', 'admin']), roomController.getRevenueByRoomType);
-// router.get('/reports/maintenance', allowRoles(['owner', 'admin']), roomController.getMaintenanceReport);
+ router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyReport);
+ router.get('/reports/revenue', allowRoles(['owner', 'admin']), getRevenueByRoomType);
 
 module.exports = router;
