@@ -73,3 +73,18 @@ export const changePassword = (passwordData) => async (dispatch) => {
     throw error;
   }
 };
+
+export {
+  loginRequest,
+  loginSuccess,
+  loginFailure,
+  logoutRequest,
+  logoutSuccess,
+  logoutFailure,
+  registerRequest,
+  registerSuccess,
+  registerFailure,
+  changePasswordRequest,
+  changePasswordSuccess,
+  changePasswordFailure
+};

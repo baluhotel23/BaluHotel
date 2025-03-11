@@ -29,6 +29,17 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
     },
     // Logout
+    logoutRequest: (state) => {
+      state.loading = true;
+    },
+    logoutSuccess: (state) => {
+      state.user = null;
+      state.token = null;
+      state.isAuthenticated = false;
+      state.loading = false;
+      state.error = null;
+      localStorage.removeItem('token');
+    },
     logout: (state) => {
       state.user = null;
       state.token = null;
@@ -36,6 +47,10 @@ const authSlice = createSlice({
       state.loading = false;
       state.error = null;
       localStorage.removeItem('token');
+    },
+    logoutFailure: (state, action) => {
+      state.loading = false;
+      state.error = action.payload;
     },
     // Register
     registerRequest: (state) => {
@@ -72,7 +87,10 @@ export const {
   loginRequest,
   loginSuccess,
   loginFailure,
+  logoutRequest,
+  logoutSuccess,
   logout,
+  logoutFailure,
   registerRequest,
   registerSuccess,
   registerFailure,
