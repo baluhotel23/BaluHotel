@@ -114,8 +114,13 @@ const logout = async (req, res, next) => {
 const changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const { id } = req.user;
-
+    const { id, role } = req.user;
+    
+    // Si el rol es Customer, se impide el cambio mediante este endpoint
+    if (role === 'Customer') {
+      throw new CustomError('Los clientes no pueden cambiar la contraseña desde esta sección. Utilice el proceso de recuperación de contraseña.', 403);
+    }
+    
     const user = await User.findByPk(id);
     
     // Verificar contraseña actual
@@ -123,11 +128,11 @@ const changePassword = async (req, res, next) => {
     if (!validPassword) {
       throw new CustomError('Contraseña actual incorrecta', 400);
     }
-
+    
     // Hash y actualizar nueva contraseña
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await user.update({ password: hashedPassword });
-
+    
     res.json({
       error: false,
       message: 'Contraseña actualizada exitosamente'

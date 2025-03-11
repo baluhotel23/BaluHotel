@@ -1,7 +1,36 @@
 import api from '../../utils/axios';
-import { loginRequest, loginSuccess, loginFailure, logout } from '../Reducer/authReducer';
+import {
+  registerRequest,
+  registerSuccess,
+  registerFailure,
+  loginRequest,
+  loginSuccess,
+  loginFailure,
+  logoutRequest,
+  logoutSuccess,
+  logoutFailure,
+  changePasswordRequest,
+  changePasswordSuccess,
+  changePasswordFailure,
+} from '../Reducer/authReducer';
 
-// Rename loginUser to login to match the import
+// Acción para registrar un usuario
+export const register = (userData) => async (dispatch) => {
+  try {
+    dispatch(registerRequest());
+    const { data } = await api.post('/auth/register', userData);
+    // Se asume que el response incluye token y datos de usuario
+    dispatch(registerSuccess(data));
+    localStorage.setItem('token', data.token);
+    return data;
+  } catch (error) {
+    const errMsg = error.response?.data?.message || 'Error en el registro';
+    dispatch(registerFailure(errMsg));
+    throw error;
+  }
+};
+
+// Acción para hacer login
 export const login = (credentials) => async (dispatch) => {
   try {
     dispatch(loginRequest());
@@ -10,15 +39,37 @@ export const login = (credentials) => async (dispatch) => {
     localStorage.setItem('token', data.token);
     return data;
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Error en el login';
-    dispatch(loginFailure(errorMessage));
+    const errMsg = error.response?.data?.message || 'Error en el login';
+    dispatch(loginFailure(errMsg));
     throw error;
   }
 };
 
-export const logoutUser = () => (dispatch) => {
-  dispatch(logout());
+// Acción para hacer logout
+export const logout = () => async (dispatch) => {
+  try {
+    dispatch(logoutRequest());
+    const { data } = await api.post('/auth/logout');
+    dispatch(logoutSuccess(data));
+    localStorage.removeItem('token');
+    return data;
+  } catch (error) {
+    const errMsg = error.response?.data?.message || 'Error en el logout';
+    dispatch(logoutFailure(errMsg));
+    throw error;
+  }
 };
 
-// Export the actions
-export { loginRequest, loginSuccess, loginFailure, logout };
+// Acción para cambiar la contraseña (sólo para staff, según backend)
+export const changePassword = (passwordData) => async (dispatch) => {
+  try {
+    dispatch(changePasswordRequest());
+    const { data } = await api.put('/auth/change-password', passwordData);
+    dispatch(changePasswordSuccess(data));
+    return data;
+  } catch (error) {
+    const errMsg = error.response?.data?.message || 'Error al cambiar la contraseña';
+    dispatch(changePasswordFailure(errMsg));
+    throw error;
+  }
+};
