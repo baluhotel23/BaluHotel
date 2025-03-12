@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { loginSuccess } from './Redux/Actions/authActions';
+import * as jwtDecode from 'jwt-decode';
+import { login } from './Redux/Actions/authActions';
 import PrivateRoute from './Components/PrivateRoute';
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
-
 
 // Importa tus componentes
 import Login from './Components/Auth/Login';
@@ -15,6 +15,7 @@ import Tienda from './Components/Tienda/Tienda';
 import NotFound from './Components/NotFound';
 import Unauthorized from './Components/Auth/Unauthorized';
 import Landing from './Components/Landing';
+import ServiceManagement from './Components/Dashboard/ServiceManagement';
 
 function App() {
   const dispatch = useDispatch();
@@ -23,17 +24,27 @@ function App() {
     // Verificar si hay un token guardado al iniciar la app
     const token = localStorage.getItem('token');
     if (token) {
-      // Si hay token, intentar restaurar la sesión
-      const user = JSON.parse(localStorage.getItem('user'));
-      if (user) {
-        dispatch(loginSuccess({ token, user }));
+      try {
+        const decoded = jwtDecode(token);
+        // Verificar que el token no haya expirado (exp en segundos)
+        if (decoded.exp * 1000 < Date.now()) {
+          // Token expirado, puedes limpiar la sesión o redirigir
+          console.log('El token ha expirado');
+        } else {
+          const user = JSON.parse(localStorage.getItem('user'));
+          if (user) {
+            dispatch(login({ token, user }));
+          }
+        }
+      } catch (error) {
+        console.error('Error decodificando el token:', error);
       }
     }
   }, [dispatch]);
 
   return (
     <BrowserRouter>
-    <ToastContainer />
+      <ToastContainer />
       <Routes>
         {/* Rutas públicas */}
         <Route path="/" element={<Landing />} />
@@ -46,13 +57,19 @@ function App() {
         <Route
           path="/dashboard"
           element={
-            <PrivateRoute allowedRoles={['Owner']}>
+            <PrivateRoute allowedRoles={['owner', 'admin']}>
               <Dashboard />
             </PrivateRoute>
           }
         />
-
-
+        <Route
+          path="/admin/services"
+          element={
+            <PrivateRoute allowedRoles={['owner', 'admin']}>
+              <ServiceManagement />
+            </PrivateRoute>
+          }
+        />
 
         {/* Ruta por defecto para 404 */}
         <Route path="*" element={<NotFound />} />
@@ -62,4 +79,3 @@ function App() {
 }
 
 export default App;
-

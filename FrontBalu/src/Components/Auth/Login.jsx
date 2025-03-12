@@ -1,17 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { login } from '../../Redux/Actions/authActions';
 
+
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error } = useSelector(state => state.auth);
+  // Extraemos el estado de autenticación
+  const { loading, error, token, user } = useSelector(state => state.auth);
+
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
 
+
+  // Validamos token y role cada vez que cambien en el estado de auth
+  useEffect(() => {
+    console.log('Token:', token);
+    console.log('Token en localStorage:', localStorage.getItem('token'));
+
+    console.log('User:', user);
+    if (user && user.role) {
+      console.log('Role del usuario:', user.role);
+    }
+  }, [token, user]);
+
+  // Maneja el envío del formulario
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -28,6 +44,7 @@ const Login = () => {
       console.error('Login failed:', error);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

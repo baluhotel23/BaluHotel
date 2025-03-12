@@ -2,15 +2,17 @@ import { configureStore } from '@reduxjs/toolkit';
 import { combineReducers } from 'redux';
 import authReducer from '../Reducer/authReducer';
 import passwordReducer from '../Reducer/passwordReducer';
-import roomReducer from '../Reducer/roomReducer'; // nueva importación
+import roomReducer from '../Reducer/roomReducer'; 
 import toastMiddleware from '../../utils/toastMiddleware';  
 import serviceReducer from '../Reducer/serviceReducer';
+import reportReducer from '../Reducer/reportReducer';
 
 const rootReducer = combineReducers({
   auth: authReducer,
   password: passwordReducer,
   room: roomReducer, 
   service: serviceReducer,
+  report: reportReducer
 });
 
 export const store = configureStore({

@@ -6,7 +6,7 @@ export const createService = (serviceData) => async (dispatch) => {
   dispatch({ type: 'CREATE_SERVICE_REQUEST' });
   try {
     // Se realiza la petición POST al endpoint /services enviando serviceData.
-    const { data } = await api.post('/services', serviceData);
+    const { data } = await api.post('/admin/services', serviceData);
     // Al recibir respuesta, se despacha la acción de éxito con la data obtenida.
     dispatch({ type: 'CREATE_SERVICE_SUCCESS', payload: data });
   } catch (error) {
@@ -22,7 +22,7 @@ export const updateService = (serviceId, serviceData) => async (dispatch) => {
   dispatch({ type: 'UPDATE_SERVICE_REQUEST' });
   try {
     // Se realiza una petición PUT al endpoint /services/:id, usando el ID del servicio y los datos actualizados.
-    const { data } = await api.put(`/services/${serviceId}`, serviceData);
+    const { data } = await api.put(`/admin/services/${serviceId}`, serviceData);
     dispatch({ type: 'UPDATE_SERVICE_SUCCESS', payload: data });
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al actualizar el servicio';
@@ -35,8 +35,8 @@ export const getAllServices = () => async (dispatch) => {
   dispatch({ type: 'GET_SERVICES_REQUEST' });
   try {
     // Se realiza una petición GET al endpoint /services para obtener la lista.
-    const { data } = await api.get('/services');
-    dispatch({ type: 'GET_SERVICES_SUCCESS', payload: data });
+    const { data } = await api.get('/admin/services');
+    dispatch({ type: 'GET_SERVICES_SUCCESS', payload: data.data });
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al obtener los servicios';
     dispatch({ type: 'GET_SERVICES_FAILURE', payload: errorMessage });
@@ -48,7 +48,7 @@ export const deleteService = (serviceId) => async (dispatch) => {
   dispatch({ type: 'DELETE_SERVICE_REQUEST' });
   try {
     // Se realiza una petición DELETE al endpoint /services/:id usando el ID.
-    const { data } = await api.delete(`/services/${serviceId}`);
+    const { data } = await api.delete(`/admin/services/${serviceId}`);
     dispatch({ type: 'DELETE_SERVICE_SUCCESS', payload: data });
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al eliminar el servicio';
