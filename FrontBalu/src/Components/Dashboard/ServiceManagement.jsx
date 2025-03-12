@@ -1,6 +1,8 @@
+// filepath: c:\Users\yaniz\Documents\BaluHotel\BaluHotel\FrontBalu\src\Components\Dashboard\ServiceManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { createService, updateService, getAllServices, deleteService } from '../../Redux/Actions/serviceActions';
+import { getAllServices, createService, updateService, deleteService } from '../../Redux/Actions/serviceActions';
+import DashboardLayout from './DashboardLayout';
 
 const ServiceManagement = () => {
   const dispatch = useDispatch();
@@ -40,7 +42,7 @@ const ServiceManagement = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
+    <DashboardLayout>
       <h1 className="text-2xl font-semibold mb-4">Service Management</h1>
 
       {/* Service Form */}
@@ -98,7 +100,7 @@ const ServiceManagement = () => {
           </div>
         ))}
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 
