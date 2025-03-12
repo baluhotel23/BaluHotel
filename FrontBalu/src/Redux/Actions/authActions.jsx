@@ -21,7 +21,7 @@ export const register = (userData) => async (dispatch) => {
     const { data } = await api.post('/auth/register', userData);
     // Se asume que el response incluye token y datos de usuario
     dispatch(registerSuccess(data));
-    localStorage.setItem('token', data.token);
+    localStorage.setItem('token', data.data.token);
     return data;
   } catch (error) {
     const errMsg = error.response?.data?.message || 'Error en el registro';
@@ -35,8 +35,9 @@ export const login = (credentials) => async (dispatch) => {
   try {
     dispatch(loginRequest());
     const { data } = await api.post('/auth/login', credentials);
-    dispatch(loginSuccess(data));
-    localStorage.setItem('token', data.token);
+    console.log('Respuesta de login:', data); // Debug: imprime la respuesta
+     dispatch(loginSuccess(data.data));
+    localStorage.setItem('token', data.data.token);
     return data;
   } catch (error) {
     const errMsg = error.response?.data?.message || 'Error en el login';
@@ -74,17 +75,4 @@ export const changePassword = (passwordData) => async (dispatch) => {
   }
 };
 
-export {
-  loginRequest,
-  loginSuccess,
-  loginFailure,
-  logoutRequest,
-  logoutSuccess,
-  logoutFailure,
-  registerRequest,
-  registerSuccess,
-  registerFailure,
-  changePasswordRequest,
-  changePasswordSuccess,
-  changePasswordFailure
-};
+// Acción para recuperar contraseña

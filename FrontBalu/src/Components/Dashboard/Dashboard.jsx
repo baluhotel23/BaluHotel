@@ -1,8 +1,7 @@
-// eslint-disable-next-line no-unused-vars
 import React from 'react'
 import { Link } from 'react-router-dom';
 
-const Dasboard = () => {
+const Dashboard = () => {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-semibold mb-4">Dashboard</h1>
@@ -49,4 +48,4 @@ const Dasboard = () => {
   );
 };
 
-export default Dasboard
+export default Dashboard

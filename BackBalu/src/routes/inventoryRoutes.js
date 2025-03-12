@@ -28,8 +28,8 @@ router.get('/low-stock', getLowStockItems);
 
 // Compras y proveedores
 // router.get('/purchases', inventoryController.getAllPurchases);
-// router.post('/purchases', allowRoles(['owner', 'admin']), inventoryController.createPurchase);
-// router.get('/purchases/:id', inventoryController.getPurchaseDetails);
+ router.post('/purchases', allowRoles(['owner', 'admin']), createPurchase);
+ //router.get('/purchases/:id', getPurchaseDetails);
 // router.get('/suppliers', inventoryController.getAllSuppliers);
 // router.post('/suppliers', allowRoles(['owner', 'admin']), inventoryController.createSupplier);
 
@@ -40,8 +40,8 @@ router.get('/low-stock', getLowStockItems);
 
 // // Reportes de inventario
 // router.get('/reports/consumption', allowRoles(['owner', 'admin']), inventoryController.getConsumptionReport);
-// router.get('/reports/valuation', allowRoles(['owner', 'admin']), inventoryController.getInventoryValuation);
-// router.get('/reports/movements', allowRoles(['owner', 'admin']), inventoryController.getInventoryMovements);
+//router.get('/reports/valuation', allowRoles(['owner', 'admin']), getInventoryValuation);
+//router.get('/reports/movements', allowRoles(['owner', 'admin']), getInventoryMovements);
 
 // // Asignación a habitaciones
 // router.get('/room-assignments', inventoryController.getRoomAssignments);
