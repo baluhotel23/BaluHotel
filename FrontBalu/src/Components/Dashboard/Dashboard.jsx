@@ -37,9 +37,11 @@ const Dashboard = () => {
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">Create Room</h2>
             <p className="text-gray-600 mb-4">Add new rooms to the hotel.</p>
+            <Link to="/admin/create-room">
             <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
               CREAR HABITACION
             </button>
+            </Link>
           </div>
         )}
 

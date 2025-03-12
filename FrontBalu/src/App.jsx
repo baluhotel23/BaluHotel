@@ -16,6 +16,7 @@ import NotFound from './Components/NotFound';
 import Unauthorized from './Components/Auth/Unauthorized';
 import Landing from './Components/Landing';
 import ServiceManagement from './Components/Dashboard/ServiceManagement';
+import CreateRoom from './Components/Dashboard/CreateRoom';
 
 function App() {
   const dispatch = useDispatch();
@@ -67,6 +68,14 @@ function App() {
           element={
             <PrivateRoute allowedRoles={['owner', 'admin']}>
               <ServiceManagement />
+            </PrivateRoute>
+          }
+        />
+           <Route
+          path="/admin/create-room"
+          element={
+            <PrivateRoute allowedRoles={['owner', 'admin']}>
+              <CreateRoom />
             </PrivateRoute>
           }
         />

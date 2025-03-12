@@ -7,8 +7,8 @@ export const theme = {
   extend: {
     darkMode: 'selector',
     colors: {
-      boton: "#636363",
-      secondary: "#6b7280",
+      boton: "#465740",
+      secondary: "#273c3e",
       customBlue: "#445868",
       customRed: "#6b4946",
       customGreen: "#0f766e",
@@ -16,7 +16,8 @@ export const theme = {
       customPurple: "#0f766e",
       customPink: "#059669",
       textWhite: "white",
-      footer: "#49465a"
+      footer: "#232b20",
+      Hover:"#354130",
     },
     fontFamily: {
         Montserrat: ['Montserrat', 'sans-serif'], // Definir la fuente Nunito
