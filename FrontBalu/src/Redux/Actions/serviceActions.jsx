@@ -5,8 +5,8 @@ export const createService = (serviceData) => async (dispatch) => {
   // Se despacha una acción para indicar que la solicitud ha iniciado.
   dispatch({ type: 'CREATE_SERVICE_REQUEST' });
   try {
-    // Se realiza la petición POST al endpoint /services enviando serviceData.
-    const { data } = await api.post('/services', serviceData);
+    // Se realiza la petición POST al endpoint /admin/services enviando serviceData.
+    const { data } = await api.post('/admin/services', serviceData);
     // Al recibir respuesta, se despacha la acción de éxito con la data obtenida.
     dispatch({ type: 'CREATE_SERVICE_SUCCESS', payload: data });
   } catch (error) {
@@ -21,8 +21,8 @@ export const createService = (serviceData) => async (dispatch) => {
 export const updateService = (serviceId, serviceData) => async (dispatch) => {
   dispatch({ type: 'UPDATE_SERVICE_REQUEST' });
   try {
-    // Se realiza una petición PUT al endpoint /services/:id, usando el ID del servicio y los datos actualizados.
-    const { data } = await api.put(`/services/${serviceId}`, serviceData);
+    // Se realiza una petición PUT al endpoint /admin/services/:id, usando el ID del servicio y los datos actualizados.
+    const { data } = await api.put(`/admin/services/${serviceId}`, serviceData);
     dispatch({ type: 'UPDATE_SERVICE_SUCCESS', payload: data });
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al actualizar el servicio';
@@ -34,8 +34,8 @@ export const updateService = (serviceId, serviceData) => async (dispatch) => {
 export const getAllServices = () => async (dispatch) => {
   dispatch({ type: 'GET_SERVICES_REQUEST' });
   try {
-    // Se realiza una petición GET al endpoint /services para obtener la lista.
-    const { data } = await api.get('/services');
+    // Se realiza una petición GET al endpoint /admin/services para obtener la lista.
+    const { data } = await api.get('/admin/services');
     dispatch({ type: 'GET_SERVICES_SUCCESS', payload: data });
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al obtener los servicios';
@@ -47,8 +47,8 @@ export const getAllServices = () => async (dispatch) => {
 export const deleteService = (serviceId) => async (dispatch) => {
   dispatch({ type: 'DELETE_SERVICE_REQUEST' });
   try {
-    // Se realiza una petición DELETE al endpoint /services/:id usando el ID.
-    const { data } = await api.delete(`/services/${serviceId}`);
+    // Se realiza una petición DELETE al endpoint /admin/services/:id usando el ID.
+    const { data } = await api.delete(`/admin/services/${serviceId}`);
     dispatch({ type: 'DELETE_SERVICE_SUCCESS', payload: data });
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al eliminar el servicio';

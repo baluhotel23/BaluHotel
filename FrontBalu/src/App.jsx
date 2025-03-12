@@ -15,6 +15,7 @@ import Tienda from './Components/Tienda/Tienda';
 import NotFound from './Components/NotFound';
 import Unauthorized from './Components/Auth/Unauthorized';
 import Landing from './Components/Landing';
+import ServiceManagement from './Components/Dashboard/ServiceManagement';
 
 function App() {
   const dispatch = useDispatch();
@@ -51,7 +52,14 @@ function App() {
             </PrivateRoute>
           }
         />
-
+        <Route  // Add ServiceManagement route
+          path="/admin/services"
+          element={
+            <PrivateRoute allowedRoles={['owner']}>
+              <ServiceManagement />
+            </PrivateRoute>
+          }
+        />
 
 
         {/* Ruta por defecto para 404 */}
