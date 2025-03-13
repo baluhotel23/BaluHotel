@@ -118,15 +118,27 @@ const createRoom = async (req, res, next) => {
 // Actualizar una habitación
 const updateRoom = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const room = await Room.findByPk(id);
+    const { roomNumber } = req.params;
+    const { services, ...roomData } = req.body;
+    const room = await Room.findByPk(roomNumber);
     if (!room) {
       return res.status(404).json({
         error: true,
         message: 'Habitación no encontrada'
       });
     }
-    const updatedRoom = await room.update(req.body);
+    const updatedRoom = await room.update(roomData);
+
+    // Actualizar las asociaciones con servicios
+    if (services && services.length > 0) {
+      const serviceInstances = await Service.findAll({
+        where: {
+          name: services
+        }
+      });
+      await room.setServices(serviceInstances);
+    }
+
     res.status(200).json({
       error: false,
       data: updatedRoom,
@@ -136,18 +148,20 @@ const updateRoom = async (req, res, next) => {
     next(error);
   }
 };
-
-// Eliminar (o dar de baja) una habitación
 const deleteRoom = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const room = await Room.findByPk(id);
+    const { roomNumber } = req.params;
+    const room = await Room.findOne({ where: { roomNumber: parseInt(roomNumber, 10) } });
     if (!room) {
       return res.status(404).json({
         error: true,
         message: 'Habitación no encontrada'
       });
     }
+
+    // Eliminar las asociaciones con servicios
+    await room.setServices([]);
+
     await room.destroy();
     res.status(200).json({
       error: false,
@@ -159,13 +173,12 @@ const deleteRoom = async (req, res, next) => {
 };
 
 
-
 // Actualizar el estado de la habitación (campo status)
 const updateRoomStatus = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { roomNumber } = req.params;
     const { status } = req.body;
-    const room = await Room.findByPk(id);
+    const room = await Room.findByPk(roomNumber);
     if (!room) {
       return res.status(404).json({
         error: true,
@@ -258,9 +271,9 @@ const getRoomServices = async (req, res, next) => {
 // Actualizar servicios de una habitación
 const updateRoomServices = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { roomNumber } = req.params;
     const { services } = req.body; // array de strings
-    const room = await Room.findByPk(id);
+    const room = await Room.findByPk(roomNumber);
     if (!room) {
       return res.status(404).json({
         error: true,

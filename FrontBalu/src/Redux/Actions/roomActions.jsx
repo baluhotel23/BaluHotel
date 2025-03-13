@@ -5,7 +5,7 @@ export const getAllRooms = () => async (dispatch) => {
   dispatch({ type: 'GET_ROOMS_REQUEST' });
   try {
     const { data } = await api.get('/rooms');
-    dispatch({ type: 'GET_ROOMS_SUCCESS', payload: data });
+    dispatch({ type: 'GET_ROOMS_SUCCESS', payload: data.data });
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al obtener habitaciones';
     dispatch({ type: 'GET_ROOMS_FAILURE', payload: errorMessage });

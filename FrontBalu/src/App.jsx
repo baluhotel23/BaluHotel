@@ -17,6 +17,8 @@ import Unauthorized from './Components/Auth/Unauthorized';
 import Landing from './Components/Landing';
 import ServiceManagement from './Components/Dashboard/ServiceManagement';
 import CreateRoom from './Components/Dashboard/CreateRoom';
+import RoomList from './Components/Dashboard/RoomList';
+import EditRoom from './Components/Dashboard/EditRoom';
 
 function App() {
   const dispatch = useDispatch();
@@ -76,6 +78,22 @@ function App() {
           element={
             <PrivateRoute allowedRoles={['owner', 'admin']}>
               <CreateRoom />
+            </PrivateRoute>
+          }
+        />
+              <Route
+          path="/admin/rooms"
+          element={
+            <PrivateRoute allowedRoles={['owner', 'admin']}>
+              <RoomList />
+            </PrivateRoute>
+          }
+        />
+              <Route
+          path="/rooms/edit/:roomNumber"
+          element={
+            <PrivateRoute allowedRoles={['owner', 'admin']}>
+              <EditRoom />
             </PrivateRoute>
           }
         />
