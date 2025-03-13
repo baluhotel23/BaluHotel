@@ -18,6 +18,7 @@ export const theme = {
       textWhite: "white",
       footer: "#232b20",
       Hover:"#354130",
+      degrade:"#8c794d"
     },
     fontFamily: {
         Montserrat: ['Montserrat', 'sans-serif'], // Definir la fuente Nunito
