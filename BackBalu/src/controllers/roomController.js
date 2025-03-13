@@ -363,9 +363,64 @@ const getRevenueByRoomType = async (req, res, next) => {
   }
 };
 
+const getActivePromotions = async (req, res, next) => {
+  try {
+    const promotions = await Room.findAll({
+      where: {
+        isPromo: true,
+        available: true
+      },
+      include: [
+        {
+          model: Service,
+          attributes: ['name'],
+          through: { attributes: [] }
+        }
+      ]
+    });
+    res.status(200).json({
+      error: false,
+      data: promotions,
+      message: 'Promociones activas obtenidas correctamente'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Obtener ofertas especiales (habitaciones en promoción que tienen precio promocional definido)
+const getSpecialOffers = async (req, res, next) => {
+  try {
+    const specialOffers = await Room.findAll({
+      where: {
+        isPromo: true,
+        promotionPrice: {
+          [Op.ne]: null
+        },
+        available: true
+      },
+      include: [
+        {
+          model: Service,
+          attributes: ['name'],
+          through: { attributes: [] }
+        }
+      ]
+    });
+    res.status(200).json({
+      error: false,
+      data: specialOffers,
+      message: 'Ofertas especiales obtenidas correctamente'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 
 module.exports = {
+  getActivePromotions,
+  getSpecialOffers,
   getAllRooms,
   getRoomTypes,
   getRoomById,

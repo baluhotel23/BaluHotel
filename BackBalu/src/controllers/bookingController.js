@@ -42,8 +42,8 @@ const checkAvailability = async (req, res) => {
 
 const getRoomTypes = async (req, res) => {
     const types = await Room.findAll({
-        attributes: ['type', 'price', 'capacity'],
-        group: ['type', 'price', 'capacity']
+        attributes: ['type', 'price', 'maxGuests'],
+        group: ['type', 'price', 'maxGuests']
     });
 
     res.json({
@@ -54,7 +54,7 @@ const getRoomTypes = async (req, res) => {
 
 // Client and staff endpoints
 const createBooking = async (req, res) => {
-    const { roomNumber, checkIn, checkOut, guestDetails, guestCount } = req.body;
+    const { roomNumber, checkIn, checkOut,  guestCount } = req.body;
     // Usamos guestId a partir del usuario autenticado (n_document)
     const guestId = req.user.n_document;
   
@@ -96,7 +96,7 @@ const createBooking = async (req, res) => {
       roomNumber,
       checkIn,
       checkOut,
-      guestDetails,
+      
       guestCount,
       status: 'pending',
       totalAmount
@@ -109,23 +109,33 @@ const createBooking = async (req, res) => {
     });
   };
 
-const getUserBookings = async (req, res) => {
-    const bookings = await Booking.findAll({
-        where: { guestId: req.user.n_document },
+  const getUserBookings = async (req, res, next) => {
+    try {
+      const guestId = req.user.n_document;
+      if (!guestId) {
+        return res.status(400).json({
+          error: true,
+          message: 'Identificador de usuario no encontrado en el token'
+        });
+      }
+      const bookings = await Booking.findAll({
+        where: { guestId },
         include: [{ model: Room }]
-    });
-
-    res.json({
+      });
+      res.json({
         error: false,
         data: bookings
-    });
-};
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 
 const getBookingById = async (req, res) => {
-    const { id } = req.params;
+    const { bookingId } = req.params;
 
     const booking = await Booking.findOne({
-        where: { id },
+        where: { bookingId },
         include: [
             { model: Room },
             { model: ExtraCharge },
@@ -163,11 +173,11 @@ const getAllBookings = async (req, res) => {
     const bookings = await Booking.findAll({
         where,
         include: [
-            { model: Room },
-            { model: User, attributes: ['n_document', 'email', 'name'] }
+          { model: Room },
+          { model: User, as: 'guest', attributes: ['n_document', 'email', 'first_name', 'last_name', 'email', 'phone'] }
         ],
         order: [['checkIn', 'ASC']]
-    });
+      });
 
     res.json({
         error: false,
@@ -175,62 +185,89 @@ const getAllBookings = async (req, res) => {
     });
 };
 
-const checkIn = async (req, res) => {
-    const { id } = req.params;
-    const booking = await Booking.findByPk(id);
-
-    if (!booking) {
+const checkIn = async (req, res, next) => {
+    try {
+      const { bookingId } = req.params;
+      const booking = await Booking.findByPk(bookingId);
+  
+      if (!booking) {
         throw new CustomError('Reserva no encontrada', 404);
-    }
-
-    if (booking.status !== 'pending') {
-        throw new CustomError('Estado de reserva inválido para check-in', 400);
-    }
-
-    await booking.update({
+      }
+  
+      // Comparación insensible a mayúsculas
+      const currentStatus = booking.status.toLowerCase();
+  
+      if (currentStatus !== 'pending') {
+        let errorMessage = 'Estado de reserva inválido para check-in';
+        if (currentStatus === 'cancelled') {
+          errorMessage = 'Esta reserva fue cancelada y no se puede realizar el check-in';
+        } else {
+          errorMessage = `No se puede realizar el check-in porque el estado de la reserva es "${booking.status}"`;
+        }
+        throw new CustomError(errorMessage, 400);
+      }
+  
+      await booking.update({
         status: 'checked-in',
         checkInTime: new Date(),
-        checkedInBy: req.user.n_
-    });
-
-    res.json({
+        checkedInBy: req.user.n_document
+      });
+  
+      res.json({
         error: false,
         message: 'Check-in realizado exitosamente',
         data: booking
-    });
-};
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 
-const checkOut = async (req, res) => {
-    const { id } = req.params;
-    const booking = await Booking.findByPk(id, {
-        include: [{ model: ExtraCharge }]
+const checkOut = async (req, res, next) => {
+  try {
+    const { bookingId } = req.params;
+    const booking = await Booking.findByPk(bookingId, {
+      include: [{ model: ExtraCharge }]
     });
 
     if (!booking) {
-        throw new CustomError('Reserva no encontrada', 404);
+      throw new CustomError('Reserva no encontrada', 404);
     }
 
-    if (booking.status !== 'checked-in') {
-        throw new CustomError('Estado de reserva inválido para check-out', 400);
+    const currentStatus = booking.status.toLowerCase();
+    if (currentStatus !== 'checked-in') {
+      let errorMessage = 'Estado de reserva inválido para check-out';
+      if (currentStatus === 'pending') {
+        errorMessage = 'La reserva aún no ha realizado el check-in';
+      } else if (currentStatus === 'cancelled') {
+        errorMessage = 'La reserva fue cancelada y no se puede proceder al check-out';
+      } else if (currentStatus === 'completed') {
+        errorMessage = 'El check-out ya fue realizado';
+      }
+      throw new CustomError(errorMessage, 400);
     }
 
+    // Suponiendo que calculateTotalAmount es una función que calcula el total a pagar
     const bill = await Bill.create({
-        bookingId: id,
-        totalAmount: calculateTotalAmount(booking),
-        generatedBy: req.user.n_document
+      bookingId: bookingId,
+      totalAmount: calculateTotalAmount(booking),
+      generatedBy: req.user.n_document
     });
 
     await booking.update({
-        status: 'completed',
-        checkOutTime: new Date(),
-        checkedOutBy: req.user.n_document
+      status: 'completed',
+      checkOutTime: new Date(),
+      checkedOutBy: req.user.n_document
     });
 
     res.json({
-        error: false,
-        message: 'Check-out realizado exitosamente',
-        data: { booking, bill }
+      error: false,
+      message: 'Check-out realizado exitosamente',
+      data: { booking, bill }
     });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // Helper functions
@@ -242,41 +279,50 @@ const calculateTotalAmount = (booking) => {
     return roomCharge + extraCharges;
 };
 
-const addExtraCharges = async (req, res) => {
-    const { id } = req.params;
-    const { description, amount } = req.body;
-
-    const booking = await Booking.findByPk(id);
-    if (!booking) {
+const addExtraCharges = async (req, res, next) => {
+    try {
+      const { bookingId } = req.params;
+      const { price, quantity, description } = req.body;
+  
+      // Buscar la reserva usando el bookingId de los parámetros
+      const booking = await Booking.findByPk(bookingId);
+      if (!booking) {
         throw new CustomError('Reserva no encontrada', 404);
-    }
-
-    if (booking.status !== 'checked-in') {
+      }
+  
+      // Solo se permiten cargos si el estado de la reserva es "checked-in"
+      if (booking.status.toLowerCase() !== 'checked-in') {
         throw new CustomError('Solo se pueden agregar cargos a reservas con check-in', 400);
-    }
-
-    const extraCharge = await ExtraCharge.create({
-        bookingId: id,
+      }
+  
+      // Crear el cargo extra
+      const extraCharge = await ExtraCharge.create({
+        bookingId, // bookingId proveniente de req.params
         description,
-        amount,
+        price,
+        quantity,
+        amount: price * quantity,
         createdBy: req.user.n_document
-    });
-
-    res.status(201).json({
+      });
+  
+      res.status(201).json({
         error: false,
         message: 'Cargo extra agregado exitosamente',
         data: extraCharge
-    });
-};
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 
 const generateBill = async (req, res) => {
-    const { id } = req.params;
+    const { bookingId } = req.params;
     
-    const booking = await Booking.findByPk(id, {
+    const booking = await Booking.findByPk(bookingId, {
         include: [
             { model: Room },
             { model: ExtraCharge },
-            { model: User, attributes: ['name', 'email', 'document'] }
+            { model: User, attributes: ['name', 'email', 'n_document'] }
         ]
     });
 
@@ -286,7 +332,7 @@ const generateBill = async (req, res) => {
 
     const totalAmount = calculateTotalAmount(booking);
     const bill = await Bill.create({
-        bookingId: id,
+        bookingId: bookingId,
         totalAmount,
         generatedBy: req.user.n_document,
         details: {
@@ -306,7 +352,7 @@ const generateBill = async (req, res) => {
 };
 
 const updateBookingStatus = async (req, res) => {
-    const { id } = req.params;
+    const { bookingId } = req.params;
     const { status, reason } = req.body;
 
     const validStatuses = ['pending', 'confirmed', 'cancelled', 'checked-in', 'completed'];
@@ -314,7 +360,7 @@ const updateBookingStatus = async (req, res) => {
         throw new CustomError('Estado de reserva inválido', 400);
     }
 
-    const booking = await Booking.findByPk(id);
+    const booking = await Booking.findByPk(bookingId);
     if (!booking) {
         throw new CustomError('Reserva no encontrada', 404);
     }
@@ -334,10 +380,10 @@ const updateBookingStatus = async (req, res) => {
 };
 
 const cancelBooking = async (req, res) => {
-    const { id } = req.params;
+    const { bookingId } = req.params;
     const { reason } = req.body;
 
-    const booking = await Booking.findByPk(id);
+    const booking = await Booking.findByPk(bookingId);
     if (!booking) {
         throw new CustomError('Reserva no encontrada', 404);
     }

@@ -1,11 +1,15 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
-  const ExtraCharge = sequelize.define("ExtraCharge", {
+   sequelize.define("ExtraCharge", {
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    description: {
+      type: DataTypes.STRING,
+      allowNull: false
     },
     quantity: {
       type: DataTypes.INTEGER,
@@ -24,5 +28,5 @@ module.exports = (sequelize) => {
     tableName: 'ExtraCharges'
   });
 
-  return ExtraCharge;
+  
 };
