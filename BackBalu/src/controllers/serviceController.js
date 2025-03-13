@@ -1,4 +1,4 @@
-const { Service } = require('../data');
+const { Service, Room } = require('../data');
 
 const createService = async (req, res, next) => {
   try {
@@ -17,7 +17,7 @@ const createService = async (req, res, next) => {
 const updateService = async (req, res, next) => {
   try {
     const { serviceId } = req.params;
-    const { name } = req.body;
+    const { name, rooms } = req.body;
     const service = await Service.findByPk(serviceId);
     if (!service) {
       return res.status(404).json({
@@ -25,7 +25,23 @@ const updateService = async (req, res, next) => {
         message: 'Servicio no encontrado'
       });
     }
+
+    // Eliminar las asociaciones existentes con habitaciones
+    await service.setRooms([]);
+
+    // Actualizar el servicio
     const updatedService = await service.update({ name });
+
+    // Crear nuevas asociaciones con habitaciones
+    if (rooms && rooms.length > 0) {
+      const roomInstances = await Room.findAll({
+        where: {
+          roomNumber: rooms
+        }
+      });
+      await service.setRooms(roomInstances);
+    }
+
     res.status(200).json({
       error: false,
       data: updatedService,
@@ -35,6 +51,7 @@ const updateService = async (req, res, next) => {
     next(error);
   }
 };
+
 
 const deleteService = async (req, res, next) => {
   try {
@@ -46,6 +63,10 @@ const deleteService = async (req, res, next) => {
         message: 'Servicio no encontrado'
       });
     }
+
+    // Eliminar las asociaciones con habitaciones
+    await service.setRooms([]);
+
     await service.destroy();
     res.status(200).json({
       error: false,
@@ -55,6 +76,7 @@ const deleteService = async (req, res, next) => {
     next(error);
   }
 };
+
 
 const getAllServices = async (req, res, next) => {
   try {

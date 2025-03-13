@@ -74,9 +74,9 @@ router.get('/reports/combined', allowRoles(['owner', 'admin']),getCombinedReport
 
 // Rutas para la gestión de servicios (solo owner y admin)
 router.post("/services", allowRoles(["owner", "admin"]), createService);
-router.put("/services/:id", allowRoles(["owner", "admin"]), updateService);
+router.put("/services/:serviceId", allowRoles(["owner", "admin"]), updateService);
 router.get("/services", allowRoles(["owner", "admin"]), getAllServices);
-router.delete("/services/:id", allowRoles(["owner", "admin"]), deleteService);
+router.delete("/services/:serviceId", allowRoles(["owner", "admin"]), deleteService);
 
 
 module.exports = router;
