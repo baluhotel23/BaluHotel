@@ -14,16 +14,14 @@ function Navbar() {
     return null;
   }
     return (
-        <nav className="bg-white shadow-md fixed w-full z-10">
+        <nav className="bg-white shadow-md fixed top-0 w-full z-10">
           <div className="container mx-auto flex justify-between items-center py-4 px-6">
             <img src="/assets/logo.png" alt="Hotel Copahue" className="h-10" />
             <ul className="hidden md:flex space-x-6 text-gray-800">
               <li><Link to="/" className="hover:text-yellow-600">Inicio</Link></li>
               <li><Link to="/about" className="hover:text-yellow-600">Sobre nosotros</Link></li>
-              <li><Link to="/rooms" className="hover:text-yellow-600">Habitaciones</Link></li>
-              <li><Link to="/events" className="hover:text-yellow-600">Eventos</Link></li>
-              <li><Link to="/restaurant" className="hover:text-yellow-600">Restaurante</Link></li>
-              <li><Link to="/activities" className="hover:text-yellow-600">Actividades</Link></li>
+              <li><Link to="/RoomsSection" className="hover:text-yellow-600">Habitaciones</Link></li>
+             
               <li><Link to="/reserve" className="bg-yellow-500 px-4 py-2 rounded text-white hover:bg-yellow-600">Reservar</Link></li>
             </ul>
           </div>

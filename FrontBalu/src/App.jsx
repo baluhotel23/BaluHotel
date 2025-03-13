@@ -53,6 +53,7 @@ function App() {
     <BrowserRouter>
       <ToastContainer />
        <Navbar />
+       <div className="pt-16"> {/* Agregar margen superior para evitar superposición */}
       <Routes>
         {/* Rutas públicas */}
         <Route path="/" element={<Landing />} />
@@ -99,6 +100,7 @@ function App() {
         {/* Ruta por defecto para 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </div>
     </BrowserRouter>
   );
 }
