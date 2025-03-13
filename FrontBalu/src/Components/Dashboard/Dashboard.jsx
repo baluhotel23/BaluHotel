@@ -13,8 +13,8 @@ const Dashboard = () => {
         {/* Card 1: Manage Hotels */}
         {(user.role === 'owner' || user.role === 'admin') && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
-            <h2 className="text-xl font-semibold mb-2">Manage Hotels</h2>
-            <p className="text-gray-600 mb-4">Create and modify hotel information.</p>
+            <h2 className="text-xl font-semibold mb-2">CREAR/MODIFICAR HOTEL</h2>
+            <p className="text-gray-600 mb-4">Modificar la informacion del Hotel.</p>
             <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
               CREAR/MODIFICAR HOTEL
             </button>
@@ -24,8 +24,8 @@ const Dashboard = () => {
         {/* Card 2: Create Staff */}
         {(user.role === 'owner' || user.role === 'admin') && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
-            <h2 className="text-xl font-semibold mb-2">Create Staff</h2>
-            <p className="text-gray-600 mb-4">Add new staff members to the system.</p>
+            <h2 className="text-xl font-semibold mb-2">CREAR STAFF</h2>
+            <p className="text-gray-600 mb-4">Crear el staff de trabajo.</p>
             <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
               CREAR STAFF
             </button>
@@ -35,8 +35,8 @@ const Dashboard = () => {
         {/* Card 3: Create Room */}
         {(user.role === 'owner' || user.role === 'admin') && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
-            <h2 className="text-xl font-semibold mb-2">Create Room</h2>
-            <p className="text-gray-600 mb-4">Add new rooms to the hotel.</p>
+            <h2 className="text-xl font-semibold mb-2"> CREAR HABITACION</h2>
+            <p className="text-gray-600 mb-4">Agregar habitaciones.</p>
             <Link to="/admin/create-room">
             <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
               CREAR HABITACION
@@ -46,8 +46,8 @@ const Dashboard = () => {
         )}
                {(user.role === 'owner' || user.role === 'admin') && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
-            <h2 className="text-xl font-semibold mb-2">Create Room</h2>
-            <p className="text-gray-600 mb-4">Add new rooms to the hotel.</p>
+            <h2 className="text-xl font-semibold mb-2">LISTAR HABITACIONES</h2>
+            <p className="text-gray-600 mb-4">Ver todas las habitaciones.</p>
             <Link to="/admin/rooms">
             <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
               LISTAR HABITACIONES
@@ -59,8 +59,8 @@ const Dashboard = () => {
         {/* Card 4: Upload Services */}
         {user.role === 'owner' && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
-            <h2 className="text-xl font-semibold mb-2">Upload Services</h2>
-            <p className="text-gray-600 mb-4">Add or modify services offered by the hotel.</p>
+            <h2 className="text-xl font-semibold mb-2">CARGAR SERVICIOS</h2>
+            <p className="text-gray-600 mb-4">Cargar nuevos servicios.</p>
             <Link to="/admin/services">
               <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                 CARGAR SERVICIOS
