@@ -1,4 +1,4 @@
-const { Room } = require('../data'); // Asegúrate de que estos modelos estén correctamente exportados
+const { Room, Service } = require('../data'); // Asegúrate de que estos modelos estén correctamente exportados
 const { Op } = require("sequelize");
 
 // Obtener todas las habitaciones
@@ -79,10 +79,32 @@ const checkAvailability = async (req, res, next) => {
   }
 };
 
+
 // Crear una nueva habitación
 const createRoom = async (req, res, next) => {
   try {
-    const newRoom = await Room.create(req.body);
+    const { roomNumber, price, amenities, description, image_url, maxGuests, services } = req.body;
+
+    // Crear la habitación
+    const newRoom = await Room.create({
+      roomNumber,
+      price,
+      amenities,
+      description,
+      image_url,
+      maxGuests
+    });
+
+    // Asociar los servicios a la habitación
+    if (services && services.length > 0) {
+      const serviceInstances = await Service.findAll({
+        where: {
+          name: services
+        }
+      });
+      await newRoom.addServices(serviceInstances);
+    }
+
     res.status(201).json({
       error: false,
       data: newRoom,

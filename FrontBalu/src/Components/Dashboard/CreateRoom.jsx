@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { createRoom } from '../../Redux/Actions/roomActions';
+import { getAllServices } from '../../Redux/Actions/serviceActions';
 import DashboardLayout from './DashboardLayout';
 import { openCloudinaryWidget } from '../../cloudinaryConfig';
 
@@ -8,6 +9,11 @@ const CreateRoom = () => {
   const [images, setImages] = useState([]);
   const dispatch = useDispatch();
   const { loading, error } = useSelector(state => state.room);
+  const { services } = useSelector(state => state.service);
+
+  useEffect(() => {
+    dispatch(getAllServices());
+  }, [dispatch]);
 
   const handleWidget = () => {
     openCloudinaryWidget((uploadedImageUrl) => {
@@ -18,27 +24,41 @@ const CreateRoom = () => {
   const [formData, setFormData] = useState({
     roomNumber: '',
     price: '',
-    amenities: '',
+    services: '',
     description: '',
+    maxGuests: 1,
     image_url: [] // Cambiamos el campo a image_url
   });
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    if (name === 'services') {
+      const selectedServices = Array.from(e.target.selectedOptions, option => option.value);
+      setFormData({
+        ...formData,
+        [name]: selectedServices
+      });
+      console.log('Selected services:', selectedServices);
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+      console.log(`Changed ${name}:`, value);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Form data before submit:', { ...formData, image_url: images });
     try {
       await dispatch(createRoom({ ...formData, image_url: images }));
       setFormData({
         roomNumber: '',
         price: '',
-        amenities: '',
+        services: '',
         description: '',
+        maxGuests: 1,
         image_url: []
       });
       setImages([]);
@@ -80,14 +100,34 @@ const CreateRoom = () => {
           />
         </div>
         <div>
-          <label htmlFor="amenities" className="block text-sm font-medium text-gray-700">
-            Amenities
+          <label htmlFor="services" className="block text-sm font-medium text-gray-700">
+            Servicios
+          </label>
+          <select
+            name="services"
+            id="services"
+            value={formData.services}
+            onChange={handleChange}
+            required
+            className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+          >
+            <option value="">Selecciona un servicio</option>
+            {services.map(service => (
+              <option key={service.id} value={service.name}>
+                {service.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="maxGuests" className="block text-sm font-medium text-gray-700">
+            Capacidad Máxima
           </label>
           <input
-            type="text"
-            name="amenities"
-            id="amenities"
-            value={formData.amenities}
+            type="number"
+            name="maxGuests"
+            id="maxGuests"
+            value={formData.maxGuests}
             onChange={handleChange}
             required
             className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
