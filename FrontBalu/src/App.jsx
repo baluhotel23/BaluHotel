@@ -18,7 +18,7 @@ import Landing from './Components/Landing';
 import ServiceManagement from './Components/Dashboard/ServiceManagement';
 import CreateRoom from './Components/Dashboard/CreateRoom';
 import RoomList from './Components/Dashboard/RoomList';
-import EditRoom from './Components/Dashboard/EditRoom';
+
 
 function App() {
   const dispatch = useDispatch();
@@ -89,14 +89,7 @@ function App() {
             </PrivateRoute>
           }
         />
-              <Route
-          path="/rooms/edit/:roomNumber"
-          element={
-            <PrivateRoute allowedRoles={['owner', 'admin']}>
-              <EditRoom />
-            </PrivateRoute>
-          }
-        />
+        
 
         {/* Ruta por defecto para 404 */}
         <Route path="*" element={<NotFound />} />
