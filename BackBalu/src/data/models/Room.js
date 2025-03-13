@@ -31,6 +31,13 @@ module.exports = (sequelize) => {
     type: DataTypes.ARRAY(DataTypes.STRING),
     defaultValue: [],
 },
+
+type: {
+  type: DataTypes.ENUM,
+  values: ["Sencilla", "Doble", "Triple", "Cuadruple", "Pareja"],
+  allowNull: true,
+  
+},
     status: {
       type: DataTypes.ENUM,
       values: ["Limpia", "Ocupada", "Mantenimiento", "Reservada"],

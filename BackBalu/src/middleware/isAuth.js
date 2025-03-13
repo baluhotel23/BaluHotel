@@ -30,7 +30,7 @@ const verifyToken = (req, res, next) => {
 const generateToken = (userData) => {
   return jwt.sign(
     {
-      id: userData.n_document,
+      n_document: userData.n_document, // Usar el PK n_document
       role: userData.role,
       email: userData.email
     },

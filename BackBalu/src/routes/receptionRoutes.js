@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/isAuth');
 const { isStaff } = require('../middleware/byRol');
-//const { validateCheckIn, validateCheckOut } = require('../middleware/validation');
+const validateCheckIn = require('../middleware/validation/validateChekIn');
+const validateCheckOut = require('../middleware/validation/validateCheckOut');
+
 const { getDashboard,
     getTodayCheckIns,
     getTodayCheckOuts,
@@ -35,8 +37,8 @@ router.get('/today-checkins', getTodayCheckIns);
 router.get('/today-checkouts', getTodayCheckOuts);
 
 // Gestión de check-in/check-out
-router.post('/checkin/:bookingId',  processCheckIn);
-router.post('/checkout/:bookingId', processCheckOut);
+router.post('/checkin/:bookingId', validateCheckIn,   processCheckIn);
+router.post('/checkout/:bookingId', validateCheckOut, processCheckOut);
 router.get('/pending-arrivals', getPendingArrivals);
 router.get('/pending-departures', getPendingDepartures);
 

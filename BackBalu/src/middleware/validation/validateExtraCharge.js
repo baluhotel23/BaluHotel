@@ -1,7 +1,7 @@
 const { CustomError } = require('../../middleware/error');
 
 const validateExtraCharge = (req, res, next) => {
-    const { description, amount } = req.body;
+    const { description, price } = req.body;
 
     // Validar que exista descripción
     if (!description || description.trim().length === 0) {
@@ -14,17 +14,17 @@ const validateExtraCharge = (req, res, next) => {
     }
 
     // Validar que el monto exista y sea número
-    if (!amount || typeof amount !== 'number') {
+    if (!price || typeof price !== 'number') {
         throw new CustomError('El monto debe ser un número válido', 400);
     }
 
     // Validar que el monto sea positivo
-    if (amount <= 0) {
+    if (price <= 0) {
         throw new CustomError('El monto debe ser mayor a 0', 400);
     }
 
     // Validar que el monto no sea excesivamente alto (ejemplo: límite de 1,000,000)
-    if (amount > 1000000) {
+    if (price > 1000000) {
         throw new CustomError('El monto excede el límite permitido', 400);
     }
 

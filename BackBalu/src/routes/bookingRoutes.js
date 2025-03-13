@@ -29,27 +29,27 @@ router.get('/room-types', getRoomTypes);
 router.use(verifyToken);
 router.post('/create', createBooking);
 router.get('/user', getUserBookings);
-router.get('/:id', getBookingById);
-router.post('/:id/cancel', cancelBooking);
+router.get('/:bookingId', getBookingById);
+router.post('/:bookingId/cancel', cancelBooking);
 
 // Rutas para clientes y staff
 router.post('/', validateBooking, createBooking);
-router.get('/my-bookings', getUserBookings);
-router.get('/:id', getBookingById);
+router.get('/user/my-bookings', getUserBookings);
+router.get('/:bookingId', getBookingById);
 
 // Middleware de staff para todas las rutas siguientes
 router.use(isStaff);
 
 // Rutas de gestión de reservas (solo staff)
-router.get('/all', getAllBookings);
-router.put('/:id/check-in', checkIn);
-router.put('/:id/check-out', checkOut);
-router.post('/:id/extra-charges', validateExtraCharge, addExtraCharges);
-router.get('/:id/bill', generateBill);
-router.put('/:id/status', updateBookingStatus);
+router.get('/reservas/all', getAllBookings);
+router.put('/:bookingId/check-in', checkIn);
+router.put('/:bookingId/check-out', checkOut);
+router.post('/:bookingId/extra-charges', validateExtraCharge, addExtraCharges);
+router.get('/:bookingId/bill', generateBill);
+router.put('/:bookingId/status', updateBookingStatus);
 
 // Rutas que requieren permisos especiales
-router.delete('/:id', 
+router.delete('/:bookingId', 
     allowRoles(['owner', 'admin']), 
     cancelBooking
 );

@@ -19,7 +19,7 @@ const {
 const {
   getDashboard,
   getReports,
-  getExpenses,
+  getAllExpenses,
   createExpense,
 } = require("../controllers/financialController");
 
@@ -45,8 +45,8 @@ router.use(verifyToken);
 // Rutas de gestión de usuarios (solo owner)
 router.get("/users", isOwner, getAllUsers);
 router.post("/users", isOwner, createStaffUser);
-router.put("/users/:id", isOwner, updateUser);
-router.delete("/users/:id", isOwner, deactivateUser);
+router.put("/users/:n_document", isOwner, updateUser);
+router.delete("/users/:n_document", isOwner, deactivateUser);
 
 // Rutas de gestión de inventario (owner y admin)
 router.get("/", allowRoles(["owner", "admin"]), getInventory);
@@ -56,7 +56,7 @@ router.get("/low-stock", allowRoles(["owner", "admin"]), getLowStockItems);
 
 //Rutas de gestión financiera (solo owner)
 
-router.get("/expenses", isOwner, getExpenses);
+router.get("/expenses", isOwner, getAllExpenses);
 router.post("/expenses", isOwner, createExpense);
 
 // Rutas de configuración del hotel (owner y admin)

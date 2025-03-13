@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/isAuth');
 const  validateBooking  = require('../middleware/validation/validateBooking');
-const { getAllRooms, getRoomById, getRoomTypes, checkAvailability } = require('../controllers/roomController');
+const { getAllRooms, getRoomById, getRoomTypes, checkAvailability,getActivePromotions,
+  getSpecialOffers  } = require('../controllers/roomController');
 const {
     createBooking,
     getUserBookings,
@@ -24,8 +25,8 @@ router.get('/room-types', getRoomTypes);
 router.get('/availability', checkAvailability);
 
 // Promociones y ofertas
-// router.get('/promotions', getActivePromotions);
-// router.get('/special-offers', getSpecialOffers);
+router.get('/promotions', getActivePromotions);
+router.get('/special-offers', getSpecialOffers);
 
 // Rutas que requieren autenticación
 router.use(verifyToken);
