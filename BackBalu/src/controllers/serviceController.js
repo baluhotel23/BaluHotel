@@ -18,7 +18,7 @@ const updateService = async (req, res, next) => {
   try {
     const { serviceId } = req.params;
     const { name } = req.body;
-    const service = await Service.findByPk(id);
+    const service = await Service.findByPk(serviceId);
     if (!service) {
       return res.status(404).json({
         error: true,

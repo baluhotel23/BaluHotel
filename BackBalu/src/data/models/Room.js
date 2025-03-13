@@ -26,10 +26,7 @@ module.exports = (sequelize) => {
     promotionPrice: {
       type: DataTypes.DECIMAL(10, 2),
     },
-    tags: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      defaultValue: [],
-    },
+    
    image_url: {
     type: DataTypes.ARRAY(DataTypes.STRING),
     defaultValue: [],
