@@ -11,17 +11,21 @@ import { ToastContainer } from 'react-toastify';
 import Login from './Components/Auth/Login';
 import Register from './Components/Auth/Register';
 import Dashboard from './Components/Dashboard/Dashboard';
-import Tienda from './Components/Tienda/Tienda';
+import RoomsSection from './Components/Rooms/RoomsSection';
 import NotFound from './Components/NotFound';
 import Unauthorized from './Components/Auth/Unauthorized';
 import Landing from './Components/Landing';
 import ServiceManagement from './Components/Dashboard/ServiceManagement';
 import CreateRoom from './Components/Dashboard/CreateRoom';
 import RoomList from './Components/Dashboard/RoomList';
+import Navbar from './Components/Navbar';
 
 
 function App() {
   const dispatch = useDispatch();
+ 
+
+
 
   useEffect(() => {
     // Verificar si hay un token guardado al iniciar la app
@@ -48,10 +52,11 @@ function App() {
   return (
     <BrowserRouter>
       <ToastContainer />
+       <Navbar />
       <Routes>
         {/* Rutas públicas */}
         <Route path="/" element={<Landing />} />
-        <Route path="/tienda" element={<Tienda />} />
+        <Route path="/RoomsSection" element={<RoomsSection />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
