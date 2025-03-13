@@ -34,16 +34,19 @@ function RoomsCarousel() {
       >
         {rooms.map((room) => (
           <SwiperSlide key={room.roomNumber}>
-            <div className="relative w-full h-[300px]">
+            <div className="relative w-full h-[300px] overflow-hidden">
               <img
                 src={room.image_url[0]}
                 alt={`Habitación ${room.roomNumber}`}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black to-transparent p-4">
-                <h2 className="text-white font-bold">{room.roomType}</h2>
+              {/* Capa de opacidad debajo */}
+              <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-[#8c794d] to-transparent opacity-90"></div>
+              {/* Texto y botón centrado */}
+              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 text-center text-white">
+                <h2 className="font-bold text-lg">{room.roomType}</h2>
                 <button
-                  className="bg-white text-black px-4 py-2 mt-2 rounded"
+                  className="bg-white text-[#8c794d] font-semibold px-6 py-2 rounded-full mt-2 shadow-md"
                   onClick={() => navigate(`/room/${room.roomNumber}`)}
                 >
                   Ver más
