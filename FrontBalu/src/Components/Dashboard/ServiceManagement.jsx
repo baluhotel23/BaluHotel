@@ -6,7 +6,6 @@ import DashboardLayout from './DashboardLayout';
 const ServiceManagement = () => {
   const dispatch = useDispatch();
   const { services, loading, error } = useSelector((state) => state.service);
-  console.log(services);
   const [name, setName] = useState('');
   const [editingServiceId, setEditingServiceId] = useState(null);
 
@@ -19,6 +18,7 @@ const ServiceManagement = () => {
     if (name.trim() !== '') {
       await dispatch(createService({ name }));
       setName('');
+      dispatch(getAllServices()); // Refrescar la lista de servicios
     }
   };
 
@@ -28,11 +28,15 @@ const ServiceManagement = () => {
       await dispatch(updateService(editingServiceId, { name }));
       setName('');
       setEditingServiceId(null);
+      dispatch(getAllServices()); // Refrescar la lista de servicios
     }
   };
 
   const handleDeleteService = async (serviceId) => {
-    await dispatch(deleteService(serviceId));
+    if (window.confirm('¿Estás seguro de que deseas eliminar este servicio?')) {
+      await dispatch(deleteService(serviceId));
+      dispatch(getAllServices()); // Refrescar la lista de servicios
+    }
   };
 
   const handleEditService = (service) => {
@@ -78,26 +82,36 @@ const ServiceManagement = () => {
       {/* Service List */}
       {loading && <p>Cargando...</p>}
       {error && <p>Error: {error}</p>}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {services.map((service) => (
-          <div key={service.serviceId} className="bg-white rounded-lg shadow-md p-4">
-            <h2 className="text-lg font-semibold mb-2">{service.name}</h2>
-            <div className="flex justify-end">
-              <button
-                onClick={() => handleEditService(service)}
-                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:shadow-outline"
-              >
-                Editar
-              </button>
-              <button
-                onClick={() => handleDeleteService(service.serviceId)} // Asegúrate de usar service.serviceId
-                className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-              >
-                Eliminar
-              </button>
-            </div>
-          </div>
-        ))}
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr>
+              <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Servicio</th>
+              <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {services.map((service) => (
+              <tr key={service.serviceId}>
+                <td className="px-6 py-4 whitespace-nowrap">{service.name}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <button
+                    onClick={() => handleEditService(service)}
+                    className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:shadow-outline"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDeleteService(service.serviceId)} // Asegúrate de usar service.serviceId
+                    className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                  >
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </DashboardLayout>
   );
