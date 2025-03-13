@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
- sequelize.define('RoomCheckIn', {
+  sequelize.define('RoomCheckIn', {
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
@@ -27,6 +27,12 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    // Campo para almacenar la asignación de inventario (puede ser un JSON)
+    assignedInventory: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Almacena los items asignados a la habitación y sus cantidades'
+    },
     // Fecha de última actualización o revisión
     lastUpdated: {
       type: DataTypes.DATE,
@@ -37,6 +43,4 @@ module.exports = (sequelize) => {
     paranoid: true,
     tableName: 'RoomPreparations'
   });
-
- 
 };
