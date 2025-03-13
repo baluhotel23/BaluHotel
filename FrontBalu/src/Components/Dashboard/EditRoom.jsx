@@ -32,7 +32,7 @@ const EditRoom = () => {
       setFormData({
         roomNumber: room.roomNumber,
         price: room.price,
-        services: room.services ? room.services.map(service => service.name) : [],
+        services: room.Services ? room.Services.map(service => service.name) : [],
         description: room.description,
         maxGuests: room.maxGuests,
         image_url: room.image_url || []
@@ -91,122 +91,126 @@ const EditRoom = () => {
         <p>Error: {error}</p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-700">
-              Número de Habitación
-            </label>
-            <input
-              type="text"
-              name="roomNumber"
-              id="roomNumber"
-              value={formData.roomNumber}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label htmlFor="price" className="block text-sm font-medium text-gray-700">
-              Precio
-            </label>
-            <input
-              type="number"
-              name="price"
-              id="price"
-              value={formData.price}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label htmlFor="services" className="block text-sm font-medium text-gray-700">
-              Servicios
-            </label>
-            <select
-              name="services"
-              id="services"
-              value={formData.services}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-              multiple
-            >
-              {services.map(service => (
-                <option key={service.id} value={service.name}>
-                  {service.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="maxGuests" className="block text-sm font-medium text-gray-700">
-              Capacidad Máxima
-            </label>
-            <input
-              type="number"
-              name="maxGuests"
-              id="maxGuests"
-              value={formData.maxGuests}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-              Descripción
-            </label>
-            <textarea
-              name="description"
-              id="description"
-              value={formData.description}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Imágenes
-            </label>
-            <button
-              type="button"
-              onClick={handleWidget}
-              className="mt-1 block w-full py-2 px-4 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700"
-            >
-              Subir Imágenes
-            </button>
-            <div className="mt-4 grid grid-cols-3 gap-4">
-              {formData.image_url.map((img, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={img}
-                    alt={`Imagen ${index + 1}`}
-                    className="w-full h-32 object-cover rounded-md"
+          <table className="min-w-full divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200">
+              <tr>
+                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-500">Número de Habitación</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <input
+                    type="text"
+                    name="roomNumber"
+                    id="roomNumber"
+                    value={formData.roomNumber}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
                   />
+                </td>
+              </tr>
+              <tr>
+                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-500">Precio</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <input
+                    type="number"
+                    name="price"
+                    id="price"
+                    value={formData.price}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-500">Capacidad Máxima</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <input
+                    type="number"
+                    name="maxGuests"
+                    id="maxGuests"
+                    value={formData.maxGuests}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-500">Servicios</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <select
+                    name="services"
+                    id="services"
+                    value={formData.services}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                    multiple
+                  >
+                    {services.map(service => (
+                      <option key={service.id} value={service.name}>
+                        {service.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+              <tr>
+                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-500">Descripción</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <textarea
+                    name="description"
+                    id="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-500">Imágenes</td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   <button
                     type="button"
-                    onClick={() => handleImageDelete(img)}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
+                    onClick={handleWidget}
+                    className="mt-1 block w-full py-2 px-4 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700"
                   >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="h-5 w-5" 
-                      viewBox="0 0 20 20" 
-                      fill="currentColor"
-                    >
-                      <path 
-                        fillRule="evenodd" 
-                        d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" 
-                        clipRule="evenodd" 
-                      />
-                    </svg>
+                    Subir Imágenes
                   </button>
-                </div>
-              ))}
-            </div>
-          </div>
+                  <div className="mt-4 grid grid-cols-3 gap-4">
+                    {formData.image_url.map((img, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={img}
+                          alt={`Imagen ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-md"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleImageDelete(img)}
+                          className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
+                        >
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            className="h-5 w-5" 
+                            viewBox="0 0 20 20" 
+                            fill="currentColor"
+                          >
+                            <path 
+                              fillRule="evenodd" 
+                              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" 
+                              clipRule="evenodd" 
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
           <div>
             <button
               type="submit"

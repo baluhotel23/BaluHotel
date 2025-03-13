@@ -37,6 +37,7 @@ const RoomList = () => {
               <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número de Habitación</th>
               <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
               <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacidad Máxima</th>
+              <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicios</th>
               <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
             </tr>
           </thead>
@@ -47,6 +48,9 @@ const RoomList = () => {
                   <td className="px-6 py-4 whitespace-nowrap">{room.roomNumber}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{room.price}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{room.maxGuests}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {room.Services && room.Services.map(service => service.name).join(', ')}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
                       onClick={() => handleEdit(room.roomNumber)}
@@ -65,7 +69,7 @@ const RoomList = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="4" className="px-6 py-4 whitespace-nowrap text-center">
+                <td colSpan="5" className="px-6 py-4 whitespace-nowrap text-center">
                   No hay habitaciones disponibles.
                 </td>
               </tr>
@@ -73,7 +77,7 @@ const RoomList = () => {
           </tbody>
         </table>
       )}
-     </DashboardLayout>
+    </DashboardLayout>
   );
 };
 

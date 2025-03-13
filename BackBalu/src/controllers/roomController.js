@@ -4,7 +4,15 @@ const { Op } = require("sequelize");
 // Obtener todas las habitaciones
 const getAllRooms = async (req, res, next) => {
   try {
-    const rooms = await Room.findAll();
+    const rooms = await Room.findAll({
+      include: [
+        {
+          model: Service,
+          attributes: ['name'], // Solo incluir el campo 'name' de los servicios
+          through: { attributes: [] } // Excluir atributos de la tabla intermedia
+        }
+      ]
+    });
     res.status(200).json({
       error: false,
       data: rooms,
@@ -42,7 +50,15 @@ const getRoomTypes = async (req, res, next) => {
 const getRoomById = async (req, res, next) => {
   try {
     const { roomNumber } = req.params;
-    const room = await Room.findByPk(roomNumber);
+    const room = await Room.findByPk(roomNumber, {
+      include: [
+        {
+          model: Service,
+          attributes: ['name'], // Solo incluir el campo 'name' de los servicios
+          through: { attributes: [] } // Excluir atributos de la tabla intermedia
+        }
+      ]
+    });
     if (!room) {
       return res.status(404).json({
         error: true,
@@ -58,6 +74,7 @@ const getRoomById = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // Revisar disponibilidad (ejemplo básico: habitaciones con available = true)
 const checkAvailability = async (req, res, next) => {
@@ -104,10 +121,20 @@ const createRoom = async (req, res, next) => {
       });
       await newRoom.addServices(serviceInstances);
     }
+    const roomWithServices = await Room.findByPk(newRoom.roomNumber, {
+      include: [
+        {
+          model: Service,
+          attributes: ['name'], // Solo incluir el campo 'name' de los servicios
+          through: { attributes: [] } // Excluir atributos de la tabla intermedia
+        }
+      ]
+    });
+
 
     res.status(201).json({
       error: false,
-      data: newRoom,
+      data: roomWithServices,
       message: 'Habitación creada correctamente'
     });
   } catch (error) {
@@ -139,9 +166,19 @@ const updateRoom = async (req, res, next) => {
       await room.setServices(serviceInstances);
     }
 
+    const roomWithServices = await Room.findByPk(updatedRoom.roomNumber, {
+      include: [
+        {
+          model: Service,
+          attributes: ['name'], // Solo incluir el campo 'name' de los servicios
+          through: { attributes: [] } // Excluir atributos de la tabla intermedia
+        }
+      ]
+    });
+
     res.status(200).json({
       error: false,
-      data: updatedRoom,
+      data: roomWithServices,
       message: 'Habitación actualizada correctamente'
     });
   } catch (error) {
