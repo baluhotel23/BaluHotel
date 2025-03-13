@@ -62,7 +62,7 @@ RoomCheckIn.belongsTo(Room, { foreignKey: 'roomNumber', as: 'room' });
 
 
 Booking.belongsTo(Room);
-Room.hasMany(Booking);
+Room.hasMany(Booking, { foreignKey: 'roomNumber' })
 Booking.belongsTo(User, { as: 'guest' });
 User.hasMany(Booking);
 

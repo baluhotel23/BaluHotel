@@ -54,56 +54,64 @@ const getRoomTypes = async (req, res) => {
 
 // Client and staff endpoints
 const createBooking = async (req, res) => {
-    const { roomNumber, checkIn, checkOut, guestDetails } = req.body;
-    const userId = req.user.id;
-
+    const { roomNumber, checkIn, checkOut, guestDetails, guestCount } = req.body;
+    // Usamos guestId a partir del usuario autenticado (n_document)
+    const guestId = req.user.n_document;
+  
+    // Buscar la habitación
     const room = await Room.findByPk(roomNumber);
     if (!room) {
-        throw new CustomError('Habitación no encontrada', 404);
+      throw new CustomError('Habitación no encontrada', 404);
     }
-
-    // Verificar disponibilidad
+    
+    // Verificar disponibilidad (lógica similar a la que ya tienes)
     const existingBooking = await Booking.findOne({
-        where: {
-            roomNumber,
-            [Op.or]: [
-                {
-                    checkIn: {
-                        [Op.between]: [checkIn, checkOut]
-                    }
-                },
-                {
-                    checkOut: {
-                        [Op.between]: [checkIn, checkOut]
-                    }
-                }
-            ]
-        }
-    });
-
-    if (existingBooking) {
-        throw new CustomError('Habitación no disponible para las fechas seleccionadas', 400);
-    }
-
-    const booking = await Booking.create({
-        userId,
+      where: {
         roomNumber,
-        checkIn,
-        checkOut,
-        guestDetails,
-        status: 'pending'
+        [Op.or]: [
+          {
+            checkIn: {
+              [Op.between]: [checkIn, checkOut]
+            }
+          },
+          {
+            checkOut: {
+              [Op.between]: [checkIn, checkOut]
+            }
+          }
+        ]
+      }
     });
-
+    
+    if (existingBooking) {
+      throw new CustomError('Habitación no disponible para las fechas seleccionadas', 400);
+    }
+  
+    // Calcular número de noches y totalAmount
+    const nights = calculateNights(checkIn, checkOut);
+    const totalAmount = room.price * nights;
+  
+    const booking = await Booking.create({
+      guestId,
+      roomNumber,
+      checkIn,
+      checkOut,
+      guestDetails,
+      guestCount,
+      status: 'pending',
+      totalAmount
+    });
+  
     res.status(201).json({
-        error: false,
-        message: 'Reserva creada exitosamente',
-        data: booking
+      error: false,
+      message: 'Reserva creada exitosamente',
+      data: booking
     });
-};
+  };
 
 const getUserBookings = async (req, res) => {
     const bookings = await Booking.findAll({
-        where: { userId: req.user.id },
+        where: { guestId: req.user.n_document },
         include: [{ model: Room }]
     });
 
@@ -130,7 +138,7 @@ const getBookingById = async (req, res) => {
     }
 
     // Si es cliente, verificar que sea su reserva
-    if (req.user.role === 'client' && booking.userId !== req.user.id) {
+    if (req.user.role === 'client' && booking.guestId !== req.user.n_document) {
         throw new CustomError('No autorizado', 403);
     }
 
@@ -156,7 +164,7 @@ const getAllBookings = async (req, res) => {
         where,
         include: [
             { model: Room },
-            { model: User, attributes: ['id', 'email', 'name'] }
+            { model: User, attributes: ['n_document', 'email', 'name'] }
         ],
         order: [['checkIn', 'ASC']]
     });
@@ -182,7 +190,7 @@ const checkIn = async (req, res) => {
     await booking.update({
         status: 'checked-in',
         checkInTime: new Date(),
-        checkedInBy: req.user.id
+        checkedInBy: req.user.n_
     });
 
     res.json({
@@ -209,13 +217,13 @@ const checkOut = async (req, res) => {
     const bill = await Bill.create({
         bookingId: id,
         totalAmount: calculateTotalAmount(booking),
-        generatedBy: req.user.id
+        generatedBy: req.user.n_document
     });
 
     await booking.update({
         status: 'completed',
         checkOutTime: new Date(),
-        checkedOutBy: req.user.id
+        checkedOutBy: req.user.n_document
     });
 
     res.json({
@@ -251,7 +259,7 @@ const addExtraCharges = async (req, res) => {
         bookingId: id,
         description,
         amount,
-        createdBy: req.user.id
+        createdBy: req.user.n_document
     });
 
     res.status(201).json({
@@ -280,7 +288,7 @@ const generateBill = async (req, res) => {
     const bill = await Bill.create({
         bookingId: id,
         totalAmount,
-        generatedBy: req.user.id,
+        generatedBy: req.user.n_document,
         details: {
             roomCharge: calculateRoomCharge(booking),
             extraCharges: booking.ExtraCharges,
@@ -314,7 +322,7 @@ const updateBookingStatus = async (req, res) => {
     await booking.update({
         status,
         statusReason: reason,
-        statusUpdatedBy: req.user.id,
+        statusUpdatedBy: req.user.n_document,
         statusUpdatedAt: new Date()
     });
 
@@ -341,7 +349,7 @@ const cancelBooking = async (req, res) => {
     await booking.update({
         status: 'cancelled',
         statusReason: reason,
-        cancelledBy: req.user.id,
+        cancelledBy: req.user.n_document,
         cancelledAt: new Date()
     });
 

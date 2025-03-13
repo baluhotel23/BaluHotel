@@ -6,13 +6,17 @@ import roomReducer from '../Reducer/roomReducer';
 import toastMiddleware from '../../utils/toastMiddleware';  
 import serviceReducer from '../Reducer/serviceReducer';
 import reportReducer from '../Reducer/reportReducer';
+import bookingReducer from '../Reducer/bookingReducer';
+import inventoryReducer from '../Reducer/inventoryReducer';
 
 const rootReducer = combineReducers({
   auth: authReducer,
   password: passwordReducer,
   room: roomReducer, 
   service: serviceReducer,
-  report: reportReducer
+  report: reportReducer,
+  booking: bookingReducer,
+  inventory: inventoryReducer,
 });
 
 export const store = configureStore({
