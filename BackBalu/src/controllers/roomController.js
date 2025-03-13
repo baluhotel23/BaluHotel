@@ -41,8 +41,8 @@ const getRoomTypes = async (req, res, next) => {
 // Obtener una habitación en particular por su roomNumber
 const getRoomById = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const room = await Room.findByPk(id);
+    const { roomNumber } = req.params;
+    const room = await Room.findByPk(roomNumber);
     if (!room) {
       return res.status(404).json({
         error: true,
