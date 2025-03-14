@@ -56,7 +56,10 @@ const RoomDetail = () => {
                 </li>
               ))}
             </ul>
-            <h3 className="text-xl font-bold mt-2 text-secondary">${parseFloat(room.price).toLocaleString('es-ES')}</h3>
+            <h3 className="text-xl font-bold mt-2 text-secondary flex items-center">
+              ${parseFloat(room.price).toLocaleString('es-ES')} X
+              <FontAwesomeIcon icon={faUser} className="ml-2" />
+            </h3>
           </div>
           <button
             onClick={() => navigate('/booking')}

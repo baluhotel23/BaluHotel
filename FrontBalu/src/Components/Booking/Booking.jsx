@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { checkAvailability, getRoomTypes } from '../../Redux/Actions/bookingActions';
+import { checkAvailability, getRoomTypes, createBooking } from '../../Redux/Actions/bookingActions';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faWifi, faParking, faTv, faFan, faUtensils, faUser, faUsers } from '@fortawesome/free-solid-svg-icons';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const Booking = () => {
@@ -18,6 +18,7 @@ const Booking = () => {
   const [rooms, setRooms] = useState(1);
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
+  const [selectedRoom, setSelectedRoom] = useState(null);
 
   useEffect(() => {
     dispatch(getRoomTypes());
@@ -29,11 +30,54 @@ const Booking = () => {
   };
 
   const handleReserve = (room) => {
-    if (adults + children > room.maxGuests) {
+    const totalGuests = adults + children;
+    let maxGuests = 0;
+
+    switch (room.type.toLowerCase()) {
+      case 'pareja':
+      case 'sencilla':
+        maxGuests = 2;
+        break;
+      case 'triple':
+        maxGuests = 3;
+        break;
+      case 'cuadruple':
+        maxGuests = 8;
+        break;
+      default:
+        maxGuests = room.maxGuests;
+    }
+
+    if (totalGuests > maxGuests) {
       alert('La cantidad de personas supera el máximo permitido para esta habitación.');
       return;
     }
-    // Lógica de reserva aquí
+    setSelectedRoom(room);
+  };
+
+  const handleBooking = () => {
+    const totalGuests = adults + children;
+    let pricePerPerson = selectedRoom.price;
+
+    if (totalGuests === 2) {
+      pricePerPerson = 60000;
+    } else if (totalGuests > 4) {
+      pricePerPerson = 50000;
+    }
+
+    const nights = differenceInDays(checkOut, checkIn);
+    const totalAmount = pricePerPerson * totalGuests * nights;
+
+    const bookingData = {
+      checkIn,
+      checkOut,
+      pointOfSale: 'Online',
+      status: 'pending',
+      guestCount: totalGuests,
+      totalAmount,
+    };
+
+    dispatch(createBooking(bookingData));
   };
 
   const getServiceIcon = (serviceName) => {
@@ -141,6 +185,18 @@ const Booking = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+        {selectedRoom && (
+          <div className="bg-gray-800 p-6 rounded-xl shadow-lg mt-6">
+            <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
+            <p className="mb-2">Habitación: {selectedRoom.type}</p>
+            <p className="mb-2">Desde: {formatDate(checkIn)}</p>
+            <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
+            <p className="mb-2">Adultos: {adults}</p>
+            <p className="mb-2">Niños: {children}</p>
+            <p className="mb-2">Total: {formatPrice(selectedRoom.price * (adults + children))}</p>
+            <button onClick={handleBooking} className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold">Confirmar Reserva</button>
           </div>
         )}
       </div>
