@@ -15,6 +15,11 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: false
     },
+    pointOfSale: {
+        type: DataTypes.ENUM("Online", "Local"),
+        allowNull: false,
+        defaultValue: "Online",
+      },
     status: {
       type: DataTypes.ENUM('pending', 'confirmed', 'checked-in', 'completed', 'cancelled'),
       defaultValue: 'pending'
