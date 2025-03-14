@@ -25,6 +25,7 @@ const CreateRoom = () => {
     roomNumber: '',
     price: '',
     services: '',
+    type: '',
     description: '',
     maxGuests: 1,
     image_url: [] // Cambiamos el campo a image_url
@@ -57,6 +58,7 @@ const CreateRoom = () => {
         roomNumber: '',
         price: '',
         services: '',
+        type: '',
         description: '',
         maxGuests: 1,
         image_url: []
@@ -117,6 +119,26 @@ const CreateRoom = () => {
                 {service.name}
               </option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="type" className="block text-sm font-medium text-gray-700">
+            Tipo de Habitación
+          </label>
+          <select
+            name="type"
+            id="type"
+            value={formData.type}
+            onChange={handleChange}
+            required
+            className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+          >
+            <option value="">Selecciona un tipo</option>
+            <option value="Sencilla">Sencilla</option>
+            <option value="Doble">Doble</option>
+            <option value="Triple">Triple</option>
+            <option value="Cuadruple">Cuadruple</option>
+            <option value="Pareja">Pareja</option>
           </select>
         </div>
         <div>

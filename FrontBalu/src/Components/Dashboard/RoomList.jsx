@@ -14,6 +14,7 @@ const RoomList = () => {
     roomNumber: '',
     price: '',
     services: [],
+    type: '',
     description: '',
     maxGuests: 1,
     image_url: [],
@@ -34,6 +35,7 @@ const RoomList = () => {
         roomNumber: editingRoom.roomNumber,
         price: editingRoom.price,
         services: editingRoom.Services ? editingRoom.Services.map(service => service.name) : [],
+        type: editingRoom.type,
         description: editingRoom.description,
         maxGuests: editingRoom.maxGuests,
         image_url: editingRoom.image_url || [],
@@ -122,6 +124,7 @@ const RoomList = () => {
                 <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
                 <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacidad</th>
                 <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicios</th>
+                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Hab</th>
                 <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Imágenes</th>
                 <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Disponible</th>
                 <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Promoción</th>
@@ -191,6 +194,25 @@ const RoomList = () => {
                       </select>
                     ) : (
                       room.Services.map(service => service.name).join(', ')
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                      <select
+                        name="type"
+                        value={formData.type}
+                        onChange={handleChange}
+                        className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                      >
+                        <option value="">Selecciona un tipo</option>
+                        <option value="Sencilla">Sencilla</option>
+                        <option value="Doble">Doble</option>
+                        <option value="Triple">Triple</option>
+                        <option value="Cuadruple">Cuadruple</option>
+                        <option value="Pareja">Pareja</option>
+                      </select>
+                    ) : (
+                      room.type
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

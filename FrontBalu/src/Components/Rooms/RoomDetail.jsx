@@ -42,9 +42,10 @@ const RoomDetail = () => {
           </Swiper>
         </div>
         <div className="p-4">
-          <h2 className="text-2xl font-bold mb-4">{room.description}</h2>
+          <h2 className="text-2xl font-bold mb-4">{room.type}</h2>
           <h2 className="text-xl font-bold mt-4 text-secondary">Habitación N°{room.roomNumber}</h2>
           <p className="mb-4">Capacidad máxima: {room.maxGuests} {room.maxGuests > 1 ? 'personas' : 'persona'}</p>
+          <p className="mb-4">Detalle  {room.description}</p>
           <div className="mb-4">
             <h3 className="text-xl font-semibold mb-2">Servicios</h3>
             <ul className="space-y-2">

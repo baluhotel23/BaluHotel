@@ -89,10 +89,12 @@ function RoomsSection() {
               onChange={(e) => setFilterType(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded"
             >
-              <option value="">Todos los tipos</option>
-              <option value="simple">Simple</option>
-              <option value="doble">Doble</option>
-              <option value="suite">Suite</option>
+              <option value="">Selecciona un tipo</option>
+                        <option value="Sencilla">Sencilla</option>
+                        <option value="Doble">Doble</option>
+                        <option value="Triple">Triple</option>
+                        <option value="Cuadruple">Cuadruple</option>
+                        <option value="Pareja">Pareja</option>
             </select>
           </div>
         </div>
