@@ -32,7 +32,7 @@ export const getRoomTypes = () => async (dispatch) => {
 export const createBooking = (bookingData) => async (dispatch) => {
   dispatch({ type: 'CREATE_BOOKING_REQUEST' });
   try {
-    const { data } = await api.post('/bookings', bookingData);
+    const { data } = await api.post('/bookings/create', bookingData);
     dispatch({ type: 'CREATE_BOOKING_SUCCESS', payload: data.data });
   } catch (error) {
     const errorMessage =
