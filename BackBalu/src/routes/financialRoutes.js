@@ -47,8 +47,8 @@ router.use(verifyToken);
 
 // // Gestión de facturas (owner y admin)
  router.get('/bills', allowRoles(['owner', 'admin']), getAllBills);
- router.get('/bills/:id', allowRoles(['owner', 'admin']), getBillDetails);
- router.post('/bills/:id/void', isOwner, voidBill);
+ router.get('/bills/:idBill', allowRoles(['owner', 'admin']), getBillDetails);
+ router.post('/bills/:idBill/void', isOwner, voidBill);
 
 // // Reportes financieros (solo owner)
  router.get('/reports/profit-loss', isOwner, getProfitLossReport);

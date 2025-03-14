@@ -187,8 +187,8 @@ const getAllBills = async (req, res, next) => {
 
 const getBillDetails = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const bill = await Bill.findByPk(id);
+    const { idBill } = req.params;
+    const bill = await Bill.findByPk(idBill);
     if (!bill) {
       throw new CustomError('Factura no encontrada', 404);
     }
@@ -204,8 +204,8 @@ const getBillDetails = async (req, res, next) => {
 
 const voidBill = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const bill = await Bill.findByPk(id);
+    const { idBill } = req.params;
+    const bill = await Bill.findByPk(idBill);
     if (!bill) {
       throw new CustomError('Factura no encontrada', 404);
     }
