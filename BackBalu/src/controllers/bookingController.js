@@ -58,7 +58,7 @@ const getRoomTypes = async (req, res) => {
 
 // Client and staff endpoints
 const createBooking = async (req, res) => {
-    const { roomNumber, checkIn, checkOut,  guestCount } = req.body;
+    const { roomNumber, checkIn, checkOut,  guestCount, totalAmount } = req.body;
     // Usamos guestId a partir del usuario autenticado (n_document)
     const guestId = req.user.n_document;
   
@@ -92,18 +92,18 @@ const createBooking = async (req, res) => {
     }
   
     // Calcular número de noches y totalAmount
-    const nights = calculateNights(checkIn, checkOut);
-    const totalAmount = room.price * nights;
+    //const nights = calculateNights(checkIn, checkOut);
+    //const totalAmount = totalbooking * nights; // revisar esta logica
   
     const booking = await Booking.create({
       guestId,
       roomNumber,
       checkIn,
       checkOut,
-      
+      totalAmount,
       guestCount,
       status: 'pending',
-      totalAmount
+      
     });
   
     res.status(201).json({
