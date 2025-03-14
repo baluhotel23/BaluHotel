@@ -29,8 +29,13 @@ function RoomsSection() {
             className="w-full h-[250px] object-cover"
           />
           <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/60 to-transparent p-4">
-            {/* <h2 className="text-white text-lg font-bold">{room.maxGuests}</h2> */}
-            <button className="bg-white text-gray-800 font-bold rounded-full px-4 py-1 mt-2">
+            <button 
+              className="bg-white text-gray-800 font-bold rounded-full px-4 py-1 mt-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/room/${room.roomNumber}`);
+              }}
+            >
               Ver más
             </button>
           </div>

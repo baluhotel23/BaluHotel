@@ -29,7 +29,7 @@ export const getRoomById = (roomNumber) => async (dispatch) => {
   dispatch({ type: 'GET_ROOM_REQUEST' });
   try {
     const { data } = await api.get(`/rooms/${roomNumber}`);
-    dispatch({ type: 'GET_ROOM_SUCCESS', payload: data });
+    dispatch({ type: 'GET_ROOM_SUCCESS', payload: data.data });
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al obtener la habitación';
     dispatch({ type: 'GET_ROOM_FAILURE', payload: errorMessage });

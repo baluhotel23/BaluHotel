@@ -20,7 +20,7 @@ function RoomsCarousel() {
   if (error) return <p className="text-center text-xl text-red-500">Error: {error}</p>;
 
   return (
-    <div className="w-full max-w-screen-xl mx-auto px-4">
+    <div className="w-full max-w-screen-xl mx-auto ">
       <Swiper
         modules={[Autoplay]}
         slidesPerView={1}
