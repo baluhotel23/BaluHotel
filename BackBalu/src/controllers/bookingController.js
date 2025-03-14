@@ -60,7 +60,7 @@ const getRoomTypes = async (req, res) => {
 const createBooking = async (req, res) => {
     const { roomNumber, checkIn, checkOut,  guestCount, totalAmount } = req.body;
     // Usamos guestId a partir del usuario autenticado (n_document)
-    const guestId = req.user.n_document;
+    //const guestId = req.user.n_document;
   
     // Buscar la habitación
     const room = await Room.findByPk(roomNumber);
@@ -96,7 +96,7 @@ const createBooking = async (req, res) => {
     //const totalAmount = totalbooking * nights; // revisar esta logica
   
     const booking = await Booking.create({
-      guestId,
+      //guestId,
       roomNumber,
       checkIn,
       checkOut,

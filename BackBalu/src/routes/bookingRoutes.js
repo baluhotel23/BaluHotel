@@ -24,10 +24,12 @@ const {
 // Rutas públicas (no requieren autenticación)
 router.get('/availability', checkAvailability);
 router.get('/room-types', getRoomTypes);
-
-// Middleware de autenticación para todas las rutas siguientes
-router.use(verifyToken);
 router.post('/create', createBooking);
+// Middleware de autenticación para todas las rutas siguientes
+
+
+router.use(verifyToken);
+
 router.get('/user', getUserBookings);
 router.get('/:bookingId', getBookingById);
 router.post('/:bookingId/cancel', cancelBooking);
