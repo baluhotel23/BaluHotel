@@ -59,7 +59,7 @@ const RoomDetail = () => {
             <h3 className="text-xl font-bold mt-2 text-secondary">${parseFloat(room.price).toLocaleString('es-ES')}</h3>
           </div>
           <button
-            onClick={() => navigate('/reserve')}
+            onClick={() => navigate('/booking')}
             className="bg-degrade px-4 py-2 rounded-full text-white hover:bg-yellow-700 opacity-50"
           >
             Reservar

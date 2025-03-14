@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { getAllRooms, updateRoom, deleteRoom } from '../../Redux/Actions/roomActions';
+import { getAllServices } from '../../Redux/Actions/serviceActions';
 import DashboardLayout from './DashboardLayout';
 import { openCloudinaryWidget } from '../../cloudinaryConfig';
 
@@ -27,6 +28,7 @@ const RoomList = () => {
 
   useEffect(() => {
     dispatch(getAllRooms());
+    dispatch(getAllServices());
   }, [dispatch]);
 
   useEffect(() => {
@@ -53,14 +55,14 @@ const RoomList = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value, type, selectedOptions, checked } = e.target;
     if (type === 'checkbox') {
       setFormData({
         ...formData,
         [name]: checked
       });
     } else if (name === 'services') {
-      const selectedServices = Array.from(e.target.selectedOptions, option => option.value);
+      const selectedServices = Array.from(selectedOptions, option => option.value);
       setFormData({
         ...formData,
         [name]: selectedServices
@@ -115,228 +117,185 @@ const RoomList = () => {
       ) : error ? (
         <p>Error: {error}</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead>
-              <tr>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número de Habitación</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacidad</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicios</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Hab</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Imágenes</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Disponible</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Promoción</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Promoción</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activo</th>
-                <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {rooms.map((room) => (
-                <tr key={room.roomNumber}>
-                  <td className="px-6 py-4 whitespace-nowrap">{room.roomNumber}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <input
-                        type="text"
-                        name="description"
-                        value={formData.description}
-                        onChange={handleChange}
-                        className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      room.description
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <input
-                        type="number"
-                        name="price"
-                        value={formData.price}
-                        onChange={handleChange}
-                        className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      room.price
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <input
-                        type="number"
-                        name="maxGuests"
-                        value={formData.maxGuests}
-                        onChange={handleChange}
-                        className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      room.maxGuests
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <select
-                        name="services"
-                        value={formData.services}
-                        onChange={handleChange}
-                        className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                        multiple
-                      >
-                        {services.map(service => (
-                          <option key={service.id} value={service.name}>
-                            {service.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      room.Services.map(service => service.name).join(', ')
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <select
-                        name="type"
-                        value={formData.type}
-                        onChange={handleChange}
-                        className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      >
-                        <option value="">Selecciona un tipo</option>
-                        <option value="Sencilla">Sencilla</option>
-                        <option value="Doble">Doble</option>
-                        <option value="Triple">Triple</option>
-                        <option value="Cuadruple">Cuadruple</option>
-                        <option value="Pareja">Pareja</option>
-                      </select>
-                    ) : (
-                      room.type
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={handleWidget}
-                          className="mt-1 block w-full py-2 px-4 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700"
-                        >
-                          Subir Imágenes
-                        </button>
-                        <div className="mt-4 grid grid-cols-3 gap-4">
-                          {formData.image_url.map((img, index) => (
-                            <div key={index} className="relative group">
-                              <img
-                                src={img}
-                                alt={`Imagen ${index + 1}`}
-                                className="w-full h-32 object-cover rounded-md"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleImageDelete(img)}
-                                className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
-                              >
-                                <svg 
-                                  xmlns="http://www.w3.org/2000/svg" 
-                                  className="h-5 w-5" 
-                                  viewBox="0 0 20 20" 
-                                  fill="currentColor"
-                                >
-                                  <path 
-                                    fillRule="evenodd" 
-                                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" 
-                                    clipRule="evenodd" 
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      room.image_url.map((img, index) => (
-                        <img
-                          key={index}
-                          src={img}
-                          alt={`Imagen ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-md"
+        <div className="space-y-6">
+          {rooms.map((room) => (
+            <div key={room.roomNumber} className="bg-white p-4 rounded-lg shadow-md">
+              <div className="flex flex-col md:flex-row md:items-center">
+                <div className="flex-shrink-0">
+                  {room.image_url.map((img, index) => (
+                    <img
+                      key={index}
+                      src={img}
+                      alt={`Imagen ${index + 1}`}
+                      className="w-16 h-16 object-cover rounded-md mb-2 md:mb-0 md:mr-4"
+                    />
+                  ))}
+                </div>
+                <div className="flex-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Número de Habitación</label>
+                      <p className="mt-1">{room.roomNumber}</p>
+                    </div>
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Descripción</label>
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                        <input
+                          type="text"
+                          name="description"
+                          value={formData.description}
+                          onChange={handleChange}
+                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
                         />
-                      ))
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <input
-                        type="checkbox"
-                        name="available"
-                        checked={formData.available}
-                        onChange={handleChange}
-                        className="mt-1 block shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      room.available ? 'Sí' : 'No'
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <input
-                        type="checkbox"
-                        name="isPromo"
-                        checked={formData.isPromo}
-                        onChange={handleChange}
-                        className="mt-1 block shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      room.isPromo ? 'Sí' : 'No'
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <input
-                        type="number"
-                        name="promotionPrice"
-                        value={formData.promotionPrice || ''}
-                        onChange={handleChange}
-                        className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      room.promotionPrice
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <input
-                        type="text"
-                        name="status"
-                        value={formData.status || ''}
-                        onChange={handleChange}
-                        className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      room.status
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
-                      <input
-                        type="checkbox"
-                        name="isActive"
-                        checked={formData.isActive}
-                        onChange={handleChange}
-                        className="mt-1 block shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      room.isActive ? 'Sí' : 'No'
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                      ) : (
+                        <p className="mt-1">{room.description}</p>
+                      )}
+                    </div>
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Precio</label>
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                        <input
+                          type="number"
+                          name="price"
+                          value={formData.price}
+                          onChange={handleChange}
+                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        />
+                      ) : (
+                        <p className="mt-1">{room.price}</p>
+                      )}
+                    </div>
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Capacidad</label>
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                        <input
+                          type="number"
+                          name="maxGuests"
+                          value={formData.maxGuests}
+                          onChange={handleChange}
+                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        />
+                      ) : (
+                        <p className="mt-1">{room.maxGuests}</p>
+                      )}
+                    </div>
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Servicios</label>
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                        <select
+                          name="services"
+                          value={formData.services}
+                          onChange={handleChange}
+                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                          multiple
+                        >
+                          {services.map(service => (
+                            <option key={service.id} value={service.name}>
+                              {service.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="mt-1">{room.Services.map(service => service.name).join(', ')}</p>
+                      )}
+                    </div>
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Tipo de Habitación</label>
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                        <select
+                          name="type"
+                          value={formData.type}
+                          onChange={handleChange}
+                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        >
+                          <option value="">Selecciona un tipo</option>
+                          <option value="Sencilla">Sencilla</option>
+                          <option value="Doble">Doble</option>
+                          <option value="Triple">Triple</option>
+                          <option value="Cuadruple">Cuadruple</option>
+                          <option value="Pareja">Pareja</option>
+                        </select>
+                      ) : (
+                        <p className="mt-1">{room.type}</p>
+                      )}
+                    </div>
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Disponible</label>
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                        <input
+                          type="checkbox"
+                          name="available"
+                          checked={formData.available}
+                          onChange={handleChange}
+                          className="mt-1 block shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        />
+                      ) : (
+                        <p className="mt-1">{room.available ? 'Sí' : 'No'}</p>
+                      )}
+                    </div>
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Promoción</label>
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                        <input
+                          type="checkbox"
+                          name="isPromo"
+                          checked={formData.isPromo}
+                          onChange={handleChange}
+                          className="mt-1 block shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        />
+                      ) : (
+                        <p className="mt-1">{room.isPromo ? 'Sí' : 'No'}</p>
+                      )}
+                    </div>
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Precio Promoción</label>
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                        <input
+                          type="number"
+                          name="promotionPrice"
+                          value={formData.promotionPrice || ''}
+                          onChange={handleChange}
+                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        />
+                      ) : (
+                        <p className="mt-1">{room.promotionPrice}</p>
+                      )}
+                    </div>
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Estado</label>
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                        <input
+                          type="text"
+                          name="status"
+                          value={formData.status || ''}
+                          onChange={handleChange}
+                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        />
+                      ) : (
+                        <p className="mt-1">{room.status}</p>
+                      )}
+                    </div>
+                    <div className="border-b pb-2">
+                      <label className="block text-sm font-medium text-gray-700">Activo</label>
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                        <input
+                          type="checkbox"
+                          name="isActive"
+                          checked={formData.isActive}
+                          onChange={handleChange}
+                          className="mt-1 block shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        />
+                      ) : (
+                        <p className="mt-1">{room.isActive ? 'Sí' : 'No'}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex space-x-2">
                     {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
                       <>
                         <button
                           onClick={handleSubmit}
-                          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:shadow-outline"
+                          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
                         >
                           Guardar
                         </button>
@@ -351,7 +310,7 @@ const RoomList = () => {
                       <>
                         <button
                           onClick={() => handleEdit(room)}
-                          className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:shadow-outline"
+                          className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
                         >
                           Editar
                         </button>
@@ -363,11 +322,11 @@ const RoomList = () => {
                         </button>
                       </>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </DashboardLayout>

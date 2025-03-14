@@ -29,7 +29,7 @@ function Navbar() {
           <li><Link to="/" className="hover:text-degrade">Inicio</Link></li>
           <li><Link to="/about" className="hover:text-degrade">Sobre nosotros</Link></li>
           <li><Link to="/RoomsSection" className="hover:text-degrade">Habitaciones</Link></li>
-          <li><Link to="/reserve" className="bg-degrade px-4 py-2 rounded-full text-white hover:bg-yellow-700 opacity-50">Reservar</Link></li>
+          <li><Link to="/booking" className="bg-degrade px-4 py-2 rounded-full text-white hover:bg-yellow-700 opacity-50">Reservar</Link></li>
         </ul>
       </div>
       {isOpen && (
@@ -38,7 +38,7 @@ function Navbar() {
             <li><Link to="/" className="hover:text-degrade" onClick={() => setIsOpen(false)}>Inicio</Link></li>
             <li><Link to="/about" className="hover:text-degrade" onClick={() => setIsOpen(false)}>Sobre nosotros</Link></li>
             <li><Link to="/RoomsSection" className="hover:text-degrade" onClick={() => setIsOpen(false)}>Habitaciones</Link></li>
-            <li><Link to="/reserve" className="bg-degrade px-4 py-2 rounded-full text-white hover:bg-yellow-700 opacity-50" onClick={() => setIsOpen(false)}>Reservar</Link></li>
+            <li><Link to="/booking" className="bg-degrade px-4 py-2 rounded-full text-white hover:bg-yellow-700 opacity-50" onClick={() => setIsOpen(false)}>Reservar</Link></li>
           </ul>
         </div>
       )}
