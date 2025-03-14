@@ -1,4 +1,4 @@
-const { Room, Booking, ExtraCharge, Bill, User } = require('../data');
+const { Room, Booking, ExtraCharge, Bill, User, Service } = require('../data');
 const { CustomError } = require('../middleware/error');
 const { Op } = require('sequelize');
 
@@ -28,6 +28,10 @@ const checkAvailability = async (req, res) => {
                 ]
             },
             required: false
+        },
+        {
+          model: Service,
+          through: { attributes: [] } // Include services without through table attributes
         }]
     });
 

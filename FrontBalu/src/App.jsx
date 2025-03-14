@@ -20,6 +20,7 @@ import CreateRoom from './Components/Dashboard/CreateRoom';
 import RoomList from './Components/Dashboard/RoomList';
 import Navbar from './Components/Navbar';
 import RoomDetail from './Components/Rooms/RoomDetail';
+import Booking from './Components/Booking/Booking';
 
 
 function App() {
@@ -60,6 +61,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/RoomsSection" element={<RoomsSection />} />
         <Route path="/room/:roomNumber" element={<RoomDetail />} />
+        <Route path="/booking" element={<Booking />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/unauthorized" element={<Unauthorized />} />

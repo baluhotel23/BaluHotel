@@ -26,7 +26,7 @@ const bookingReducer = (state = initialState, action) => {
         case 'GET_ROOM_TYPES_REQUEST':
             return { ...state, loading: true, error: null };
         case 'GET_ROOM_TYPES_SUCCESS':
-            return { ...state, loading: false, roomTypes: action.payload };
+            return { ...state, loading: false, roomTypes: action.payload.data };
         case 'GET_ROOM_TYPES_FAILURE':
             return { ...state, loading: false, error: action.payload };
 

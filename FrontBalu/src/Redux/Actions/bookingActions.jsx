@@ -19,8 +19,8 @@ export const checkAvailability = (params) => async (dispatch) => {
 export const getRoomTypes = () => async (dispatch) => {
   dispatch({ type: 'GET_ROOM_TYPES_REQUEST' });
   try {
-    const { data } = await api.get('/room-types');
-    dispatch({ type: 'GET_ROOM_TYPES_SUCCESS', payload: data.data });
+    const { data } = await api.get('/bookings/room-types');
+    dispatch({ type: 'GET_ROOM_TYPES_SUCCESS', payload: data });
   } catch (error) {
     const errorMessage =
       error.response?.data?.message || 'Error al obtener tipos de habitación';
