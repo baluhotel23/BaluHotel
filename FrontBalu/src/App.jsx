@@ -21,6 +21,7 @@ import RoomList from './Components/Dashboard/RoomList';
 import Navbar from './Components/Navbar';
 import RoomDetail from './Components/Rooms/RoomDetail';
 import Booking from './Components/Booking/Booking';
+import BookingsPendientes from './Components/Taxxa/BookingsPendientes';
 
 
 function App() {
@@ -96,6 +97,15 @@ function App() {
           element={
             <PrivateRoute allowedRoles={['owner', 'admin']}>
               <RoomList />
+            </PrivateRoute>
+          }
+        />
+
+<Route
+          path="/admin/pendientesFactura"
+          element={
+            <PrivateRoute allowedRoles={['owner', 'admin']}>
+              <BookingsPendientes />
             </PrivateRoute>
           }
         />

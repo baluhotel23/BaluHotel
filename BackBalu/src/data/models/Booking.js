@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
- const Reservation = sequelize.define('Booking', {
+ sequelize.define('Booking', {
     bookingId: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -21,7 +21,7 @@ module.exports = (sequelize) => {
         defaultValue: "Online",
       },
     status: {
-      type: DataTypes.ENUM('pending', 'confirmed', 'checked-in', 'completed', 'cancelled'),
+      type: DataTypes.ENUM('pending', 'confirmed', 'checked-in', 'completed', 'facturada', 'cancelled'),
       defaultValue: 'pending'
     },
     guestCount: {
@@ -33,6 +33,6 @@ module.exports = (sequelize) => {
       allowNull: false
     }
   });
-return Reservation;
+
  
 };

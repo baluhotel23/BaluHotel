@@ -1,4 +1,4 @@
-const { SellerData, User, OrderDetail } = require('../../data');
+const { SellerData, User, Booking } = require('../../data');
 const { generateToken, sendDocument } = require('./taxxaUtils');
 
 const createInvoice = async (req, res) => {
@@ -16,39 +16,39 @@ const createInvoice = async (req, res) => {
       });
     }
 
-    const id_orderDetail = invoiceData.sorderreference;
-    console.log('Procesando orden:', id_orderDetail);
+    const bookingId = invoiceData.bookingId;
+    console.log('Procesando reserva:', bookingId);
 
     // First, get the order details
-    const orderDetail = await OrderDetail.findOne({
-      where: { id_orderDetail }
+    const Booking = await Booking.findOne({
+      where: { bookingId }
     });
 
     // Validate order exists
-    if (!orderDetail) {
-      console.error('Orden no encontrada:', id_orderDetail);
+    if (Booking) {
+      console.error('Reserva no encontrada:', bookingId);
       return res.status(404).json({
-        message: 'Orden no encontrada',
+        message: 'Reserva no encontrada',
         success: false,
-        orderReference: id_orderDetail
+        orderReference: bookingId
       });
     }
 
     // Check and log current order status
-    console.log('Estado actual de la orden:', orderDetail.status);
+    console.log('Estado actual de la reserva:', Booking.status);
 
     // Validate order status
-    if (orderDetail.status === 'facturada') {
-      console.log('=== Orden previamente facturada ===');
-      console.log('ID Orden:', id_orderDetail);
-      console.log('Estado:', orderDetail.status);
-      console.log('Fecha de facturación:', orderDetail.updatedAt);
+    if (Booking.status === 'confirmed') {
+      console.log('=== Reserva previamente facturada ===');
+      console.log('ID Reserva:', bookingId);
+      console.log('Estado:', Booking.status);
+      console.log('Fecha de facturación:', Booking.updatedAt);
 
       return res.status(400).json({
-        message: 'La orden ya está facturada',
+        message: 'La reserva ya está facturada',
         success: false,
-        orderReference: id_orderDetail,
-        invoicedAt: orderDetail.updatedAt
+        orderReference: bookingId,
+        invoicedAt: Booking.updatedAt
       });
     }
 
@@ -56,7 +56,7 @@ const createInvoice = async (req, res) => {
     console.log('=== Consultando datos adicionales ===');
     const [sellerData, userData] = await Promise.all([
       SellerData.findOne({ where: { sdocno: sellerId } }),
-      User.findOne({ where: { n_document: orderDetail.n_document } })
+      User.findOne({ where: { n_document: Booking.n_document } })
     ]);
 
     // Validate and log seller data
@@ -72,11 +72,11 @@ const createInvoice = async (req, res) => {
 
     // Validate and log user data
     if (!userData) {
-      console.error('Datos del comprador no encontrados:', orderDetail.n_document);
+      console.error('Datos del comprador no encontrados:', Booking.n_document);
       return res.status(404).json({
         message: 'Datos del comprador no encontrados',
         success: false,
-        buyerId: orderDetail.n_document
+        buyerId: Booking.n_document
       });
     }
     console.log('Datos del comprador encontrados:', userData.first_name, userData.last_name);
@@ -105,7 +105,7 @@ const createInvoice = async (req, res) => {
           ntaxexclusiveamount: 21008.4,
           ntaxinclusiveamount: 25000,
           npayableamount: 25000,
-          sorderreference: id_orderDetail,
+          sorderreference: bookingId,
           tdatereference: new Date().toISOString().slice(0, 10),
           jextrainfo: {},
           jdocumentitems: documentItemsArray,
@@ -173,14 +173,14 @@ const createInvoice = async (req, res) => {
     console.log('Respuesta de Taxxa:', JSON.stringify(taxxaResponse, null, 2));
 
     if (taxxaResponse && taxxaResponse.rerror === 0) {
-      console.log('=== Actualizando estado de la orden ===');
-      await orderDetail.update({ status: 'facturada' });
+      console.log('=== Actualizando estado de la reserva ===');
+      await Booking.update({ status: 'facturada' });
 
       return res.status(200).json({
         message: 'Factura creada y enviada con éxito',
         success: true,
         response: taxxaResponse,
-        orderReference: id_orderDetail
+        orderReference: bookingId
       });
     }
 
