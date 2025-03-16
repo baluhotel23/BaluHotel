@@ -5,7 +5,7 @@ import { getAllBookings } from '../../Redux/Actions/bookingActions';
 
 const BookingsPendientes = () => {
   const dispatch = useDispatch();
-  const { bookings, loading, error } = useSelector((state) => state.bookingsReducer); // Ajusta el nombre del reducer según tu app
+  const { bookings, loading, error } = useSelector((state) => state.booking); // Ajusta el nombre del reducer según tu app
 
   useEffect(() => {
     // Se envía el parámetro para buscar reservas con status "confirmed"

@@ -100,7 +100,7 @@ const checkAvailability = async (req, res, next) => {
 // Crear una nueva habitación
 const createRoom = async (req, res, next) => {
   try {
-    const { roomNumber, price, amenities, description, image_url, maxGuests, services } = req.body;
+    const { roomNumber, price, amenities, description, image_url, maxGuests, services, type } = req.body;
 
     // Crear la habitación
     const newRoom = await Room.create({
@@ -109,7 +109,8 @@ const createRoom = async (req, res, next) => {
       amenities,
       description,
       image_url,
-      maxGuests
+      maxGuests,
+      type
     });
 
     // Asociar los servicios a la habitación

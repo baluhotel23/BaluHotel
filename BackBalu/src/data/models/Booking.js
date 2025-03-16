@@ -1,38 +1,57 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
- sequelize.define('Booking', {
+  sequelize.define('Booking', {
+
     bookingId: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true
+      autoIncrement: true,
+      allowNull: false,
     },
     checkIn: {
       type: DataTypes.DATE,
-      allowNull: false
+      allowNull: false,
     },
     checkOut: {
       type: DataTypes.DATE,
-      allowNull: false
+      allowNull: false,
+    },
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     pointOfSale: {
-        type: DataTypes.ENUM("Online", "Local"),
-        allowNull: false,
-        defaultValue: "Online",
-      },
-    status: {
-      type: DataTypes.ENUM('pending', 'confirmed', 'checked-in', 'completed', 'facturada', 'cancelled'),
-      defaultValue: 'pending'
+      type: DataTypes.STRING,
+      allowNull: true,
     },
     guestCount: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true,
     },
     totalAmount: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: false
+      allowNull: true,
+    },
+   
+    guestId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      references: {
+        model: 'buyers', 
+        key: 'sdocno'
+      }
+    },
+    
+    roomNumber: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
     }
+  }, {
+    tableName: 'bookings',
+    timestamps: true,
   });
 
- 
+  
+  
 };

@@ -71,7 +71,7 @@ export const getBookingById = (bookingId) => async (dispatch) => {
 export const getAllBookings = (queryParams) => async (dispatch) => {
   dispatch({ type: 'GET_ALL_BOOKINGS_REQUEST' });
   try {
-    const { data } = await api.get('/bookings', { params: queryParams });
+    const { data } = await api.get('/bookings/reservas/all', { params: queryParams });
     dispatch({ type: 'GET_ALL_BOOKINGS_SUCCESS', payload: data.data });
   } catch (error) {
     const errorMessage =

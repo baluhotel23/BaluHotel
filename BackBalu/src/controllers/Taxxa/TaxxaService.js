@@ -19,13 +19,13 @@ const createInvoice = async (req, res) => {
     const bookingId = invoiceData.bookingId;
     console.log('Procesando reserva:', bookingId);
 
-    // First, get the order details
-    const Booking = await Booking.findOne({
+    // Buscar la reserva con bookingId
+    const bookingInstance = await Booking.findOne({
       where: { bookingId }
     });
 
-    // Validate order exists
-    if (Booking) {
+    // Validar que la reserva exista
+    if (!bookingInstance) {
       console.error('Reserva no encontrada:', bookingId);
       return res.status(404).json({
         message: 'Reserva no encontrada',
@@ -34,32 +34,28 @@ const createInvoice = async (req, res) => {
       });
     }
 
-    // Check and log current order status
-    console.log('Estado actual de la reserva:', Booking.status);
+    // Registrar estado actual
+    console.log('Estado actual de la reserva:', bookingInstance.status);
 
-    // Validate order status
-    if (Booking.status === 'confirmed') {
+    // Validar si la reserva ya está facturada (suponiendo que estado 'confirmed' indica facturación)
+    if (bookingInstance.status === 'confirmed') {
       console.log('=== Reserva previamente facturada ===');
-      console.log('ID Reserva:', bookingId);
-      console.log('Estado:', Booking.status);
-      console.log('Fecha de facturación:', Booking.updatedAt);
-
       return res.status(400).json({
         message: 'La reserva ya está facturada',
         success: false,
         orderReference: bookingId,
-        invoicedAt: Booking.updatedAt
+        invoicedAt: bookingInstance.updatedAt
       });
     }
 
-    // Now get seller and user data in parallel
+    // Obtener datos del vendedor y del comprador en paralelo
     console.log('=== Consultando datos adicionales ===');
     const [sellerData, userData] = await Promise.all([
       SellerData.findOne({ where: { sdocno: sellerId } }),
-      User.findOne({ where: { n_document: Booking.n_document } })
+      User.findOne({ where: { n_document: bookingInstance.n_document } })
     ]);
 
-    // Validate and log seller data
+    // Validar datos del vendedor
     if (!sellerData) {
       console.error('Datos del vendedor no encontrados:', sellerId);
       return res.status(404).json({
@@ -70,18 +66,18 @@ const createInvoice = async (req, res) => {
     }
     console.log('Datos del vendedor encontrados:', sellerData.ssellername);
 
-    // Validate and log user data
+    // Validar datos del comprador
     if (!userData) {
-      console.error('Datos del comprador no encontrados:', Booking.n_document);
+      console.error('Datos del comprador no encontrados:', bookingInstance.n_document);
       return res.status(404).json({
         message: 'Datos del comprador no encontrados',
         success: false,
-        buyerId: Booking.n_document
+        buyerId: bookingInstance.n_document
       });
     }
     console.log('Datos del comprador encontrados:', userData.first_name, userData.last_name);
 
-    // Construir el objeto jdocumentitems como un array
+    // Construir el array de items del documento
     const documentItemsArray = Object.values(invoiceData.jdocumentitems);
 
     console.log('=== Construyendo documento para Taxxa ===');
@@ -174,7 +170,9 @@ const createInvoice = async (req, res) => {
 
     if (taxxaResponse && taxxaResponse.rerror === 0) {
       console.log('=== Actualizando estado de la reserva ===');
-      await Booking.update({ status: 'facturada' });
+      // Actualizamos la reserva; si bookingInstance es una instancia de modelo puedes usar update directamente:
+      await bookingInstance.update({ status: 'facturada' });
+      // Otra opción: Booking.update({ status: 'facturada' }, { where: { bookingId } });
 
       return res.status(200).json({
         message: 'Factura creada y enviada con éxito',

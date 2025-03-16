@@ -22,6 +22,8 @@ import Navbar from './Components/Navbar';
 import RoomDetail from './Components/Rooms/RoomDetail';
 import Booking from './Components/Booking/Booking';
 import BookingsPendientes from './Components/Taxxa/BookingsPendientes';
+import BuyerRegistrationForm from './Components/Taxxa/BuyerRegistrationForm';
+import ParentBuyerRegistration from './Components/Taxxa/ParentBuyerRegistration';
 
 
 function App() {
@@ -65,6 +67,8 @@ function App() {
         <Route path="/booking" element={<Booking />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/buyerForm" element={<BuyerRegistrationForm />} />
+        <Route path="/registro-comprador" element={<ParentBuyerRegistration />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
 
         {/* Rutas protegidas */}
@@ -109,6 +113,8 @@ function App() {
             </PrivateRoute>
           }
         />
+
+
         
 
         {/* Ruta por defecto para 404 */}

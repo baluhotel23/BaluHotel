@@ -1,5 +1,5 @@
 const initialState = {
-    user: null,
+    buyer: null,
     seller: null,
     invoice: null,
     loading: false,
@@ -9,7 +9,7 @@ const initialState = {
   
   const taxxaReducer = (state = initialState, action) => {
     switch (action.type) {
-      case 'FETCH_USER_REQUEST':
+      case 'FETCH_BUYER_REQUEST':
       case 'FETCH_SELLER_REQUEST':
       case 'CREATE_SELLER_REQUEST':
       case 'UPDATE_SELLER_REQUEST':
@@ -21,11 +21,11 @@ const initialState = {
           message: null,
         };
   
-      case 'FETCH_USER_SUCCESS':
+      case 'FETCH_BUYER_SUCCESS':
         return {
           ...state,
           loading: false,
-          user: action.payload,
+          buyer: action.payload,
           error: null,
         };
   
@@ -64,7 +64,7 @@ const initialState = {
           message: 'Factura enviada exitosamente.',
         };
   
-      case 'FETCH_USER_FAILURE':
+      case 'FETCH_BUYER_FAILURE':
       case 'FETCH_SELLER_FAILURE':
       case 'CREATE_SELLER_FAILURE':
       case 'UPDATE_SELLER_FAILURE':

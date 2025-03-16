@@ -1,21 +1,21 @@
 import api from '../../utils/axios';
 import { toast } from 'react-toastify';
 
-export const fetchUserByDocument = (n_document) => async (dispatch) => {
-    dispatch({ type: 'FETCH_USER_REQUEST' });
+export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
+    dispatch({ type: 'FETCH_BUYER_REQUEST' });
   
     try {
-      const response = await api.get(`/user/${n_document}`);
+      const response = await api.get(`/taxxa/buyer/${sdocno}`);
       const data = await response.json();
       console.log(data);
   
       if (data && data.message) {
-        dispatch({ type: 'FETCH_USER_SUCCESS', payload: data.message });
+        dispatch({ type: 'FETCH_BUYER_SUCCESS', payload: data.message });
       } else {
-        dispatch({ type: 'FETCH_USER_FAILURE', payload: "Usuario no encontrado" });
+        dispatch({ type: 'FETCH_BUYER_FAILURE', payload: "Usuario no encontrado" });
       }
     } catch (error) {
-      dispatch({ type: 'FETCH_USER_FAILURE', payload: error.message });
+      dispatch({ type: 'FETCH_BUYER_FAILURE', payload: error.message });
     }
   };
 

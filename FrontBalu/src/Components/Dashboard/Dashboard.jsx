@@ -56,7 +56,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Card 4: Upload Services */}
         {user.role === 'owner' && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">CARGAR SERVICIOS</h2>
@@ -68,6 +67,21 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
+
+        {/* Card 4: Upload Services */}
+        {(user.role === 'owner' || user.role === 'admin') && (
+          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+            <h2 className="text-xl font-semibold mb-2">TAXXA</h2>
+            <p className="text-gray-600 mb-4">Facturación</p>
+            <Link to="/admin/pendientesFactura">
+              <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                TAXXA
+              </button>
+            </Link>
+          </div>
+        )}
+
+       
       </div>
     </DashboardLayout>
   );
