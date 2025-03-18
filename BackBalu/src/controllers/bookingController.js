@@ -115,7 +115,7 @@ const createBooking = async (req, res) => {
 
   const getUserBookings = async (req, res, next) => {
     try {
-      const guestId = req.user.sdocno;
+      const guestId = req.guestId;
       if (!guestId) {
         return res.status(400).json({
           error: true,
@@ -152,9 +152,7 @@ const getBookingById = async (req, res) => {
     }
 
     // Si es cliente, verificar que sea su reserva
-    if (req.buyer.role === 'client' && booking.guestId !== req.user.sdocno) {
-        throw new CustomError('No autorizado', 403);
-    }
+    
 
     res.json({
         error: false,

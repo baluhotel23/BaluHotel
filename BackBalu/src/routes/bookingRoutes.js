@@ -30,13 +30,13 @@ router.post('/create', createBooking);
 
 router.use(verifyToken);
 
-router.get('/user', getUserBookings);
+router.get('/user/:guestId', getUserBookings);
 router.get('/:bookingId', getBookingById);
 router.post('/:bookingId/cancel', cancelBooking);
 
 // Rutas para clientes y staff
 router.post('/', validateBooking, createBooking);
-router.get('/user/my-bookings', getUserBookings);
+router.get('/user/my-bookings/:guestId', getUserBookings);
 router.get('/:bookingId', getBookingById);
 
 // Middleware de staff para todas las rutas siguientes
