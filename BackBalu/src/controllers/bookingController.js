@@ -7,44 +7,80 @@ const PDFDocument = require('pdfkit');
 
 // Public endpoints
 const checkAvailability = async (req, res) => {
-    const { checkIn, checkOut, roomType } = req.query;
-    
-    const where = {};
-    if (roomType) where.type = roomType;
+  try {
+      const { checkIn, checkOut, roomType } = req.query;
+      
+      const where = {};
+      if (roomType) where.type = roomType;
 
-    const rooms = await Room.findAll({
-        where,
-        include: [{
-            model: Booking,
-            where: {
-                [Op.or]: [
-                    {
-                        checkIn: {
-                            [Op.between]: [checkIn, checkOut]
-                        }
-                    },
-                    {
-                        checkOut: {
-                            [Op.between]: [checkIn, checkOut]
-                        }
-                    }
-                ]
-            },
-            required: false
-        },
-        {
-          model: Service,
-          through: { attributes: [] } // Include services without through table attributes
-        }]
-    });
+      // Get all rooms with their bookings
+      const rooms = await Room.findAll({
+          where,
+          include: [{
+              model: Booking,
+              attributes: ['bookingId', 'checkIn', 'checkOut', 'status'],
+              // Remove the where clause to get ALL bookings
+              required: false
+          },
+          {
+              model: Service,
+              through: { attributes: [] }
+          }]
+      });
 
-    const availableRooms = rooms.filter(room => !room.Bookings.length);
+      // Process rooms to include availability info
+      const roomsWithAvailability = rooms.map(room => {
+          // Filter active bookings (not cancelled)
+          const activeBookings = room.Bookings.filter(
+              booking => booking.status !== 'cancelled'
+          );
 
-    res.json({
-        error: false,
-        message: 'Disponibilidad consultada exitosamente',
-        data: availableRooms
-    });
+          // Check if room is available for requested dates
+          const isAvailable = !activeBookings.some(booking => {
+              const bookingStart = new Date(booking.checkIn);
+              const bookingEnd = new Date(booking.checkOut);
+              const requestStart = new Date(checkIn);
+              const requestEnd = new Date(checkOut);
+
+              return (
+                  (bookingStart <= requestEnd && bookingEnd >= requestStart) ||
+                  (requestStart <= bookingEnd && requestEnd >= bookingStart)
+              );
+          });
+
+          // Get all booked dates
+          const bookedDates = activeBookings.map(booking => ({
+              checkIn: booking.checkIn,
+              checkOut: booking.checkOut,
+              bookingId: booking.bookingId
+          }));
+
+          return {
+              roomNumber: room.roomNumber,
+              type: room.type,
+              price: room.price,
+              maxGuests: room.maxGuests,
+              description: room.description,
+              image_url: room.image_url,
+              Services: room.Services,
+              isAvailable,
+              bookedDates,
+              currentBookings: activeBookings.length
+          };
+      });
+
+      res.json({
+          error: false,
+          message: 'Disponibilidad consultada exitosamente',
+          data: roomsWithAvailability
+      });
+  } catch (error) {
+      res.status(500).json({
+          error: true,
+          message: 'Error al consultar disponibilidad',
+          details: error.message
+      });
+  }
 };
 
 const getRoomTypes = async (req, res) => {

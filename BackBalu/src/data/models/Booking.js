@@ -17,13 +17,14 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     status: {
-      type: DataTypes.STRING,
-      allowNull: false,
+      type: DataTypes.ENUM('pending', 'confirmed', 'checked-in', 'completed', 'cancelled'),
+      defaultValue: 'pending'
     },
     pointOfSale: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
+        type: DataTypes.ENUM("Online", "Local"),
+        allowNull: false,
+        defaultValue: "Online",
+      },
     guestCount: {
       type: DataTypes.INTEGER,
       allowNull: true,
