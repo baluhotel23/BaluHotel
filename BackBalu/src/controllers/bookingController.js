@@ -2,6 +2,7 @@ const { Room, Booking, ExtraCharge, Bill,  Service, Buyer} = require('../data');
 const { CustomError } = require('../middleware/error');
 const { Op } = require('sequelize');
 const jwt = require("jsonwebtoken");
+const PDFDocument = require('pdfkit');
 
 
 // Public endpoints
@@ -141,7 +142,7 @@ const downloadBookingPdf = async (req, res, next) => {
     }
     
     // Generar PDF (puedes personalizar la lógica)
-    const doc = new pdf();
+    const doc = new PDFDocument();
     let buffers = [];
     doc.on('data', buffers.push.bind(buffers));
     doc.on('end', () => {

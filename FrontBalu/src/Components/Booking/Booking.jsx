@@ -125,20 +125,33 @@ const Booking = () => {
     );
 };
 
+const calculateTotal = (adults, children, room, checkIn, checkOut) => {
+  const totalGuests = adults + children;
+  const nights = differenceInDays(checkOut, checkIn) + 1;
+
+  if (!room) return 0;
+
+  let pricePerPerson = room.price;
+  if (totalGuests === 1) pricePerPerson = 70000;
+  else if (totalGuests >= 2 && totalGuests <= 4) pricePerPerson = 60000;
+  else if (totalGuests > 4) pricePerPerson = 50000;
+
+  return pricePerPerson * totalGuests * nights;
+};
+useEffect(() => {
+  if (selectedRoom) {
+    const newTotal = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
+    setBookingTotal(newTotal);
+  }
+}, [adults, children, selectedRoom, checkIn, checkOut]);
+
 const handleAdultsChange = (e, room) => {
   const newAdults = parseInt(e.target.value);
   const total = newAdults + children;
 
   if (total <= room.maxGuests) {
     setAdults(newAdults);
-    // Calcular nuevo total
-    const nights = differenceInDays(checkOut, checkIn);
-    let pricePerPerson = room.price;
-    
-    if (total === 2) pricePerPerson = 60000;
-    else if (total > 4) pricePerPerson = 50000;
-    
-    const newTotal = pricePerPerson * total * nights;
+    const newTotal = calculateTotal(newAdults, children, room, checkIn, checkOut);
     setBookingTotal(newTotal);
   } else {
     toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
@@ -151,14 +164,7 @@ const handleChildrenChange = (e, room) => {
 
   if (total <= room.maxGuests) {
     setChildren(newChildren);
-    // Calcular nuevo total
-    const nights = differenceInDays(checkOut, checkIn);
-    let pricePerPerson = room.price;
-    
-    if (total === 2) pricePerPerson = 60000;
-    else if (total > 4) pricePerPerson = 50000;
-    
-    const newTotal = pricePerPerson * total * nights;
+    const newTotal = calculateTotal(adults, newChildren, room, checkIn, checkOut);
     setBookingTotal(newTotal);
   } else {
     toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
@@ -179,20 +185,11 @@ const handleChildrenChange = (e, room) => {
     }
   
     try {
+      const totalAmount = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
       const totalGuests = adults + children;
-      const nights = differenceInDays(checkOut, checkIn);
-  
-      if (nights <= 0) {
-        alert("Por favor seleccione fechas válidas");
-        return;
-      }
-  
-      let pricePerPerson = selectedRoom.price;
-      if (totalGuests === 2) pricePerPerson = 60000;
-      else if (totalGuests > 4) pricePerPerson = 50000;
-  
-      const totalAmount = pricePerPerson * totalGuests * nights;
-  
+      const nights = differenceInDays(checkOut, checkIn) + 1;
+
+
       const bookingData = {
         checkIn,
         checkOut,
@@ -431,7 +428,7 @@ const handleChildrenChange = (e, room) => {
               <p className="mb-2">Adultos: {adults}</p>
               <p className="mb-2">Niños: {children}</p>
               <p className="mb-2">
-                Total: {formatPrice(selectedRoom.price * (adults + children))}
+              Total: {formatPrice(bookingTotal)}
               </p>
               <button
                 onClick={handleBooking}
