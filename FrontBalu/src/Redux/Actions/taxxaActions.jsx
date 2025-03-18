@@ -173,7 +173,7 @@ export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
             });
             toast.error(error.message);
             // Retornamos un objeto de error en lugar de lanzar el error
-            return { error: true, message: error.message };
+            return { success: false, message: error.message };
         }
     };
 };

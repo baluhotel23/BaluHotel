@@ -147,22 +147,22 @@ const Booking = () => {
       alert("Por favor complete el registro de usuario");
       return;
     }
-  
+
     try {
       const totalGuests = adults + children;
       const nights = differenceInDays(checkOut, checkIn);
-  
+
       if (nights <= 0) {
         alert("Por favor seleccione fechas válidas");
         return;
       }
-  
+
       let pricePerPerson = selectedRoom.price;
       if (totalGuests === 2) pricePerPerson = 60000;
       else if (totalGuests > 4) pricePerPerson = 50000;
-  
+
       const totalAmount = pricePerPerson * totalGuests * nights;
-  
+
       const bookingData = {
         checkIn,
         checkOut,
@@ -178,20 +178,18 @@ const Booking = () => {
         guestId: buyerData.sdocno,
         buyerInfo: {
           name: buyerData.scostumername,
-          docType: buyerData.jpartylegalentity.wdoctype,
-          docNumber: buyerData.sdocno,
-          email: buyerData.jcontact.selectronicmail,
-          phone: buyerData.jcontact.stelephone,
+          docType: buyerData.wdoctype,      // <-- Se usa la propiedad aplanada
+          sdocno: buyerData.sdocno,
+          email: buyerData.selectronicmail,
+          phone: buyerData.stelephone,
         },
       };
-  
+
       console.log("Datos completos de la reserva:", bookingData);
       const response = await dispatch(createBooking(bookingData));
-  
-      if (response.success) {
-        alert('Reserva creada exitosamente');
-      }
-  
+
+      
+
     } catch (error) {
       console.error('Error al crear la reserva:', error);
       alert('Error al procesar la reserva: ' + error.message);
@@ -375,32 +373,32 @@ const Booking = () => {
         )}
       </div>
       {showRegistration && (
-  <div className="col-span-1 md:col-span-4 flex flex-col md:flex-row gap-6">
-    <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
-      <h2 className="text-xl font-bold mb-4">Registro de Usuario</h2>
-      <ParentBuyerRegistration onComplete={handleBuyerDataComplete} />
-    </div>
-    {selectedRoom && (
-      <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
-        <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
-        <p className="mb-2">Habitación: {selectedRoom.type}</p>
-        <p className="mb-2">Desde: {formatDate(checkIn)}</p>
-        <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
-        <p className="mb-2">Adultos: {adults}</p>
-        <p className="mb-2">Niños: {children}</p>
-        <p className="mb-2">
-          Total: {formatPrice(selectedRoom.price * (adults + children))}
-        </p>
-        <button
-          onClick={handleBooking}
-          className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold"
-        >
-          Confirmar Reserva
-        </button>
-      </div>
-    )}
-  </div>
-)}
+        <div className="col-span-1 md:col-span-4 flex flex-col md:flex-row gap-6">
+          <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
+            <h2 className="text-xl font-bold mb-4">Registro de Usuario</h2>
+            <ParentBuyerRegistration onComplete={handleBuyerDataComplete} />
+          </div>
+          {selectedRoom && (
+            <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
+              <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
+              <p className="mb-2">Habitación: {selectedRoom.type}</p>
+              <p className="mb-2">Desde: {formatDate(checkIn)}</p>
+              <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
+              <p className="mb-2">Adultos: {adults}</p>
+              <p className="mb-2">Niños: {children}</p>
+              <p className="mb-2">
+                Total: {formatPrice(selectedRoom.price * (adults + children))}
+              </p>
+              <button
+                onClick={handleBooking}
+                className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold"
+              >
+                Confirmar Reserva
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

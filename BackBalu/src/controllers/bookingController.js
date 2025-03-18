@@ -60,7 +60,7 @@ const getRoomTypes = async (req, res) => {
 const createBooking = async (req, res) => {
     const { roomNumber, checkIn, checkOut,  guestCount, totalAmount } = req.body;
     // Usamos guestId a partir del usuario autenticado (n_document)
-    const guestId = req.buyer.sdocno;
+    const guestId = req.buyer?.sdocno || req.body.guestId;
   
     // Buscar la habitación
     const room = await Room.findByPk(roomNumber);
@@ -178,7 +178,7 @@ const getAllBookings = async (req, res) => {
         where,
         include: [
           { model: Room },
-          { model: Buyer, as: 'guest', attributes: ['n_document', 'email', 'first_name', 'last_name', 'email', 'phone'] }
+          { model: Buyer, as: 'guest', attributes: ['sdocno'] }
         ],
         order: [['checkIn', 'ASC']]
       });
@@ -214,7 +214,7 @@ const checkIn = async (req, res, next) => {
       await booking.update({
         status: 'checked-in',
         checkInTime: new Date(),
-        checkedInBy: req.user.n_document
+        checkedInBy: req.buyer.sdocno
       });
   
       res.json({
@@ -255,13 +255,13 @@ const checkOut = async (req, res, next) => {
     const bill = await Bill.create({
       bookingId: bookingId,
       totalAmount: calculateTotalAmount(booking),
-      generatedBy: req.user.sdocno
+      generatedBy: req.buyer.sdocno
     });
 
     await booking.update({
       status: 'completed',
       checkOutTime: new Date(),
-      checkedOutBy: req.user.sdocno
+      checkedOutBy: req.buyer.sdocno
     });
 
     res.json({
@@ -306,7 +306,7 @@ const addExtraCharges = async (req, res, next) => {
         price,
         quantity,
         amount: price * quantity,
-        createdBy: req.user.n_document
+        createdBy: req.buyer.sdocno
       });
   
       res.status(201).json({
@@ -338,7 +338,7 @@ const generateBill = async (req, res) => {
     const bill = await Bill.create({
         bookingId: bookingId,
         totalAmount,
-        generatedBy: req.user.n_document,
+        generatedBy: req.buyer.sdocno,
         details: {
             roomCharge: calculateRoomCharge(booking),
             extraCharges: booking.ExtraCharges,
@@ -399,7 +399,7 @@ const cancelBooking = async (req, res) => {
     await booking.update({
         status: 'cancelled',
         statusReason: reason,
-        cancelledBy: req.user.n_document,
+        cancelledBy: req.buyer.sdocno,
         cancelledAt: new Date()
     });
 

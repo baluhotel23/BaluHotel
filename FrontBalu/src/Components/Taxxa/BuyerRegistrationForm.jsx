@@ -65,7 +65,7 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
           value={buyer.scostumername}
           onChange={handleChange}
           required
-          className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
           placeholder="Ej. Juan Pérez"
         />
       </div>
@@ -79,7 +79,7 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
           name="wlegalorganizationtype"
           value={buyer.wlegalorganizationtype}
           onChange={handleChange}
-          className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full p-2 border rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
         >
           <option value="person">Persona Natural</option>
           <option value="company">Persona Jurídica</option>
@@ -95,7 +95,7 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
           name="sfiscalresponsibilities"
           value={buyer.sfiscalresponsibilities}
           onChange={handleChange}
-          className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full p-2 border rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
         >
           <option value="R-99-PN">No Aplica – Otros</option>
           <option value="O-1">IVA</option>
@@ -115,7 +115,7 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
             value={buyer.jpartylegalentity.wdoctype}
             onChange={handleChange}
             required
-            className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-2 border rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
           >
             <option value="">Selecciona un tipo de documento</option>
             <option value="RC">Registro civil</option>
@@ -142,7 +142,7 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
             value={buyer.jpartylegalentity.sdocno}
             onChange={handleChange}
             required
-            className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-2 border rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
             placeholder="Ingrese número de documento"
           />
         </div>
@@ -157,7 +157,7 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
           name="jpartylegalentity.scorporateregistrationschemename"
           value={buyer.jpartylegalentity.scorporateregistrationschemename}
           onChange={handleChange}
-          className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full p-2 border rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
           placeholder="Ej. Juan Pérez"
         />
       </div>
@@ -173,7 +173,7 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
             name="jcontact.scontactperson"
             value={buyer.jcontact.scontactperson}
             onChange={handleChange}
-            className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-2 border rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
             placeholder="Nombre de contacto"
           />
         </div>
@@ -186,7 +186,7 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
             name="jcontact.selectronicmail"
             value={buyer.jcontact.selectronicmail}
             onChange={handleChange}
-            className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-2 border rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
             placeholder="correo@ejemplo.com"
           />
         </div>
@@ -201,7 +201,7 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
           name="jcontact.stelephone"
           value={buyer.jcontact.stelephone}
           onChange={handleChange}
-          className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full p-2 border rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
           placeholder="Número de teléfono"
         />
       </div>

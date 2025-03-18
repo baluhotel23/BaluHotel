@@ -20,7 +20,7 @@ app.use(passport.initialize());
 
 // CORS Configuration - Single configuration
 app.use(cors({
-  origin: 'http://localhost:5173',
+  // origin: 'http://localhost:5173',
   methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true

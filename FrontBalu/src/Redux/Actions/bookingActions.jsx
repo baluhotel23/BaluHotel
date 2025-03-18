@@ -1,4 +1,5 @@
 import api from '../../utils/axios';
+import { toast } from 'react-toastify';
 
 
 
@@ -29,16 +30,36 @@ export const getRoomTypes = () => async (dispatch) => {
 };
 
 // CREATE BOOKING
-export const createBooking = (bookingData) => async (dispatch) => {
-  dispatch({ type: 'CREATE_BOOKING_REQUEST' });
-  try {
-    const { data } = await api.post('/bookings/create', bookingData);
-    dispatch({ type: 'CREATE_BOOKING_SUCCESS', payload: data.data });
-  } catch (error) {
-    const errorMessage =
-      error.response?.data?.message || 'Error al crear reserva';
-    dispatch({ type: 'CREATE_BOOKING_FAILURE', payload: errorMessage });
-  }
+export const createBooking = (bookingData) => {
+  return async (dispatch) => {
+    dispatch({ type: 'CREATE_BOOKING_REQUEST' });
+    try {
+      const { data } = await api.post('/bookings/create', bookingData);
+      // Supongamos que el backend retorna { error: false, data: {…}, message: "..." }
+      if (data.error) {
+        dispatch({
+          type: 'CREATE_BOOKING_FAILURE',
+          payload: data.message,
+        });
+        toast.error(data.message);
+        return { success: false, message: data.message };
+      }
+      dispatch({
+        type: 'CREATE_BOOKING_SUCCESS',
+        payload: data.data,
+      });
+      toast.success('Reserva creada exitosamente');
+      return { success: true, data: data.data };
+    } catch (error) {
+      console.error("Error en createBooking:", error);
+      dispatch({
+        type: 'CREATE_BOOKING_FAILURE',
+        payload: error.message,
+      });
+      toast.error(error.message);
+      return { success: false, message: error.message };
+    }
+  };
 };
 
 // GET BOOKINGS OF THE USER
