@@ -136,3 +136,44 @@ export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
       }
     }
   };
+
+  export const createBuyer = (buyerData) => {
+    return async (dispatch) => {
+        dispatch({ type: 'CREATE_BUYER_REQUEST' });
+        
+        try {
+            console.log('Enviando datos del comprador:', buyerData);
+            
+            const response = await api.post('/taxxa/buyer', buyerData);
+            console.log('Respuesta del servidor:', response.data);
+            
+            if (response.data.error) {
+                dispatch({
+                    type: 'CREATE_BUYER_FAILURE',
+                    payload: response.data.message
+                });
+                toast.error(response.data.message);
+                // Retornamos el error en lugar de lanzar una excepción.
+                return { error: true, message: response.data.message };
+            }
+  
+            dispatch({
+                type: 'CREATE_BUYER_SUCCESS',
+                payload: response.data.data
+            });
+            toast.success('Buyer creado exitosamente');
+  
+            return response.data;
+            
+        } catch (error) {
+            console.error('Error creando buyer:', error);
+            dispatch({
+                type: 'CREATE_BUYER_FAILURE',
+                payload: error.message
+            });
+            toast.error(error.message);
+            // Retornamos un objeto de error en lugar de lanzar el error
+            return { error: true, message: error.message };
+        }
+    };
+};

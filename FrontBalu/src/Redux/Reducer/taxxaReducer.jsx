@@ -74,6 +74,30 @@ const initialState = {
           loading: false,
           error: action.payload,
         };
+
+        case 'CREATE_BUYER_REQUEST':
+      return {
+        ...state,
+        loading: true,
+        error: null
+      };
+
+    case 'CREATE_BUYER_SUCCESS':
+      return {
+        ...state,
+        loading: false,
+        buyer: action.payload,
+        error: null,
+        message: 'Comprador creado exitosamente'
+      };
+
+    case 'CREATE_BUYER_FAILURE':
+      return {
+        ...state,
+        loading: false,
+        error: action.payload,
+        message: null
+      };
   
       default:
         return state;

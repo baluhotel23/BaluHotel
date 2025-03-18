@@ -4,9 +4,32 @@ const { Buyer } = require('../../data');
 const createBuyer = async (req, res, next) => {
   try {
     const buyerData = req.body;
+    // Extraer los campos que no queremos enviar (los anidados)
+    const { jpartylegalentity, jcontact, ...rest } = buyerData;
     
-    // Verificar si ya existe un Buyer con el mismo sdocno (llave primaria)
-    const existingBuyer = await Buyer.findOne({ where: { sdocno: buyerData.sdocno } });
+    // Formar el objeto aplanado, asignando las propiedades a nivel raíz
+    const flattenedBuyerData = {
+      ...rest,
+      sdocno: buyerData.sdocno || (jpartylegalentity && jpartylegalentity.sdocno),
+      wdoctype: buyerData.wdoctype || (jpartylegalentity && jpartylegalentity.wdoctype),
+      scorporateregistrationschemename:
+        buyerData.scorporateregistrationschemename ||
+        (jpartylegalentity && jpartylegalentity.scorporateregistrationschemename),
+      scontactperson: buyerData.scontactperson || (jcontact && jcontact.scontactperson),
+      selectronicmail: buyerData.selectronicmail || (jcontact && jcontact.selectronicmail),
+      stelephone: buyerData.stelephone || (jcontact && jcontact.stelephone),
+    };
+
+    const sdocno = flattenedBuyerData.sdocno;
+    
+    if (!sdocno) {
+      return res.status(400).json({
+        error: true,
+        message: 'El número de documento (sdocno) es requerido',
+      });
+    }
+    // Verificar si ya existe un Buyer con el mismo sdocno
+    const existingBuyer = await Buyer.findOne({ where: { sdocno } });
     if (existingBuyer) {
       return res.status(400).json({
         error: true,
@@ -15,7 +38,7 @@ const createBuyer = async (req, res, next) => {
       });
     }
     
-    const newBuyer = await Buyer.create(buyerData);
+    const newBuyer = await Buyer.create(flattenedBuyerData);
     return res.status(201).json({
       error: false,
       message: 'Buyer registrado exitosamente',

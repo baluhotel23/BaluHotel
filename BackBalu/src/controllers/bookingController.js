@@ -1,4 +1,4 @@
-const { Room, Booking, ExtraCharge, Bill, User, Service } = require('../data');
+const { Room, Booking, ExtraCharge, Bill,  Service, Buyer} = require('../data');
 const { CustomError } = require('../middleware/error');
 const { Op } = require('sequelize');
 
@@ -60,7 +60,7 @@ const getRoomTypes = async (req, res) => {
 const createBooking = async (req, res) => {
     const { roomNumber, checkIn, checkOut,  guestCount, totalAmount } = req.body;
     // Usamos guestId a partir del usuario autenticado (n_document)
-    //const guestId = req.user.n_document;
+    const guestId = req.buyer.sdocno;
   
     // Buscar la habitación
     const room = await Room.findByPk(roomNumber);
@@ -92,11 +92,11 @@ const createBooking = async (req, res) => {
     }
   
     // Calcular número de noches y totalAmount
-    //const nights = calculateNights(checkIn, checkOut);
+    const nights = calculateNights(checkIn, checkOut);
     //const totalAmount = totalbooking * nights; // revisar esta logica
   
     const booking = await Booking.create({
-      //guestId,
+      guestId,
       roomNumber,
       checkIn,
       checkOut,
@@ -115,7 +115,7 @@ const createBooking = async (req, res) => {
 
   const getUserBookings = async (req, res, next) => {
     try {
-      const guestId = req.user.n_document;
+      const guestId = req.user.sdocno;
       if (!guestId) {
         return res.status(400).json({
           error: true,
@@ -152,7 +152,7 @@ const getBookingById = async (req, res) => {
     }
 
     // Si es cliente, verificar que sea su reserva
-    if (req.user.role === 'client' && booking.guestId !== req.user.n_document) {
+    if (req.buyer.role === 'client' && booking.guestId !== req.user.sdocno) {
         throw new CustomError('No autorizado', 403);
     }
 
@@ -178,7 +178,7 @@ const getAllBookings = async (req, res) => {
         where,
         include: [
           { model: Room },
-          { model: User, as: 'guest', attributes: ['n_document', 'email', 'first_name', 'last_name', 'email', 'phone'] }
+          { model: Buyer, as: 'guest', attributes: ['n_document', 'email', 'first_name', 'last_name', 'email', 'phone'] }
         ],
         order: [['checkIn', 'ASC']]
       });
@@ -255,13 +255,13 @@ const checkOut = async (req, res, next) => {
     const bill = await Bill.create({
       bookingId: bookingId,
       totalAmount: calculateTotalAmount(booking),
-      generatedBy: req.user.n_document
+      generatedBy: req.user.sdocno
     });
 
     await booking.update({
       status: 'completed',
       checkOutTime: new Date(),
-      checkedOutBy: req.user.n_document
+      checkedOutBy: req.user.sdocno
     });
 
     res.json({
@@ -326,7 +326,7 @@ const generateBill = async (req, res) => {
         include: [
             { model: Room },
             { model: ExtraCharge },
-            { model: User, attributes: ['name', 'email', 'n_document'] }
+            { model: Buyer, attributes: ['name', 'email', 'sdocno'] }
         ]
     });
 
@@ -344,7 +344,7 @@ const generateBill = async (req, res) => {
             extraCharges: booking.ExtraCharges,
             nights: calculateNights(booking.checkIn, booking.checkOut),
             roomDetails: booking.Room,
-            guestDetails: booking.User
+            guestDetails: booking.buyer
         }
     });
 
@@ -372,7 +372,7 @@ const updateBookingStatus = async (req, res) => {
     await booking.update({
         status,
         statusReason: reason,
-        statusUpdatedBy: req.user.n_document,
+        statusUpdatedBy: req.buyer.sdocno,
         statusUpdatedAt: new Date()
     });
 

@@ -56,7 +56,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {user.role === 'owner' && (
+        {(user.role === 'owner' || user.role === 'admin') && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">CARGAR SERVICIOS</h2>
             <p className="text-gray-600 mb-4">Cargar nuevos servicios.</p>
