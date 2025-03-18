@@ -80,6 +80,17 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
+         {(user.role === 'owner' || user.role === 'admin') && (
+          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+            <h2 className="text-xl font-semibold mb-2">DISPONIBILIDAD</h2>
+            <p className="text-gray-600 mb-4">DISPONIBILIDAD</p>
+            <Link to="/bookings/availability">
+              <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                DISPONIBILIDAD
+              </button>
+            </Link>
+          </div>
+        )}
 
        
       </div>
