@@ -2,7 +2,6 @@ const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
   sequelize.define('Booking', {
-
     bookingId: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -33,7 +32,6 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
     },
-   
     guestId: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -42,16 +40,16 @@ module.exports = (sequelize) => {
         key: 'sdocno'
       }
     },
-    
     roomNumber: {
       type: DataTypes.INTEGER,
       allowNull: false,
-    }
+    },
+    trackingToken: {
+      type: DataTypes.STRING,
+      allowNull: true, 
+    },
   }, {
     tableName: 'bookings',
     timestamps: true,
   });
-
-  
-  
 };

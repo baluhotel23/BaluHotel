@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import * as jwtDecode from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode';
 import { login } from './Redux/Actions/authActions';
 import PrivateRoute from './Components/PrivateRoute';
 import 'react-toastify/dist/ReactToastify.css';
@@ -24,15 +24,32 @@ import Booking from './Components/Booking/Booking';
 import BookingsPendientes from './Components/Taxxa/BookingsPendientes';
 import BuyerRegistrationForm from './Components/Taxxa/BuyerRegistrationForm';
 import ParentBuyerRegistration from './Components/Taxxa/ParentBuyerRegistration';
+import BookingStatusPage from './Components/Booking/BookingStatusPage';
 
-
-function App() {
+const AppContent = () => {
   const dispatch = useDispatch();
- 
-
-
+  const location = useLocation();
 
   useEffect(() => {
+    // Define las rutas públicas que no requieren autenticación
+    const publicPaths = [
+      '/',
+      '/booking',
+      '/booking-status',
+      '/RoomsSection',
+      '/room',
+      '/login',
+      '/register',
+      '/buyerForm',
+      '/registro-comprador',
+      '/unauthorized'
+    ];
+
+    // Si la ruta actual es pública, omite la verificación de token
+    if (publicPaths.some(path => location.pathname.startsWith(path))) {
+      return;
+    }
+
     // Verificar si hay un token guardado al iniciar la app
     const token = localStorage.getItem('token');
     if (token) {
@@ -40,7 +57,6 @@ function App() {
         const decoded = jwtDecode(token);
         // Verificar que el token no haya expirado (exp en segundos)
         if (decoded.exp * 1000 < Date.now()) {
-          // Token expirado, puedes limpiar la sesión o redirigir
           console.log('El token ha expirado');
         } else {
           const user = JSON.parse(localStorage.getItem('user'));
@@ -52,75 +68,80 @@ function App() {
         console.error('Error decodificando el token:', error);
       }
     }
-  }, [dispatch]);
+  }, [dispatch, location]);
 
   return (
-    <BrowserRouter>
+    <>
       <ToastContainer />
-       <Navbar />
-       <div className="pt-16"> {/* Agregar margen superior para evitar superposición */}
-      <Routes>
-        {/* Rutas públicas */}
-        <Route path="/" element={<Landing />} />
-        <Route path="/RoomsSection" element={<RoomsSection />} />
-        <Route path="/room/:roomNumber" element={<RoomDetail />} />
-        <Route path="/booking" element={<Booking />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/buyerForm" element={<BuyerRegistrationForm />} />
-        <Route path="/registro-comprador" element={<ParentBuyerRegistration />} />
-        <Route path="/unauthorized" element={<Unauthorized />} />
+      <Navbar />
+      <div className="pt-16">
+        <Routes>
+          {/* Rutas públicas */}
+          <Route path="/" element={<Landing />} />
+          <Route path="/booking-status/:trackingToken" element={<BookingStatusPage />} />
+          <Route path="/RoomsSection" element={<RoomsSection />} />
+          <Route path="/room/:roomNumber" element={<RoomDetail />} />
+          <Route path="/booking" element={<Booking />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/buyerForm" element={<BuyerRegistrationForm />} />
+          <Route path="/registro-comprador" element={<ParentBuyerRegistration />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
 
-        {/* Rutas protegidas */}
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute allowedRoles={['owner', 'admin']}>
-              <Dashboard />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/services"
-          element={
-            <PrivateRoute allowedRoles={['owner', 'admin']}>
-              <ServiceManagement />
-            </PrivateRoute>
-          }
-        />
-           <Route
-          path="/admin/create-room"
-          element={
-            <PrivateRoute allowedRoles={['owner', 'admin']}>
-              <CreateRoom />
-            </PrivateRoute>
-          }
-        />
-              <Route
-          path="/admin/rooms"
-          element={
-            <PrivateRoute allowedRoles={['owner', 'admin']}>
-              <RoomList />
-            </PrivateRoute>
-          }
-        />
+          {/* Rutas protegidas */}
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin']}>
+                <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/services"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin']}>
+                <ServiceManagement />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/create-room"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin']}>
+                <CreateRoom />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/rooms"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin']}>
+                <RoomList />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/pendientesFactura"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin']}>
+                <BookingsPendientes />
+              </PrivateRoute>
+            }
+          />
 
-<Route
-          path="/admin/pendientesFactura"
-          element={
-            <PrivateRoute allowedRoles={['owner', 'admin']}>
-              <BookingsPendientes />
-            </PrivateRoute>
-          }
-        />
-
-
-        
-
-        {/* Ruta por defecto para 404 */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          {/* Ruta por defecto para 404 */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </div>
+    </>
+  );
+};
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }

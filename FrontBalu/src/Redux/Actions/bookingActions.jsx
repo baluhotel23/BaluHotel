@@ -35,7 +35,6 @@ export const createBooking = (bookingData) => {
     dispatch({ type: 'CREATE_BOOKING_REQUEST' });
     try {
       const { data } = await api.post('/bookings/create', bookingData);
-      // Supongamos que el backend retorna { error: false, data: {…}, message: "..." }
       if (data.error) {
         dispatch({
           type: 'CREATE_BOOKING_FAILURE',
@@ -46,7 +45,7 @@ export const createBooking = (bookingData) => {
       }
       dispatch({
         type: 'CREATE_BOOKING_SUCCESS',
-        payload: data.data,
+        payload: data.data,  // data.data debe incluir { booking, trackingLink }
       });
       toast.success('Reserva creada exitosamente');
       return { success: true, data: data.data };

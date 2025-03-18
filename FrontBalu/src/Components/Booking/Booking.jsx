@@ -18,6 +18,7 @@ import {
 import { format, differenceInDays } from "date-fns";
 import ParentBuyerRegistration from "../Taxxa/ParentBuyerRegistration";
 import { es } from "date-fns/locale";
+import { toast } from "react-toastify";
 
 const ROOM_TYPES = ["Sencilla", "Doble", "Triple", "Cuadruple", "Pareja"];
 
@@ -31,7 +32,7 @@ const Booking = () => {
   const [checkIn, setCheckIn] = useState(new Date());
   const [checkOut, setCheckOut] = useState(new Date());
   const [roomType, setRoomType] = useState("");
-
+  const [bookingTotal, setBookingTotal] = useState(0);
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   const [maxCapacity, setMaxCapacity] = useState(2);
@@ -76,64 +77,93 @@ const Booking = () => {
 
   const handleReserve = (room) => {
     if (!room || !room.type) {
-      console.error("Datos de habitación inválidos");
+      toast.error("Datos de habitación inválidos");
       return;
     }
 
     const maxGuests = room.maxGuests || 2;
+
+    
     setMaxCapacity(maxGuests);
-    console.log("Capacidad máxima establecida:", maxGuests);
 
-    // Reset adults and children if they exceed new maxCapacity
-    if (adults + children > maxGuests) {
-      setAdults(1);
-      setChildren(0);
-      alert(
-        `Esta habitación tiene un máximo de ${maxGuests} huéspedes. Se han reiniciado los valores.`
-      );
-    }
+    toast.info(
+      <div>
+        <p>¿Confirma las siguientes fechas?</p>
+        <p>Check-in: {formatDate(checkIn)}</p>
+        <p>Check-out: {formatDate(checkOut)}</p>
+        <button 
+          onClick={() => {
+            if (adults + children > maxGuests) {
+              setAdults(1);
+              setChildren(0);
+              toast.warning(
+                `Esta habitación tiene un máximo de ${maxGuests} huéspedes. Se han reiniciado los valores.`
+              );
+            }
+            setSelectedRoom(room);
+            setShowRegistration(true);
+            toast.dismiss();
+          }}
+          className="mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 mr-2"
+        >
+          Confirmar
+        </button>
+        <button
+          onClick={() => toast.dismiss()}
+          className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+        >
+          Cancelar
+        </button>
+      </div>,
+      {
+        position: "top-center",
+        autoClose: false,
+        closeOnClick: false,
+        draggable: false,
+        closeButton: false,
+      }
+    );
+};
 
-    setSelectedRoom(room);
-    setShowRegistration(true);
-  };
+const handleAdultsChange = (e, room) => {
+  const newAdults = parseInt(e.target.value);
+  const total = newAdults + children;
 
-  const handleAdultsChange = (e, room) => {
-    const newAdults = parseInt(e.target.value);
-    const total = newAdults + children;
+  if (total <= room.maxGuests) {
+    setAdults(newAdults);
+    // Calcular nuevo total
+    const nights = differenceInDays(checkOut, checkIn);
+    let pricePerPerson = room.price;
+    
+    if (total === 2) pricePerPerson = 60000;
+    else if (total > 4) pricePerPerson = 50000;
+    
+    const newTotal = pricePerPerson * total * nights;
+    setBookingTotal(newTotal);
+  } else {
+    toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
+  }
+};
 
-    console.log("Cambiando adultos:", {
-      newAdults,
-      children,
-      total,
-      maxGuests: room.maxGuests,
-      roomNumber: room.roomNumber,
-    });
+const handleChildrenChange = (e, room) => {
+  const newChildren = parseInt(e.target.value);
+  const total = adults + newChildren;
 
-    if (total <= room.maxGuests) {
-      setAdults(newAdults);
-    } else {
-      alert(`La capacidad máxima es de ${room.maxGuests} personas`);
-    }
-  };
-
-  const handleChildrenChange = (e, room) => {
-    const newChildren = parseInt(e.target.value);
-    const total = adults + newChildren;
-
-    console.log("Cambiando niños:", {
-      adults,
-      newChildren,
-      total,
-      maxGuests: room.maxGuests,
-      roomNumber: room.roomNumber,
-    });
-
-    if (total <= room.maxGuests) {
-      setChildren(newChildren);
-    } else {
-      alert(`La capacidad máxima es de ${room.maxGuests} personas`);
-    }
-  };
+  if (total <= room.maxGuests) {
+    setChildren(newChildren);
+    // Calcular nuevo total
+    const nights = differenceInDays(checkOut, checkIn);
+    let pricePerPerson = room.price;
+    
+    if (total === 2) pricePerPerson = 60000;
+    else if (total > 4) pricePerPerson = 50000;
+    
+    const newTotal = pricePerPerson * total * nights;
+    setBookingTotal(newTotal);
+  } else {
+    toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
+  }
+};
 
   const handleBuyerDataComplete = (buyerData) => {
     console.log('Buyer creado exitosamente:', buyerData);
@@ -147,22 +177,22 @@ const Booking = () => {
       alert("Por favor complete el registro de usuario");
       return;
     }
-
+  
     try {
       const totalGuests = adults + children;
       const nights = differenceInDays(checkOut, checkIn);
-
+  
       if (nights <= 0) {
         alert("Por favor seleccione fechas válidas");
         return;
       }
-
+  
       let pricePerPerson = selectedRoom.price;
       if (totalGuests === 2) pricePerPerson = 60000;
       else if (totalGuests > 4) pricePerPerson = 50000;
-
+  
       const totalAmount = pricePerPerson * totalGuests * nights;
-
+  
       const bookingData = {
         checkIn,
         checkOut,
@@ -174,25 +204,36 @@ const Booking = () => {
         adults,
         children,
         nights,
-        // Se utiliza el sdocno a nivel raíz
         guestId: buyerData.sdocno,
         buyerInfo: {
           name: buyerData.scostumername,
-          docType: buyerData.wdoctype,      // <-- Se usa la propiedad aplanada
+          docType: buyerData.wdoctype,
           sdocno: buyerData.sdocno,
           email: buyerData.selectronicmail,
           phone: buyerData.stelephone,
         },
       };
-
+  
       console.log("Datos completos de la reserva:", bookingData);
       const response = await dispatch(createBooking(bookingData));
-
       
-
+      if (response.success) {
+        alert('Reserva creada exitosamente');
+        // Opcional: abrir directamente el PDF en una nueva pestaña:
+        window.open(response.data.trackingLink, '_blank');
+        // O almacenar el enlace en un estado y mostrar un botón de descarga:
+        // setDownloadLink(response.data.trackingLink);
+      } else {
+        alert('Error al crear la reserva: ' + response.message);
+      }
     } catch (error) {
       console.error('Error al crear la reserva:', error);
-      alert('Error al procesar la reserva: ' + error.message);
+      // Check if it's an axios error with a response
+      if (error.response && error.response.data) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error('Error al procesar la reserva: ' + error.message);
+      }
     }
   };
 
@@ -351,6 +392,9 @@ const Booking = () => {
                           </option>
                         ))}
                       </select>
+                    </div>
+                    <div>
+                    <p>Total: {formatPrice(bookingTotal)}</p>
                     </div>
                     <button
                       onClick={() => {

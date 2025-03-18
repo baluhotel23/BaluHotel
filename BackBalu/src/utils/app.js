@@ -6,9 +6,11 @@ const cors = require('cors');
 const path = require('path');
 const { passport } = require('./passport');
 const { JWT_SECRET_KEY } = require('./config/envs');
+const { errorHandler } = require('./middleware/errorHandler');
+
 
 const app = express();
-
+app.use(errorHandler);
 // Middlewares
 app.use(express.json()); // Solo este para manejar JSON
 app.use(express.urlencoded({ extended: true }));

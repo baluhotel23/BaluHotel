@@ -21,12 +21,12 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
         }
         if (name === "sfiscalresponsibilities") {
           switch (value) {
-            case "O1":
-              updatedBuyer.stributaryidentificationkey = "01";
+            case "O-1":
+              updatedBuyer.stributaryidentificationkey = "O-1";
               updatedBuyer.stributaryidentificationname = "IVA";
               break;
-            case "O4":
-              updatedBuyer.stributaryidentificationkey = "04";
+            case "O-4":
+              updatedBuyer.stributaryidentificationkey = "O-4";
               updatedBuyer.stributaryidentificationname = "INC";
               break;
             case "ZA":
@@ -34,12 +34,12 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
               updatedBuyer.stributaryidentificationname = "IVA e INC";
               break;
             case "R-99-PN":
-              updatedBuyer.stributaryidentificationkey = "ZZ";
+              updatedBuyer.stributaryidentificationkey = "R-99-PN";
               updatedBuyer.stributaryidentificationname = "No aplica";
               break;
             default:
-              updatedBuyer.stributaryidentificationkey = "";
-              updatedBuyer.stributaryidentificationname = "";
+              updatedBuyer.stributaryidentificationkey = null;
+              updatedBuyer.stributaryidentificationname = null;
               break;
           }
         }
@@ -47,8 +47,6 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
       });
     }
   };
-
-  
 
   return (
     <div className="max-w-2xl mx-auto p-4 bg-gray-50 rounded shadow space-y-6">
@@ -95,8 +93,10 @@ const BuyerRegistrationForm = ({ buyer, setBuyer }) => {
           name="sfiscalresponsibilities"
           value={buyer.sfiscalresponsibilities}
           onChange={handleChange}
+          required={buyer.wlegalorganizationtype === "company"} 
           className="w-full p-2 border rounded focus:outline-none focus:ring-2 text-black focus:ring-blue-500"
         >
+          <option value="">Seleccione responsabilidad</option>
           <option value="R-99-PN">No Aplica – Otros</option>
           <option value="O-1">IVA</option>
           <option value="O-4">INC</option>
@@ -224,13 +224,11 @@ BuyerRegistrationForm.propTypes = {
       selectronicmail: PropTypes.string.isRequired,
       stelephone: PropTypes.string.isRequired,
     }).isRequired,
-    // Los nuevos campos, si es necesario
     sfiscalregime: PropTypes.string,
     stributaryidentificationkey: PropTypes.string,
     stributaryidentificationname: PropTypes.string,
   }).isRequired,
   setBuyer: PropTypes.func.isRequired,
 };
-
 
 export default BuyerRegistrationForm;

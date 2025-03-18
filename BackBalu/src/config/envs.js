@@ -19,7 +19,7 @@ module.exports = {
   WOMPI_PUBLIC_KEY: process.env.WOMPI_PUBLIC_KEY,
   WOMPI_INTEGRITY_SECRET: process.env.WOMPI_INTEGRITY_SECRET,
   WOMPI_EVENT_KEY: process.env.WOMPI_EVENT_KEY,
-  TAXXA_API_URL:  process.env.TAXXA_API_URL,
+  TAXXA_API_URL: process.env.TAXXA_API_URL,
   TAXXA_EMAIL: process.env.TAXXA_EMAIL,
   TAXXA_PASSWORD: process.env.TAXXA_PASSWORD,
   CURRENT_TOKEN: process.env.CURRENT_TOKEN,
@@ -35,4 +35,7 @@ module.exports = {
   SMTP_USER: process.env.SMTP_USER,
   FRONTEND_URL: process.env.FRONTEND_URL,
   NODE_ENV: process.env.NODE_ENV,
+
+  BOOKING_SECRET: process.env.BOOKING_SECRET,
+  FRONT_URL: process.env.FRONT_URL,
 };

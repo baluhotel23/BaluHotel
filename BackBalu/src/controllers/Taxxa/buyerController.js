@@ -1,4 +1,6 @@
 const { Buyer } = require('../../data'); 
+const CustomError = require('../../utils/errors/errorHandler');
+
 
 // Crea un nuevo Buyer
 const createBuyer = async (req, res, next) => {
@@ -23,10 +25,7 @@ const createBuyer = async (req, res, next) => {
     const sdocno = flattenedBuyerData.sdocno;
     
     if (!sdocno) {
-      return res.status(400).json({
-        error: true,
-        message: 'El número de documento (sdocno) es requerido',
-      });
+      throw new CustomError('El número de documento (sdocno) es requerido', 400);
     }
     // Verificar si ya existe un Buyer con el mismo sdocno
     const existingBuyer = await Buyer.findOne({ where: { sdocno } });

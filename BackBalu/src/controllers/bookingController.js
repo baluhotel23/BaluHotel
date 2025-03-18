@@ -1,6 +1,8 @@
 const { Room, Booking, ExtraCharge, Bill,  Service, Buyer} = require('../data');
 const { CustomError } = require('../middleware/error');
 const { Op } = require('sequelize');
+const jwt = require("jsonwebtoken");
+
 
 // Public endpoints
 const checkAvailability = async (req, res) => {
@@ -58,72 +60,163 @@ const getRoomTypes = async (req, res) => {
 
 // Client and staff endpoints
 const createBooking = async (req, res) => {
-    const { roomNumber, checkIn, checkOut,  guestCount, totalAmount } = req.body;
-    // Usamos guestId a partir del usuario autenticado (n_document)
-    const guestId = req.buyer?.sdocno || req.body.guestId;
+  const { roomNumber, checkIn, checkOut, guestCount, totalAmount } = req.body;
+  // Extraer guestId del token o body
+  const guestId = req.buyer?.sdocno || req.body.guestId;
+
+  // Buscar la habitación
+  const room = await Room.findByPk(roomNumber);
+  if (!room) {
+    throw new CustomError('Habitación no encontrada', 404);
+  }
   
-    // Buscar la habitación
-    const room = await Room.findByPk(roomNumber);
-    if (!room) {
-      throw new CustomError('Habitación no encontrada', 404);
-    }
-    
-    // Verificar disponibilidad (lógica similar a la que ya tienes)
-    const existingBooking = await Booking.findOne({
-      where: {
-        roomNumber,
-        [Op.or]: [
-          {
-            checkIn: {
-              [Op.between]: [checkIn, checkOut]
-            }
-          },
-          {
-            checkOut: {
-              [Op.between]: [checkIn, checkOut]
-            }
-          }
-        ]
-      }
-    });
-    
-    if (existingBooking) {
-      throw new CustomError('Habitación no disponible para las fechas seleccionadas', 400);
-    }
-  
-    // Calcular número de noches y totalAmount
-    const nights = calculateNights(checkIn, checkOut);
-    //const totalAmount = totalbooking * nights; // revisar esta logica
-  
-    const booking = await Booking.create({
-      guestId,
+  // Verificar disponibilidad
+  const existingBooking = await Booking.findOne({
+    where: {
       roomNumber,
-      checkIn,
-      checkOut,
-      totalAmount,
-      guestCount,
-      status: 'pending',
-      
-    });
+      [Op.or]: [
+        { checkIn: { [Op.between]: [checkIn, checkOut] } },
+        { checkOut: { [Op.between]: [checkIn, checkOut] } }
+      ]
+    }
+  });
   
-    res.status(201).json({
+  if (existingBooking) {
+    throw new CustomError('Habitación no disponible para las fechas seleccionadas', 400);
+  }
+  
+  // Calcular número de noches (puedes usar calculateNights)
+  const nights = calculateNights(checkIn, checkOut);
+  
+  // Crear la reserva
+  const booking = await Booking.create({
+    guestId,
+    roomNumber,
+    checkIn,
+    checkOut,
+    totalAmount,
+    guestCount,
+    status: 'pending',
+  });
+  
+  // Generar trackingToken usando jwt
+  // Asegúrate de definir process.env.BOOKING_SECRET y process.env.FRONT_URL
+  const token = jwt.sign({ bookingId: booking.bookingId }, process.env.BOOKING_SECRET, { expiresIn: "7d" });
+  
+  // Actualizar el registro con el trackingToken
+  await booking.update({ trackingToken: token });
+
+  // Retornar un enlace para consultar la reserva en el front
+  const trackingLink = `${process.env.FRONT_URL}/booking-status/${token}`;
+  
+  res.status(201).json({
+    error: false,
+    message: 'Reserva creada exitosamente',
+    data: {
+      booking,
+      trackingLink,
+    }
+  });
+};
+
+
+const downloadBookingPdf = async (req, res, next) => {
+  try {
+    const { trackingToken } = req.params;
+    
+    // Verificar y decodificar el token
+    const decoded = jwt.verify(trackingToken, process.env.BOOKING_SECRET);
+    const bookingId = decoded.bookingId;
+    
+    const booking = await Booking.findOne({
+      where: { bookingId },
+      include: [
+        { model: Room },
+        // incluir demás relaciones si es necesario
+      ]
+    });
+    
+    if (!booking) {
+      throw new CustomError('Reserva no encontrada', 404);
+    }
+    
+    // Generar PDF (puedes personalizar la lógica)
+    const doc = new pdf();
+    let buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+      const pdfData = Buffer.concat(buffers);
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment;filename=booking_'+bookingId+'.pdf',
+        'Content-Length': pdfData.length
+      });
+      res.end(pdfData);
+    });
+    
+    // Escribe contenido del PDF
+    doc.fontSize(18).text('Detalle de Reserva', { underline: true });
+    doc.moveDown();
+    doc.fontSize(12).text(`Booking ID: ${booking.bookingId}`);
+    doc.text(`Estado: ${booking.status}`);
+    doc.text(`Fecha de check-in: ${booking.checkIn}`);
+    doc.text(`Fecha de check-out: ${booking.checkOut}`);
+    doc.text(`Monto Total: ${booking.totalAmount}`);
+    // Agrega más detalles según sea necesario
+    
+    // Incluir enlace de seguimiento en el PDF
+    doc.moveDown();
+    doc.text(`Revisa el estado de tu reserva aquí: ${process.env.FRONT_URL}/booking-status/${trackingToken}`);
+    
+    doc.end();
+    
+  } catch (error) {
+    next(error);
+  }
+};
+const getBookingByToken = async (req, res, next) => {
+  try {
+    const { trackingToken } = req.params;
+    
+    // Verify and decode token
+    const decoded = jwt.verify(trackingToken, process.env.BOOKING_SECRET);
+    const bookingId = decoded.bookingId;
+    
+    const booking = await Booking.findOne({
+      where: { bookingId },
+      include: [
+        { model: Room },
+        // Include other relations if needed
+      ]
+    });
+    
+    if (!booking) {
+      throw new CustomError('Reserva no encontrada', 404);
+    }
+    
+    res.json({
       error: false,
-      message: 'Reserva creada exitosamente',
       data: booking
     });
-  };
+    
+  } catch (error) {
+    next(error);
+  }
+};
+
 
   const getUserBookings = async (req, res, next) => {
     try {
-      const guestId = req.guestId;
-      if (!guestId) {
+      // Se utiliza req.params.sdocno si está presente, sino se toma de req.buyer.sdocno
+      const userId = req.params.sdocno || req.buyer?.sdocno;
+      if (!userId) {
         return res.status(400).json({
           error: true,
           message: 'Identificador de usuario no encontrado en el token'
         });
       }
       const bookings = await Booking.findAll({
-        where: { guestId },
+        where: { guestId: userId },
         include: [{ model: Room }]
       });
       res.json({
@@ -134,31 +227,29 @@ const createBooking = async (req, res) => {
       next(error);
     }
   };
-
-const getBookingById = async (req, res) => {
+  
+  const getBookingById = async (req, res) => {
     const { bookingId } = req.params;
-
+  
     const booking = await Booking.findOne({
-        where: { bookingId },
-        include: [
-            { model: Room },
-            { model: ExtraCharge },
-            { model: Bill }
-        ]
+      where: { bookingId },
+      include: [
+        { model: Room },
+        { model: ExtraCharge },
+        { model: Bill },
+        // Si necesitas incluir la información del comprador:
+        { model: Buyer, as: 'guest', attributes: ['sdocno', 'scostumername'] }
+      ]
     });
-
+  
     if (!booking) {
-        throw new CustomError('Reserva no encontrada', 404);
+      throw new CustomError('Reserva no encontrada', 404);
     }
-
-    // Si es cliente, verificar que sea su reserva
-    
-
     res.json({
-        error: false,
-        data: booking
+      error: false,
+      data: booking
     });
-};
+  };
 
 // Staff only endpoints
 const getAllBookings = async (req, res) => {
@@ -509,9 +600,11 @@ module.exports = {
     checkOut,
     calculateTotalAmount,
     addExtraCharges,
+    downloadBookingPdf,
     generateBill,
     updateBookingStatus,
     cancelBooking,
     getOccupancyReport,
-    getRevenueReport    
+    getRevenueReport,
+    getBookingByToken    
 };
