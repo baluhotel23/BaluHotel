@@ -168,37 +168,37 @@ const RoomReservation = ({ room }) => {
           </div>
         ) : (
           <div>
-            <h1 className="text-2xl font-bold mb-4">
+            <h1 className="text-2xl font-light border-2 text-secondary mb-4">
               Reservar Habitación {room.roomNumber}
             </h1>
-            <p className="mb-2">
-              <strong>Tipo:</strong> {room.type}
+            <p className="mb-2 text-customYellow">
+              <strong>Tipo: </strong> {room.type}
             </p>
-            <p className="mb-2">
+            <p className="mb-2  text-customYellow">
               <strong>Descripción:</strong> {room.description}
             </p>
-            <p className="mb-2">
+            <p className="mb-2  text-customYellow">
                 <strong>Check-In:</strong>{" "}
                 {checkIn && isValid(new Date(checkIn))
                   ? format(new Date(checkIn), "dd-MM-yyyy")
                   : "No seleccionado"}
               </p>
-              <p className="mb-2">
+              <p className="mb-2  text-customYellow">
                 <strong>Check-Out:</strong>{" "}
                 {checkOut && isValid(new Date(checkOut))
                   ? format(new Date(checkOut), "dd-MM-yyyy")
                   : "No seleccionado"}
               </p>
-              <p className="mb-2">
+              <p className="mb-2  text-customYellow">
   <strong>Cantidad de Personas:</strong> {adults + children}{" "}
   ({adults} adultos, {children} niños)
 </p>
-            <p className="mb-4">
+            <p className="mb-4  text-teal-950 text-lg">
               <strong>Total:</strong> ${calculateTotal()}
             </p>
             <button
               onClick={handleBooking}
-              className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600"
+              className="w-full bg-boton text-white py-2 px-4 rounded-md hover:bg-Hover"
             >
               Confirmar Reserva
             </button>
