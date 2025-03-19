@@ -41,7 +41,6 @@ const AppContent = () => {
       '/RoomsSection',
       '/room',
       '/login',
-      '/register',
       '/buyerForm',
       '/registro-comprador',
       '/unauthorized'
@@ -85,7 +84,6 @@ const AppContent = () => {
           <Route path="/room/:roomNumber" element={<RoomDetail />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
           <Route path="/buyerForm" element={<BuyerRegistrationForm />} />
           <Route path="/registro-comprador" element={<ParentBuyerRegistration />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
@@ -136,6 +134,14 @@ const AppContent = () => {
             element={
               <PrivateRoute allowedRoles={['owner', 'admin']}>
                 <RoomAvailability />
+              </PrivateRoute>
+            }
+          />
+                  <Route
+            path="/register"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <Register />
               </PrivateRoute>
             }
           />

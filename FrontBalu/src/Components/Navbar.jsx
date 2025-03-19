@@ -26,6 +26,7 @@ function Navbar() {
           </button>
         </div>
         <ul className="hidden md:flex space-x-6 text-gray-800">
+          <li><Link to="/login" className="hover:text-degrade">Staff</Link></li>
           <li><Link to="/" className="hover:text-degrade">Inicio</Link></li>
           <li><Link to="/about" className="hover:text-degrade">Sobre nosotros</Link></li>
           <li><Link to="/RoomsSection" className="hover:text-degrade">Habitaciones</Link></li>

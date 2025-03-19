@@ -21,7 +21,7 @@ export const register = (userData) => async (dispatch) => {
     const { data } = await api.post('/auth/register', userData);
     // Se asume que el response incluye token y datos de usuario
     dispatch(registerSuccess(data));
-    localStorage.setItem('token', data.data.token);
+    localStorage.setItem('token', data.token);
     return data;
   } catch (error) {
     const errMsg = error.response?.data?.message || 'Error en el registro';
