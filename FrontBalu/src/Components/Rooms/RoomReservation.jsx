@@ -6,6 +6,8 @@ import "react-calendar/dist/Calendar.css";
 import { format, differenceInDays, isValid } from "date-fns";
 import { toast } from "react-toastify";
 import ParentBuyerRegistration from "../Taxxa/ParentBuyerRegistration"; // Importar el componente de registro
+import DashboardLayout from "../Dashboard/DashboardLayout";
+
 
 const RoomReservation = ({ room }) => {
   const dispatch = useDispatch();
@@ -94,10 +96,11 @@ const RoomReservation = ({ room }) => {
   };
 
   return (
+    <DashboardLayout>
     <div className="flex flex-col lg:flex-row gap-6 p-6">
       {/* Sección izquierda: Selección de fechas */}
       <div className="lg:w-1/2 bg-gray-100 p-6 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold mb-4">Selecciona las fechas:</h3>
+        <h3 className="text-lg font-semibold mb-4">Habitación: {room.roomNumber}</h3>
         <Calendar
           selectRange
           onChange={handleDateChange}
@@ -160,7 +163,7 @@ const RoomReservation = ({ room }) => {
       <div className="lg:w-1/2 bg-white p-6 rounded-lg shadow-md">
         {!isBuyerRegistered ? (
           <div>
-            <h3 className="text-lg font-semibold mb-4">Registro del Cliente</h3>
+           
             <ParentBuyerRegistration onComplete={handleBuyerDataComplete} />
           </div>
         ) : (
@@ -174,8 +177,24 @@ const RoomReservation = ({ room }) => {
             <p className="mb-2">
               <strong>Descripción:</strong> {room.description}
             </p>
+            <p className="mb-2">
+                <strong>Check-In:</strong>{" "}
+                {checkIn && isValid(new Date(checkIn))
+                  ? format(new Date(checkIn), "dd-MM-yyyy")
+                  : "No seleccionado"}
+              </p>
+              <p className="mb-2">
+                <strong>Check-Out:</strong>{" "}
+                {checkOut && isValid(new Date(checkOut))
+                  ? format(new Date(checkOut), "dd-MM-yyyy")
+                  : "No seleccionado"}
+              </p>
+              <p className="mb-2">
+  <strong>Cantidad de Personas:</strong> {adults + children}{" "}
+  ({adults} adultos, {children} niños)
+</p>
             <p className="mb-4">
-              <strong>Precio por noche:</strong> ${room.price}
+              <strong>Total:</strong> ${calculateTotal()}
             </p>
             <button
               onClick={handleBooking}
@@ -187,6 +206,7 @@ const RoomReservation = ({ room }) => {
         )}
       </div>
     </div>
+    </DashboardLayout>
   );
 };
 

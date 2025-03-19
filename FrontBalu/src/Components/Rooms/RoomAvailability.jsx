@@ -51,8 +51,9 @@ const { checkIn, checkOut, availability, loading, error } = useSelector(
       <h1 className="title">Disponibilidad de Habitaciones</h1>
       <div className="rooms-grid">
         {availability.map((room) => (
-          <div key={room.roomNumber} className="room-card">
-            <h2 className="room-number">Habitación {room.roomNumber}</h2>
+          <div key={room.roomNumber}  className="room-card">
+            <h2 className="font-semibold text-2xl text-degrade">Habitación {room.roomNumber} </h2>
+            <h5 className="font-semibold text-degrade">Capacidad Maxima {room.maxGuests}</h5>
             <img
               src={room.image_url[0]}
               alt={`Habitación ${room.roomNumber}`}
@@ -72,9 +73,9 @@ const { checkIn, checkOut, availability, loading, error } = useSelector(
             </div>
             <button
               onClick={() => setSelectedRoom(room)}
-              className="btn btn-primary"
+              className="bg-boton text-white text-lg p-2 rounded-xl"
             >
-              Seleccionar
+              Reservar
             </button>
            
           </div>
