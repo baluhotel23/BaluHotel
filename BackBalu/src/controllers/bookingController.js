@@ -155,7 +155,7 @@ const createBooking = async (req, res) => {
         bookingId: booking.bookingId,
         amount: totalAmount,
         paymentMethod: 'credit_card',
-        paymentType: 'online', // Changed from 'wompi' to 'online'
+        paymentType: 'online', 
         paymentStatus: 'pending',
         paymentDate: new Date()
       });
