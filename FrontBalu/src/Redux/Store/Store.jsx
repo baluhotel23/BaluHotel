@@ -8,6 +8,7 @@ import serviceReducer from '../Reducer/serviceReducer';
 import reportReducer from '../Reducer/reportReducer';
 import bookingReducer from '../Reducer/bookingReducer';
 import inventoryReducer from '../Reducer/inventoryReducer';
+import paymentReducer from '../Reducer/paymentReducer';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -17,6 +18,7 @@ const rootReducer = combineReducers({
   report: reportReducer,
   booking: bookingReducer,
   inventory: inventoryReducer,
+  payment:paymentReducer
 });
 
 export const store = configureStore({

@@ -1,4 +1,4 @@
-import  { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   checkAvailability,
@@ -19,11 +19,15 @@ import { format, differenceInDays } from "date-fns";
 import ParentBuyerRegistration from "../Taxxa/ParentBuyerRegistration";
 import { es } from "date-fns/locale";
 import { toast } from "react-toastify";
+import WompiPayment from "../WompiPayment"; // Importa el componente WompiPayment
+
+import { useNavigate } from "react-router-dom"; // Importa useNavigate
 
 const ROOM_TYPES = ["Sencilla", "Doble", "Triple", "Cuadruple", "Pareja"];
 
 const Booking = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate(); // Inicializa useNavigate
   const { availability, loading, error } = useSelector(
     (state) => state.booking
   );
@@ -41,6 +45,10 @@ const Booking = () => {
   const [buyerData, setBuyerData] = useState(null);
   const [isBookingReady, setIsBookingReady] = useState(false);
   const today = new Date();
+
+  const [paymentType, setPaymentType] = useState("wompi"); // Estado para el tipo de pago
+ 
+  
 
   useEffect(() => {
     console.log("Cargando disponibilidad inicial...");
@@ -83,7 +91,6 @@ const Booking = () => {
 
     const maxGuests = room.maxGuests || 2;
 
-    
     setMaxCapacity(maxGuests);
 
     toast.info(
@@ -91,7 +98,7 @@ const Booking = () => {
         <p>¿Confirma las siguientes fechas?</p>
         <p>Check-in: {formatDate(checkIn)}</p>
         <p>Check-out: {formatDate(checkOut)}</p>
-        <button 
+        <button
           onClick={() => {
             if (adults + children > maxGuests) {
               setAdults(1);
@@ -123,109 +130,163 @@ const Booking = () => {
         closeButton: false,
       }
     );
-};
+  };
 
-const calculateTotal = (adults, children, room, checkIn, checkOut) => {
-  const totalGuests = adults + children;
-  const nights = differenceInDays(checkOut, checkIn) + 1;
+  const calculateTotal = (adults, children, room, checkIn, checkOut) => {
+    const totalGuests = adults + children;
+    const nights = differenceInDays(checkOut, checkIn) + 1;
 
-  if (!room) return 0;
+    if (!room) return 0;
 
-  let pricePerPerson = room.price;
-  if (totalGuests === 1) pricePerPerson = 70000;
-  else if (totalGuests >= 2 && totalGuests <= 4) pricePerPerson = 60000;
-  else if (totalGuests > 4) pricePerPerson = 50000;
+    let pricePerPerson = room.price;
+    if (totalGuests === 1) pricePerPerson = 70000;
+    else if (totalGuests >= 2 && totalGuests <= 4) pricePerPerson = 60000;
+    else if (totalGuests > 4) pricePerPerson = 50000;
 
-  return pricePerPerson * totalGuests * nights;
-};
-useEffect(() => {
-  if (selectedRoom) {
-    const newTotal = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
-    setBookingTotal(newTotal);
-  }
-}, [adults, children, selectedRoom, checkIn, checkOut]);
+    return pricePerPerson * totalGuests * nights;
+  };
+  useEffect(() => {
+    if (selectedRoom) {
+      const newTotal = calculateTotal(
+        adults,
+        children,
+        selectedRoom,
+        checkIn,
+        checkOut
+      );
+      setBookingTotal(newTotal);
+    }
+  }, [adults, children, selectedRoom, checkIn, checkOut]);
 
-const handleAdultsChange = (e, room) => {
-  const newAdults = parseInt(e.target.value);
-  const total = newAdults + children;
+  const handleAdultsChange = (e, room) => {
+    const newAdults = parseInt(e.target.value);
+    const total = newAdults + children;
 
-  if (total <= room.maxGuests) {
-    setAdults(newAdults);
-    const newTotal = calculateTotal(newAdults, children, room, checkIn, checkOut);
-    setBookingTotal(newTotal);
-  } else {
-    toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
-  }
-};
+    if (total <= room.maxGuests) {
+      setAdults(newAdults);
+      const newTotal = calculateTotal(
+        newAdults,
+        children,
+        room,
+        checkIn,
+        checkOut
+      );
+      setBookingTotal(newTotal);
+    } else {
+      toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
+    }
+  };
 
-const handleChildrenChange = (e, room) => {
-  const newChildren = parseInt(e.target.value);
-  const total = adults + newChildren;
+  const handleChildrenChange = (e, room) => {
+    const newChildren = parseInt(e.target.value);
+    const total = adults + newChildren;
 
-  if (total <= room.maxGuests) {
-    setChildren(newChildren);
-    const newTotal = calculateTotal(adults, newChildren, room, checkIn, checkOut);
-    setBookingTotal(newTotal);
-  } else {
-    toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
-  }
-};
+    if (total <= room.maxGuests) {
+      setChildren(newChildren);
+      const newTotal = calculateTotal(
+        adults,
+        newChildren,
+        room,
+        checkIn,
+        checkOut
+      );
+      setBookingTotal(newTotal);
+    } else {
+      toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
+    }
+  };
 
   const handleBuyerDataComplete = (buyerData) => {
-    console.log('Buyer creado exitosamente:', buyerData);
+    console.log("Buyer creado exitosamente:", buyerData);
     // Se asume que buyerData ya trae sdocno a nivel raíz
     setBuyerData(buyerData);
     setIsBookingReady(true);
   };
-  // Modificar handleBooking
-  const handleBooking = async () => {
-    if (!selectedRoom || !buyerData) {
-      alert("Por favor complete el registro de usuario");
-      return;
-    }
-  
-    try {
+
+  const handleWompiPaymentSuccess = (transaction) => {
+    console.log("Pago con Wompi exitoso:", transaction);
+    if (transaction.status === "APPROVED") {
       const totalAmount = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
       const totalGuests = adults + children;
       const nights = differenceInDays(checkOut, checkIn) + 1;
-
-
+  
       const bookingData = {
         checkIn,
         checkOut,
         pointOfSale: "Online",
-        status: "pending",
+        status: "confirmed", // Set status as confirmed
         guestCount: totalGuests,
         roomNumber: selectedRoom.roomNumber,
         totalAmount,
         adults,
         children,
         nights,
-        guestId: buyerData.sdocno,
+        guestId: buyerData?.sdocno,
+        paymentType: "online",
+        paymentMethod: "credit_card",
+        paymentStatus: transaction.status,
+        transactionId: transaction.id,
+        paymentReference: transaction.reference,
+        paymentDetails: {
+          cardType: transaction.paymentMethod?.extra?.cardType,
+          cardBrand: transaction.paymentMethod?.extra?.brand,
+          lastFour: transaction.paymentMethod?.extra?.lastFour,
+          installments: transaction.paymentMethod?.installments,
+          processorResponseCode: transaction.paymentMethod?.extra?.processorResponseCode
+        },
         buyerInfo: {
-          name: buyerData.scostumername,
-          docType: buyerData.wdoctype,
-          sdocno: buyerData.sdocno,
-          email: buyerData.selectronicmail,
-          phone: buyerData.stelephone,
+          name: buyerData?.scostumername,
+          docType: buyerData?.wdoctype,
+          sdocno: buyerData?.sdocno,
+          email: buyerData?.selectronicmail,
+          phone: buyerData?.stelephone,
         },
       };
   
+      handleBooking(bookingData);
+  
+      // Mostrar mensaje de éxito con más detalles
+      toast.success(
+        <div>
+          <p>¡Pago exitoso!</p>
+          <p>Referencia: {transaction.reference}</p>
+          <p>Tarjeta: {transaction.paymentMethod?.extra?.brand}-{transaction.paymentMethod?.extra?.lastFour}</p>
+        </div>,
+        { autoClose: 5000 }
+      );
+    } else {
+      toast.error(`El pago no fue aprobado. Estado: ${transaction.status}`);
+    }
+  };
+  
+
+  
+
+  const handleBooking = async (bookingData) => {
+    if (!selectedRoom || !buyerData) {
+      alert("Por favor complete el registro de usuario");
+      return;
+    }
+  
+    try {
       console.log("Datos completos de la reserva:", bookingData);
       const response = await dispatch(createBooking(bookingData));
       
       if (response.success) {
-        alert('Reserva creada exitosamente');
-        // Opcional: abrir directamente el PDF en una nueva pestaña:
-        window.open(response.data.trackingLink, '_blank');
-        // O almacenar el enlace en un estado y mostrar un botón de descarga:
-        // setDownloadLink(response.data.trackingLink);
+        toast.success('Reserva confirmada exitosamente');
+        
+        // Redirigir al usuario a la página de confirmación
+        if (response.data && response.data.trackingLink) {
+          window.open(response.data.trackingLink, '_blank');
+        }
+        
+        // Opcional: redirigir a una página de confirmación
+        navigate(`/booking-confirmation/${response.data.booking.bookingId}`);
       } else {
-        alert('Error al crear la reserva: ' + response.message);
+        toast.error('Error al confirmar la reserva: ' + response.message);
       }
     } catch (error) {
-      console.error('Error al crear la reserva:', error);
-      // Check if it's an axios error with a response
+      console.error('Error al procesar la reserva:', error);
       if (error.response && error.response.data) {
         toast.error(error.response.data.message);
       } else {
@@ -233,8 +294,7 @@ const handleChildrenChange = (e, room) => {
       }
     }
   };
-
-
+  
   const getServiceIcon = (serviceName) => {
     switch (serviceName.toLowerCase()) {
       case "wifi":
@@ -391,7 +451,7 @@ const handleChildrenChange = (e, room) => {
                       </select>
                     </div>
                     <div>
-                    <p>Total: {formatPrice(bookingTotal)}</p>
+                      <p>Total: {formatPrice(bookingTotal)}</p>
                     </div>
                     <button
                       onClick={() => {
@@ -419,25 +479,29 @@ const handleChildrenChange = (e, room) => {
             <h2 className="text-xl font-bold mb-4">Registro de Usuario</h2>
             <ParentBuyerRegistration onComplete={handleBuyerDataComplete} />
           </div>
-          {selectedRoom && (
-            <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
-              <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
-              <p className="mb-2">Habitación: {selectedRoom.type}</p>
-              <p className="mb-2">Desde: {formatDate(checkIn)}</p>
-              <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
-              <p className="mb-2">Adultos: {adults}</p>
-              <p className="mb-2">Niños: {children}</p>
-              <p className="mb-2">
-              Total: {formatPrice(bookingTotal)}
-              </p>
-              <button
-                onClick={handleBooking}
-                className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold"
-              >
-                Confirmar Reserva
-              </button>
-            </div>
-          )}
+         {selectedRoom && (
+  <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
+    <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
+    <p className="mb-2">Habitación: {selectedRoom.type}</p>
+    <p className="mb-2">Desde: {formatDate(checkIn)}</p>
+    <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
+    <p className="mb-2">Adultos: {adults}</p>
+    <p className="mb-2">Niños: {children}</p>
+    <p className="mb-2">Total: {formatPrice(bookingTotal)}</p>
+    
+    <WompiPayment
+      booking={{
+        bookingId: selectedRoom.roomNumber,
+        totalAmount: bookingTotal,
+      }}
+      onPaymentComplete={handleWompiPaymentSuccess}
+    />
+  </div>
+)}
+             
+             
+            
+         
         </div>
       )}
     </div>
