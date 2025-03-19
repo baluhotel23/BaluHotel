@@ -20,7 +20,7 @@ import ParentBuyerRegistration from "../Taxxa/ParentBuyerRegistration";
 import { es } from "date-fns/locale";
 import { toast } from "react-toastify";
 import WompiPayment from "../WompiPayment"; // Importa el componente WompiPayment
-import { registerLocalPayment } from "../../Redux/Actions/paymentActions"; // Importa la action registerLocalPayment
+
 import { useNavigate } from "react-router-dom"; // Importa useNavigate
 
 const ROOM_TYPES = ["Sencilla", "Doble", "Triple", "Cuadruple", "Pareja"];
@@ -48,11 +48,7 @@ const Booking = () => {
 
   const [paymentType, setPaymentType] = useState("wompi"); // Estado para el tipo de pago
  
-  const [localPaymentData, setLocalPaymentData] = useState({
-    // Estado para los datos del pago local
-    amount: 0,
-    paymentMethod: "",
-  });
+  
 
   useEffect(() => {
     console.log("Cargando disponibilidad inicial...");
@@ -209,59 +205,7 @@ const Booking = () => {
 
   const handleWompiPaymentSuccess = (transaction) => {
     console.log("Pago con Wompi exitoso:", transaction);
-    // Después del pago exitoso con Wompi, llama a handleBooking para finalizar la reserva
-    handleBooking();
-  };
-
-  const handleLocalPaymentChange = (e) => {
-    setLocalPaymentData({
-      ...localPaymentData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleRegisterLocalPayment = async () => {
-    try {
-      // Validar que los datos del pago local estén completos
-      if (!localPaymentData.amount || !localPaymentData.paymentMethod) {
-        toast.error("Por favor complete todos los datos del pago local");
-        return;
-      }
-
-      // Crear el objeto con los datos del pago local
-      const paymentData = {
-        bookingId: selectedRoom.roomNumber,
-        amount: parseFloat(localPaymentData.amount),
-        paymentMethod: localPaymentData.paymentMethod,
-      };
-
-      // Registrar el pago local utilizando la action de Redux
-      await dispatch(registerLocalPayment(paymentData));
-
-      // Mostrar un mensaje de éxito
-      toast.success("Pago local registrado exitosamente");
-
-      // Después de registrar el pago local, llama a handleBooking para finalizar la reserva
-      handleBooking();
-    } catch (error) {
-      console.error("Error al registrar el pago local:", error);
-      toast.error(
-        error.response
-          ? error.response.data.message
-          : "Error al registrar el pago local"
-      );
-    }
-  };
-
-  // Modificar handleBooking
-  // En handleBooking del componente Booking.jsx
-  const handleBooking = async () => {
-    if (!selectedRoom || !buyerData) {
-      alert("Por favor complete el registro de usuario");
-      return;
-    }
-  
-    try {
+    if (transaction.status === "APPROVED") {
       const totalAmount = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
       const totalGuests = adults + children;
       const nights = differenceInDays(checkOut, checkIn) + 1;
@@ -270,36 +214,79 @@ const Booking = () => {
         checkIn,
         checkOut,
         pointOfSale: "Online",
-        status: "pending",
+        status: "confirmed", // Set status as confirmed
         guestCount: totalGuests,
         roomNumber: selectedRoom.roomNumber,
         totalAmount,
         adults,
         children,
         nights,
-        guestId: buyerData.sdocno,
+        guestId: buyerData?.sdocno,
+        paymentType: "online",
+        paymentMethod: "credit_card",
+        paymentStatus: transaction.status,
+        transactionId: transaction.id,
+        paymentReference: transaction.reference,
+        paymentDetails: {
+          cardType: transaction.paymentMethod?.extra?.cardType,
+          cardBrand: transaction.paymentMethod?.extra?.brand,
+          lastFour: transaction.paymentMethod?.extra?.lastFour,
+          installments: transaction.paymentMethod?.installments,
+          processorResponseCode: transaction.paymentMethod?.extra?.processorResponseCode
+        },
         buyerInfo: {
-          name: buyerData.scostumername,
-          docType: buyerData.wdoctype,
-          sdocno: buyerData.sdocno,
-          email: buyerData.selectronicmail,
-          phone: buyerData.stelephone,
+          name: buyerData?.scostumername,
+          docType: buyerData?.wdoctype,
+          sdocno: buyerData?.sdocno,
+          email: buyerData?.selectronicmail,
+          phone: buyerData?.stelephone,
         },
       };
   
+      handleBooking(bookingData);
+  
+      // Mostrar mensaje de éxito con más detalles
+      toast.success(
+        <div>
+          <p>¡Pago exitoso!</p>
+          <p>Referencia: {transaction.reference}</p>
+          <p>Tarjeta: {transaction.paymentMethod?.extra?.brand}-{transaction.paymentMethod?.extra?.lastFour}</p>
+        </div>,
+        { autoClose: 5000 }
+      );
+    } else {
+      toast.error(`El pago no fue aprobado. Estado: ${transaction.status}`);
+    }
+  };
+  
+
+  
+
+  const handleBooking = async (bookingData) => {
+    if (!selectedRoom || !buyerData) {
+      alert("Por favor complete el registro de usuario");
+      return;
+    }
+  
+    try {
       console.log("Datos completos de la reserva:", bookingData);
       const response = await dispatch(createBooking(bookingData));
       
       if (response.success) {
-        toast.success('Reserva creada exitosamente');
+        toast.success('Reserva confirmada exitosamente');
+        
+        // Redirigir al usuario a la página de confirmación
         if (response.data && response.data.trackingLink) {
           window.open(response.data.trackingLink, '_blank');
         }
+        
+        // Opcional: redirigir a una página de confirmación
+        navigate(`/booking-confirmation/${response.data.booking.bookingId}`);
       } else {
-        toast.error('Error al crear la reserva: ' + response.message);
+        toast.error('Error al confirmar la reserva: ' + response.message);
       }
     } catch (error) {
-      console.error('Error al crear la reserva:', error);
+      console.error('Error al procesar la reserva:', error);
       if (error.response && error.response.data) {
         toast.error(error.response.data.message);
       } else {
@@ -307,7 +294,7 @@ const Booking = () => {
       }
     }
   };
-
+  
   const getServiceIcon = (serviceName) => {
     switch (serviceName.toLowerCase()) {
       case "wifi":
@@ -492,77 +479,29 @@ const Booking = () => {
             <h2 className="text-xl font-bold mb-4">Registro de Usuario</h2>
             <ParentBuyerRegistration onComplete={handleBuyerDataComplete} />
           </div>
-          {selectedRoom && (
-            <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
-              <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
-              <p className="mb-2">Habitación: {selectedRoom.type}</p>
-              <p className="mb-2">Desde: {formatDate(checkIn)}</p>
-              <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
-              <p className="mb-2">Adultos: {adults}</p>
-              <p className="mb-2">Niños: {children}</p>
-              <p className="mb-2">Total: {formatPrice(bookingTotal)}</p>
-              {/* Selector de tipo de pago */}
-              <div className="mb-4">
-                <label className="block text-sm font-bold mb-2">
-                  Seleccione el tipo de pago:
-                </label>
-                <select
-                  value={paymentType}
-                  onChange={(e) => setPaymentType(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-gray-700 text-white"
-                >
-                  <option value="wompi">Wompi</option>
-                  <option value="local">Pago Local</option>
-                </select>
-              </div>
-              {/* Renderizar el componente WompiPayment si el tipo de pago es "wompi" */}
-              {paymentType === "wompi" && (
-                <WompiPayment
-                  booking={{
-                    bookingId: selectedRoom.roomNumber,
-                    totalAmount: bookingTotal,
-                  }}
-                  onPaymentComplete={handleWompiPaymentSuccess}
-                />
-              )}
-              {/* Mostrar el formulario de pago local si el tipo de pago es "local" */}
-              {paymentType === "local" && (
-                <div>
-                  <label className="block text-sm font-bold mb-2">
-                    Monto a pagar:
-                  </label>
-                  <input
-                    type="number"
-                    name="amount"
-                    value={localPaymentData.amount}
-                    onChange={handleLocalPaymentChange}
-                    className="w-full p-2 rounded-lg bg-gray-700 text-white mb-2"
-                  />
-                  <label className="block text-sm font-bold mb-2">
-                    Método de pago:
-                  </label>
-                  <select
-                    name="paymentMethod"
-                    value={localPaymentData.paymentMethod}
-                    onChange={handleLocalPaymentChange}
-                    className="w-full p-2 rounded-lg bg-gray-700 text-white mb-2"
-                  >
-                    <option value="">Seleccione un método de pago</option>
-                    <option value="cash">Efectivo</option>
-                    <option value="credit_card">Tarjeta de Crédito</option>
-                    <option value="debit_card">Tarjeta de Débito</option>
-                    <option value="transfer">Transferencia</option>
-                  </select>
-                  <button
-                    onClick={handleRegisterLocalPayment}
-                    className="mt-4 w-full p-3 bg-green-500 hover:bg-green-600 rounded-full font-bold"
-                  >
-                    Registrar Pago Local
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+         {selectedRoom && (
+  <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
+    <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
+    <p className="mb-2">Habitación: {selectedRoom.type}</p>
+    <p className="mb-2">Desde: {formatDate(checkIn)}</p>
+    <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
+    <p className="mb-2">Adultos: {adults}</p>
+    <p className="mb-2">Niños: {children}</p>
+    <p className="mb-2">Total: {formatPrice(bookingTotal)}</p>
+    
+    <WompiPayment
+      booking={{
+        bookingId: selectedRoom.roomNumber,
+        totalAmount: bookingTotal,
+      }}
+      onPaymentComplete={handleWompiPaymentSuccess}
+    />
+  </div>
+)}
+             
+             
+            
+         
         </div>
       )}
     </div>
