@@ -1,20 +1,21 @@
-import React, {useEffect} from "react";
+import React, {useEffect, useState} from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { checkAvailability } from "../../Redux/Actions/bookingActions";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import "./RoomAvailability.css";
 import DashboardLayout from "../Dashboard/DashboardLayout";
-
+import RoomReservation from "./RoomReservation";
 
 const RoomAvailability = () => {
 const dispatch = useDispatch();
-const { checkIn, checkOut } = useSelector((state) => state.booking);    
-const { availability, loading, error } = useSelector((state) => state.booking);
-useEffect(() => {
-    console.log("Cargando disponibilidad inicial...");
+const { checkIn, checkOut, availability, loading, error } = useSelector(
+    (state) => state.booking
+  );
+  const [selectedRoom, setSelectedRoom] = useState(null);
+ useEffect(() => {
     dispatch(checkAvailability({ checkIn, checkOut }));
-  }, [dispatch]);
+  }, [dispatch, checkIn, checkOut]);
 
 
   // Función para determinar la clase de cada fecha en el calendario
@@ -33,6 +34,16 @@ useEffect(() => {
   if (error) {
     return <p className="error-message">Error: {error}</p>;
   }
+  if (selectedRoom) {
+    return (
+      <RoomReservation
+        room={selectedRoom}
+        checkIn={checkIn}
+        checkOut={checkOut}
+      />
+    );
+  }
+
 
   return (
     <DashboardLayout>
@@ -59,6 +70,12 @@ useEffect(() => {
                 }
               />
             </div>
+            <button
+              onClick={() => setSelectedRoom(room)}
+              className="btn btn-primary"
+            >
+              Seleccionar
+            </button>
            
           </div>
         ))}
