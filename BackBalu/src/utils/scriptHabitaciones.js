@@ -66,8 +66,6 @@ const loadRooms = async () => {
                 promotionPrice: null,
                 image_url: [
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
-
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
                 ],
                 type: "Cuadruple",
@@ -84,7 +82,6 @@ const loadRooms = async () => {
                 isPromo: false,
                 promotionPrice: null,
                 image_url: [
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
 
@@ -122,7 +119,7 @@ const loadRooms = async () => {
                 isPromo: false,
                 promotionPrice: null,
                 image_url: [
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741903636/packs/tmtyuenykidfex4e4l5c.png",
+                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
@@ -198,7 +195,7 @@ const loadRooms = async () => {
                 isPromo: false,
                 promotionPrice: null,
                 image_url: [
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741903636/packs/tmtyuenykidfex4e4l5c.png",
+                   
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
@@ -293,10 +290,8 @@ const loadRooms = async () => {
                 isPromo: false,
                 promotionPrice: null,
                 image_url: [
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741903636/packs/tmtyuenykidfex4e4l5c.png",
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
+                   "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
+				   "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
                 ],
                 type: "Cuadruple",
                 status: null,
@@ -312,10 +307,10 @@ const loadRooms = async () => {
                 isPromo: false,
                 promotionPrice: null,
                 image_url: [
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741903636/packs/tmtyuenykidfex4e4l5c.png",
+                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
+                   
                 ],
                 type: "Cuadruple",
                 status: null,
@@ -331,8 +326,7 @@ const loadRooms = async () => {
                 isPromo: false,
                 promotionPrice: null,
                 image_url: [
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741903636/packs/tmtyuenykidfex4e4l5c.png",
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
+                    
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
                 ],
@@ -350,7 +344,7 @@ const loadRooms = async () => {
                 isPromo: false,
                 promotionPrice: null,
                 image_url: [
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741903636/packs/tmtyuenykidfex4e4l5c.png",
+                  
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
@@ -388,10 +382,10 @@ const loadRooms = async () => {
                 isPromo: false,
                 promotionPrice: null,
                 image_url: [
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741903636/packs/tmtyuenykidfex4e4l5c.png",
+                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
+                   
                 ],
                 type: "Cuadruple",
                 status: null,
@@ -407,8 +401,7 @@ const loadRooms = async () => {
                 isPromo: false,
                 promotionPrice: null,
                 image_url: [
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741903636/packs/tmtyuenykidfex4e4l5c.png",
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
+                   
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
                 ],
@@ -426,7 +419,7 @@ const loadRooms = async () => {
                 isPromo: false,
                 promotionPrice: null,
                 image_url: [
-                    "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741903636/packs/tmtyuenykidfex4e4l5c.png",
+                  
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/bqbv8wdpdxdujyycjam8.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/nddesbjmbt7lo1yjbblt.png",
                     "https://res.cloudinary.com/dv1xvijmn/image/upload/v1741921960/packs/mde0kduevtv9ymofknhs.png",
@@ -457,7 +450,7 @@ const loadRooms = async () => {
                 isActive: true,
             });
         }
-
+        rooms.sort((a, b) => a.roomNumber - b.roomNumber);
         // Insertar habitaciones en la base de datos
         for (const room of rooms) {
             const existingRoom = await Room.findOne({ where: { roomNumber: room.roomNumber } });

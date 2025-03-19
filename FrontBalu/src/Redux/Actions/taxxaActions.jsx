@@ -42,16 +42,12 @@ export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
   
   export const createSellerData = (sellerData) => async (dispatch) => {
     dispatch({ type: 'CREATE_SELLER_REQUEST' });
-    
+  
     try {
-      const response = await api.post(`/seller/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sellerData),
-      });
-      const data = await response.json();
-    
-      if (response.ok) {
+      const response = await api.put(`/admin/settings/hotel-settings`, sellerData); // Enviar directamente el objeto sellerData
+      const data = response.data;
+  
+      if (response.status === 200) {
         dispatch({ type: 'CREATE_SELLER_SUCCESS', payload: data.data });
         toast.success('Datos del comercio creados correctamente.');
       } else {
@@ -71,14 +67,10 @@ export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
     dispatch({ type: 'UPDATE_SELLER_REQUEST' });
   
     try {
-      const response = await api.put(`/seller/${n_document}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sellerData),
-      });
-      const data = await response.json();
+      const response = await api.put(`/seller/${n_document}`, sellerData); // Enviar directamente el objeto sellerData
+      const data = response.data;
   
-      if (response.ok) {
+      if (response.status === 200) {
         dispatch({ type: 'UPDATE_SELLER_SUCCESS', payload: data.data });
         return true; // Retorna éxito
       } else {
