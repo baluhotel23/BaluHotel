@@ -1,4 +1,4 @@
-import  { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   checkAvailability,
@@ -19,11 +19,15 @@ import { format, differenceInDays } from "date-fns";
 import ParentBuyerRegistration from "../Taxxa/ParentBuyerRegistration";
 import { es } from "date-fns/locale";
 import { toast } from "react-toastify";
+import WompiPayment from "../WompiPayment"; // Importa el componente WompiPayment
+import { registerLocalPayment } from "../../Redux/Actions/paymentActions"; // Importa la action registerLocalPayment
+import { useNavigate } from "react-router-dom"; // Importa useNavigate
 
 const ROOM_TYPES = ["Sencilla", "Doble", "Triple", "Cuadruple", "Pareja"];
 
 const Booking = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate(); // Inicializa useNavigate
   const { availability, loading, error } = useSelector(
     (state) => state.booking
   );
@@ -41,6 +45,14 @@ const Booking = () => {
   const [buyerData, setBuyerData] = useState(null);
   const [isBookingReady, setIsBookingReady] = useState(false);
   const today = new Date();
+
+  const [paymentType, setPaymentType] = useState("wompi"); // Estado para el tipo de pago
+ 
+  const [localPaymentData, setLocalPaymentData] = useState({
+    // Estado para los datos del pago local
+    amount: 0,
+    paymentMethod: "",
+  });
 
   useEffect(() => {
     console.log("Cargando disponibilidad inicial...");
@@ -83,7 +95,6 @@ const Booking = () => {
 
     const maxGuests = room.maxGuests || 2;
 
-    
     setMaxCapacity(maxGuests);
 
     toast.info(
@@ -91,7 +102,7 @@ const Booking = () => {
         <p>¿Confirma las siguientes fechas?</p>
         <p>Check-in: {formatDate(checkIn)}</p>
         <p>Check-out: {formatDate(checkOut)}</p>
-        <button 
+        <button
           onClick={() => {
             if (adults + children > maxGuests) {
               setAdults(1);
@@ -123,61 +134,127 @@ const Booking = () => {
         closeButton: false,
       }
     );
-};
+  };
 
-const calculateTotal = (adults, children, room, checkIn, checkOut) => {
-  const totalGuests = adults + children;
-  const nights = differenceInDays(checkOut, checkIn) + 1;
+  const calculateTotal = (adults, children, room, checkIn, checkOut) => {
+    const totalGuests = adults + children;
+    const nights = differenceInDays(checkOut, checkIn) + 1;
 
-  if (!room) return 0;
+    if (!room) return 0;
 
-  let pricePerPerson = room.price;
-  if (totalGuests === 1) pricePerPerson = 70000;
-  else if (totalGuests >= 2 && totalGuests <= 4) pricePerPerson = 60000;
-  else if (totalGuests > 4) pricePerPerson = 50000;
+    let pricePerPerson = room.price;
+    if (totalGuests === 1) pricePerPerson = 70000;
+    else if (totalGuests >= 2 && totalGuests <= 4) pricePerPerson = 60000;
+    else if (totalGuests > 4) pricePerPerson = 50000;
 
-  return pricePerPerson * totalGuests * nights;
-};
-useEffect(() => {
-  if (selectedRoom) {
-    const newTotal = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
-    setBookingTotal(newTotal);
-  }
-}, [adults, children, selectedRoom, checkIn, checkOut]);
+    return pricePerPerson * totalGuests * nights;
+  };
+  useEffect(() => {
+    if (selectedRoom) {
+      const newTotal = calculateTotal(
+        adults,
+        children,
+        selectedRoom,
+        checkIn,
+        checkOut
+      );
+      setBookingTotal(newTotal);
+    }
+  }, [adults, children, selectedRoom, checkIn, checkOut]);
 
-const handleAdultsChange = (e, room) => {
-  const newAdults = parseInt(e.target.value);
-  const total = newAdults + children;
+  const handleAdultsChange = (e, room) => {
+    const newAdults = parseInt(e.target.value);
+    const total = newAdults + children;
 
-  if (total <= room.maxGuests) {
-    setAdults(newAdults);
-    const newTotal = calculateTotal(newAdults, children, room, checkIn, checkOut);
-    setBookingTotal(newTotal);
-  } else {
-    toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
-  }
-};
+    if (total <= room.maxGuests) {
+      setAdults(newAdults);
+      const newTotal = calculateTotal(
+        newAdults,
+        children,
+        room,
+        checkIn,
+        checkOut
+      );
+      setBookingTotal(newTotal);
+    } else {
+      toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
+    }
+  };
 
-const handleChildrenChange = (e, room) => {
-  const newChildren = parseInt(e.target.value);
-  const total = adults + newChildren;
+  const handleChildrenChange = (e, room) => {
+    const newChildren = parseInt(e.target.value);
+    const total = adults + newChildren;
 
-  if (total <= room.maxGuests) {
-    setChildren(newChildren);
-    const newTotal = calculateTotal(adults, newChildren, room, checkIn, checkOut);
-    setBookingTotal(newTotal);
-  } else {
-    toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
-  }
-};
+    if (total <= room.maxGuests) {
+      setChildren(newChildren);
+      const newTotal = calculateTotal(
+        adults,
+        newChildren,
+        room,
+        checkIn,
+        checkOut
+      );
+      setBookingTotal(newTotal);
+    } else {
+      toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
+    }
+  };
 
   const handleBuyerDataComplete = (buyerData) => {
-    console.log('Buyer creado exitosamente:', buyerData);
+    console.log("Buyer creado exitosamente:", buyerData);
     // Se asume que buyerData ya trae sdocno a nivel raíz
     setBuyerData(buyerData);
     setIsBookingReady(true);
   };
+
+  const handleWompiPaymentSuccess = (transaction) => {
+    console.log("Pago con Wompi exitoso:", transaction);
+    // Después del pago exitoso con Wompi, llama a handleBooking para finalizar la reserva
+    handleBooking();
+  };
+
+  const handleLocalPaymentChange = (e) => {
+    setLocalPaymentData({
+      ...localPaymentData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleRegisterLocalPayment = async () => {
+    try {
+      // Validar que los datos del pago local estén completos
+      if (!localPaymentData.amount || !localPaymentData.paymentMethod) {
+        toast.error("Por favor complete todos los datos del pago local");
+        return;
+      }
+
+      // Crear el objeto con los datos del pago local
+      const paymentData = {
+        bookingId: selectedRoom.roomNumber,
+        amount: parseFloat(localPaymentData.amount),
+        paymentMethod: localPaymentData.paymentMethod,
+      };
+
+      // Registrar el pago local utilizando la action de Redux
+      await dispatch(registerLocalPayment(paymentData));
+
+      // Mostrar un mensaje de éxito
+      toast.success("Pago local registrado exitosamente");
+
+      // Después de registrar el pago local, llama a handleBooking para finalizar la reserva
+      handleBooking();
+    } catch (error) {
+      console.error("Error al registrar el pago local:", error);
+      toast.error(
+        error.response
+          ? error.response.data.message
+          : "Error al registrar el pago local"
+      );
+    }
+  };
+
   // Modificar handleBooking
+  // En handleBooking del componente Booking.jsx
   const handleBooking = async () => {
     if (!selectedRoom || !buyerData) {
       alert("Por favor complete el registro de usuario");
@@ -188,8 +265,7 @@ const handleChildrenChange = (e, room) => {
       const totalAmount = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
       const totalGuests = adults + children;
       const nights = differenceInDays(checkOut, checkIn) + 1;
-
-
+  
       const bookingData = {
         checkIn,
         checkOut,
@@ -215,17 +291,15 @@ const handleChildrenChange = (e, room) => {
       const response = await dispatch(createBooking(bookingData));
       
       if (response.success) {
-        alert('Reserva creada exitosamente');
-        // Opcional: abrir directamente el PDF en una nueva pestaña:
-        window.open(response.data.trackingLink, '_blank');
-        // O almacenar el enlace en un estado y mostrar un botón de descarga:
-        // setDownloadLink(response.data.trackingLink);
+        toast.success('Reserva creada exitosamente');
+        if (response.data && response.data.trackingLink) {
+          window.open(response.data.trackingLink, '_blank');
+        }
       } else {
-        alert('Error al crear la reserva: ' + response.message);
+        toast.error('Error al crear la reserva: ' + response.message);
       }
     } catch (error) {
       console.error('Error al crear la reserva:', error);
-      // Check if it's an axios error with a response
       if (error.response && error.response.data) {
         toast.error(error.response.data.message);
       } else {
@@ -233,7 +307,6 @@ const handleChildrenChange = (e, room) => {
       }
     }
   };
-
 
   const getServiceIcon = (serviceName) => {
     switch (serviceName.toLowerCase()) {
@@ -391,7 +464,7 @@ const handleChildrenChange = (e, room) => {
                       </select>
                     </div>
                     <div>
-                    <p>Total: {formatPrice(bookingTotal)}</p>
+                      <p>Total: {formatPrice(bookingTotal)}</p>
                     </div>
                     <button
                       onClick={() => {
@@ -427,15 +500,67 @@ const handleChildrenChange = (e, room) => {
               <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
               <p className="mb-2">Adultos: {adults}</p>
               <p className="mb-2">Niños: {children}</p>
-              <p className="mb-2">
-              Total: {formatPrice(bookingTotal)}
-              </p>
-              <button
-                onClick={handleBooking}
-                className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold"
-              >
-                Confirmar Reserva
-              </button>
+              <p className="mb-2">Total: {formatPrice(bookingTotal)}</p>
+              {/* Selector de tipo de pago */}
+              <div className="mb-4">
+                <label className="block text-sm font-bold mb-2">
+                  Seleccione el tipo de pago:
+                </label>
+                <select
+                  value={paymentType}
+                  onChange={(e) => setPaymentType(e.target.value)}
+                  className="w-full p-2 rounded-lg bg-gray-700 text-white"
+                >
+                  <option value="wompi">Wompi</option>
+                  <option value="local">Pago Local</option>
+                </select>
+              </div>
+              {/* Renderizar el componente WompiPayment si el tipo de pago es "wompi" */}
+              {paymentType === "wompi" && (
+                <WompiPayment
+                  booking={{
+                    bookingId: selectedRoom.roomNumber,
+                    totalAmount: bookingTotal,
+                  }}
+                  onPaymentComplete={handleWompiPaymentSuccess}
+                />
+              )}
+              {/* Mostrar el formulario de pago local si el tipo de pago es "local" */}
+              {paymentType === "local" && (
+                <div>
+                  <label className="block text-sm font-bold mb-2">
+                    Monto a pagar:
+                  </label>
+                  <input
+                    type="number"
+                    name="amount"
+                    value={localPaymentData.amount}
+                    onChange={handleLocalPaymentChange}
+                    className="w-full p-2 rounded-lg bg-gray-700 text-white mb-2"
+                  />
+                  <label className="block text-sm font-bold mb-2">
+                    Método de pago:
+                  </label>
+                  <select
+                    name="paymentMethod"
+                    value={localPaymentData.paymentMethod}
+                    onChange={handleLocalPaymentChange}
+                    className="w-full p-2 rounded-lg bg-gray-700 text-white mb-2"
+                  >
+                    <option value="">Seleccione un método de pago</option>
+                    <option value="cash">Efectivo</option>
+                    <option value="credit_card">Tarjeta de Crédito</option>
+                    <option value="debit_card">Tarjeta de Débito</option>
+                    <option value="transfer">Transferencia</option>
+                  </select>
+                  <button
+                    onClick={handleRegisterLocalPayment}
+                    className="mt-4 w-full p-3 bg-green-500 hover:bg-green-600 rounded-full font-bold"
+                  >
+                    Registrar Pago Local
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
