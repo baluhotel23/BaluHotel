@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   checkAvailability,
   createBooking,
+  updateOnlinePayment
 } from "../../Redux/Actions/bookingActions";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -19,20 +20,20 @@ import { format, differenceInDays } from "date-fns";
 import ParentBuyerRegistration from "../Taxxa/ParentBuyerRegistration";
 import { es } from "date-fns/locale";
 import { toast } from "react-toastify";
-import WompiPayment from "../WompiPayment"; // Importa el componente WompiPayment
-
-import { useNavigate } from "react-router-dom"; // Importa useNavigate
+import WompiPayment from "../WompiPayment";
+import { useNavigate } from "react-router-dom";
 
 const ROOM_TYPES = ["Sencilla", "Doble", "Triple", "Cuadruple", "Pareja"];
 
 const Booking = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate(); // Inicializa useNavigate
-  const { availability, loading, error } = useSelector(
-    (state) => state.booking
-  );
-  const [showRegistration, setShowRegistration] = useState(false);
+  const navigate = useNavigate();
+  const { availability, loading, error } = useSelector((state) => state.booking);
   const { rooms } = useSelector((state) => state.room);
+  const [showRegistration, setShowRegistration] = useState(false);
+  const today = new Date();
+
+  // Estados para fechas, búsqueda y reserva
   const [checkIn, setCheckIn] = useState(new Date());
   const [checkOut, setCheckOut] = useState(new Date());
   const [roomType, setRoomType] = useState("");
@@ -42,14 +43,14 @@ const Booking = () => {
   const [maxCapacity, setMaxCapacity] = useState(2);
   const [selectedRoom, setSelectedRoom] = useState(null);
 
+  // Estados para registro del comprador y reserva
   const [buyerData, setBuyerData] = useState(null);
   const [isBookingReady, setIsBookingReady] = useState(false);
-  const today = new Date();
 
-  const [paymentType, setPaymentType] = useState("wompi"); // Estado para el tipo de pago
- 
-  
+  // Estado para tipo de pago (por el momento no se utiliza, pero queda como referencia)
+  const [paymentType, setPaymentType] = useState("wompi");
 
+  // Cargar disponibilidad inicial
   useEffect(() => {
     console.log("Cargando disponibilidad inicial...");
     dispatch(checkAvailability({ checkIn, checkOut }));
@@ -61,8 +62,6 @@ const Booking = () => {
       return;
     }
     setCheckIn(date);
-
-    // Si el checkout es menor que el nuevo checkin, actualizarlo
     if (checkOut <= date) {
       const nextDay = new Date(date);
       nextDay.setDate(date.getDate() + 1);
@@ -88,11 +87,8 @@ const Booking = () => {
       toast.error("Datos de habitación inválidos");
       return;
     }
-
     const maxGuests = room.maxGuests || 2;
-
     setMaxCapacity(maxGuests);
-
     toast.info(
       <div>
         <p>¿Confirma las siguientes fechas?</p>
@@ -135,25 +131,17 @@ const Booking = () => {
   const calculateTotal = (adults, children, room, checkIn, checkOut) => {
     const totalGuests = adults + children;
     const nights = differenceInDays(checkOut, checkIn) + 1;
-
     if (!room) return 0;
-
     let pricePerPerson = room.price;
     if (totalGuests === 1) pricePerPerson = 70000;
     else if (totalGuests >= 2 && totalGuests <= 4) pricePerPerson = 60000;
     else if (totalGuests > 4) pricePerPerson = 50000;
-
     return pricePerPerson * totalGuests * nights;
   };
+
   useEffect(() => {
     if (selectedRoom) {
-      const newTotal = calculateTotal(
-        adults,
-        children,
-        selectedRoom,
-        checkIn,
-        checkOut
-      );
+      const newTotal = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
       setBookingTotal(newTotal);
     }
   }, [adults, children, selectedRoom, checkIn, checkOut]);
@@ -161,17 +149,9 @@ const Booking = () => {
   const handleAdultsChange = (e, room) => {
     const newAdults = parseInt(e.target.value);
     const total = newAdults + children;
-
     if (total <= room.maxGuests) {
       setAdults(newAdults);
-      const newTotal = calculateTotal(
-        newAdults,
-        children,
-        room,
-        checkIn,
-        checkOut
-      );
-      setBookingTotal(newTotal);
+      setBookingTotal(calculateTotal(newAdults, children, room, checkIn, checkOut));
     } else {
       toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
     }
@@ -180,17 +160,9 @@ const Booking = () => {
   const handleChildrenChange = (e, room) => {
     const newChildren = parseInt(e.target.value);
     const total = adults + newChildren;
-
     if (total <= room.maxGuests) {
       setChildren(newChildren);
-      const newTotal = calculateTotal(
-        adults,
-        newChildren,
-        room,
-        checkIn,
-        checkOut
-      );
-      setBookingTotal(newTotal);
+      setBookingTotal(calculateTotal(adults, newChildren, room, checkIn, checkOut));
     } else {
       toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
     }
@@ -198,103 +170,98 @@ const Booking = () => {
 
   const handleBuyerDataComplete = (buyerData) => {
     console.log("Buyer creado exitosamente:", buyerData);
-    // Se asume que buyerData ya trae sdocno a nivel raíz
     setBuyerData(buyerData);
     setIsBookingReady(true);
   };
 
-  const handleWompiPaymentSuccess = (transaction) => {
+  // Flujo principal para el pago con Wompi
+  const handleWompiPaymentSuccess = async (transaction) => {
     console.log("Pago con Wompi exitoso:", transaction);
-    if (transaction.status === "APPROVED") {
-      const totalAmount = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
-      const totalGuests = adults + children;
-      const nights = differenceInDays(checkOut, checkIn) + 1;
+    if (transaction.status !== "APPROVED") {
+      toast.error(`El pago no fue aprobado. Estado: ${transaction.status}`);
+      return;
+    }
+    const totalAmount = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
+    const totalGuests = adults + children;
+    const nights = differenceInDays(checkOut, checkIn) + 1;
+    const bookingData = {
+      checkIn,
+      checkOut,
+      pointOfSale: "Online",
+      status: "confirmed",
+      guestCount: totalGuests,
+      roomNumber: selectedRoom.roomNumber,
+      totalAmount,
+      adults,
+      children,
+      nights,
+      guestId: buyerData?.sdocno,
+      paymentType: "online",
+      paymentMethod: "credit_card",
+      paymentStatus: transaction.status,
+      transactionId: transaction.id,
+      paymentReference: transaction.reference,
+      paymentDetails: {
+        cardType: transaction.paymentMethod?.extra?.cardType,
+        cardBrand: transaction.paymentMethod?.extra?.brand,
+        lastFour: transaction.paymentMethod?.extra?.lastFour,
+        installments: transaction.paymentMethod?.installments,
+        processorResponseCode: transaction.paymentMethod?.extra?.processorResponseCode,
+      },
+      buyerInfo: {
+        name: buyerData?.scostumername,
+        docType: buyerData?.wdoctype,
+        sdocno: buyerData?.sdocno,
+        email: buyerData?.selectronicmail,
+        phone: buyerData?.stelephone,
+      },
+    };
   
-      const bookingData = {
-        checkIn,
-        checkOut,
-        pointOfSale: "Online",
-        status: "confirmed", // Set status as confirmed
-        guestCount: totalGuests,
-        roomNumber: selectedRoom.roomNumber,
-        totalAmount,
-        adults,
-        children,
-        nights,
-        guestId: buyerData?.sdocno,
-        paymentType: "online",
-        paymentMethod: "credit_card",
-        paymentStatus: transaction.status,
+    try {
+      console.log("Datos completos de la reserva:", bookingData);
+      const createResponse = await dispatch(createBooking(bookingData));
+      if (!createResponse.success) {
+        toast.error('Error al confirmar la reserva: ' + createResponse.message);
+        return;
+      }
+      // Se asume que se retorna createResponse.data.booking.bookingId
+      const bookingId = createResponse.data.booking.bookingId;
+      // Preparar payload para actualizar el pago online
+      const paymentPayload = {
+        bookingId,
+        amount: transaction.amountInCents ? transaction.amountInCents / 100 : totalAmount,
         transactionId: transaction.id,
         paymentReference: transaction.reference,
-        paymentDetails: {
-          cardType: transaction.paymentMethod?.extra?.cardType,
-          cardBrand: transaction.paymentMethod?.extra?.brand,
-          lastFour: transaction.paymentMethod?.extra?.lastFour,
-          installments: transaction.paymentMethod?.installments,
-          processorResponseCode: transaction.paymentMethod?.extra?.processorResponseCode
-        },
-        buyerInfo: {
-          name: buyerData?.scostumername,
-          docType: buyerData?.wdoctype,
-          sdocno: buyerData?.sdocno,
-          email: buyerData?.selectronicmail,
-          phone: buyerData?.stelephone,
-        },
+        paymentMethod: "credit_card", // o "wompi" según corresponda
       };
-  
-      handleBooking(bookingData);
-  
-      // Mostrar mensaje de éxito con más detalles
+      console.log("Enviando actualización de pago online:", paymentPayload);
+      const updateResponse = await dispatch(updateOnlinePayment(paymentPayload));
+      if (updateResponse.success) {
+        toast.success("Pago online registrado y reserva actualizada exitosamente");
+        if (createResponse.data.trackingLink) {
+          window.open(createResponse.data.trackingLink, '_blank');
+        }
+        navigate(`/booking-confirmation/${bookingId}`);
+      } else {
+        toast.error("Error al actualizar el pago online: " + updateResponse.message);
+      }
       toast.success(
         <div>
           <p>¡Pago exitoso!</p>
           <p>Referencia: {transaction.reference}</p>
-          <p>Tarjeta: {transaction.paymentMethod?.extra?.brand}-{transaction.paymentMethod?.extra?.lastFour}</p>
+          <p>
+            Tarjeta: {transaction.paymentMethod?.extra?.brand}-{transaction.paymentMethod?.extra?.lastFour}
+          </p>
         </div>,
         { autoClose: 5000 }
       );
-    } else {
-      toast.error(`El pago no fue aprobado. Estado: ${transaction.status}`);
-    }
-  };
-  
-
-  
-
-  const handleBooking = async (bookingData) => {
-    if (!selectedRoom || !buyerData) {
-      alert("Por favor complete el registro de usuario");
-      return;
-    }
-  
-    try {
-      console.log("Datos completos de la reserva:", bookingData);
-      const response = await dispatch(createBooking(bookingData));
-      
-      if (response.success) {
-        toast.success('Reserva confirmada exitosamente');
-        
-        // Redirigir al usuario a la página de confirmación
-        if (response.data && response.data.trackingLink) {
-          window.open(response.data.trackingLink, '_blank');
-        }
-        
-        // Opcional: redirigir a una página de confirmación
-        navigate(`/booking-confirmation/${response.data.booking.bookingId}`);
-      } else {
-        toast.error('Error al confirmar la reserva: ' + response.message);
-      }
     } catch (error) {
-      console.error('Error al procesar la reserva:', error);
-      if (error.response && error.response.data) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error('Error al procesar la reserva: ' + error.message);
-      }
+      console.error("Error en el flujo de reserva/pago:", error);
+      toast.error("Error al procesar la reserva y el pago online");
     }
   };
-  
+
+  // Funciones de utilidad
   const getServiceIcon = (serviceName) => {
     switch (serviceName.toLowerCase()) {
       case "wifi":
@@ -325,187 +292,168 @@ const Booking = () => {
     return format(date, "dd-MM-yyyy", { locale: es });
   };
 
-  return (
-    <div className="container mx-auto p-4 grid grid-cols-1 md:grid-cols-4 gap-6 bg-stone-500 text-white min-h-screen">
-      {/* Formulario de Búsqueda */}
-      <div className="col-span-1 bg-gray-800 p-6 rounded-xl shadow-lg">
-        <h1 className="text-2xl font-bold mb-4">Buscar Habitaciones</h1>
-        <label className="block mb-2">Desde</label>
-        <DatePicker
-          selected={checkIn}
-          onChange={handleCheckInChange}
-          minDate={today}
-          className="w-full p-2 rounded-lg bg-gray-700"
-          dateFormat="dd-MM-yyyy"
-          locale={es}
-        />
-        <label className="block mt-4 mb-2">Hasta</label>
-        <DatePicker
-          selected={checkOut}
-          onChange={handleCheckOutChange}
-          minDate={new Date(checkIn.getTime() + 86400000)} // checkIn + 1 día en milisegundos
-          className="w-full p-2 rounded-lg bg-gray-700"
-          dateFormat="dd-MM-yyyy"
-          locale={es}
-        />
-        <label className="block mt-4 mb-2">Tipo de Habitación</label>
-        <select
-          value={roomType}
-          onChange={(e) => {
-            setRoomType(e.target.value);
-            console.log("Tipo seleccionado:", e.target.value);
-            // Filtrar habitaciones por tipo seleccionado
-            dispatch(
-              checkAvailability({
-                checkIn,
-                checkOut,
-                roomType: e.target.value,
-              })
-            );
-          }}
-          className="w-full p-2 rounded-lg bg-gray-700"
-        >
-          <option value="">Todos los tipos</option>
-          {ROOM_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={handleSearch}
-          className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold"
-        >
-          Buscar
-        </button>
-      </div>
+  // ...
+return (
+  <div className="container mx-auto p-4 grid grid-cols-1 md:grid-cols-4 gap-6 bg-stone-500 text-white min-h-screen">
+    {/* Formulario de Búsqueda */}
+    <div className="col-span-1 bg-gray-800 p-6 rounded-xl shadow-lg">
+      <h1 className="text-2xl font-bold mb-4">Buscar Habitaciones</h1>
+      <label className="block mb-2">Desde</label>
+      <DatePicker
+        selected={checkIn}
+        onChange={handleCheckInChange}
+        minDate={today}
+        className="w-full p-2 rounded-lg bg-gray-700"
+        dateFormat="dd-MM-yyyy"
+        locale={es}
+      />
+      <label className="block mt-4 mb-2">Hasta</label>
+      <DatePicker
+        selected={checkOut}
+        onChange={handleCheckOutChange}
+        minDate={new Date(checkIn.getTime() + 86400000)}
+        className="w-full p-2 rounded-lg bg-gray-700"
+        dateFormat="dd-MM-yyyy"
+        locale={es}
+      />
+      <label className="block mt-4 mb-2">Tipo de Habitación</label>
+      <select
+        value={roomType}
+        onChange={(e) => {
+          setRoomType(e.target.value);
+          console.log("Tipo seleccionado:", e.target.value);
+          dispatch(checkAvailability({ checkIn, checkOut, roomType: e.target.value }));
+        }}
+        className="w-full p-2 rounded-lg bg-gray-700"
+      >
+        <option value="">Todos los tipos</option>
+        {ROOM_TYPES.map((type) => (
+          <option key={type} value={type}>{type}</option>
+        ))}
+      </select>
+      <button
+        onClick={handleSearch}
+        className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold"
+      >
+        Buscar
+      </button>
+    </div>
 
-      {/* Habitaciones Disponibles */}
-      <div className="col-span-3">
-        {loading && <p>Cargando habitaciones...</p>}
-        {error && <p>Error: {error}</p>}
-        {availability?.length > 0 && (
-          <div>
-            <h2 className="text-xl font-bold mb-4">Habitaciones Disponibles</h2>
-            <div className="space-y-6">
-              {availability.map((room) => (
-                <div
-                  key={room.roomNumber}
-                  className="bg-gray-800 p-6 rounded-xl flex flex-col md:flex-row items-center shadow-lg"
-                >
-                  <img
-                    src={room.image_url[0]}
-                    alt={`Habitación ${room.roomNumber}`}
-                    className="w-32 h-32 object-cover rounded-lg mb-4 md:mb-0 md:mr-6"
-                  />
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold mb-2">{room.type}</h3>
-                    <p className="text-gray-400 mb-2">{room.description}</p>
-                    <ul className="space-y-2">
-                      {room.Services &&
-                        room.Services.map((service, index) => (
-                          <li
-                            key={index}
-                            className="flex text-white items-center space-x-2"
-                          >
-                            <FontAwesomeIcon
-                              icon={getServiceIcon(service.name)}
-                            />
-                            <span>{service.name}</span>
-                          </li>
-                        ))}
-                    </ul>
-                    <p className="text-2xl font-bold text-yellow-400">
-                      {formatPrice(room.price)}
-                    </p>
-                  </div>
-                  <div className="mt-4 md:mt-0 md:ml-6 flex space-x-4">
-                    <div>
-                      <label className="block text-sm">Adultos</label>
-                      <select
-                        value={adults}
-                        onChange={(e) => handleAdultsChange(e, room)} // Pasar la room actual
-                        className="w-16 p-2 rounded-lg bg-gray-700"
-                      >
-                        {[...Array(room.maxGuests)].map((_, index) => (
-                          <option key={index} value={index + 1}>
-                            {index + 1}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm">Niños</label>
-                      <select
-                        value={children}
-                        onChange={(e) => handleChildrenChange(e, room)} // Pasar la room actual
-                        className="w-16 p-2 rounded-lg bg-gray-700"
-                      >
-                        {[
-                          ...Array(Math.max(0, room.maxGuests - adults + 1)),
-                        ].map((_, index) => (
-                          <option key={index} value={index}>
-                            {index}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <p>Total: {formatPrice(bookingTotal)}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        console.log("Reservando habitación:", {
-                          roomNumber: room.roomNumber,
-                          maxGuests: room.maxGuests,
-                          currentTotal: adults + children,
-                        });
-                        handleReserve(room);
-                      }}
-                      className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold"
-                    >
-                      Reservar
-                    </button>
-                  </div>
+    {/* Listado de Habitaciones Disponibles */}
+    <div className="col-span-3">
+      {loading && <p>Cargando habitaciones...</p>}
+      {error && <p>Error: {error}</p>}
+      {!loading && (!availability || availability.length === 0) && (
+        <p>No hay habitaciones disponibles para las fechas y tipo seleccionado.</p>
+      )}
+      {/* Se muestra el listado solo si no se ha seleccionado una habitación */}
+      {!selectedRoom && availability && availability.length > 0 && (
+        <div>
+          <h2 className="text-xl font-bold mb-4">Habitaciones Disponibles</h2>
+          <div className="space-y-6">
+            {availability.map((room) => (
+              <div key={room.roomNumber} className="bg-gray-800 p-6 rounded-xl flex flex-col md:flex-row items-center shadow-lg">
+                <img 
+                  src={room.image_url[0]} 
+                  alt={`Habitación ${room.roomNumber}`} 
+                  className="w-32 h-32 object-cover rounded-lg mb-4 md:mb-0 md:mr-6" 
+                />
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold mb-2">{room.type}</h3>
+                  <p className="text-gray-400 mb-2">{room.description}</p>
+                  <ul className="space-y-2">
+                    {room.Services && room.Services.map((service, index) => (
+                      <li key={index} className="flex text-white items-center space-x-2">
+                        <FontAwesomeIcon icon={getServiceIcon(service.name)} />
+                        <span>{service.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-2xl font-bold text-yellow-400">{formatPrice(room.price)}</p>
                 </div>
-              ))}
-            </div>
+                <div className="mt-4 md:mt-0 md:ml-6">
+                  <button
+                    onClick={() => {
+                      console.log("Seleccionando habitación:", room);
+                      handleReserve(room);
+                    }}
+                    className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold"
+                  >
+                    Seleccionar
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
-      {showRegistration && (
-        <div className="col-span-1 md:col-span-4 flex flex-col md:flex-row gap-6">
-          <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
-            <h2 className="text-xl font-bold mb-4">Registro de Usuario</h2>
-            <ParentBuyerRegistration onComplete={handleBuyerDataComplete} />
-          </div>
-         {selectedRoom && (
-  <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
-    <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
-    <p className="mb-2">Habitación: {selectedRoom.type}</p>
-    <p className="mb-2">Desde: {formatDate(checkIn)}</p>
-    <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
-    <p className="mb-2">Adultos: {adults}</p>
-    <p className="mb-2">Niños: {children}</p>
-    <p className="mb-2">Total: {formatPrice(bookingTotal)}</p>
-    
-    <WompiPayment
-      booking={{
-        bookingId: selectedRoom.roomNumber,
-        totalAmount: bookingTotal,
-      }}
-      onPaymentComplete={handleWompiPaymentSuccess}
-    />
-  </div>
-)}
-             
-             
-            
-         
         </div>
       )}
     </div>
-  );
-};
 
+    {/* Sección de Registro y Confirmación de Reserva (sólo si ya se ha seleccionado una habitación) */}
+    {showRegistration && selectedRoom && (
+      <div className="col-span-1 md:col-span-4 flex flex-col md:flex-row gap-6">
+        <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
+          <h2 className="text-xl font-bold mb-4">Registro de Usuario</h2>
+          <ParentBuyerRegistration onComplete={handleBuyerDataComplete} />
+        </div>
+        <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
+          <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
+          <p className="mb-2">Habitación: {selectedRoom.type}</p>
+          <p className="mb-2">Desde: {formatDate(checkIn)}</p>
+          <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
+          {/* Controles para elegir pasajeros */}
+          <div className="flex space-x-4 mb-2">
+            <div>
+              <label className="block text-sm">Adultos</label>
+              <select
+                value={adults}
+                onChange={(e) => handleAdultsChange(e, selectedRoom)}
+                className="w-16 p-2 rounded-lg bg-gray-700"
+              >
+                {[...Array(selectedRoom.maxGuests)].map((_, index) => (
+                  <option key={index} value={index + 1}>
+                    {index + 1}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm">Niños</label>
+              <select
+                value={children}
+                onChange={(e) => handleChildrenChange(e, selectedRoom)}
+                className="w-16 p-2 rounded-lg bg-gray-700"
+              >
+                {[...Array(Math.max(0, selectedRoom.maxGuests - adults + 1))].map((_, index) => (
+                  <option key={index} value={index}>
+                    {index}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p className="mb-2">Total: {formatPrice(bookingTotal)}</p>
+          <WompiPayment
+            booking={{
+              bookingId: selectedRoom.roomNumber,
+              totalAmount: bookingTotal,
+            }}
+            onPaymentComplete={handleWompiPaymentSuccess}
+          />
+          <button
+            onClick={() => {
+              // Permitir volver al listado de habitaciones para cambiar la selección
+              setSelectedRoom(null);
+              setShowRegistration(false);
+            }}
+            className="mt-4 w-full p-3 bg-red-500 hover:bg-red-600 rounded-full font-bold"
+          >
+            Cambiar habitación
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);
+}
 export default Booking;

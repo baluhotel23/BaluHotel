@@ -2,23 +2,30 @@ import api from '../../utils/axios';
 import { toast } from 'react-toastify';
 
 export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
-    dispatch({ type: 'FETCH_BUYER_REQUEST' });
-  
-    try {
-      const response = await api.get(`/taxxa/buyer/${sdocno}`);
-      const data = await response.json();
-      console.log(data);
-  
-      if (data && data.message) {
-        dispatch({ type: 'FETCH_BUYER_SUCCESS', payload: data.message });
-      } else {
-        dispatch({ type: 'FETCH_BUYER_FAILURE', payload: "Usuario no encontrado" });
-      }
-    } catch (error) {
-      dispatch({ type: 'FETCH_BUYER_FAILURE', payload: error.message });
-    }
-  };
+  dispatch({ type: 'FETCH_BUYER_REQUEST' });
 
+  try {
+    const response = await api.get(`/taxxa/buyer/${sdocno}`);
+    const data = await response.json();
+    console.log(data);
+
+    if (data && data.message) {
+      dispatch({ type: 'FETCH_BUYER_SUCCESS', payload: data.message });
+    } else {
+      const errorMsg = "Usuario no encontrado";
+      dispatch({ type: 'FETCH_BUYER_FAILURE', payload: errorMsg });
+      toast.error("Complete los datos del usuario");
+    }
+  } catch (error) {
+    let errorMsg = error.message;
+    // Si el error es 404, mostramos un mensaje más amigable
+    if (error.response && error.response.status === 404) {
+      errorMsg = "Complete los datos del usuario";
+    }
+    dispatch({ type: 'FETCH_BUYER_FAILURE', payload: errorMsg });
+    toast.error(errorMsg);
+  }
+};
 
   export const fetchSellerData = (n_document) => async (dispatch) => {
     dispatch({ type: 'FETCH_SELLER_REQUEST' });

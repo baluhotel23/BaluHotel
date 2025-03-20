@@ -29,8 +29,8 @@ const ParentBuyerRegistration = ({ onComplete }) => {
 
     // Primer paso: verificar si existe el buyer usando el documento
     const handleCheckDocument = async () => {
-        if (!buyer.jpartylegalentity.sdocno || !buyer.jpartylegalentity.wdoctype) {
-            setError('El número y tipo de documento son requeridos para la verificación');
+        if (!buyer.jpartylegalentity.sdocno) {
+            setError('El número de documento es requerido para la verificación');
             return;
         }
         setLoading(true);

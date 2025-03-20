@@ -126,6 +126,15 @@ const bookingReducer = (state = initialState, action) => {
         case 'GET_REVENUE_REPORT_FAILURE':
             return { ...state, loading: false, error: action.payload };
 
+        // UPDATE ONLINE PAYMENT
+        case 'UPDATE_ONLINE_PAYMENT_REQUEST':
+            return { ...state, loading: true, error: null };
+        case 'UPDATE_ONLINE_PAYMENT_SUCCESS':
+            // Opcionalmente, si deseas actualizar detalles de la reserva o payment en el state, lo haces acá
+            return { ...state, loading: false, bookingDetails: { ...state.bookingDetails, payment: action.payload } };
+        case 'UPDATE_ONLINE_PAYMENT_FAILURE':
+            return { ...state, loading: false, error: action.payload };
+
         default:
             return state;
     }
