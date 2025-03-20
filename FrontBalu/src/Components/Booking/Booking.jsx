@@ -32,7 +32,8 @@ const Booking = () => {
   const { rooms } = useSelector((state) => state.room);
   const [showRegistration, setShowRegistration] = useState(false);
   const today = new Date();
-
+  const buyerRedux = useSelector((state) => state.taxxa.buyer);
+  console.log("buyerRedux:", buyerRedux);
   // Estados para fechas, búsqueda y reserva
   const [checkIn, setCheckIn] = useState(new Date());
   const [checkOut, setCheckOut] = useState(new Date());
@@ -292,6 +293,14 @@ const Booking = () => {
     return format(date, "dd-MM-yyyy", { locale: es });
   };
 
+
+  useEffect(() => {
+    if (buyerRedux && !buyerData) {
+      setBuyerData(buyerRedux);
+      setIsBookingReady(true);
+    }
+  }, [buyerRedux, buyerData]);
+
   // ...
 return (
   <div className="container mx-auto p-4 grid grid-cols-1 md:grid-cols-4 gap-6 bg-stone-500 text-white min-h-screen">
@@ -391,11 +400,15 @@ return (
 
     {/* Sección de Registro y Confirmación de Reserva (sólo si ya se ha seleccionado una habitación) */}
     {showRegistration && selectedRoom && (
-      <div className="col-span-1 md:col-span-4 flex flex-col md:flex-row gap-6">
-        <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
-          <h2 className="text-xl font-bold mb-4">Registro de Usuario</h2>
-          <ParentBuyerRegistration onComplete={handleBuyerDataComplete} />
-        </div>
+        <div className="col-span-1 md:col-span-4 flex flex-col md:flex-row gap-6">
+          <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
+            <h2 className="text-xl font-bold mb-4">Registro de Usuario</h2>
+            {/* Se pasa initialBuyerData para precargar si ya existe */}
+            <ParentBuyerRegistration 
+              initialBuyerData={buyerRedux}
+              onComplete={handleBuyerDataComplete} 
+            />
+          </div>
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
           <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
           <p className="mb-2">Habitación: {selectedRoom.type}</p>

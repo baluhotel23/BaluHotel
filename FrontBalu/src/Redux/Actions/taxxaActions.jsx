@@ -6,11 +6,11 @@ export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
 
   try {
     const response = await api.get(`/taxxa/buyer/${sdocno}`);
-    const data = await response.json();
+    const data = response.data;
     console.log(data);
 
-    if (data && data.message) {
-      dispatch({ type: 'FETCH_BUYER_SUCCESS', payload: data.message });
+    if (data && !data.error && data.data) {
+      dispatch({ type: 'FETCH_BUYER_SUCCESS', payload: data.data });
     } else {
       const errorMsg = "Usuario no encontrado";
       dispatch({ type: 'FETCH_BUYER_FAILURE', payload: errorMsg });
@@ -18,7 +18,6 @@ export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
     }
   } catch (error) {
     let errorMsg = error.message;
-    // Si el error es 404, mostramos un mensaje más amigable
     if (error.response && error.response.status === 404) {
       errorMsg = "Complete los datos del usuario";
     }
