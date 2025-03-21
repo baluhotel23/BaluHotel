@@ -80,6 +80,9 @@
     background-color: #51cf66 !important;
     color: white !important;
   }
+  .bg-boton {
+    width: 100%; /* El botón ocupa todo el ancho del contenedor */
+  }
   
   .error-message {
     color: red;

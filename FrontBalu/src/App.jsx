@@ -26,7 +26,7 @@ import BuyerRegistrationForm from './Components/Taxxa/BuyerRegistrationForm';
 import ParentBuyerRegistration from './Components/Taxxa/ParentBuyerRegistration';
 import BookingStatusPage from './Components/Booking/BookingStatusPage';
 import RoomAvailability from './Components/Rooms/RoomAvailability';
-
+import HotelSetting from './Components/Dashboard/HotelSetting';
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -134,6 +134,14 @@ const AppContent = () => {
             element={
               <PrivateRoute allowedRoles={['owner', 'admin']}>
                 <RoomAvailability />
+              </PrivateRoute>
+            }
+          />
+                 <Route
+            path="/hotelSetting"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <HotelSetting />
               </PrivateRoute>
             }
           />
