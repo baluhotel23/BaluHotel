@@ -1,4 +1,4 @@
-const { Room, Booking, ExtraCharge, Bill,  Service, Buyer} = require('../data');
+const { Room, Booking, ExtraCharge, Bill, Service, Buyer, Payment } = require('../data');
 const { CustomError } = require('../middleware/error');
 const { Op } = require('sequelize');
 const jwt = require("jsonwebtoken");
@@ -97,65 +97,155 @@ const getRoomTypes = async (req, res) => {
 
 // Client and staff endpoints
 const createBooking = async (req, res) => {
-  const { roomNumber, checkIn, checkOut, guestCount, totalAmount } = req.body;
-  // Extraer guestId del token o body
-  const guestId = req.buyer?.sdocno || req.body.guestId;
+  try {
+    const { 
+      roomNumber, 
+      checkIn, 
+      checkOut, 
+      guestCount, 
+      totalAmount,
+    } = req.body;
+    // Extraer guestId del token o body
+    const guestId = req.buyer?.sdocno || req.body.guestId;
 
-  // Buscar la habitación
-  const room = await Room.findByPk(roomNumber);
-  if (!room) {
-    throw new CustomError('Habitación no encontrada', 404);
-  }
-  
-  // Verificar disponibilidad
-  const existingBooking = await Booking.findOne({
-    where: {
+    // Buscar la habitación
+    const room = await Room.findByPk(roomNumber);
+    if (!room) {
+      throw new CustomError('Habitación no encontrada', 404);
+    }
+
+    // Verificar disponibilidad
+    const existingBooking = await Booking.findOne({
+      where: {
+        roomNumber,
+        [Op.or]: [
+          { checkIn: { [Op.between]: [checkIn, checkOut] } },
+          { checkOut: { [Op.between]: [checkIn, checkOut] } }
+        ]
+      }
+    });
+
+    if (existingBooking) {
+      throw new CustomError('Habitación no disponible para las fechas seleccionadas', 400);
+    }
+
+    // Calcular número de noches (puedes usar calculateNights)
+    const nights = calculateNights(checkIn, checkOut);
+
+    const pointOfSale = req.body.pointOfSale || "Online";
+
+    // Crear la reserva
+    const booking = await Booking.create({
+      guestId,
       roomNumber,
-      [Op.or]: [
-        { checkIn: { [Op.between]: [checkIn, checkOut] } },
-        { checkOut: { [Op.between]: [checkIn, checkOut] } }
-      ]
-    }
-  });
-  
-  if (existingBooking) {
-    throw new CustomError('Habitación no disponible para las fechas seleccionadas', 400);
-  }
-  
-  // Calcular número de noches (puedes usar calculateNights)
-  const nights = calculateNights(checkIn, checkOut);
-  
-  // Crear la reserva
-  const booking = await Booking.create({
-    guestId,
-    roomNumber,
-    checkIn,
-    checkOut,
-    totalAmount,
-    guestCount,
-    status: 'pending',
-  });
-  
-  // Generar trackingToken usando jwt
-  // Asegúrate de definir process.env.BOOKING_SECRET y process.env.FRONT_URL
-  const token = jwt.sign({ bookingId: booking.bookingId }, process.env.BOOKING_SECRET, { expiresIn: "7d" });
-  
-  // Actualizar el registro con el trackingToken
-  await booking.update({ trackingToken: token });
+      checkIn,
+      checkOut,
+      totalAmount,
+      guestCount,
+      status: 'pending',
+      pointOfSale: "Online"
+    });
+    // Generar trackingToken usando jwt
+    const token = jwt.sign({ bookingId: booking.bookingId }, process.env.BOOKING_SECRET, { expiresIn: "7d" });
+    await booking.update({ trackingToken: token });
 
-  // Retornar un enlace para consultar la reserva en el front
-  const trackingLink = `${process.env.FRONT_URL}/booking-status/${token}`;
-  
-  res.status(201).json({
-    error: false,
-    message: 'Reserva creada exitosamente',
-    data: {
-      booking,
-      trackingLink,
+
+    if (req.body.pointOfSale === 'Online') {
+      await Payment.create({
+        bookingId: booking.bookingId,
+        amount: totalAmount,
+        paymentMethod: 'credit_card',
+        paymentType: 'online', 
+        paymentStatus: 'pending',
+        paymentDate: new Date()
+      });
     }
-  });
+
+    // Retornar un enlace para consultar la reserva en el front
+    const trackingLink = `${process.env.FRONT_URL}/booking-status/${token}`;
+
+    res.status(201).json({
+      error: false,
+      message: 'Reserva creada exitosamente',
+      data: {
+        booking,
+        trackingLink,
+      }
+    });
+
+  } catch (error) {
+    console.error('Error creating booking:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Error al crear la reserva'
+    });
+  }
 };
 
+const updateOnlinePayment = async (req, res, next) => {
+  try {
+    console.log("updateOnlinePayment - req.body:", req.body);
+    const { bookingId, amount, transactionId, paymentReference, paymentMethod } = req.body;
+
+    // Buscar la reserva
+    const booking = await Booking.findByPk(bookingId);
+    if (!booking) {
+      throw new CustomError('Reserva no encontrada', 404);
+    }
+
+    // Verificar que la reserva sea de pago online
+    if (booking.pointOfSale !== 'Online') {
+      throw new CustomError('Esta reserva no es de pago online', 400);
+    }
+
+    // Buscar el pago pendiente de tipo online asociado a la reserva
+    let payment = await Payment.findOne({ 
+      where: { bookingId, paymentType: 'online', paymentStatus: 'pending' },
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Si no existe, crearlo (opción 2)
+    if (!payment) {
+      payment = await Payment.create({
+        bookingId,
+        amount,
+        paymentMethod,
+        paymentType: 'online',
+        paymentStatus: 'pending', // se actualizará a 'completed' a continuación
+        paymentDate: new Date()
+      });
+    }
+
+    // Actualizar el registro de pago
+    payment.amount = amount;
+    payment.paymentMethod = paymentMethod;
+    payment.transactionId = transactionId;
+    payment.paymentReference = paymentReference;
+    payment.paymentStatus = 'completed';
+    await payment.save();
+
+    // Actualizar el estado de la reserva según el monto pagado
+    const totalAmount = Number(booking.totalAmount);
+    const paidAmount = Number(amount);
+
+    if (paidAmount < totalAmount) {
+      booking.status = 'advanced';
+    } else {
+      booking.status = 'confirmed';
+    }
+    await booking.save();
+
+    res.status(200).json({
+      error: false,
+      message: 'Pago online registrado y reserva actualizada exitosamente',
+      data: payment
+    });
+
+  } catch (error) {
+    console.error("Error al actualizar el pago online:", error);
+    next(error);
+  }
+};
 
 const downloadBookingPdf = async (req, res, next) => {
   try {
@@ -643,5 +733,6 @@ module.exports = {
     cancelBooking,
     getOccupancyReport,
     getRevenueReport,
-    getBookingByToken    
+    getBookingByToken,
+    updateOnlinePayment   
 };

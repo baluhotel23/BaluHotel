@@ -21,8 +21,8 @@ const {
     downloadBookingPdf,
     getOccupancyReport,
     getRevenueReport,
-    getBookingByToken
-} = require('../controllers/bookingController');
+    getBookingByToken,
+    updateOnlinePayment} = require('../controllers/bookingController');
 
 // Rutas públicas (no requieren autenticación)
 router.get('/availability', checkAvailability);
@@ -30,6 +30,7 @@ router.get('/room-types', getRoomTypes);
 router.post('/create', createBooking);
 router.get('/status/:trackingToken', getBookingByToken); 
 router.get('/pdf/:trackingToken', downloadBookingPdf);
+router.put('/online-payment', updateOnlinePayment);
 
 // Middleware de autenticación para todas las rutas siguientes
 
@@ -39,6 +40,7 @@ router.use(verifyToken);
 router.get('/user/:sdocno', getUserBookings);
 router.get('/:bookingId', getBookingById);
 router.post('/:bookingId/cancel', cancelBooking);
+
 
 // Rutas para clientes y staff
 router.post('/', validateBooking, createBooking);

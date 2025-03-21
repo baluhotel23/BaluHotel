@@ -11,17 +11,23 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    stock: {
+
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    },
+
+    currentStock: {
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0,
     },
-    minimumStock: {
+    minStock: {
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 10,
     },
-    price: {
+    unitPrice: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       defaultValue: 0.00,

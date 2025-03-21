@@ -39,7 +39,7 @@ const createPurchase = async (req, res) => {
     const purchase = await Purchase.create({
         supplier,
         totalAmount,
-        createdBy: req.user.id,
+        createdBy: req.user.n_document,
         date: new Date()
     });
 
@@ -83,7 +83,7 @@ const updateInventory = async (req, res) => {
         description,
         minStock,
         unitPrice,
-        updatedBy: req.user.id
+        updatedBy: req.user.n_document
     });
 
     res.json({
@@ -151,7 +151,7 @@ const getAllItems = async (req, res) => {
       currentStock,
       minStock,
       unitPrice,
-      createdBy: req.user.id
+      createdBy: req.user.n_document
     });
     res.status(201).json({
       error: false,
@@ -175,7 +175,7 @@ const getAllItems = async (req, res) => {
       currentStock,
       minStock,
       unitPrice,
-      updatedBy: req.user.id
+      updatedBy: req.user.n_document
     });
     res.json({
       error: false,
@@ -482,7 +482,7 @@ const getConsumptionReport = async (req, res) => {
       roomId,
       inventoryId,
       quantity,
-      assignedBy: req.user.id // Se asume que req.user contiene el id del usuario autenticado
+      assignedBy: req.user.n_document // Se asume que req.user contiene el id del usuario autenticado
     });
     
     res.status(201).json({

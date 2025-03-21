@@ -25,6 +25,8 @@ import BookingsPendientes from './Components/Taxxa/BookingsPendientes';
 import BuyerRegistrationForm from './Components/Taxxa/BuyerRegistrationForm';
 import ParentBuyerRegistration from './Components/Taxxa/ParentBuyerRegistration';
 import BookingStatusPage from './Components/Booking/BookingStatusPage';
+import RoomAvailability from './Components/Rooms/RoomAvailability';
+import HotelSetting from './Components/Dashboard/HotelSetting';
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -39,7 +41,6 @@ const AppContent = () => {
       '/RoomsSection',
       '/room',
       '/login',
-      '/register',
       '/buyerForm',
       '/registro-comprador',
       '/unauthorized'
@@ -83,7 +84,6 @@ const AppContent = () => {
           <Route path="/room/:roomNumber" element={<RoomDetail />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
           <Route path="/buyerForm" element={<BuyerRegistrationForm />} />
           <Route path="/registro-comprador" element={<ParentBuyerRegistration />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
@@ -126,6 +126,30 @@ const AppContent = () => {
             element={
               <PrivateRoute allowedRoles={['owner', 'admin']}>
                 <BookingsPendientes />
+              </PrivateRoute>
+            }
+          />
+              <Route
+            path="/bookings/availability"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin']}>
+                <RoomAvailability />
+              </PrivateRoute>
+            }
+          />
+                 <Route
+            path="/hotelSetting"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <HotelSetting />
+              </PrivateRoute>
+            }
+          />
+                  <Route
+            path="/register"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <Register />
               </PrivateRoute>
             }
           />

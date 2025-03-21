@@ -1,53 +1,61 @@
 const initialState = {
-    inventory: [],    // Lista de items de inventario
-    purchase: null,   // Última compra creada (si es necesario)
-    lowStock: [],     // Lista de items con baja existencia
-    loading: false,
-    error: null
-  };
+    inventory: [],
+  lowStockItems: [],
+  currentItem: null,
+  purchases: [],
+  currentPurchase: null,
+  suppliers: [],
+  categories: [],
+  loading: false,
+  error: null
+};
   
-  const inventoryReducer = (state = initialState, action) => {
-    switch (action.type) {
-      // Obtener inventario
-      case 'GET_INVENTORY_REQUEST':
-        return { ...state, loading: true, error: null };
-      case 'GET_INVENTORY_SUCCESS':
-        return { ...state, loading: false, inventory: action.payload, error: null };
-      case 'GET_INVENTORY_FAILURE':
-        return { ...state, loading: false, error: action.payload };
-  
-      // Crear compra
-      case 'CREATE_PURCHASE_REQUEST':
-        return { ...state, loading: true, error: null };
-      case 'CREATE_PURCHASE_SUCCESS':
-        return { ...state, loading: false, purchase: action.payload, error: null };
-      case 'CREATE_PURCHASE_FAILURE':
-        return { ...state, loading: false, error: action.payload };
-  
-      // Actualizar inventario
-      case 'UPDATE_INVENTORY_REQUEST':
-        return { ...state, loading: true, error: null };
-      case 'UPDATE_INVENTORY_SUCCESS':
-        return {
-          ...state,
-          loading: false,
-          inventory: state.inventory.map(item => 
-            // Ajusta 'id' según la propiedad que identifique al item,
-            // por ejemplo: item.inventoryId === action.payload.inventoryId
-            item.id === action.payload.id ? action.payload : item
-          ),
-          error: null
-        };
-      case 'UPDATE_INVENTORY_FAILURE':
-        return { ...state, loading: false, error: action.payload };
-  
-      // Obtener items de bajo stock
-      case 'GET_LOW_STOCK_REQUEST':
-        return { ...state, loading: true, error: null };
-      case 'GET_LOW_STOCK_SUCCESS':
-        return { ...state, loading: false, lowStock: action.payload, error: null };
-      case 'GET_LOW_STOCK_FAILURE':
-        return { ...state, loading: false, error: action.payload };
+const inventoryReducer = (state = initialState, action) => {
+  switch (action.type) {
+    case 'GET_INVENTORY':
+      return {
+        ...state,
+        inventory: action.payload,
+        loading: false
+      };
+    case 'GET_LOW_STOCK':
+      return {
+        ...state,
+        lowStockItems: action.payload,
+        loading: false
+      };
+    case 'GET_ALL_ITEMS':
+      return {
+        ...state,
+        inventory: action.payload,
+        loading: false
+      };
+    case 'GET_ITEM':
+      return {
+        ...state,
+        currentItem: action.payload,
+        loading: false
+      };
+    case 'CREATE_ITEM':
+      return {
+        ...state,
+        inventory: [...state.inventory, action.payload],
+        loading: false
+      };
+    case 'UPDATE_ITEM':
+      return {
+        ...state,
+        inventory: state.inventory.map(item => 
+          item.id === action.payload.id ? action.payload : item
+        ),
+        loading: false
+      };
+    case 'DELETE_ITEM':
+      return {
+        ...state,
+        inventory: state.inventory.filter(item => item.id !== action.payload),
+        loading: false
+      };
   
       default:
         return state;

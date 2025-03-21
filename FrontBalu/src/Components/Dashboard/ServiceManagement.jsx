@@ -60,7 +60,7 @@ const ServiceManagement = () => {
           />
           <button
             type="submit"
-            className="ml-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            className="ml-2 bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
           >
             {editingServiceId ? 'Actualizar Servicio' : 'Crear Servicio'}
           </button>

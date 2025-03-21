@@ -203,3 +203,19 @@ export const getRevenueReport = (params) => async (dispatch) => {
     dispatch({ type: 'GET_REVENUE_REPORT_FAILURE', payload: errorMessage });
   }
 };
+
+export const updateOnlinePayment = (paymentData) => async (dispatch) => {
+  dispatch({ type: 'UPDATE_ONLINE_PAYMENT_REQUEST' });
+  try {
+    const { data } = await api.put('/bookings/online-payment', paymentData);
+    dispatch({ type: 'UPDATE_ONLINE_PAYMENT_SUCCESS', payload: data.data });
+    toast.success(data.message);
+    return { success: true, data: data.data };
+  } catch (error) {
+    const errorMessage =
+      error.response?.data?.message || 'Error al actualizar el pago online';
+    dispatch({ type: 'UPDATE_ONLINE_PAYMENT_FAILURE', payload: errorMessage });
+    toast.error(errorMessage);
+    return { success: false, message: errorMessage };
+  }
+};

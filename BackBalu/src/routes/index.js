@@ -9,13 +9,14 @@ const receptionRoutes = require('./receptionRoutes');
 const roomRoutes = require('./roomRoutes');
 const bookingRoutes = require('./bookingRoutes');
 const clientRoutes = require('./clientRoutes');
-const taxxaRouter = require('./taxxaRouter')
-
+const taxxaRouter = require('./taxxaRouter');
+const webhookRouter = require('../controllers/webhook');
+const { registerLocalPayment } = require('../controllers/paymentController');
 
 // Rutas públicas
 router.use('/auth', authRoutes);
 router.use('/client', clientRoutes);
-
+router.use("/eventos", webhookRouter); 
 // Rutas protegidas
 router.use('/admin', adminRoutes);
 router.use('/financial', financialRoutes);
@@ -23,7 +24,8 @@ router.use('/inventory', inventoryRoutes);
 router.use('/reception', receptionRoutes);
 router.use('/rooms', roomRoutes);
 router.use('/bookings', bookingRoutes);
-router.use('/taxxa', taxxaRouter)
+router.use('/taxxa', taxxaRouter);
+router.use('/payment',   registerLocalPayment);
 
 
 
