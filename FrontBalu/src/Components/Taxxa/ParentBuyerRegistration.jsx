@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useDispatch } from 'react-redux';
 import { createBuyer, fetchBuyerByDocument } from '../../Redux/Actions/taxxaActions';
@@ -20,17 +20,42 @@ const initialBuyerState = {
     },
 };
 
-const ParentBuyerRegistration = ({ onComplete }) => {
+const ParentBuyerRegistration = ({ initialBuyerData, onComplete }) => {
     const dispatch = useDispatch();
     const [buyer, setBuyer] = useState(initialBuyerState);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [docChecked, setDocChecked] = useState(false);
 
+    useEffect(() => {
+        if (initialBuyerData) {
+            setBuyer({
+                scostumername: initialBuyerData.scostumername || '',
+                wlegalorganizationtype: initialBuyerData.wlegalorganizationtype || 'person',
+                sfiscalresponsibilities: initialBuyerData.sfiscalresponsibilities || 'R-99-PN',
+                jpartylegalentity: {
+                    wdoctype: initialBuyerData.wdoctype || '',
+                    sdocno: initialBuyerData.sdocno || '',
+                    scorporateregistrationschemename: initialBuyerData.scorporateregistrationschemename || '',
+                },
+                jcontact: {
+                    scontactperson: initialBuyerData.scontactperson || '',
+                    selectronicmail: initialBuyerData.selectronicmail || '',
+                    stelephone: initialBuyerData.stelephone || '',
+                },
+            });
+            setDocChecked(true); // Pasar directamente al modo "formulario completo"
+            // Llamar a onComplete para notificar al componente padre que los datos están listos
+            if (onComplete) {
+                onComplete(initialBuyerData);
+            }
+        }
+    }, [initialBuyerData, onComplete]);
+
     // Primer paso: verificar si existe el buyer usando el documento
     const handleCheckDocument = async () => {
-        if (!buyer.jpartylegalentity.sdocno || !buyer.jpartylegalentity.wdoctype) {
-            setError('El número y tipo de documento son requeridos para la verificación');
+        if (!buyer.jpartylegalentity.sdocno) {
+            setError('El número de documento es requerido para la verificación');
             return;
         }
         setLoading(true);
@@ -98,23 +123,8 @@ const ParentBuyerRegistration = ({ onComplete }) => {
                     {error}
                 </div>
             )}
-            {!docChecked ? (
-                <div>
-                    {/* Modo solo documento: se muestran solo los campos para elegir el tipo y número */}
-                    <BuyerRegistrationForm buyer={buyer} setBuyer={setBuyer} onlyDoc={true} />
-                    <div className="text-center">
-                        <button
-                            onClick={handleCheckDocument}
-                            disabled={loading}
-                            className={`mt-4 w-full md:w-auto ${
-                                loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
-                            } text-white font-semibold py-2 px-6 rounded shadow`}
-                        >
-                            {loading ? 'Verificando...' : 'Verificar Documento'}
-                        </button>
-                    </div>
-                </div>
-            ) : (
+            {/* Mostrar el formulario completo directamente si initialBuyerData está presente */}
+            {initialBuyerData || docChecked ? (
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Modo formulario completo: se muestran todos los campos */}
                     <BuyerRegistrationForm buyer={buyer} setBuyer={setBuyer} />
@@ -130,12 +140,43 @@ const ParentBuyerRegistration = ({ onComplete }) => {
                         </button>
                     </div>
                 </form>
+            ) : (
+                <div>
+                    {/* Modo solo documento: se muestran solo los campos para elegir el tipo y número */}
+                    <BuyerRegistrationForm buyer={buyer} setBuyer={setBuyer} onlyDoc={true} />
+                    <div className="text-center">
+                        <button
+                            onClick={handleCheckDocument}
+                            disabled={loading}
+                            className={`mt-4 w-full md:w-auto ${
+                                loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                            } text-white font-semibold py-2 px-6 rounded shadow`}
+                        >
+                            {loading ? 'Verificando...' : 'Verificar Documento'}
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );
 };
 
 ParentBuyerRegistration.propTypes = {
+    initialBuyerData: PropTypes.shape({
+        scostumername: PropTypes.string,
+        wlegalorganizationtype: PropTypes.string,
+        sfiscalresponsibilities: PropTypes.string,
+        jpartylegalentity: PropTypes.shape({
+            wdoctype: PropTypes.string.isRequired,
+            sdocno: PropTypes.string,
+            scorporateregistrationschemename: PropTypes.string,
+        }),
+        jcontact: PropTypes.shape({
+            scontactperson: PropTypes.string.isRequired,
+            selectronicmail: PropTypes.string, // Ensure this is validated
+            stelephone: PropTypes.string,
+        }).isRequired,
+    }),
     onComplete: PropTypes.func,
 };
 

@@ -182,7 +182,70 @@ const createBooking = async (req, res) => {
   }
 };
 
+const updateOnlinePayment = async (req, res, next) => {
+  try {
+    console.log("updateOnlinePayment - req.body:", req.body);
+    const { bookingId, amount, transactionId, paymentReference, paymentMethod } = req.body;
 
+    // Buscar la reserva
+    const booking = await Booking.findByPk(bookingId);
+    if (!booking) {
+      throw new CustomError('Reserva no encontrada', 404);
+    }
+
+    // Verificar que la reserva sea de pago online
+    if (booking.pointOfSale !== 'Online') {
+      throw new CustomError('Esta reserva no es de pago online', 400);
+    }
+
+    // Buscar el pago pendiente de tipo online asociado a la reserva
+    let payment = await Payment.findOne({ 
+      where: { bookingId, paymentType: 'online', paymentStatus: 'pending' },
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Si no existe, crearlo (opción 2)
+    if (!payment) {
+      payment = await Payment.create({
+        bookingId,
+        amount,
+        paymentMethod,
+        paymentType: 'online',
+        paymentStatus: 'pending', // se actualizará a 'completed' a continuación
+        paymentDate: new Date()
+      });
+    }
+
+    // Actualizar el registro de pago
+    payment.amount = amount;
+    payment.paymentMethod = paymentMethod;
+    payment.transactionId = transactionId;
+    payment.paymentReference = paymentReference;
+    payment.paymentStatus = 'completed';
+    await payment.save();
+
+    // Actualizar el estado de la reserva según el monto pagado
+    const totalAmount = Number(booking.totalAmount);
+    const paidAmount = Number(amount);
+
+    if (paidAmount < totalAmount) {
+      booking.status = 'advanced';
+    } else {
+      booking.status = 'confirmed';
+    }
+    await booking.save();
+
+    res.status(200).json({
+      error: false,
+      message: 'Pago online registrado y reserva actualizada exitosamente',
+      data: payment
+    });
+
+  } catch (error) {
+    console.error("Error al actualizar el pago online:", error);
+    next(error);
+  }
+};
 
 const downloadBookingPdf = async (req, res, next) => {
   try {
@@ -670,5 +733,6 @@ module.exports = {
     cancelBooking,
     getOccupancyReport,
     getRevenueReport,
-    getBookingByToken    
+    getBookingByToken,
+    updateOnlinePayment   
 };
