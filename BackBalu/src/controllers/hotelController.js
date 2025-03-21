@@ -3,13 +3,25 @@ const { HotelSettings } = require('../data');
 // GET /settings - Obtiene la configuración del hotel (se asume que es un singleton)
 const getHotelSettings = async (req, res) => {
   try {
-    const settings = await HotelSettings.findOne();
-    if (!settings) {
-      return res.status(404).json({ error: true, message: 'Configuración no encontrada' });
+    // Buscar el único registro de configuración del hotel
+    const hotelSettings = await HotelSettings.findOne();
+
+    // Validar si se encontraron datos
+    if (!hotelSettings) {
+      return res.status(404).json({ message: 'Configuración del hotel no encontrada' });
     }
-    res.status(200).json({ error: false, data: settings });
+
+    // Responder con los datos del hotel
+    res.status(200).json({ 
+      message: 'Configuración del hotel encontrada exitosamente', 
+      data: hotelSettings 
+    });
   } catch (error) {
-    res.status(500).json({ error: true, message: 'Error al obtener la configuración', details: error.message });
+    console.error('Error al obtener la configuración del hotel:', error);
+    res.status(500).json({ 
+      message: 'Error al obtener la configuración del hotel', 
+      error: error.message 
+    });
   }
 };
 

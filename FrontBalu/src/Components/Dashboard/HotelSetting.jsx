@@ -1,43 +1,59 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { createSellerData, updateSellerData } from "../../Redux/Actions/taxxaActions";
+import { createHotelSettings, updateHotelSettings, fetchHotelSettings } from "../../Redux/Actions/hotelActions";
 import { toast } from "react-toastify";
 import DashboardLayout from "./DashboardLayout";
 
-const HotelSetting = ({ existingData }) => {
+const HotelSetting = () => {
     const dispatch = useDispatch();
+    const { hotelSettings, loading, error } = useSelector((state) => state.hotel); // Accede al estado del reducer
 
-    // Estado inicial del formulario
     const [formData, setFormData] = useState({
-        name: existingData?.name || "", // Campo obligatorio
-        address: existingData?.address || "", // Campo obligatorio
-        contactInfo: existingData?.contactInfo || [{ instagram: "" }], // Inicializa como un array con un objeto vacío
-        wlegalorganizationtype: existingData?.wlegalorganizationtype || "company",
-        sfiscalresponsibilities: existingData?.sfiscalresponsibilities || "O-47",
-        sdocno: existingData?.sdocno || "",
-        sdoctype: existingData?.sdoctype || "NIT",
-        ssellername: existingData?.ssellername || "",
-        ssellerbrand: existingData?.ssellerbrand || "",
-        scontactperson: existingData?.scontactperson || "",
-        saddresszip: existingData?.saddresszip || "",
-        wdepartmentcode: existingData?.wdepartmentcode || "",
-        wtowncode: existingData?.wtowncode || "",
-        scityname: existingData?.scityname || "",
-        contact_selectronicmail: existingData?.contact_selectronicmail || "",
-        registration_wdepartmentcode: existingData?.registration_wdepartmentcode || "",
-        registration_scityname: existingData?.registration_scityname || "",
-        registration_saddressline1: existingData?.registration_saddressline1 || "",
-        registration_scountrycode: existingData?.registration_scountrycode || "CO",
-        registration_wprovincecode: existingData?.registration_wprovincecode || "",
-        registration_szip: existingData?.registration_szip || "",
-        registration_sdepartmentname: existingData?.registration_sdepartmentname || "",
+        name: "",
+        address: "",
+        contactInfo: [{ instagram: "" }],
+        wlegalorganizationtype: "company",
+        sfiscalresponsibilities: "O-47",
+        sdocno: "",
+        sdoctype: "NIT",
+        ssellername: "",
+        ssellerbrand: "",
+        scontactperson: "",
+        saddresszip: "",
+        wdepartmentcode: "",
+        wtowncode: "",
+        scityname: "",
+        contact_selectronicmail: "",
+        registration_wdepartmentcode: "",
+        registration_scityname: "",
+        registration_saddressline1: "",
+        registration_scountrycode: "CO",
+        registration_wprovincecode: "",
+        registration_szip: "",
+        registration_sdepartmentname: "",
     });
 
+    const [isEditing, setIsEditing] = useState(false); // Estado para alternar entre creación y edición
+
+    // Cargar los datos del hotel al montar el componente
     useEffect(() => {
-        if (existingData) {
-            setFormData(existingData);
+        dispatch(fetchHotelSettings());
+    }, [dispatch]);
+
+    // Actualizar el formulario si hay datos existentes
+    useEffect(() => {
+        if (hotelSettings) {
+            console.log('Datos del hotel:', hotelSettings); // Verifica los datos en la consola
+            setFormData({
+                ...hotelSettings,
+                contactInfo: Array.isArray(hotelSettings.contactInfo)
+                    ? hotelSettings.contactInfo
+                    : [{ instagram: "" }], // Asegúrate de que contactInfo sea un array
+            });
+            setIsEditing(true);
         }
-    }, [existingData]);
+    }, [hotelSettings]);
+
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -47,41 +63,43 @@ const HotelSetting = ({ existingData }) => {
         }));
     };
 
-    // Manejo especial para el campo de Instagram dentro de contactInfo
     const handleInstagramChange = (e) => {
         const { value } = e.target;
         setFormData((prevFormData) => ({
             ...prevFormData,
-            contactInfo: [{ instagram: value }], // Actualiza el array con el nuevo valor
+            contactInfo: [{ instagram: value }],
         }));
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log("Datos enviados:", formData);
-
-        if (existingData) {
-            const success = await dispatch(updateSellerData(existingData.id, formData));
+    
+        if (isEditing) {
+            const success = await dispatch(updateHotelSettings(formData));
             if (success) {
-                toast.success("Datos actualizados correctamente.");
+                toast.success("Datos del hotel actualizados correctamente.");
             } else {
-                toast.error("Error al actualizar los datos.");
+                toast.error("Error al actualizar los datos del hotel.");
             }
         } else {
-            const success = await dispatch(createSellerData(formData));
-            if (success) {
-                toast.success("Datos creados correctamente.");
+            const createdData = await dispatch(createHotelSettings(formData));
+            if (createdData) {
+                setFormData(createdData); // Actualiza el formulario con los datos creados
+                setIsEditing(true); // Cambia a modo edición
+                toast.success("Datos del hotel creados correctamente.");
             } else {
-                toast.error("Error al crear los datos.");
+                toast.error("Error al crear los datos del hotel.");
             }
         }
     };
 
+    if (loading) return <p>Cargando...</p>;
+    if (error) return <p>Error: {error}</p>;
     return (
         <DashboardLayout>
         <div className="max-w-4xl mx-auto p-6 bg-white shadow-md rounded-lg">
             <h2 className="text-2xl font-bold text-center mb-4">
-                {existingData ? "Actualizar Datos del Hotel" : "Datos Hotel"}
+                {isEditing ? "Actualizar Datos del Hotel" : "Datos Hotel"}
             </h2>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -120,7 +138,7 @@ const HotelSetting = ({ existingData }) => {
                         type="url"
                         id="instagram"
                         name="instagram"
-                        value={formData.contactInfo[0]?.instagram || ""}
+                        value={formData.contactInfo?.[0]?.instagram || ""} // Validación para evitar errores
                         onChange={handleInstagramChange}
                         className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
                     />
@@ -292,6 +310,35 @@ const HotelSetting = ({ existingData }) => {
             className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
         </div>
+        {/* Código del Departamento */}
+<div>
+    <label htmlFor="wdepartmentcode" className="block text-sm font-medium text-gray-700">
+        Código del Departamento
+    </label>
+    <input
+        type="text"
+        id="wdepartmentcode"
+        name="wdepartmentcode"
+        value={formData.wdepartmentcode}
+        onChange={handleChange}
+        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
+    />
+</div>
+
+{/* Nombre de la Ciudad */}
+<div>
+    <label htmlFor="scityname" className="block text-sm font-medium text-gray-700">
+        Nombre de la Ciudad
+    </label>
+    <input
+        type="text"
+        id="scityname"
+        name="scityname"
+        value={formData.scityname}
+        onChange={handleChange}
+        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
+    />
+</div>
 
 {/* Correo electrónico de contacto */}
 <div>
@@ -387,7 +434,7 @@ const HotelSetting = ({ existingData }) => {
                     type="submit"
                     className="col-span-1 md:col-span-2 bg-indigo-600 text-white py-2 px-4 rounded-md shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                 >
-                    {existingData ? "Actualizar" : "Crear"}
+                    {isEditing ? "Actualizar" : "Crear"}
                 </button>
             </form>
         </div>

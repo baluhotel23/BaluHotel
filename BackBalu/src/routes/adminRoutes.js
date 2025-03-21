@@ -64,6 +64,7 @@ router.post("/expenses", isOwner, createExpense);
 // Rutas de configuración del hotel (owner y admin)
 router.get("/settings/hotel-settings", allowRoles(["owner", "admin"]), getHotelSettings);
 router.put("/settings/hotel-settings", allowRoles(["owner", "admin"]), updateHotelSettings);
+router.post("/settings/hotel-settings", allowRoles(["owner", "admin"]), updateHotelSettings);
 
 
 
