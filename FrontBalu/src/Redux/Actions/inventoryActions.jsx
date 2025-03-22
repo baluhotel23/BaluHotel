@@ -96,7 +96,7 @@ export const deleteItem = (id) => async (dispatch) => {
 // Additional actions for stock management
 export const addStock = (id, quantity) => async (dispatch) => {
   try {
-    const { data } = await api.post(`/inventory/${id}/add-stock`, { quantity });
+    const { data } = await api.post(`/inventory/${id}/stock/add`, { quantity });
     dispatch({ type: 'ADD_STOCK', payload: data.data });
     toast.success('Stock añadido exitosamente');
     return { success: true, data: data.data };
@@ -108,7 +108,7 @@ export const addStock = (id, quantity) => async (dispatch) => {
 
 export const removeStock = (id, quantity) => async (dispatch) => {
   try {
-    const { data } = await api.post(`/inventory/${id}/remove-stock`, { quantity });
+    const { data } = await api.post(`/inventory/${id}/stock/remove`, { quantity });
     dispatch({ type: 'REMOVE_STOCK', payload: data.data });
     toast.success('Stock removido exitosamente');
     return { success: true, data: data.data };

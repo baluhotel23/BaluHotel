@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { getAllItems, updateItem, deleteItem } from "../../Redux/Actions/inventoryActions";
+import { getAllItems, updateItem, deleteItem, addStock, removeStock } from "../../Redux/Actions/inventoryActions";
 import { toast } from "react-toastify";
 import DashboardLayout from "./DashboardLayout";
 import { FaEdit, FaTrash } from "react-icons/fa";
@@ -28,6 +28,32 @@ const ManageItems = () => {
       dispatch(getAllItems()); // Refrescar la lista
     } else {
       toast.error("Error al actualizar el item");
+    }
+  };
+
+  const handleAddStock = async (id) => {
+    const quantity = prompt("Ingrese la cantidad a añadir:");
+    if (!quantity || isNaN(quantity) || Number(quantity) <= 0) {
+      toast.error("Cantidad inválida");
+      return;
+    }
+  
+    const { success } = await dispatch(addStock(id, Number(quantity)));
+    if (success) {
+      dispatch(getAllItems()); // Refrescar la lista
+    }
+  };
+  
+  const handleRemoveStock = async (id) => {
+    const quantity = prompt("Ingrese la cantidad a remover:");
+    if (!quantity || isNaN(quantity) || Number(quantity) <= 0) {
+      toast.error("Cantidad inválida");
+      return;
+    }
+  
+    const { success } = await dispatch(removeStock(id, Number(quantity)));
+    if (success) {
+      dispatch(getAllItems()); // Refrescar la lista
     }
   };
 
@@ -214,18 +240,39 @@ const ManageItems = () => {
                     <td className="border border-gray-300 px-4 py-2">
                       {item.isActive ? "Sí" : "No"}
                     </td>
-                    <td className="border  px-4 py-2 flex justify-center space-x-2">
-                      <FaEdit
-                        onClick={() => handleEdit(item)}
-                        className="text-blue-500 cursor-pointer hover:text-blue-700"
-                        title="Editar"
-                      />
-                      <FaTrash
-                        onClick={() => handleDelete(item.id)}
-                        className="text-red-500 cursor-pointer hover:text-red-700"
-                        title="Eliminar"
-                      />
-                    </td>
+                    <td className="border px-4 py-2 flex justify-center space-x-2">
+  {/* Ícono para editar */}
+  <FaEdit
+    onClick={() => handleEdit(item)}
+    className="text-blue-500 cursor-pointer hover:text-blue-700"
+    title="Editar"
+  />
+
+  {/* Ícono para eliminar */}
+  <FaTrash
+    onClick={() => handleDelete(item.id)}
+    className="text-red-500 cursor-pointer hover:text-red-700"
+    title="Eliminar"
+  />
+
+  {/* Botón para añadir stock */}
+  <button
+    onClick={() => handleAddStock(item.id)}
+    className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
+    title="Añadir Stock"
+  >
+    + Stock
+  </button>
+
+  {/* Botón para remover stock */}
+  <button
+    onClick={() => handleRemoveStock(item.id)}
+    className="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600"
+    title="Remover Stock"
+  >
+    - Stock
+  </button>
+</td>
                   </>
                 )}
               </tr>
