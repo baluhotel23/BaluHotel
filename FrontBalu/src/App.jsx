@@ -27,6 +27,8 @@ import ParentBuyerRegistration from './Components/Taxxa/ParentBuyerRegistration'
 import BookingStatusPage from './Components/Booking/BookingStatusPage';
 import RoomAvailability from './Components/Rooms/RoomAvailability';
 import HotelSetting from './Components/Dashboard/HotelSetting';
+import CreateItems from './Components/Dashboard/CreateItems';
+import ManageItems from './Components/Dashboard/ManageItems';
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -153,7 +155,22 @@ const AppContent = () => {
               </PrivateRoute>
             }
           />
-
+                      <Route
+            path="/inventory"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <CreateItems />
+              </PrivateRoute>
+            }
+          />
+               <Route
+            path="/allItems"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <ManageItems />
+              </PrivateRoute>
+            }
+          />
           {/* Ruta por defecto para 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>

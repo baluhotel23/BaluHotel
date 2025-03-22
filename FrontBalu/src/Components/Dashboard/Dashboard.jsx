@@ -95,6 +95,17 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
+         {(user.role === 'owner' ) && (
+          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+            <h2 className="text-xl font-semibold mb-2">CARGAR INVENTARIO</h2>
+            <p className="text-gray-600 mb-4">Crear y modificar inventario.</p>
+            <Link to="/inventory">
+            <button className="bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded">
+              CARGAR INVENTARIO
+            </button>
+            </Link>
+          </div>
+        )}
 
        
       </div>

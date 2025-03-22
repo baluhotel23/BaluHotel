@@ -159,31 +159,49 @@ const getAllItems = async (req, res) => {
       data: newItem
     });
   };
-  
-  // Actualiza un item existente en el inventario
   const updateItem = async (req, res) => {
     const { id } = req.params;
     const { name, description, category, currentStock, minStock, unitPrice } = req.body;
-    const item = await BasicInventory.findByPk(id);
-    if (!item) {
-      throw new CustomError('Item no encontrado', 404);
+
+    // Log para verificar los datos recibidos
+    console.log("Datos recibidos en el backend para actualizar:");
+    console.log("ID:", id);
+    console.log("Body:", req.body);
+
+    try {
+        const item = await BasicInventory.findByPk(id);
+        if (!item) {
+            throw new CustomError("Item no encontrado", 404);
+        }
+
+        // Log para verificar el estado actual del item antes de actualizar
+        console.log("Estado actual del item antes de actualizar:", item.toJSON());
+
+        await item.update({
+            name,
+            description,
+            category,
+            currentStock,
+            minStock,
+            unitPrice,
+        });
+
+        // Log para verificar el estado del item después de actualizar
+        console.log("Estado del item después de actualizar:", item.toJSON());
+
+        res.json({
+            error: false,
+            message: "Item actualizado exitosamente",
+            data: item,
+        });
+    } catch (error) {
+        console.error("Error al actualizar el item:", error);
+        res.status(500).json({
+            error: true,
+            message: "Error al actualizar el item",
+        });
     }
-    await item.update({
-      name,
-      description,
-      category,
-      currentStock,
-      minStock,
-      unitPrice,
-      updatedBy: req.user.n_document
-    });
-    res.json({
-      error: false,
-      message: 'Item actualizado exitosamente',
-      data: item
-    });
-  };
-  
+};
   // Elimina un item del inventario
   const deleteItem = async (req, res) => {
     const { id } = req.params;
@@ -195,7 +213,7 @@ const getAllItems = async (req, res) => {
     res.json({
       error: false,
       message: 'Item eliminado exitosamente',
-      data: item
+      
     });
   };
 
