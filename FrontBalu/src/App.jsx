@@ -29,6 +29,8 @@ import RoomAvailability from './Components/Rooms/RoomAvailability';
 import HotelSetting from './Components/Dashboard/HotelSetting';
 import CreateItems from './Components/Dashboard/CreateItems';
 import ManageItems from './Components/Dashboard/ManageItems';
+import RegistrationPass from './Components/Dashboard/Registration';
+import RoomDetailCheck from './Components/Dashboard/RoomDetailCheck';
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -168,6 +170,22 @@ const AppContent = () => {
             element={
               <PrivateRoute allowedRoles={['owner']}>
                 <ManageItems />
+              </PrivateRoute>
+            }
+          />
+                  <Route
+            path="/registerPass"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <RegistrationPass />
+              </PrivateRoute>
+            }
+          />
+                      <Route
+            path="/roomCheck"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <RoomDetailCheck />
               </PrivateRoute>
             }
           />
