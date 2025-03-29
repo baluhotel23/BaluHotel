@@ -2,6 +2,7 @@ const initialState = {
     rooms: [],
     roomTypes: [],
     selectedRoom: null,
+    searchedRoom: null,
     amenities: [],
     services: [],
     occupancyReport: null,
@@ -35,7 +36,15 @@ const initialState = {
         return { ...state, loading: false, selectedRoom: action.payload };
       case 'GET_ROOM_FAILURE':
         return { ...state, loading: false, error: action.payload };
-  
+       
+       
+        case "SEARCH_ROOM_REQUEST":
+          return { ...state, loading: true, error: null };
+        case "SEARCH_ROOM_SUCCESS":
+          return { ...state, loading: false, searchedRoom: action.payload };
+        case "SEARCH_ROOM_FAILURE":
+          return { ...state, loading: false, error: action.payload };
+          
       // CHECK_AVAILABILITY
       case 'CHECK_AVAILABILITY_REQUEST':
         return { ...state, loading: true, error: null };

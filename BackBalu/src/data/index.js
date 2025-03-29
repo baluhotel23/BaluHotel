@@ -52,7 +52,7 @@ sequelize.models = Object.fromEntries(capsEntries);
 
 // En sequelize.models están todos los modelos importados como propiedades
 // Para relacionarlos hacemos un destructuring
-const { BasicInventory, ExtraCharge, Token, Buyer, Booking, Bill, Room, SellerData, Invoice, RoomBasics, User, Purchase, PurchaseItem, RoomCheckIn, Service, Payment} = sequelize.models;
+const { BasicInventory, ExtraCharge, Token, Buyer, Booking, Bill, Room, SellerData, Invoice, RoomBasics, User, Purchase, PurchaseItem, RoomCheckIn, Service, Payment, RegistrationPass } = sequelize.models;
 
 Room.belongsToMany(BasicInventory, { through: RoomBasics, foreignKey: 'roomNumber' });
 BasicInventory.belongsToMany(Room, { through: RoomBasics, foreignKey: 'basicId' });
@@ -88,6 +88,14 @@ Service.belongsToMany(Room, { through: "RoomServices", foreignKey: "serviceId" }
 
 Booking.hasMany(Payment, { foreignKey: 'bookingId' });
 Payment.belongsTo(Booking, { foreignKey: 'bookingId' });
+
+// Relación entre Room y RegistrationPass
+Room.hasMany(RegistrationPass, { foreignKey: 'roomNumber', sourceKey: 'roomNumber', as: 'registrationPasses' });
+RegistrationPass.belongsTo(Room, { foreignKey: 'roomNumber', targetKey: 'roomNumber', as: 'room' });
+
+// Relación entre Booking y RegistrationPass
+Booking.hasMany(RegistrationPass, { foreignKey: 'bookingId', sourceKey: 'bookingId', as: 'registrationPasses' });
+RegistrationPass.belongsTo(Booking, { foreignKey: 'bookingId', targetKey: 'bookingId', as: 'booking' });
 //---------------------------------------------------------------------------------//
 module.exports = {
   ...sequelize.models, // para poder importar los modelos así: const { Product, User } = require('./db.js');

@@ -74,16 +74,17 @@ export const getUserBookings = () => async (dispatch) => {
   }
 };
 
-// GET BOOKING DETAILS
 export const getBookingById = (bookingId) => async (dispatch) => {
-  dispatch({ type: 'GET_BOOKING_DETAILS_REQUEST' });
+  dispatch({ type: "GET_BOOKING_DETAILS_REQUEST" });
   try {
-    const { data } = await api.get(`/bookings/${bookingId}`);
-    dispatch({ type: 'GET_BOOKING_DETAILS_SUCCESS', payload: data.data });
+    const { data } = await api.get(`/bookings/${bookingId}`, {
+      
+    });
+    dispatch({ type: "GET_BOOKING_DETAILS_SUCCESS", payload: data.data });
   } catch (error) {
     const errorMessage =
-      error.response?.data?.message || 'Error al obtener detalles de la reserva';
-    dispatch({ type: 'GET_BOOKING_DETAILS_FAILURE', payload: errorMessage });
+      error.response?.data?.message || "Error al obtener detalles de la reserva";
+    dispatch({ type: "GET_BOOKING_DETAILS_FAILURE", payload: errorMessage });
   }
 };
 

@@ -43,6 +43,13 @@ const {
   getRevenueReport
 } = require("./bookingController");
 
+const { 
+    createRegistrationPass,
+    getAllRegistrationPasses,
+    updateRegistrationPass,
+    deleteRegistrationPass
+} = require("./registrationPassController");
+
 module.exports = {
     // Auth endpoints
     login,

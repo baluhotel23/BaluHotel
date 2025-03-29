@@ -21,6 +21,7 @@ const {getAllRooms,
 router.get('/', getAllRooms);
 router.get('/types', getRoomTypes);
 router.get('/:roomNumber', getRoomById);
+router.get("/", getRoomById);
 router.get('/availability/:dates', checkAvailability);
 
 // Rutas protegidas
