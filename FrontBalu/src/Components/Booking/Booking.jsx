@@ -83,6 +83,7 @@ const Booking = () => {
     dispatch(checkAvailability({ checkIn, checkOut, roomType }));
   };
 
+  // ...existing code...
   const handleReserve = (room) => {
     if (!room || !room.type) {
       toast.error("Datos de habitación inválidos");
@@ -91,33 +92,37 @@ const Booking = () => {
     const maxGuests = room.maxGuests || 2;
     setMaxCapacity(maxGuests);
     toast.info(
-      <div>
-        <p>¿Confirma las siguientes fechas?</p>
-        <p>Check-in: {formatDate(checkIn)}</p>
-        <p>Check-out: {formatDate(checkOut)}</p>
+      <div className="p-6 text-center bg-gray-800 rounded-lg shadow-xl text-white w-96"> {/* Added classes for size, centering, and background */}
+        <p className="text-lg mb-4">¿Confirma las siguientes fechas?</p> {/* Increased text size and margin */}
+        <p className="mb-2">Check-in: {formatDate(checkIn)}</p>
+        <p className="mb-4">Check-out: {formatDate(checkOut)}</p> {/* Added margin bottom */}
+        <div className="flex justify-center space-x-4"> {/* Centered buttons */}
         <button
-          onClick={() => {
-            if (adults + children > maxGuests) {
-              setAdults(1);
-              setChildren(0);
-              toast.warning(
-                `Esta habitación tiene un máximo de ${maxGuests} huéspedes. Se han reiniciado los valores.`
-              );
-            }
-            setSelectedRoom(room);
-            setShowRegistration(true);
-            toast.dismiss();
-          }}
-          className="mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 mr-2"
-        >
-          Confirmar
-        </button>
-        <button
-          onClick={() => toast.dismiss()}
-          className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-        >
-          Cancelar
-        </button>
+            onClick={() => {
+              if (adults + children > maxGuests) {
+                setAdults(1);
+                setChildren(0);
+                toast.warning(
+                  `Esta habitación tiene un máximo de ${maxGuests} huéspedes. Se han reiniciado los valores.`
+                );
+              }
+              setSelectedRoom(room);
+              setShowRegistration(true);
+              toast.dismiss();
+            }}
+            // Changed button colors, added padding, font weight, and reduced text size
+            className="px-6 py-2 bg-stone-500 text-white rounded-full hover:bg-Hover font-bold text-sm" // Added text-sm
+          >
+            Confirmar
+          </button>
+          <button
+            onClick={() => toast.dismiss()}
+            // Adjusted padding, added font weight, and reduced text size
+            className="px-6 py-2 bg-red-500 text-white rounded-full hover:bg-red-600 font-bold text-sm" // Added text-sm
+          >
+            Cancelar
+          </button>
+        </div>
       </div>,
       {
         position: "top-center",
@@ -125,9 +130,16 @@ const Booking = () => {
         closeOnClick: false,
         draggable: false,
         closeButton: false,
+        style: { // Removed default padding/margin from toast container itself
+          padding: 0,
+          margin: 0,
+          background: 'transparent', // Made container transparent to show custom background
+          boxShadow: 'none', // Removed default shadow
+        },
       }
     );
   };
+// ...existing code...
 
   const calculateTotal = (adults, children, room, checkIn, checkOut) => {
     const totalGuests = adults + children;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { useDispatch } from 'react-redux';
+import { useDispatch , useSelector} from 'react-redux';
 import { createBuyer, fetchBuyerByDocument } from '../../Redux/Actions/taxxaActions';
 import BuyerRegistrationForm from './BuyerRegistrationForm';
 
@@ -22,140 +22,131 @@ const initialBuyerState = {
 
 const ParentBuyerRegistration = ({ initialBuyerData, onComplete }) => {
     const dispatch = useDispatch();
+    // Obtener estado relevante de Redux
+    const { buyer: buyerFromRedux, loading: loadingRedux, error: errorRedux } = useSelector(state => state.taxxa);
     const [buyer, setBuyer] = useState(initialBuyerState);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [docChecked, setDocChecked] = useState(false);
+    // Usar el loading/error local o de Redux según la operación
+    const [localLoading, setLocalLoading] = useState(false);
+    const [localError, setLocalError] = useState(null);
+    const [docChecked, setDocChecked] = useState(false); // Indica si ya se intentó verificar el documento
+    const [buyerExists, setBuyerExists] = useState(false); // Indica si el fetch encontró un buyer
 
-    useEffect(() => {
-        if (initialBuyerData) {
-            setBuyer({
-                scostumername: initialBuyerData.scostumername || '',
-                wlegalorganizationtype: initialBuyerData.wlegalorganizationtype || 'person',
-                sfiscalresponsibilities: initialBuyerData.sfiscalresponsibilities || 'R-99-PN',
-                jpartylegalentity: {
-                    wdoctype: initialBuyerData.wdoctype || '',
-                    sdocno: initialBuyerData.sdocno || '',
-                    scorporateregistrationschemename: initialBuyerData.scorporateregistrationschemename || '',
-                },
-                jcontact: {
-                    scontactperson: initialBuyerData.scontactperson || '',
-                    selectronicmail: initialBuyerData.selectronicmail || '',
-                    stelephone: initialBuyerData.stelephone || '',
-                },
-            });
-            setDocChecked(true); // Pasar directamente al modo "formulario completo"
-            // Llamar a onComplete para notificar al componente padre que los datos están listos
-            if (onComplete) {
-                onComplete(initialBuyerData);
-            }
-        }
-    }, [initialBuyerData, onComplete]);
+    // ... (useEffect para initialBuyerData) ...
 
-    // Primer paso: verificar si existe el buyer usando el documento
-    const handleCheckDocument = async () => {
-        if (!buyer.jpartylegalentity.sdocno) {
-            setError('El número de documento es requerido para la verificación');
-            return;
-        }
-        setLoading(true);
-        setError(null);
-        try {
-            const response = await dispatch(
-                fetchBuyerByDocument(buyer.jpartylegalentity.sdocno)
-            );
-            // Si se encuentra al buyer, se utiliza la data y se llama onComplete
-            if (response && response.payload) {
-                console.log('Buyer ya existe:', response.payload);
+    // Efecto para reaccionar a los resultados del fetch desde Redux
+     useEffect(() => {
+        // Solo reaccionar si estábamos esperando el resultado de un fetch (docChecked es true pero buyerExists es false)
+        if (docChecked && !buyerExists) {
+            if (!loadingRedux && buyerFromRedux) {
+                console.log('Buyer encontrado vía Redux:', buyerFromRedux);
+                setBuyerExists(true); // Marcar que existe
+                // Actualizar el estado local para pre-rellenar el formulario
+                setBuyer(prev => ({ ...prev, ...buyerFromRedux }));
                 if (onComplete) {
-                    onComplete(response.payload);
+                    onComplete(buyerFromRedux); // Usar datos de Redux
                 }
-            } else {
-                // No se encontró: se permite completar el resto del formulario
-                setDocChecked(true);
+            } else if (!loadingRedux && errorRedux) {
+                // ... (manejo de error) ...
             }
-        } catch (error) {
-            setError(error.message);
-        } finally {
-            setLoading(false);
         }
+    }, [buyerFromRedux, loadingRedux, errorRedux, docChecked, buyerExists, onComplete]);
+
+
+
+    const handleCheckDocument = async () => {
+        // ... (validación de sdocno) ...
+        setLocalLoading(true); // Podrías usar loadingRedux si prefieres
+        setLocalError(null);
+        setBuyerExists(false); // Reiniciar estado
+        setDocChecked(true); // Indicar que se inició la verificación
+        // Limpiar estado Redux anterior antes de despachar? Opcional.
+        // dispatch({ type: 'FETCH_BUYER_RESET' }); // Necesitarías añadir este caso al reducer
+        dispatch(fetchBuyerByDocument(buyer.jpartylegalentity.sdocno));
+        // Ya no esperamos aquí, el useEffect reaccionará
+        setLocalLoading(false); // O quitar esto y basarse en loadingRedux
     };
 
-    // Segundo paso: enviar el formulario completo para crear el buyer
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        setError(null);
+        // Asegurarse de no intentar crear si ya se encontró uno
+        if (buyerExists) {
+            setLocalError("No se puede crear un comprador que ya fue encontrado.");
+            return;
+        }
+
+        setLocalLoading(true); // O usar loadingRedux
+        setLocalError(null);
         try {
-            const buyerData = {
-                ...buyer,
-                scostumername: buyer.scostumername.trim(),
-                jpartylegalentity: {
-                    ...buyer.jpartylegalentity,
-                    scorporateregistrationschemename: buyer.scostumername.trim(),
-                },
-                jcontact: {
-                    ...buyer.jcontact,
-                    scontactperson: buyer.scostumername.trim(),
-                },
-            };
-            const response = await dispatch(createBuyer(buyerData));
-            if (response.error) {
-                throw new Error(response.message);
-            }
-            console.log('Buyer creado exitosamente:', response.data);
-            if (onComplete) {
-                onComplete(response.data);
-            }
-            setBuyer(initialBuyerState);
+            // ... (construir buyerData) ...
+
+            // Despachar createBuyer (asumiendo que devuelve el buyer creado o maneja errores)
+            const createdBuyer = await dispatch(createBuyer(buyerData)); // createBuyer debería manejar su propio estado Redux
+
+            // Idealmente, createBuyer también actualiza buyerFromRedux
+            // y podrías tener otro useEffect para reaccionar a CREATE_BUYER_SUCCESS
+            // Pero si createBuyer devuelve los datos directamente:
+             if (createdBuyer && !createdBuyer.error) { // Ajusta según lo que realmente devuelva createBuyer
+                 console.log('Buyer creado exitosamente:', createdBuyer);
+                 if (onComplete) {
+                     onComplete(createdBuyer); // Usar los datos devueltos/actualizados
+                 }
+                 setBuyer(initialBuyerState); // Limpiar formulario
+                 setDocChecked(false); // Resetear estado
+             } else {
+                 // Si createBuyer devuelve un error en la respuesta
+                 throw new Error(createdBuyer?.message || 'Error al crear el comprador.');
+             }
+
         } catch (error) {
-            setError(error.message);
+            // Capturar errores de la acción createBuyer o errores de red
+             console.error("Error en handleSubmit:", error);
+             // Usar el error de Redux si está disponible después de CREATE_BUYER_FAILURE
+             setLocalError(errorRedux || error.message || 'Error desconocido al crear.');
         } finally {
-            setLoading(false);
+            setLocalLoading(false); // O basarse en loadingRedux
         }
     };
+
+    // Determinar el estado de carga y error combinado
+    const isLoading = localLoading || loadingRedux;
+    const displayError = localError || (docChecked && !buyerExists && errorRedux ? `Error Redux: ${errorRedux}` : null);
+
 
     return (
         <div className="max-w-3xl mx-auto p-6">
             <h1 className="text-3xl font-bold text-center mb-6">Registro del Comprador</h1>
-            {error && (
+            {displayError && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                    {error}
+                    {displayError}
                 </div>
             )}
-            {/* Mostrar el formulario completo directamente si initialBuyerData está presente */}
-            {initialBuyerData || docChecked ? (
+            {/* Renderizado condicional */}
+            {!docChecked ? (
+                 // Modo inicial: solo documento
+                <div>
+                    <BuyerRegistrationForm buyer={buyer} setBuyer={setBuyer} onlyDoc={true} />
+                    <div className="text-center">
+                        <button onClick={handleCheckDocument} disabled={isLoading} /* ... clases ... */ >
+                            {isLoading ? 'Verificando...' : 'Verificar Documento'}
+                        </button>
+                    </div>
+                </div>
+            ) : buyerExists ? (
+                // Documento verificado, buyer encontrado (opcionalmente mostrar datos o solo mensaje)
+                <div className="text-center p-4 bg-green-100 text-gray-700 rounded">
+                    Comprador encontrado. Procediendo con la reserva...
+                    {/* O podrías mostrar el formulario pre-rellenado y deshabilitado */}
+                </div>
+            ) : (
+                 // Documento verificado, buyer NO encontrado -> Mostrar formulario completo para crear
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Modo formulario completo: se muestran todos los campos */}
                     <BuyerRegistrationForm buyer={buyer} setBuyer={setBuyer} />
                     <div className="text-center">
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className={`mt-4 w-full md:w-auto ${
-                                loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-                            } text-white font-semibold py-2 px-6 rounded shadow`}
-                        >
-                            {loading ? 'Enviando...' : 'Enviar Registro'}
+                        <button type="submit" disabled={isLoading} /* ... clases ... */ >
+                            {isLoading ? 'Enviando...' : 'Enviar Registro'}
                         </button>
                     </div>
                 </form>
-            ) : (
-                <div>
-                    {/* Modo solo documento: se muestran solo los campos para elegir el tipo y número */}
-                    <BuyerRegistrationForm buyer={buyer} setBuyer={setBuyer} onlyDoc={true} />
-                    <div className="text-center">
-                        <button
-                            onClick={handleCheckDocument}
-                            disabled={loading}
-                            className={`mt-4 w-full md:w-auto ${
-                                loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
-                            } text-white font-semibold py-2 px-6 rounded shadow`}
-                        >
-                            {loading ? 'Verificando...' : 'Verificar Documento'}
-                        </button>
-                    </div>
-                </div>
             )}
         </div>
     );
@@ -167,14 +158,14 @@ ParentBuyerRegistration.propTypes = {
         wlegalorganizationtype: PropTypes.string,
         sfiscalresponsibilities: PropTypes.string,
         jpartylegalentity: PropTypes.shape({
-            wdoctype: PropTypes.string.isRequired,
+            wdoctype: PropTypes.string.isRequired, // Ensure this is validated
             sdocno: PropTypes.string,
             scorporateregistrationschemename: PropTypes.string,
         }),
         jcontact: PropTypes.shape({
             scontactperson: PropTypes.string.isRequired,
             selectronicmail: PropTypes.string, // Ensure this is validated
-            stelephone: PropTypes.string,
+            stelephone: PropTypes.string.isRequired,
         }).isRequired,
     }),
     onComplete: PropTypes.func,

@@ -35,13 +35,13 @@ const WompiPayment = ({ booking, onPaymentComplete }) => {
       <div className="space-y-4">
         <button
           onClick={() => handlePaymentOption(100)}
-          className="w-full p-3 bg-green-600 hover:bg-green-700 rounded-full"
+          className="w-full p-3 bg-gray-600 hover:bg-gray-700 rounded-full"
         >
           Pagar 100% (${booking.totalAmount})
         </button>
         <button
           onClick={() => handlePaymentOption(50)}
-          className="w-full p-3 bg-blue-600 hover:bg-blue-700 rounded-full"
+          className="w-full p-3 bg-stone-600 hover:bg-stone-700 rounded-full"
         >
           Pagar 50% (${booking.totalAmount * 0.5})
         </button>
