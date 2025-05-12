@@ -5,19 +5,10 @@ import {
   createBooking,
   updateOnlinePayment
 } from "../../Redux/Actions/bookingActions";
+import { fetchBuyerByDocument, createBuyer } from '../../Redux/Actions/taxxaActions';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faWifi,
-  faParking,
-  faTv,
-  faFan,
-  faUtensils,
-  faUser,
-} from "@fortawesome/free-solid-svg-icons";
 import { format, differenceInDays } from "date-fns";
-import ParentBuyerRegistration from "../Taxxa/ParentBuyerRegistration";
 import { es } from "date-fns/locale";
 import { toast } from "react-toastify";
 import WompiPayment from "../WompiPayment";
@@ -25,460 +16,638 @@ import { useNavigate } from "react-router-dom";
 
 const ROOM_TYPES = ["Sencilla", "Doble", "Triple", "Cuadruple", "Pareja"];
 
+// Definición del Modal
+const Modal = ({ children, isOpen, onClose }) => {
+  if (!isOpen) return null;
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      color: '#333' // Asegurar que el texto dentro del modal sea legible
+    }}>
+      <div style={{ background: 'white', padding: '20px', borderRadius: '8px', minWidth: '300px', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
+        {children}
+        <button 
+          onClick={onClose} 
+          style={{ 
+            marginTop: '20px', 
+            padding: '10px 15px', 
+            float: 'right', 
+            backgroundColor: '#f44336', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px', 
+            cursor: 'pointer' 
+          }}
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Definición del Formulario de Registro de Buyer en el Popup
+const BuyerRegistrationFormPopup = ({ isOpen, onClose, onBuyerRegistered, initialSdocno }) => {
+  const dispatch = useDispatch();
+  const [buyerFormData, setBuyerFormData] = useState({
+    sdocno: initialSdocno || '',
+    wlegalorganizationtype: 'person',
+    scostumername: '',
+    stributaryidentificationkey: 'O-1',
+    sfiscalresponsibilities: 'R-99-PN',
+    sfiscalregime: '48',
+    wdoctype: 'CC',
+    scorporateregistrationschemename: '',
+    scontactperson: '',
+    selectronicmail: '',
+    stelephone: '',
+    saddressline1: '',
+    scityname: '',
+    wdepartmentcode: '',
+  });
+
+  useEffect(() => {
+    if (initialSdocno) {
+      setBuyerFormData(prev => ({ ...prev, sdocno: initialSdocno }));
+    }
+  }, [initialSdocno, isOpen]); // Reset form when opened with new initialSdocno
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setBuyerFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const { sdocno, scostumername, selectronicmail, wdoctype, scorporateregistrationschemename, scontactperson, stelephone } = buyerFormData;
+    if (!sdocno || !scostumername || !selectronicmail || !wdoctype || !scorporateregistrationschemename || !scontactperson || !stelephone) {
+      toast.error("Por favor, complete todos los campos obligatorios del huésped (*).");
+      return;
+    }
+    const resultAction = await dispatch(createBuyer(buyerFormData));
+    if (resultAction && resultAction.success) {
+      toast.success("Huésped registrado exitosamente.");
+      onBuyerRegistered(resultAction.data); // Pasa el buyer registrado
+      onClose();
+    } else {
+      toast.error(resultAction.message || "Error al registrar el huésped.");
+    }
+  };
+
+  const inputStyle = { width: 'calc(100% - 16px)', padding: '8px', marginBottom: '10px', border: '1px solid #ccc', borderRadius: '4px' };
+  const labelStyle = { display: 'block', marginBottom: '5px', fontWeight: 'bold'};
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <h4 style={{ marginTop: 0, marginBottom: '20px' }}>Registrar Nuevo Huésped</h4>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label style={labelStyle}>Documento (sdocno):*</label>
+          <input type="text" name="sdocno" value={buyerFormData.sdocno} onChange={handleChange} required style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Tipo Documento (wdoctype):*</label>
+          <select name="wdoctype" value={buyerFormData.wdoctype} onChange={handleChange} required style={inputStyle}>
+            <option value="CC">CC - Cédula de Ciudadanía</option>
+            <option value="NIT">NIT</option>
+            <option value="CE">CE - Cédula de Extranjería</option>
+            <option value="PAS">PAS - Pasaporte</option>
+            <option value="RC">RC - Registro Civil</option>
+            <option value="TI">TI - Tarjeta de Identidad</option>
+            <option value="TE">TE - Tarjeta de Extranjería</option>
+            <option value="DEX">DEX - Documento Extranjero</option>
+            <option value="PEP">PEP - Permiso Especial de Permanencia</option>
+            <option value="PPT">PPT - Permiso Protección Temporal</option>
+            <option value="FI">FI - NIT de Otro País</option>
+            <option value="NUIP">NUIP - Número Único de Identificación Personal</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Nombre Completo (scostumername):*</label>
+          <input type="text" name="scostumername" value={buyerFormData.scostumername} onChange={handleChange} required style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Email (selectronicmail):*</label>
+          <input type="email" name="selectronicmail" value={buyerFormData.selectronicmail} onChange={handleChange} required style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Teléfono (stelephone):*</label>
+          <input type="text" name="stelephone" value={buyerFormData.stelephone} onChange={handleChange} required style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Tipo Organización Legal (wlegalorganizationtype):*</label>
+          <select name="wlegalorganizationtype" value={buyerFormData.wlegalorganizationtype} onChange={handleChange} required style={inputStyle}>
+            <option value="person">Persona</option>
+            <option value="company">Empresa</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Clave Identificación Tributaria (stributaryidentificationkey):*</label>
+          <select name="stributaryidentificationkey" value={buyerFormData.stributaryidentificationkey} onChange={handleChange} required style={inputStyle}>
+            <option value="O-1">O-1 (IVA)</option>
+            <option value="O-4">O-4 (INC)</option>
+            <option value="ZZ">ZZ (No aplica)</option>
+            <option value="ZA">ZA (IVA e INC)</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Responsabilidades Fiscales (sfiscalresponsibilities):*</label>
+          <select name="sfiscalresponsibilities" value={buyerFormData.sfiscalresponsibilities} onChange={handleChange} required style={inputStyle}>
+            <option value="R-99-PN">R-99-PN (No responsable)</option>
+            <option value="O-13">O-13 (Gran contribuyente)</option>
+            <option value="O-15">O-15 (Autorretenedor)</option>
+            <option value="O-23">O-23 (Agente de retención IVA)</option>
+            <option value="O-47">O-47 (Régimen Simple de Tributación)</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Régimen Fiscal (sfiscalregime):*</label>
+          <select name="sfiscalregime" value={buyerFormData.sfiscalregime} onChange={handleChange} required style={inputStyle}>
+            <option value="48">48 - Impuesto sobre las ventas – IVA</option>
+            <option value="49">49 - No responsable de IVA</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Nombre Esquema Registro Corporativo (scorporateregistrationschemename):*</label>
+          <input type="text" name="scorporateregistrationschemename" value={buyerFormData.scorporateregistrationschemename} onChange={handleChange} required style={inputStyle} placeholder="Ej: Registro Mercantil" />
+        </div>
+        <div>
+          <label style={labelStyle}>Persona de Contacto (scontactperson):*</label>
+          <input type="text" name="scontactperson" value={buyerFormData.scontactperson} onChange={handleChange} required style={inputStyle} />
+        </div>
+        <h5 style={{marginTop: '15px', marginBottom: '5px'}}>Dirección (Opcional)</h5>
+        <div>
+          <label style={labelStyle}>Dirección (saddressline1):</label>
+          <input type="text" name="saddressline1" value={buyerFormData.saddressline1} onChange={handleChange} style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Ciudad (scityname):</label>
+          <input type="text" name="scityname" value={buyerFormData.scityname} onChange={handleChange} style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Código Departamento (wdepartmentcode):</label>
+          <input type="text" name="wdepartmentcode" value={buyerFormData.wdepartmentcode} onChange={handleChange} style={inputStyle} />
+        </div>
+        <button 
+          type="submit" 
+          style={{ 
+            padding: '10px 15px', 
+            backgroundColor: '#4CAF50', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px', 
+            cursor: 'pointer',
+            width: 'auto',
+            display: 'block',
+            marginLeft: 'auto',
+            marginRight: 'auto',
+            marginTop: '20px'
+          }}
+        >
+          Registrar Huésped
+        </button>
+      </form>
+    </Modal>
+  );
+};
+
+// ... El resto de tu componente Booking ...
 const Booking = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { availability, loading, error } = useSelector((state) => state.booking);
-  const { rooms } = useSelector((state) => state.room);
-  const [showRegistration, setShowRegistration] = useState(false);
-  const today = new Date();
-  const buyerRedux = useSelector((state) => state.taxxa.buyer);
-  console.log("buyerRedux:", buyerRedux);
-  // Estados para fechas, búsqueda y reserva
+  const { 
+    availability, 
+    loading: availabilityLoading,
+    error: availabilityError 
+  } = useSelector((state) => state.booking);
+  const { 
+    buyer: buyerFromRedux, 
+    loading: buyerLoading, 
+    error: buyerError 
+  } = useSelector((state) => state.taxxa);
+
+  const [step, setStep] = useState(1);
   const [checkIn, setCheckIn] = useState(new Date());
   const [checkOut, setCheckOut] = useState(new Date());
   const [roomType, setRoomType] = useState("");
-  const [bookingTotal, setBookingTotal] = useState(0);
+  const [selectedRoom, setSelectedRoom] = useState(null);
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   const [maxCapacity, setMaxCapacity] = useState(2);
-  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [bookingTotal, setBookingTotal] = useState(0);
+  const [buyerSdocnoInput, setBuyerSdocnoInput] = useState('');
+  const [showBuyerPopup, setShowBuyerPopup] = useState(false);
+  const [currentBuyerData, setCurrentBuyerData] = useState(null);
+  const [paymentOption, setPaymentOption] = useState("total");
+  const [lastSearchedSdocno, setLastSearchedSdocno] = useState('');
 
-  // Estados para registro del comprador y reserva
-  const [buyerData, setBuyerData] = useState(null);
-  const [isBookingReady, setIsBookingReady] = useState(false);
-
-  // Estado para tipo de pago (por el momento no se utiliza, pero queda como referencia)
-  const [paymentType, setPaymentType] = useState("wompi");
-
-  // Cargar disponibilidad inicial
-  useEffect(() => {
-    console.log("Cargando disponibilidad inicial...");
-    dispatch(checkAvailability({ checkIn, checkOut }));
-  }, [dispatch]);
-
-  const handleCheckInChange = (date) => {
-    if (date < today) {
-      alert("No se puede seleccionar una fecha anterior a hoy");
-      return;
-    }
-    setCheckIn(date);
-    if (checkOut <= date) {
-      const nextDay = new Date(date);
-      nextDay.setDate(date.getDate() + 1);
-      setCheckOut(nextDay);
-    }
-  };
-
-  const handleCheckOutChange = (date) => {
-    if (date <= checkIn) {
-      alert("La fecha de salida debe ser posterior a la fecha de entrada");
-      return;
-    }
-    setCheckOut(date);
-  };
-
-  const handleSearch = () => {
-    console.log("Buscando habitaciones:", { checkIn, checkOut, roomType });
+  // ... (handleSearch, handleSelectRoom, handleContinuePassengers sin cambios) ...
+ const handleSearch = () => {
     dispatch(checkAvailability({ checkIn, checkOut, roomType }));
   };
 
-  // ...existing code...
-  const handleReserve = (room) => {
-    if (!room || !room.type) {
-      toast.error("Datos de habitación inválidos");
+  const handleSelectRoom = (room) => {
+    setSelectedRoom(room);
+    setMaxCapacity(room.maxGuests || 2);
+    setAdults(1); 
+    setChildren(0);
+    setStep(2);
+  };
+
+
+  const handleContinuePassengers = () => {
+    const totalGuests = adults + children;
+    if (totalGuests === 0) {
+        toast.warning('Debe seleccionar al menos un huésped.');
+        return;
+    }
+    if (totalGuests > maxCapacity) {
+      toast.warning(`Máximo ${maxCapacity} huéspedes para esta habitación.`);
       return;
     }
-    const maxGuests = room.maxGuests || 2;
-    setMaxCapacity(maxGuests);
-    toast.info(
-      <div className="p-6 text-center bg-gray-800 rounded-lg shadow-xl text-white w-96"> {/* Added classes for size, centering, and background */}
-        <p className="text-lg mb-4">¿Confirma las siguientes fechas?</p> {/* Increased text size and margin */}
-        <p className="mb-2">Check-in: {formatDate(checkIn)}</p>
-        <p className="mb-4">Check-out: {formatDate(checkOut)}</p> {/* Added margin bottom */}
-        <div className="flex justify-center space-x-4"> {/* Centered buttons */}
-        <button
-            onClick={() => {
-              if (adults + children > maxGuests) {
-                setAdults(1);
-                setChildren(0);
-                toast.warning(
-                  `Esta habitación tiene un máximo de ${maxGuests} huéspedes. Se han reiniciado los valores.`
-                );
-              }
-              setSelectedRoom(room);
-              setShowRegistration(true);
-              toast.dismiss();
-            }}
-            // Changed button colors, added padding, font weight, and reduced text size
-            className="px-6 py-2 bg-stone-500 text-white rounded-full hover:bg-Hover font-bold text-sm" // Added text-sm
-          >
-            Confirmar
-          </button>
-          <button
-            onClick={() => toast.dismiss()}
-            // Adjusted padding, added font weight, and reduced text size
-            className="px-6 py-2 bg-red-500 text-white rounded-full hover:bg-red-600 font-bold text-sm" // Added text-sm
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>,
-      {
-        position: "top-center",
-        autoClose: false,
-        closeOnClick: false,
-        draggable: false,
-        closeButton: false,
-        style: { // Removed default padding/margin from toast container itself
-          padding: 0,
-          margin: 0,
-          background: 'transparent', // Made container transparent to show custom background
-          boxShadow: 'none', // Removed default shadow
-        },
-      }
-    );
-  };
-// ...existing code...
+    let pricePerPerson;
+    if (totalGuests <= 2) pricePerPerson = 70000;
+    else if (totalGuests === 3) pricePerPerson = 60000;
+    else pricePerPerson = 50000; 
 
-  const calculateTotal = (adults, children, room, checkIn, checkOut) => {
-    const totalGuests = adults + children;
-    const nights = differenceInDays(checkOut, checkIn) + 1;
-    if (!room) return 0;
-    let pricePerPerson = room.price;
-    if (totalGuests === 1) pricePerPerson = 70000;
-    else if (totalGuests >= 2 && totalGuests <= 4) pricePerPerson = 60000;
-    else if (totalGuests > 4) pricePerPerson = 50000;
-    return pricePerPerson * totalGuests * nights;
+    const nights = differenceInDays(checkOut, checkIn);
+    if (nights < 1) {
+        toast.warning('La fecha de salida debe ser posterior a la fecha de entrada.');
+        return;
+    }
+    setBookingTotal(pricePerPerson * totalGuests * nights);
+    setStep(3);
   };
 
+  // Paso 3: Iniciar la verificación o registro del buyer
+  const handleVerifyOrRegisterBuyer = async () => {
+    const sdocnoToSearch = buyerSdocnoInput.trim();
+    if (!sdocnoToSearch) {
+      toast.error("Por favor, ingrese un número de documento para el huésped.");
+      return;
+    }
+
+    // Optimización: Si Redux ya tiene este buyer y coincide con el input actual
+    if (buyerFromRedux && buyerFromRedux.sdocno === sdocnoToSearch) {
+      toast.success(`Huésped ${buyerFromRedux.scostumername || buyerFromRedux.sdocno} encontrado (datos previos).`);
+      setCurrentBuyerData(buyerFromRedux);
+      setShowBuyerPopup(false);
+      setLastSearchedSdocno(sdocnoToSearch); // Asegurarse que lastSearchedSdocno esté actualizado
+      setStep(4); 
+      return;
+    }
+
+    setLastSearchedSdocno(sdocnoToSearch); // Establecer el sdocno que se va a buscar
+    setCurrentBuyerData(null); 
+    setShowBuyerPopup(false); 
+    dispatch(fetchBuyerByDocument(sdocnoToSearch));
+  };
+
+  // useEffect para reaccionar a los resultados de la búsqueda del buyer desde Redux
   useEffect(() => {
-    if (selectedRoom) {
-      const newTotal = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
-      setBookingTotal(newTotal);
+    // Solo actuar si estamos en el paso 3, se ha establecido un 'lastSearchedSdocno' y la carga ha terminado.
+    if (step === 3 && lastSearchedSdocno && !buyerLoading) {
+      if (buyerFromRedux && buyerFromRedux.sdocno === lastSearchedSdocno) {
+        // Buyer encontrado y coincide con el sdocno buscado explícitamente
+        if (!currentBuyerData || currentBuyerData.sdocno !== buyerFromRedux.sdocno) { 
+            toast.success(`Huésped ${buyerFromRedux.scostumername || buyerFromRedux.sdocno} encontrado.`);
+        }
+        setCurrentBuyerData(buyerFromRedux);
+        setShowBuyerPopup(false);
+        setStep(4); 
+      } else {
+        // Buyer no encontrado para el 'lastSearchedSdocno', o hubo un error.
+        if (buyerError) {
+          toast.error(`Error al buscar huésped con documento ${lastSearchedSdocno}: ${typeof buyerError === 'string' ? buyerError : (buyerError.message || 'Intente de nuevo')}. Si no existe, por favor regístrelo.`);
+        } else {
+          // No hay error específico, pero el buyer no se encontró para este sdocno.
+          toast.info(`Huésped con documento ${lastSearchedSdocno} no encontrado. Por favor, regístrelo.`);
+        }
+        setCurrentBuyerData(null); 
+        setShowBuyerPopup(true);   
+      }
     }
-  }, [adults, children, selectedRoom, checkIn, checkOut]);
+  }, [buyerFromRedux, buyerLoading, buyerError, lastSearchedSdocno, step, dispatch, currentBuyerData]);
 
-  const handleAdultsChange = (e, room) => {
-    const newAdults = parseInt(e.target.value);
-    const total = newAdults + children;
-    if (total <= room.maxGuests) {
-      setAdults(newAdults);
-      setBookingTotal(calculateTotal(newAdults, children, room, checkIn, checkOut));
-    } else {
-      toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
-    }
+  // Callback cuando un nuevo buyer es registrado a través del popup
+  const handleBuyerRegistered = (registeredBuyer) => {
+    setCurrentBuyerData(registeredBuyer); 
+    setShowBuyerPopup(false);
+    setStep(4); 
   };
-
-  const handleChildrenChange = (e, room) => {
-    const newChildren = parseInt(e.target.value);
-    const total = adults + newChildren;
-    if (total <= room.maxGuests) {
-      setChildren(newChildren);
-      setBookingTotal(calculateTotal(adults, newChildren, room, checkIn, checkOut));
-    } else {
-      toast.warning(`La capacidad máxima es de ${room.maxGuests} personas`);
+  
+  const amountToPay = paymentOption === "mitad"
+    ? Math.round(bookingTotal / 2)
+    : bookingTotal;
+  
+  // ... (handlePaymentSuccess y el resto del componente JSX) ...
+  const handlePaymentSuccess = async (transaction) => {
+    if (!currentBuyerData || !selectedRoom) {
+        toast.error("Faltan datos para crear la reserva.");
+        return;
     }
-  };
+     const totalGuests = adults + children;
+     const nights = differenceInDays(checkOut, checkIn);
 
-  const handleBuyerDataComplete = (buyerData) => {
-    console.log("Buyer creado exitosamente:", buyerData);
-    setBuyerData(buyerData);
-    setIsBookingReady(true);
-  };
-
-  // Flujo principal para el pago con Wompi
-  const handleWompiPaymentSuccess = async (transaction) => {
-    console.log("Pago con Wompi exitoso:", transaction);
-    if (transaction.status !== "APPROVED") {
-      toast.error(`El pago no fue aprobado. Estado: ${transaction.status}`);
-      return;
-    }
-    const totalAmount = calculateTotal(adults, children, selectedRoom, checkIn, checkOut);
-    const totalGuests = adults + children;
-    const nights = differenceInDays(checkOut, checkIn) + 1;
     const bookingData = {
-      checkIn,
-      checkOut,
+      checkIn: format(checkIn, "yyyy-MM-dd"),
+      checkOut: format(checkOut, "yyyy-MM-dd"),
       pointOfSale: "Online",
-      status: "confirmed",
+      status: "confirmed", 
       guestCount: totalGuests,
       roomNumber: selectedRoom.roomNumber,
-      totalAmount,
+      totalAmount: bookingTotal,
       adults,
       children,
       nights,
-      guestId: buyerData?.sdocno,
+      guestId: currentBuyerData.sdocno, 
       paymentType: "online",
-      paymentMethod: "credit_card",
+      paymentMethod: transaction.payment_method_type || "credit_card", 
       paymentStatus: transaction.status,
       transactionId: transaction.id,
       paymentReference: transaction.reference,
-      paymentDetails: {
+      paymentDetails: { 
         cardType: transaction.paymentMethod?.extra?.cardType,
         cardBrand: transaction.paymentMethod?.extra?.brand,
         lastFour: transaction.paymentMethod?.extra?.lastFour,
-        installments: transaction.paymentMethod?.installments,
-        processorResponseCode: transaction.paymentMethod?.extra?.processorResponseCode,
       },
-      buyerInfo: {
-        name: buyerData?.scostumername,
-        docType: buyerData?.wdoctype,
-        sdocno: buyerData?.sdocno,
-        email: buyerData?.selectronicmail,
-        phone: buyerData?.stelephone,
+      buyerInfo: { 
+        name: currentBuyerData.scostumername,
+        docType: currentBuyerData.wdoctype,
+        sdocno: currentBuyerData.sdocno,
+        email: currentBuyerData.selectronicmail,
+        phone: currentBuyerData.stelephone,
       },
     };
-  
+
     try {
-      console.log("Datos completos de la reserva:", bookingData);
       const createResponse = await dispatch(createBooking(bookingData));
-      if (!createResponse.success) {
-        toast.error('Error al confirmar la reserva: ' + createResponse.message);
+      if (!createResponse || !createResponse.success) {
+        toast.error('Error al confirmar la reserva: ' + (createResponse?.message || 'Error desconocido'));
         return;
       }
-      // Se asume que se retorna createResponse.data.booking.bookingId
-      const bookingId = createResponse.data.booking.bookingId;
-      // Preparar payload para actualizar el pago online
+      
+      const bookingId = createResponse.data.booking.bookingId; 
+      
       const paymentPayload = {
         bookingId,
-        amount: transaction.amountInCents ? transaction.amountInCents / 100 : totalAmount,
+        amount: amountToPay, 
         transactionId: transaction.id,
         paymentReference: transaction.reference,
-        paymentMethod: "credit_card", // o "wompi" según corresponda
+        paymentMethod: transaction.payment_method_type || "credit_card",
+        status: transaction.status,
       };
-      console.log("Enviando actualización de pago online:", paymentPayload);
-      const updateResponse = await dispatch(updateOnlinePayment(paymentPayload));
-      if (updateResponse.success) {
-        toast.success("Pago online registrado y reserva actualizada exitosamente");
-        if (createResponse.data.trackingLink) {
-          window.open(createResponse.data.trackingLink, '_blank');
-        }
-        navigate(`/booking-confirmation/${bookingId}`);
-      } else {
-        toast.error("Error al actualizar el pago online: " + updateResponse.message);
+      
+      // await dispatch(updateOnlinePayment(paymentPayload));
+
+      toast.success("Reserva confirmada y pago registrado exitosamente.");
+      if (createResponse.data.trackingLink) { 
+          // window.open(createResponse.data.trackingLink, '_blank');
       }
-      toast.success(
-        <div>
-          <p>¡Pago exitoso!</p>
-          <p>Referencia: {transaction.reference}</p>
-          <p>
-            Tarjeta: {transaction.paymentMethod?.extra?.brand}-{transaction.paymentMethod?.extra?.lastFour}
-          </p>
-        </div>,
-        { autoClose: 5000 }
-      );
+      navigate(`/booking-confirmation/${bookingId}`); 
+
     } catch (error) {
-      console.error("Error en el flujo de reserva/pago:", error);
-      toast.error("Error al procesar la reserva y el pago online");
+      console.error("Error al procesar la reserva y el pago online:", error);
+      toast.error("Error al procesar la reserva y el pago online. Intente de nuevo.");
     }
   };
 
-  // Funciones de utilidad
-  const getServiceIcon = (serviceName) => {
-    switch (serviceName.toLowerCase()) {
-      case "wifi":
-        return faWifi;
-      case "parking":
-        return faParking;
-      case "tv":
-        return faTv;
-      case "aire acondicionado":
-        return faFan;
-      case "ventilador":
-        return faFan;
-      case "desayuno":
-        return faUtensils;
-      default:
-        return faUser;
-    }
-  };
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat("es-AR", {
-      style: "currency",
-      currency: "ARS",
-    }).format(price);
-  };
-
-  const formatDate = (date) => {
-    return format(date, "dd-MM-yyyy", { locale: es });
-  };
-
-
-  useEffect(() => {
-    if (buyerRedux && !buyerData) {
-      setBuyerData(buyerRedux);
-      setIsBookingReady(true);
-    }
-  }, [buyerRedux, buyerData]);
-
-  // ...
-return (
-  <div className="container mx-auto p-4 grid grid-cols-1 md:grid-cols-4 gap-6 bg-stone-500 text-white min-h-screen">
-    {/* Formulario de Búsqueda */}
-    <div className="col-span-1 bg-gray-800 p-6 rounded-xl shadow-lg">
-      <h1 className="text-2xl font-bold mb-4">Buscar Habitaciones</h1>
-      <label className="block mb-2">Desde</label>
-      <DatePicker
-        selected={checkIn}
-        onChange={handleCheckInChange}
-        minDate={today}
-        className="w-full p-2 rounded-lg bg-gray-700"
-        dateFormat="dd-MM-yyyy"
-        locale={es}
-      />
-      <label className="block mt-4 mb-2">Hasta</label>
-      <DatePicker
-        selected={checkOut}
-        onChange={handleCheckOutChange}
-        minDate={new Date(checkIn.getTime() + 86400000)}
-        className="w-full p-2 rounded-lg bg-gray-700"
-        dateFormat="dd-MM-yyyy"
-        locale={es}
-      />
-      <label className="block mt-4 mb-2">Tipo de Habitación</label>
-      <select
-        value={roomType}
-        onChange={(e) => {
-          setRoomType(e.target.value);
-          console.log("Tipo seleccionado:", e.target.value);
-          dispatch(checkAvailability({ checkIn, checkOut, roomType: e.target.value }));
-        }}
-        className="w-full p-2 rounded-lg bg-gray-700"
-      >
-        <option value="">Todos los tipos</option>
-        {ROOM_TYPES.map((type) => (
-          <option key={type} value={type}>{type}</option>
-        ))}
-      </select>
-      <button
-        onClick={handleSearch}
-        className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold"
-      >
-        Buscar
-      </button>
-    </div>
-
-    {/* Listado de Habitaciones Disponibles */}
-    <div className="col-span-3">
-      {loading && <p>Cargando habitaciones...</p>}
-      {error && <p>Error: {error}</p>}
-      {!loading && (!availability || availability.length === 0) && (
-        <p>No hay habitaciones disponibles para las fechas y tipo seleccionado.</p>
-      )}
-      {/* Se muestra el listado solo si no se ha seleccionado una habitación */}
-      {!selectedRoom && availability && availability.length > 0 && (
-        <div>
-          <h2 className="text-xl font-bold mb-4">Habitaciones Disponibles</h2>
-          <div className="space-y-6">
-            {availability.map((room) => (
-              <div key={room.roomNumber} className="bg-gray-800 p-6 rounded-xl flex flex-col md:flex-row items-center shadow-lg">
-                <img 
-                  src={room.image_url[0]} 
-                  alt={`Habitación ${room.roomNumber}`} 
-                  className="w-32 h-32 object-cover rounded-lg mb-4 md:mb-0 md:mr-6" 
-                />
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold mb-2">{room.type}</h3>
-                  <p className="text-gray-400 mb-2">{room.description}</p>
-                  <ul className="space-y-2">
-                    {room.Services && room.Services.map((service, index) => (
-                      <li key={index} className="flex text-white items-center space-x-2">
-                        <FontAwesomeIcon icon={getServiceIcon(service.name)} />
-                        <span>{service.name}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-2xl font-bold text-yellow-400">{formatPrice(room.price)}</p>
-                </div>
-                <div className="mt-4 md:mt-0 md:ml-6">
-                  <button
-                    onClick={() => {
-                      console.log("Seleccionando habitación:", room);
-                      handleReserve(room);
-                    }}
-                    className="mt-4 w-full p-3 bg-stone-500 hover:bg-Hover rounded-full font-bold"
-                  >
-                    Seleccionar
-                  </button>
-                </div>
-              </div>
-            ))}
+  return (
+    <div className="container mx-auto p-4 max-w-3xl">
+      {/* Paso 1: Selección de habitación y fechas */}
+      {step === 1 && (
+        <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
+          <h1 className="text-2xl font-bold mb-4">Reservar Habitación</h1>
+          <div className="mb-4">
+            <label className="block mb-2">Desde</label>
+            <DatePicker
+              selected={checkIn}
+              onChange={(date) => setCheckIn(date)}
+              minDate={new Date()}
+              className="w-full p-2 rounded-lg bg-gray-700 text-white"
+              dateFormat="dd-MM-yyyy"
+              locale={es}
+            />
+            <label className="block mt-4 mb-2">Hasta</label>
+            <DatePicker
+              selected={checkOut}
+              onChange={(date) => setCheckOut(date)}
+              minDate={new Date(new Date(checkIn).getTime() + 86400000)} 
+              className="w-full p-2 rounded-lg bg-gray-700 text-white"
+              dateFormat="dd-MM-yyyy"
+              locale={es}
+            />
+            <label className="block mt-4 mb-2">Tipo de Habitación</label>
+            <select
+              value={roomType}
+              onChange={(e) => setRoomType(e.target.value)}
+              className="w-full p-2 rounded-lg bg-gray-700 text-white"
+            >
+              <option value="">Todos los tipos</option>
+              {ROOM_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleSearch}
+              className="mt-4 w-full p-3 bg-stone-500 hover:bg-stone-600 rounded-full font-bold"
+            >
+              Buscar Disponibilidad
+            </button>
           </div>
+           {availabilityLoading && <p className="text-center">Cargando habitaciones...</p>}
+          {availabilityError && <p className="text-center text-red-400">Error: {typeof availabilityError === 'string' ? availabilityError : (availabilityError.message || 'Error al buscar habitaciones')}</p>}
+          {availability && availability.length > 0 && !availabilityLoading && (
+            <div>
+              <h2 className="text-xl font-bold mb-4">Habitaciones Disponibles</h2>
+              <div className="space-y-6">
+                {availability.map((room) => (
+                  <div key={room.roomNumber} className="bg-gray-700 p-4 rounded-lg flex flex-col md:flex-row items-center">
+                    <img
+                      src={room.image_url && room.image_url[0] ? room.image_url[0] : 'https://via.placeholder.com/100'}
+                      alt={`Habitación ${room.roomNumber}`}
+                      className="w-full md:w-32 h-32 object-cover rounded-lg mb-4 md:mb-0 md:mr-6"
+                    />
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold mb-2">{room.type} - Habitación {room.roomNumber}</h3>
+                      <p className="text-gray-300 mb-2">{room.description}</p>
+                      <p className="text-xl font-bold text-yellow-400">Capacidad: {room.maxGuests} personas</p>
+                       <p className="text-lg font-semibold text-green-400">Precio por noche: {new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(room.price)}</p>
+                    </div>
+                    <div className="mt-4 md:mt-0 md:ml-6">
+                      <button
+                        onClick={() => handleSelectRoom(room)}
+                        className="w-full p-2 bg-stone-500 hover:bg-stone-600 rounded-full font-bold"
+                      >
+                        Seleccionar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+           {availability && availability.length === 0 && !availabilityLoading && (
+             <p className="text-center text-yellow-400 mt-4">No hay habitaciones disponibles para las fechas o tipo seleccionado.</p>
+           )}
         </div>
       )}
-    </div>
 
-    {/* Sección de Registro y Confirmación de Reserva (sólo si ya se ha seleccionado una habitación) */}
-    {showRegistration && selectedRoom && (
-        <div className="col-span-1 md:col-span-4 flex flex-col md:flex-row gap-6">
-          <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
-            <h2 className="text-xl font-bold mb-4">Registro de Usuario</h2>
-            {/* Se pasa initialBuyerData para precargar si ya existe */}
-            <ParentBuyerRegistration 
-              initialBuyerData={buyerRedux}
-              onComplete={handleBuyerDataComplete} 
-            />
-          </div>
-        <div className="bg-gray-800 p-6 rounded-xl shadow-lg w-full md:w-1/2">
-          <h2 className="text-xl font-bold mb-4">Confirmar Reserva</h2>
-          <p className="mb-2">Habitación: {selectedRoom.type}</p>
-          <p className="mb-2">Desde: {formatDate(checkIn)}</p>
-          <p className="mb-2">Hasta: {formatDate(checkOut)}</p>
-          {/* Controles para elegir pasajeros */}
-          <div className="flex space-x-4 mb-2">
+      {step === 2 && selectedRoom && (
+        <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
+          <h2 className="text-xl font-bold mb-4">Selecciona la cantidad de pasajeros</h2>
+          <div className="flex space-x-4 mb-4">
             <div>
-              <label className="block text-sm">Adultos</label>
+              <label className="block text-sm">Adultos (Máx. {maxCapacity})</label>
               <select
                 value={adults}
-                onChange={(e) => handleAdultsChange(e, selectedRoom)}
-                className="w-16 p-2 rounded-lg bg-gray-700"
+                onChange={(e) => setAdults(Number(e.target.value))}
+                className="w-full p-2 rounded-lg bg-gray-700 text-white"
               >
-                {[...Array(selectedRoom.maxGuests)].map((_, index) => (
-                  <option key={index} value={index + 1}>
-                    {index + 1}
-                  </option>
+                {[...Array(maxCapacity + 1)].map((_, index) => (
+                  <option key={`adult-${index}`} value={index}>{index}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm">Niños</label>
+              <label className="block text-sm">Niños (Máx. {maxCapacity - adults})</label>
               <select
                 value={children}
-                onChange={(e) => handleChildrenChange(e, selectedRoom)}
-                className="w-16 p-2 rounded-lg bg-gray-700"
+                onChange={(e) => setChildren(Number(e.target.value))}
+                className="w-full p-2 rounded-lg bg-gray-700 text-white"
+                disabled={(maxCapacity - adults) < 0}
               >
-                {[...Array(Math.max(0, selectedRoom.maxGuests - adults + 1))].map((_, index) => (
-                  <option key={index} value={index}>
-                    {index}
-                  </option>
+                {[...Array(Math.max(0, maxCapacity - adults) + 1)].map((_, index) => (
+                  <option key={`child-${index}`} value={index}>{index}</option>
                 ))}
               </select>
             </div>
           </div>
-          <p className="mb-2">Total: {formatPrice(bookingTotal)}</p>
+          <div className="mb-4">
+            <p>Habitación: <b>{selectedRoom.type} - {selectedRoom.roomNumber}</b></p>
+            <p>Desde: <b>{format(checkIn, "dd-MM-yyyy", { locale: es })}</b></p>
+            <p>Hasta: <b>{format(checkOut, "dd-MM-yyyy", { locale: es })}</b></p>
+            <p>Noches: <b>{differenceInDays(checkOut, checkIn)}</b></p>
+            <p>
+              Total Estimado: <b>
+                {new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(
+                  (() => {
+                    const totalGuests = adults + children;
+                    if (totalGuests === 0) return 0;
+                    let pricePerPerson;
+                     if (totalGuests <= 2) pricePerPerson = 70000;
+                    else if (totalGuests === 3) pricePerPerson = 60000;
+                    else pricePerPerson = 50000;
+                    const nights = differenceInDays(checkOut, checkIn);
+                    return pricePerPerson * totalGuests * nights;
+                  })()
+                )}
+              </b>
+            </p>
+          </div>
+          <div className="flex gap-4">
+            <button
+              onClick={() => setStep(1)}
+              className="w-full p-2 bg-gray-500 hover:bg-gray-600 rounded-full font-bold"
+            >
+              Volver
+            </button>
+            <button
+              onClick={handleContinuePassengers}
+              className="w-full p-2 bg-stone-500 hover:bg-stone-600 rounded-full font-bold"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
+          <h2 className="text-xl font-bold mb-4">Datos del Huésped Principal</h2>
+          <div className="mb-4">
+            <label className="block text-sm font-semibold mb-1">Documento del huésped</label>
+            <input
+              type="text"
+              value={buyerSdocnoInput}
+              onChange={e => setBuyerSdocnoInput(e.target.value)}
+              className="w-full p-2 rounded-lg bg-gray-700 text-white border border-gray-600"
+              placeholder="Ingrese documento y verifique"
+              disabled={buyerLoading} 
+            />
+            <button
+              onClick={handleVerifyOrRegisterBuyer}
+              className="mt-4 w-full p-3 bg-stone-500 hover:bg-stone-600 rounded-full font-bold"
+              disabled={buyerLoading} 
+            >
+              {buyerLoading ? 'Verificando...' : 'Verificar / Registrar Huésped'}
+            </button>
+            {buyerLoading && <p className="text-yellow-400 mt-2 text-center">Buscando huésped...</p>}
+            {currentBuyerData && !showBuyerPopup && !buyerLoading && (
+                <p className="text-green-400 mt-2">Huésped: {currentBuyerData.scostumername} ({currentBuyerData.sdocno})</p>
+            )}
+          </div>
+           <button
+              onClick={() => setStep(2)}
+              className="w-full p-2 bg-gray-500 hover:bg-gray-600 rounded-full font-bold mt-4"
+              disabled={buyerLoading}
+            >
+              Volver a Pasajeros
+            </button>
+        </div>
+      )}
+
+     <BuyerRegistrationFormPopup
+        isOpen={showBuyerPopup}
+        onClose={() => {
+            setShowBuyerPopup(false);
+            // Opcional: Considerar limpiar lastSearchedSdocno si el usuario cierra el popup
+            // setLastSearchedSdocno(''); 
+        }}
+        onBuyerRegistered={handleBuyerRegistered}
+        initialSdocno={buyerSdocnoInput} // Podría ser lastSearchedSdocno si quieres que el popup se llene con lo que se buscó
+    />
+      {step === 4 && currentBuyerData && (
+        <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
+          <h2 className="text-xl font-bold mb-4">Resumen y Pago</h2>
+          <p>Habitación: <b>{selectedRoom.type} - {selectedRoom.roomNumber}</b></p>
+          <p>Desde: <b>{format(checkIn, "dd-MM-yyyy", { locale: es })}</b> Hasta: <b>{format(checkOut, "dd-MM-yyyy", { locale: es })}</b> ({differenceInDays(checkOut, checkIn)} noches)</p>
+          <p>Adultos: <b>{adults}</b> | Niños: <b>{children}</b> (Total: {adults+children} huéspedes)</p>
+          <p>Huésped Principal: <b>{currentBuyerData.scostumername} ({currentBuyerData.sdocno})</b></p>
+          <p className="text-2xl font-bold text-yellow-400">Total Reserva: <b>{new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(bookingTotal)}</b></p>
+          <div className="my-4">
+            <label className="block text-sm font-semibold mb-1">Opción de Pago:</label>
+            <select
+              value={paymentOption}
+              onChange={e => setPaymentOption(e.target.value)}
+              className="w-full p-2 rounded-lg bg-gray-700 text-white border border-gray-600"
+            >
+              <option value="total">Pagar Total ({new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(bookingTotal)})</option>
+              <option value="mitad">Pagar 50% ({new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(Math.round(bookingTotal / 2))})</option>
+            </select>
+          </div>
+          <p className="text-xl font-semibold mb-4">Monto a Pagar Ahora: {new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(amountToPay)}</p>
           <WompiPayment
-            booking={{
-              bookingId: selectedRoom.roomNumber,
-              totalAmount: bookingTotal,
+            booking={{ 
+              bookingId: `reserva-${selectedRoom.roomNumber}-${Date.now()}`, 
+              totalAmount: amountToPay, 
+              currency: "COP", 
+              customer_email: currentBuyerData.selectronicmail, 
             }}
-            onPaymentComplete={handleWompiPaymentSuccess}
+            onPaymentComplete={handlePaymentSuccess}
           />
           <button
-            onClick={() => {
-              // Permitir volver al listado de habitaciones para cambiar la selección
-              setSelectedRoom(null);
-              setShowRegistration(false);
-            }}
-            className="mt-4 w-full p-3 bg-red-500 hover:bg-red-600 rounded-full font-bold"
+            onClick={() => setStep(3)}
+            className="mt-4 w-full p-2 bg-gray-500 hover:bg-gray-600 rounded-full font-bold"
           >
-            Cambiar habitación
+            Volver a Datos del Huésped
           </button>
         </div>
-      </div>
-    )}
-  </div>
-);
-}
+      )}
+    </div>
+  );
+};
+
 export default Booking;

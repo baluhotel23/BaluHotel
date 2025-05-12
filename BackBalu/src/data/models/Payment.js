@@ -11,40 +11,58 @@ module.exports = (sequelize) => {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'bookings',
-        key: 'bookingId'
-      }
+        model: "Bookings",
+        key: "bookingId",
+      },
     },
     amount: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
     },
     paymentMethod: {
-      type: DataTypes.ENUM(['cash', 'credit_card', 'debit_card', 'wompi', 'transfer']),
+      type: DataTypes.ENUM(
+        "credit_card",
+        "debit_card",
+        "cash",
+        "transfer",
+        "wompi",
+        "wompi_checkout"
+      ),
       allowNull: false,
     },
     paymentStatus: {
-      type: DataTypes.ENUM(['pending', 'completed', 'failed', 'refunded']),
-      defaultValue: 'pending',
-    },
-    transactionId: {
-      type: DataTypes.STRING,
+      type: DataTypes.ENUM("pending", "completed", "failed", "refunded"),
+      allowNull: false,
+      defaultValue: "pending",
     },
     paymentDate: {
       type: DataTypes.DATE,
+      allowNull: false,
       defaultValue: DataTypes.NOW,
     },
-    paymentType: {
-      type: DataTypes.ENUM(['full', 'partial', 'online']), // Added 'online' as a valid value
-      allowNull: false,
+    transactionId: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
     paymentReference: {
       type: DataTypes.STRING,
-      allowNull: true
-    }
+      allowNull: true,
+    },
+    paymentType: {
+      type: DataTypes.ENUM("full", "partial", "online"),
+      allowNull: true,
+    },
+    processedBy: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      references: {
+        model: "Users", // Cambia a 'users' si tu tabla se llama así
+        key: "n_document",
+      },
+    },
   }, {
-    tableName: 'payments',
-    timestamps: true
+   
+    timestamps: true,      // <-- AQUÍ, fuera del objeto de atributos
   });
   return Payment;
 };

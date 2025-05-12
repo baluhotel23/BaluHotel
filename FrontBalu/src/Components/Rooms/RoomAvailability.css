@@ -1,4 +1,4 @@
-.room-availability-container {
+/* .room-availability-container {
     padding: 10px;
     background-color: #f5f5f5;
     color: #333;
@@ -82,12 +82,63 @@
   }
   .bg-boton {
     width: 100%; /* El botón ocupa todo el ancho del contenedor */
-  }
+  
   
   .error-message {
     color: red;
     text-align: center;
     font-size: 1.2rem;
+  } */
+
+  .calendar-compact-container .react-calendar {
+    width: 100% !important; /* Force width */
+    max-width: 180px !important; /* Max width to prevent excessive growth */
+    font-size: 8px !important; /* Drastically reduce font size */
+    line-height: 1.1 !important;
+    border: none !important; /* Remove default border */
+    background-color: transparent !important; /* Use card background */
+    margin: 0 auto; /* Center if container is wider */
   }
+  
+  .calendar-compact-container .react-calendar__tile {
+    padding: 2px 1px !important; /* Reduce tile padding */
+    margin: 1px !important; /* Reduce tile margin */
+    height: 18px !important; /* Fixed small height */
+    flex-basis: 13% !important; /* Adjust flex basis */
+    max-width: none !important; /* Override default max-width */
+  }
+  
+  .calendar-compact-container .react-calendar__month-view__weekdays__weekday {
+    padding: 1px !important;
+    font-size: 7px !important; /* Smaller weekdays */
+    font-weight: normal !important;
+    text-align: center !important;
+    text-transform: uppercase;
+  }
+  
+  .calendar-compact-container .react-calendar__month-view__days__day--neighboringMonth {
+    color: #d1d5db !important; /* Lighter color for neighboring month days */
+    background-color: transparent !important;
+  }
+  
+  /* Hide navigation elements if not already done by props */
+  .calendar-compact-container .react-calendar__navigation {
+    display: none !important;
+  }
+  
+  /* Adjust tile colors if Tailwind classes aren't specific enough */
+  .calendar-compact-container .react-calendar__tile--now {
+    background: #a5f3fc !important; /* Example: Light cyan for today */
+    font-weight: bold;
+  }
+  
+  /* Ensure Tailwind background colors override default tile background */
+  .calendar-compact-container .react-calendar__tile[class*="bg-"] {
+      background-color: inherit !important; /* Let Tailwind class control background */
+  }
+  .calendar-compact-container .react-calendar__tile[class*="text-"] {
+      color: inherit !important; /* Let Tailwind class control text color */
+  }
+  
 
 

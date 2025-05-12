@@ -48,6 +48,17 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
+        {(user.role === 'owner' || user.role === 'admin' || user.role === 'recept') && (
+          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+            <h2 className="text-xl font-semibold mb-2"> Check In</h2>
+            <p className="text-gray-600 mb-4">CkeckList antes del checkIn</p>
+            <Link to="/admin/CheckIn">
+            <button className="bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded">
+              CHECK IN
+            </button>
+            </Link>
+          </div>
+        )}
                {(user.role === 'owner' || user.role === 'admin') && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">LISTAR HABITACIONES</h2>
@@ -84,11 +95,11 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-         {(user.role === 'owner' || user.role === 'admin') && (
+         {(user.role === 'owner' || user.role === 'recept') && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">DISPONIBILIDAD</h2>
             <p className="text-gray-600 mb-4">DISPONIBILIDAD</p>
-            <Link to="/bookings/availability">
+            <Link to="/admin/localBooking">
               <button className=" bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded">
                 DISPONIBILIDAD
               </button>

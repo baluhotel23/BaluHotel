@@ -1,4 +1,4 @@
-const { Room, Service, BasicInventory  } = require('../data'); // Asegúrate de que estos modelos estén correctamente exportados
+const { Room,RoomCheckIn, RoomBasics, Booking, Payment, BasicInventory, Service  } = require('../data'); // Asegúrate de que estos modelos estén correctamente exportados
 const { Op } = require("sequelize");
 
 // Obtener todas las habitaciones
@@ -521,6 +521,41 @@ const getSpecialOffers = async (req, res, next) => {
   }
 };
 
+const getRoomPreparationStatus = async (req, res) => {
+  try {
+    const { roomNumber } = req.params;
+    const room = await Room.findOne({
+  where: { roomNumber },
+  include: [
+    { model: Service, attributes: ['name'] },
+    { model: RoomCheckIn, as: 'preparation' },
+    {
+      model: BasicInventory,
+      attributes: ['id', 'name'],
+      through: { attributes: ['quantity'] }, // Aquí accedes a RoomBasics
+    },
+  ]
+});
+
+    if (!room) {
+      return res.status(404).json({ error: true, message: 'Habitación no encontrada' });
+    }
+
+    res.json({
+      error: false,
+      data: {
+        roomNumber: room.roomNumber,
+        status: room.status,
+        services: room.Services,
+        lastPreparation: room.preparation || null, // <-- Usa el alias aquí
+        basics: room.RoomBasics
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: true, message: error.message });
+  }
+};
+
 
 module.exports = {
   getActivePromotions,
@@ -539,5 +574,6 @@ module.exports = {
   updateRoomServices,
   getOccupancyReport,
   getRevenueByRoomType,
+  getRoomPreparationStatus
   
 };

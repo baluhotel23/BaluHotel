@@ -102,19 +102,21 @@ const SellerForm = ({ jseller, setSeller }) => {
       // Actualizar datos existentes
       const success = await dispatch(updateSellerData(sellerData.sdocno, dataToSend));
       if (success) {
-        alert("Datos actualizados con éxito");
-        navigate("/panel");
+        alert("Datos actualizados con éxito"); // Este alert se muestra
+        navigate("/dashboard"); // Ahora debería navegar
       } else {
-        alert("Error al actualizar los datos");
+        // El toast de error ya se maneja en la acción, no es necesario otro alert aquí.
+        // alert("Error al actualizar los datos");
       }
     } else {
       // Crear nuevos datos
       const success = await dispatch(createSellerData(dataToSend));
-      if (success) {
-        alert("Datos creados con éxito");
-        navigate("/panel");
+      if (success) { // Con el cambio en la acción, success ahora será true o false
+        alert("Datos creados con éxito"); // Este alert se muestra
+        navigate("/dashboard"); // Ahora debería navegar
       } else {
-        alert("Error al crear los datos");
+        // El toast de error ya se maneja en la acción.
+        // alert("Error al crear los datos");
       }
     }
   };

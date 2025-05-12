@@ -15,7 +15,7 @@ const {getAllRooms,
     getRoomServices,
     updateRoomServices,
     getOccupancyReport,
-    getRevenueByRoomType} = require('../controllers/roomController');
+    getRevenueByRoomType, getRoomPreparationStatus} = require('../controllers/roomController');
 
 // Rutas públicas
 router.get('/', getAllRooms);
@@ -57,5 +57,6 @@ router.put('/:roomNumber/services', allowRoles(['owner', 'admin']), updateRoomSe
 // // Reportes
  router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyReport);
  router.get('/reports/revenue', allowRoles(['owner', 'admin']), getRevenueByRoomType);
+router.get('/reports/preparation-status/:roomNumber', allowRoles(['owner', 'admin']), getRoomPreparationStatus);
 
 module.exports = router;

@@ -70,7 +70,7 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-          model: 'bookings', // Nombre de la tabla en la base de datos
+          model: 'Bookings', // Nombre de la tabla en la base de datos
           key: 'bookingId',
         },
       },
@@ -84,7 +84,7 @@ module.exports = (sequelize) => {
       },
     },
     {
-      tableName: "RegistrationPasses",
+   
       timestamps: true,
     }
   );

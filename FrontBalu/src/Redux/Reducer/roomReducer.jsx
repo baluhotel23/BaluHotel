@@ -1,15 +1,16 @@
 const initialState = {
-    rooms: [],
-    roomTypes: [],
-    selectedRoom: null,
-    searchedRoom: null,
-    amenities: [],
-    services: [],
-    occupancyReport: null,
-    revenueReport: null,
-    loading: false,
-    error: null,
-  };
+  rooms: [],
+  roomTypes: [],
+  selectedRoom: null,
+  searchedRoom: null,
+  amenities: [],
+  services: [],
+  occupancyReport: null,
+  revenueReport: null,
+  roomsToPrepare: [], // <--- NUEVO ESTADO
+  loading: false,
+  error: null,
+};
   
   const roomReducer = (state = initialState, action) => {
     switch (action.type) {
@@ -149,6 +150,13 @@ const initialState = {
       case 'GET_REVENUE_REPORT_FAILURE':
         return { ...state, loading: false, error: action.payload };
   
+case 'GET_ROOMS_TO_PREPARE_REQUEST':
+  return { ...state, loading: true, error: null };
+case 'GET_ROOMS_TO_PREPARE_SUCCESS':
+  return { ...state, loading: false, roomsToPrepare: action.payload };
+case 'GET_ROOMS_TO_PREPARE_FAILURE':
+  return { ...state, loading: false, error: action.payload };
+
       default:
         return state;
     }

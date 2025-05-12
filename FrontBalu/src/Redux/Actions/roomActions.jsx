@@ -193,3 +193,16 @@ export const getRevenueByRoomType = () => async (dispatch) => {
     dispatch({ type: 'GET_REVENUE_REPORT_FAILURE', payload: errorMessage });
   }
 };
+
+export const getRoomsToPrepare = (date) => async (dispatch) => {
+  dispatch({ type: 'GET_ROOMS_TO_PREPARE_REQUEST' });
+  try {
+    const { data } = await api.get('/rooms/preparation-list', { params: { date } });
+    dispatch({ type: 'GET_ROOMS_TO_PREPARE_SUCCESS', payload: data.data });
+    return { success: true, data: data.data };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al obtener habitaciones a preparar';
+    dispatch({ type: 'GET_ROOMS_TO_PREPARE_FAILURE', payload: errorMessage });
+    return { success: false, error: errorMessage };
+  }
+};

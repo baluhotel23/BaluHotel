@@ -23,7 +23,7 @@ module.exports = (sequelize) => {
   }, {
     timestamps: true,
     paranoid: true,
-    tableName: 'PurchaseItems'
+   
   });
 
   return PurchaseItem;

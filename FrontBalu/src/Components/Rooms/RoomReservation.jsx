@@ -5,7 +5,7 @@ import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { format, differenceInDays, isValid } from "date-fns";
 import { toast } from "react-toastify";
-import ParentBuyerRegistration from "../Taxxa/ParentBuyerRegistration"; // Importar el componente de registro
+//import ParentBuyerRegistration from "../Taxxa/ParentBuyerRegistration"; // Importar el componente de registro
 import DashboardLayout from "../Dashboard/DashboardLayout";
 
 

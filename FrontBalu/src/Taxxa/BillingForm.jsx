@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchUserByDocument } from "../../Redux/Actions/taxxaActions";
+import { fetchUserByDocument } from "../../Redux/Actions/actions";
 import BuyerForm from "./BuyerForm";
 import UserRegistrationPopup from "./UserRegistrationPopup";
 import DocumentTypePopup from "./DocumentTypePopup"; // Importa el popup
 import { useNavigate } from "react-router-dom";
-import OrdenesPendientes from "./ReservasPendientes";
+import OrdenesPendientes from "./OrdenesPendientes";
 
 const BillingForm = () => {
   const navigate = useNavigate();
@@ -39,6 +39,10 @@ const BillingForm = () => {
         }
       }
     });
+
+    const handleSelectDocument = (selectedDocument) => {
+      setNDocument(selectedDocument); // Actualizar el estado con el documento seleccionado
+    };
 
   const handleProceedToDocument = () => {
     if (jbuyer.scostumername === "CONSUMIDOR FINAL") {
@@ -78,12 +82,14 @@ const BillingForm = () => {
         saddressline1,
         szip
       } = userTaxxa.userInfo;
-
-
+  
       setBuyer((prevBuyer) => ({
         ...prevBuyer,
         wlegalorganizationtype: wlegalorganizationtype || "person",
-        scostumername: scostumername || `${first_name} ${last_name}`.trim() || "Consumidor Final",
+        scostumername:
+          scostumername ||
+          `${first_name} ${last_name}`.trim() ||
+          "Consumidor Final",
         stributaryidentificationkey: stributaryidentificationkey || "01",
         stributaryidentificationname: "IVA",
         sfiscalresponsibilities: sfiscalresponsibilities || "R-99-PN",
@@ -99,11 +105,11 @@ const BillingForm = () => {
           stelephone: phone || "",
           jregistrationaddress: {
             scountrycode: "CO",
-            wdepartmentcode: wdepartmentcode || "",
-            wtowncode: wtowncode || "",
-            scityname: scityname || "",
-            saddressline1: saddressline1 || "",
-            szip: szip || ""
+            wdepartmentcode: wdepartmentcode || "50",
+            wtowncode: wtowncode || "50226",
+            scityname: scityname || "Cumaral",
+            saddressline1: saddressline1 || "12 # 17 -57",
+            szip: szip || "501021"
           }
         }
       }));
@@ -122,7 +128,11 @@ const BillingForm = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <div className="flex-1 bg-gray-900">
-      <OrdenesPendientes />
+      <OrdenesPendientes
+          filterType="facturablesPendientes"
+          mode="billingForm"
+          onSelectOrder={handleSelectDocument} // Pasar la función de callback
+        />
     </div>
 
       <div className="p-6 max-w-lg mx-auto pt-16 grid-cols-4">

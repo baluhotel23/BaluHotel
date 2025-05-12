@@ -43,7 +43,7 @@ module.exports = (sequelize) => {
   }, {
     timestamps: true,
     paranoid: false,
-    tableName: 'BasicInventories'
+    
   });
 
   return BasicInventory;

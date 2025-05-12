@@ -52,19 +52,35 @@ const createBuyer = async (req, res, next) => {
 const getBuyerByDocument = async (req, res, next) => {
   try {
     const { sdocno } = req.params;
+    console.log('Backend: Buscando Buyer con sdocno (desde req.params):', sdocno); // Log del sdocno recibido
+
+    if (!sdocno) {
+      console.log('Backend: sdocno no proporcionado en los parámetros de la ruta.');
+      return res.status(400).json({
+        error: true,
+        message: 'Número de documento (sdocno) no proporcionado.',
+      });
+    }
+
     const buyer = await Buyer.findOne({ where: { sdocno } });
+    console.log('Backend: Resultado de Buyer.findOne:', buyer); // Log del resultado de la consulta
+
     if (!buyer) {
+      console.log('Backend: Comprador no encontrado en la base de datos para sdocno:', sdocno);
       return res.status(404).json({
         error: true,
         message: 'Comprador no encontrado',
       });
     }
+
+    console.log('Backend: Comprador encontrado:', buyer.toJSON()); // Log del comprador encontrado (usando .toJSON() para una mejor visualización)
     return res.status(200).json({
       error: false,
       message: 'Comprador encontrado',
       data: buyer,
     });
   } catch (error) {
+    console.error('Backend: Error en getBuyerByDocument:', error); // Log del error capturado
     next(error);
   }
 };
