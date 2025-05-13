@@ -8,46 +8,38 @@ module.exports = async (req, res) => {
     // Verifica si el evento es una actualización de la transacción
     if (event === 'transaction.updated') {
       const transaction = data.transaction;
-      const paymentReference = transaction.reference;
 
-      // Verificar la firma de integridad
-      const isValidSignature = verifyIntegritySignature(transaction, process.env.WOMPI_PUBLIC_KEY);
+      // Recalcular la firma basada en los campos que usaste al crear la firma
+      // Por ejemplo, suponiendo que usaste el id de la orden:
+      const calculatedSignature = crypto
+        .createHmac('sha256', SECRET_KEY)
+        .update(transaction.bookingId.toString())
+        .digest('hex');
 
-      if (!isValidSignature) {
-        console.error("Firma de integridad inválida");
-        return res.status(400).json({ error: 'Invalid integrity signature' });
+      // Compara la firma recibida (asegúrate de que en el payload venga 'signature') con la calculada
+      if (calculatedSignature !== transaction.signature) {
+        return res.status(400).json({ error: 'Integrity signature mismatch' });
       }
 
-      // Encuentra el pago en la base de datos usando el campo 'paymentReference'
-      const payment = await Payment.findOne({ where: { paymentReference: paymentReference } });
+      // Ahora, busca la orden basándote en el id de la orden (o en otro campo que hayas definido)
+      const booking = await Booking.findOne({ where: { bookingId: transaction.bookingId } });
 
-      if (!payment) {
-        return res.status(404).json({ error: 'Payment not found' });
+      if (!booking) {
+        return res.status(404).json({ error: 'Order not found' });
       }
 
-      // Actualiza el estado del pago basado en el estado de la transacción
+      // Actualiza el estado de la orden según el estado de la transacción
       if (transaction.status === 'APPROVED') {
-        payment.paymentStatus = 'completed'; // Cambia el estado a 'completed'
-
-        // Actualiza el estado de la reserva a "confirmed"
-        const booking = await Booking.findByPk(payment.bookingId);
-        if (booking) {
-          booking.status = 'confirmed';
-          await booking.save();
-        } else {
-          console.error("Reserva no encontrada al actualizar el estado");
-        }
+        booking.transaction_status = 'Aprobado';
       } else if (transaction.status === 'DECLINED') {
-        payment.paymentStatus = 'failed'; // Cambia el estado a 'failed'
+        booking.transaction_status = 'Rechazado';
       } else if (transaction.status === 'PENDING') {
-        payment.paymentStatus = 'pending'; // Cambia el estado a 'pending'
+        booking.transaction_status = 'Pendiente';
       }
 
-      // Guarda los cambios en la base de datos
-      await payment.save();
+      await booking.save();
 
-      // Responde a Wompi indicando que la notificación fue recibida y procesada correctamente
-      return res.status(200).json({ message: 'Payment updated' });
+      return res.status(200).json({ message: 'Order updated' });
     } else {
       return res.status(400).json({ error: 'Unknown event' });
     }
@@ -57,15 +49,5 @@ module.exports = async (req, res) => {
   }
 };
 
-function verifyIntegritySignature(transaction, publicKey) {
-  const message = transaction.status + transaction.amount_in_cents + transaction.reference;
-  const signature = transaction.signature;
-
-  const verifier = crypto.createVerify('SHA256');
-  verifier.update(message);
-
-  const isValid = verifier.verify(publicKey, signature, 'base64');
-  return isValid;
-}
 
 

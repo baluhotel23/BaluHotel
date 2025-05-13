@@ -206,3 +206,16 @@ export const getRoomsToPrepare = (date) => async (dispatch) => {
     return { success: false, error: errorMessage };
   }
 };
+
+export const getRoomBasics = (roomNumber) => async (dispatch) => {
+  dispatch({ type: 'GET_ROOM_BASICS_REQUEST' });
+  try {
+    const { data } = await api.get(`/rooms/basicos/${roomNumber}`);
+    dispatch({ type: 'GET_ROOM_BASICS_SUCCESS', payload: data.data });
+    return { error: false, data: data.data };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al obtener básicos de la habitación';
+    dispatch({ type: 'GET_ROOM_BASICS_FAILURE', payload: errorMessage });
+    return { error: true, message: errorMessage };
+  }
+};

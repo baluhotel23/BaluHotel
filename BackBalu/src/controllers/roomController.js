@@ -556,6 +556,37 @@ const getRoomPreparationStatus = async (req, res) => {
   }
 };
 
+const getRoomBasics = async (req, res, next) => {
+  try {
+    const { roomNumber } = req.params;
+    const room = await Room.findByPk(roomNumber, {
+      include: [
+        {
+          model: BasicInventory,
+          attributes: ['id', 'name', 'description'],
+          through: { attributes: ['quantity'] }
+        }
+      ]
+    });
+    if (!room) {
+      return res.status(404).json({ error: true, message: 'Habitación no encontrada' });
+    }
+    const basics = room.BasicInventories.map(basic => ({
+      id: basic.id,
+      name: basic.name,
+      description: basic.description,
+      quantity: basic.RoomBasics.quantity
+    }));
+    res.json({
+      error: false,
+      data: basics,
+      message: 'Básicos de la habitación recuperados exitosamente'
+    });
+  } catch (error) {
+    next(error);
+  }
+}; 
+
 
 module.exports = {
   getActivePromotions,
@@ -574,6 +605,6 @@ module.exports = {
   updateRoomServices,
   getOccupancyReport,
   getRevenueByRoomType,
-  getRoomPreparationStatus
-  
+  getRoomPreparationStatus,
+  getRoomBasics
 };

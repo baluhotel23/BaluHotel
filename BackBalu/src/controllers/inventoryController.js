@@ -1,4 +1,4 @@
-const { BasicInventory, Purchase, PurchaseItem } = require('../data');
+const { BasicInventory, Purchase, PurchaseItem, RoomCheckIn } = require('../data');
 const { CustomError } = require('../middleware/error');
 const { catchedAsync } = require('../utils/catchedAsync');
 

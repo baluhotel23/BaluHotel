@@ -45,7 +45,7 @@ router.post('/:bookingId/cancel', cancelBooking);
 // Rutas para clientes y staff
 router.post('/', validateBooking, createBooking);
 router.get('/user/my-bookings/:sdocno', getUserBookings);
-router.get('/:bookingId', getBookingById);
+
 
 // Middleware de staff para todas las rutas siguientes
 router.use(isStaff);

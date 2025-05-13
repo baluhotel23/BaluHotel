@@ -493,8 +493,8 @@ const getBookingById = async (req, res) => {
       { model: Room },
       { model: ExtraCharge },
       { model: Bill },
-      // Si necesitas incluir la información del comprador:
       { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername"] },
+      { model: Payment }, // <-- Agrega esta línea para incluir los pagos
     ],
   });
 
@@ -524,6 +524,7 @@ const getAllBookings = async (req, res) => {
     include: [
       { model: Room },
       { model: Buyer, as: "guest", attributes: ["sdocno"] },
+      { model: Payment },
     ],
     order: [["checkIn", "ASC"]],
   });
