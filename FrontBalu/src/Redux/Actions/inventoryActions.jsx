@@ -37,7 +37,7 @@ export const getLowStockItems = () => async (dispatch) => {
 
 export const getAllItems = () => async (dispatch) => {
   try {
-    const { data } = await api.get('/inventory/items');
+    const { data } = await api.get('/inventory/');
     dispatch({ type: 'GET_ALL_ITEMS', payload: data.data });
     return { success: true, data: data.data };
   } catch (error) {
@@ -48,7 +48,7 @@ export const getAllItems = () => async (dispatch) => {
 
 export const getItemById = (id) => async (dispatch) => {
   try {
-    const { data } = await api.get(`/inventory/items/${id}`);
+    const { data } = await api.get(`/inventory/${id}`);
     dispatch({ type: 'GET_ITEM', payload: data.data });
     return { success: true, data: data.data };
   } catch (error) {
@@ -59,7 +59,7 @@ export const getItemById = (id) => async (dispatch) => {
 
 export const createItem = (itemData) => async (dispatch) => {
   try {
-    const { data } = await api.post('/inventory/items', itemData);
+    const { data } = await api.post('/inventory/', itemData);
     dispatch({ type: 'CREATE_ITEM', payload: data.data });
     toast.success('Item creado exitosamente');
     return { success: true, data: data.data };
@@ -71,7 +71,7 @@ export const createItem = (itemData) => async (dispatch) => {
 
 export const updateItem = (id, itemData) => async (dispatch) => {
   try {
-    const { data } = await api.put(`/inventory/items/${id}`, itemData);
+    const { data } = await api.put(`/inventory/${id}`, itemData);
     dispatch({ type: 'UPDATE_ITEM', payload: data.data });
     toast.success('Item actualizado exitosamente');
     return { success: true, data: data.data };
@@ -83,7 +83,7 @@ export const updateItem = (id, itemData) => async (dispatch) => {
 
 export const deleteItem = (id) => async (dispatch) => {
   try {
-    const { data } = await api.delete(`/inventory/items/${id}`);
+    const { data } = await api.delete(`/inventory/${id}`);
     dispatch({ type: 'DELETE_ITEM', payload: id });
     toast.success('Item eliminado exitosamente');
     return { success: true, data: data.data };
@@ -96,7 +96,7 @@ export const deleteItem = (id) => async (dispatch) => {
 // Additional actions for stock management
 export const addStock = (id, quantity) => async (dispatch) => {
   try {
-    const { data } = await api.post(`/inventory/items/${id}/add-stock`, { quantity });
+    const { data } = await api.post(`/inventory/${id}/stock/add`, { quantity });
     dispatch({ type: 'ADD_STOCK', payload: data.data });
     toast.success('Stock añadido exitosamente');
     return { success: true, data: data.data };
@@ -108,7 +108,7 @@ export const addStock = (id, quantity) => async (dispatch) => {
 
 export const removeStock = (id, quantity) => async (dispatch) => {
   try {
-    const { data } = await api.post(`/inventory/items/${id}/remove-stock`, { quantity });
+    const { data } = await api.post(`/inventory/${id}/stock/remove`, { quantity });
     dispatch({ type: 'REMOVE_STOCK', payload: data.data });
     toast.success('Stock removido exitosamente');
     return { success: true, data: data.data };

@@ -50,22 +50,25 @@ export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
     dispatch({ type: 'CREATE_SELLER_REQUEST' });
   
     try {
-      const response = await api.put(`/admin/settings/hotel-settings`, sellerData); // Enviar directamente el objeto sellerData
+      const response = await api.put(`/admin/settings/hotel-settings`, sellerData);
       const data = response.data;
   
       if (response.status === 200) {
         dispatch({ type: 'CREATE_SELLER_SUCCESS', payload: data.data });
         toast.success('Datos del comercio creados correctamente.');
+        return true; // <--- AÑADIDO: Retornar true en caso de éxito
       } else {
         dispatch({
           type: 'CREATE_SELLER_FAILURE',
           payload: data.error || "Error al crear los datos del comercio",
         });
         toast.error(data.error || "Error al crear los datos del comercio.");
+        return false; // <--- AÑADIDO: Retornar false en caso de fallo
       }
     } catch (error) {
       dispatch({ type: 'CREATE_SELLER_FAILURE', payload: error.message });
       toast.error(error.message || "Ha ocurrido un error inesperado.");
+      return false; // <--- AÑADIDO: Retornar false en caso de excepción
     }
   };
   
@@ -73,22 +76,26 @@ export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
     dispatch({ type: 'UPDATE_SELLER_REQUEST' });
   
     try {
-      const response = await api.put(`/seller/${n_document}`, sellerData); // Enviar directamente el objeto sellerData
+      const response = await api.put(`/seller/${n_document}`, sellerData);
       const data = response.data;
   
       if (response.status === 200) {
         dispatch({ type: 'UPDATE_SELLER_SUCCESS', payload: data.data });
-        return true; // Retorna éxito
+        // Considera añadir un toast.success aquí también para consistencia si lo deseas
+        // toast.success('Datos del comercio actualizados correctamente.');
+        return true;
       } else {
         dispatch({
           type: 'UPDATE_SELLER_FAILURE',
           payload: data.error || "Error al actualizar los datos del comercio",
         });
-        return false; // Retorna fallo
+        toast.error(data.error || "Error al actualizar los datos del comercio."); // Ya tienes toast de error
+        return false;
       }
     } catch (error) {
       dispatch({ type: 'UPDATE_SELLER_FAILURE', payload: error.message });
-      return false; // Retorna fallo
+      toast.error(error.message || "Ha ocurrido un error inesperado."); // Ya tienes toast de error
+      return false;
     }
   };
   

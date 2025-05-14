@@ -73,7 +73,7 @@ router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyRep
  router.get('/reports/revenue', isOwner, getRevenueReport);
  router.get('/reports/inventory-usage', allowRoles(['owner', 'admin']), getInventoryUsageReport);
 router.get('/reports/combined', allowRoles(['owner', 'admin']),getCombinedReport);
-router.get("/paymentLocal", allowRoles(["owner", "admin", "recept"]), registerLocalPayment);
+router.post("/paymentLocal", allowRoles(["owner", "admin", "recept"]), registerLocalPayment);
 
 // Rutas para la gestión de servicios (solo owner y admin)
 router.post("/services", allowRoles(["owner", "admin"]), createService);

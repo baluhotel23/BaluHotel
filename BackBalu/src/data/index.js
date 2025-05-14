@@ -52,7 +52,7 @@ sequelize.models = Object.fromEntries(capsEntries);
 
 // En sequelize.models están todos los modelos importados como propiedades
 // Para relacionarlos hacemos un destructuring
-const { BasicInventory, ExtraCharge, Token, Buyer, Booking, Bill, Room, SellerData, Invoice, RoomBasics, User, Purchase, PurchaseItem, RoomCheckIn, Service, Payment} = sequelize.models;
+const { BasicInventory, ExtraCharge, Token, Buyer, Booking, Bill, Room, SellerData, Invoice, RoomBasics, User, Purchase, PurchaseItem, RoomCheckIn, Service, Payment, RegistrationPass } = sequelize.models;
 
 Room.belongsToMany(BasicInventory, { through: RoomBasics, foreignKey: 'roomNumber' });
 BasicInventory.belongsToMany(Room, { through: RoomBasics, foreignKey: 'basicId' });
@@ -78,16 +78,43 @@ BasicInventory.hasMany(ExtraCharge);
 Booking.hasOne(Bill);
 Bill.belongsTo(Booking);
 
-Purchase.hasMany(PurchaseItem);
-PurchaseItem.belongsTo(Purchase);
-PurchaseItem.belongsTo(BasicInventory);
-BasicInventory.hasMany(PurchaseItem);
+Purchase.hasMany(PurchaseItem, { foreignKey: 'purchaseId' }); // Asumiendo FK es purchaseId
+PurchaseItem.belongsTo(Purchase, { foreignKey: 'purchaseId' });
+PurchaseItem.belongsTo(BasicInventory, { foreignKey: 'basicId' }); // Asumiendo FK es basicId
+BasicInventory.hasMany(PurchaseItem, { foreignKey: 'basicId' });
 
 Room.belongsToMany(Service, { through: "RoomServices", foreignKey: "roomNumber" });
 Service.belongsToMany(Room, { through: "RoomServices", foreignKey: "serviceId" });
 
 Booking.hasMany(Payment, { foreignKey: 'bookingId' });
 Payment.belongsTo(Booking, { foreignKey: 'bookingId' });
+
+// --- NUEVA ASOCIACIÓN para Payment y User ---
+// Un Pago pertenece a un Usuario (el que lo procesó)
+Payment.belongsTo(User, {
+  foreignKey: 'processedBy', // La clave foránea en el modelo Payment
+  targetKey: 'n_document',   // La clave en el modelo User a la que processedBy hace referencia
+  as: 'processor'            // Alias para esta relación (opcional pero útil)
+});
+
+// Un Usuario puede haber procesado muchos Pagos
+User.hasMany(Payment, {
+  foreignKey: 'processedBy', // La clave foránea en el modelo Payment
+  sourceKey: 'n_document',   // La clave en el modelo User que se usa para la relación
+  as: 'processedPayments'    // Alias para esta relación (opcional pero útil)
+});
+// --- FIN DE NUEVA ASOCIACIÓN ---
+
+// Relación entre Room y RegistrationPass
+Room.hasMany(RegistrationPass, { foreignKey: 'roomNumber', sourceKey: 'roomNumber', as: 'registrationPasses' });
+RegistrationPass.belongsTo(Room, { foreignKey: 'roomNumber', targetKey: 'roomNumber', as: 'room' });
+
+// Relación entre Booking y RegistrationPass
+Booking.hasMany(RegistrationPass, { foreignKey: 'bookingId', sourceKey: 'bookingId', as: 'registrationPasses' });
+RegistrationPass.belongsTo(Booking, { foreignKey: 'bookingId', targetKey: 'bookingId', as: 'booking' });
+
+
+
 //---------------------------------------------------------------------------------//
 module.exports = {
   ...sequelize.models, // para poder importar los modelos así: const { Product, User } = require('./db.js');

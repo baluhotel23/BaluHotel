@@ -4,16 +4,23 @@ import { createRoom } from '../../Redux/Actions/roomActions';
 import { getAllServices } from '../../Redux/Actions/serviceActions';
 import DashboardLayout from './DashboardLayout';
 import { openCloudinaryWidget } from '../../cloudinaryConfig';
+import { getAllItems } from '../../Redux/Actions/inventoryActions';
 
 const CreateRoom = () => {
   const [images, setImages] = useState([]);
+  const [selectedAmenity, setSelectedAmenity] = useState("");
+  const [amenityQuantity, setAmenityQuantity] = useState(1);
+  const [roomAmenities, setRoomAmenities] = useState([]);
   const dispatch = useDispatch();
   const { loading, error } = useSelector(state => state.room);
   const { services } = useSelector(state => state.service);
-
+  const inventory = useSelector((state) => state.inventory.inventory || []);
   useEffect(() => {
     dispatch(getAllServices());
+    dispatch(getAllItems());
   }, [dispatch]);
+  
+  
 
   const handleWidget = () => {
     openCloudinaryWidget((uploadedImageUrl) => {
@@ -46,23 +53,65 @@ const CreateRoom = () => {
       });
     }
   };
-
+  const handleAddAmenity = () => {
+    if (!selectedAmenity || amenityQuantity <= 0) {
+      toast.error("Por favor, selecciona un amenity y una cantidad válida.");
+      return;
+    }
+  
+    const amenity = inventory.find((item) => item.id === selectedAmenity);
+    if (!amenity) {
+      toast.error("Amenity no encontrado.");
+      return;
+    }
+  
+    // Verificar si el amenity ya está en la lista
+    const existingAmenity = roomAmenities.find((item) => item.id === selectedAmenity);
+    if (existingAmenity) {
+      toast.error("Este amenity ya ha sido agregado.");
+      return;
+    }
+  
+    // Agregar el amenity al estado
+    setRoomAmenities((prev) => [
+      ...prev,
+      { id: selectedAmenity, name: amenity.name, quantity: amenityQuantity },
+    ]);
+  
+    // Reiniciar los campos de selección
+    setSelectedAmenity("");
+    setAmenityQuantity(1);
+  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await dispatch(createRoom({ ...formData, image_url: images }));
-      setFormData({
-        roomNumber: '',
-        price: '',
-        services: [],
-        type: '',
-        description: '',
-        maxGuests: 1,
-        image_url: []
-      });
-      setImages([]);
+      const response = await dispatch(
+        createRoom({
+          ...formData,
+          image_url: images,
+          basicInventories: roomAmenities, // Enviar los amenities seleccionados
+        })
+      );
+  
+      if (response.success) {
+        toast.success("Habitación creada correctamente.");
+        setFormData({
+          roomNumber: "",
+          price: "",
+          services: [],
+          type: "",
+          description: "",
+          maxGuests: 1,
+          image_url: [],
+        });
+        setImages([]);
+        setRoomAmenities([]);
+      } else {
+        toast.error(response.error);
+      }
     } catch (error) {
-      console.error('Error creating room:', error);
+      console.error("Error creando la habitación:", error);
+      toast.error("Error al crear la habitación.");
     }
   };
 
@@ -180,6 +229,63 @@ const CreateRoom = () => {
             />
           </div>
         </div>
+        {/* Amenities */}
+        <div className="bg-white p-4 rounded-lg shadow-md">
+          <h4 className="text-md font-bold">Agregar Amenities</h4>
+          <div className="flex items-center space-x-4">
+            <select
+              value={selectedAmenity}
+              onChange={(e) => setSelectedAmenity(e.target.value)}
+              className="w-full px-3 py-2 border rounded"
+            >
+              <option value="">Selecciona un amenity</option>
+              {inventory.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} (Stock: {item.currentStock})
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              placeholder="Cantidad"
+              value={amenityQuantity}
+              onChange={(e) => setAmenityQuantity(Number(e.target.value))}
+              className="w-20 px-3 py-2 border rounded"
+            />
+            <button
+              type="button"
+              onClick={handleAddAmenity}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            >
+              Agregar
+            </button>
+          </div>
+        </div>
+          {/* Lista de Amenities Seleccionados */}
+          <div className="mt-4">
+  <h4 className="text-md font-bold">Amenities Seleccionados</h4>
+  {roomAmenities.length > 0 ? (
+    <ul className="list-disc pl-5">
+      {roomAmenities.map((amenity, index) => (
+        <li key={index}>
+          {amenity.name} - Cantidad: {amenity.quantity}
+          <button
+            type="button"
+            onClick={() => {
+              // Eliminar el amenity de la lista
+              setRoomAmenities((prev) => prev.filter((item) => item.id !== amenity.id));
+            }}
+            className="ml-2 text-red-500 hover:underline"
+          >
+            Eliminar
+          </button>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p className="text-gray-500">No hay amenities seleccionados.</p>
+  )}
+</div>
 
         <div className="bg-white p-4 rounded-lg shadow-md">
           

@@ -21,12 +21,20 @@ import RoomList from './Components/Dashboard/RoomList';
 import Navbar from './Components/Navbar';
 import RoomDetail from './Components/Rooms/RoomDetail';
 import Booking from './Components/Booking/Booking';
-import BookingsPendientes from './Components/Taxxa/BookingsPendientes';
-import BuyerRegistrationForm from './Components/Taxxa/BuyerRegistrationForm';
-import ParentBuyerRegistration from './Components/Taxxa/ParentBuyerRegistration';
+import CheckIn from './Components/CheckIn-CheckOut/CheckIn';
+//import BookingsPendientes from './Components/Taxxa/BookingsPendientes';
+//import BuyerRegistrationForm from './Components/Taxxa/BuyerRegistrationForm';
+//import ParentBuyerRegistration from './Components/Taxxa/ParentBuyerRegistration';
 import BookingStatusPage from './Components/Booking/BookingStatusPage';
 import RoomAvailability from './Components/Rooms/RoomAvailability';
 import HotelSetting from './Components/Dashboard/HotelSetting';
+import CreateItems from './Components/Dashboard/CreateItems';
+import ManageItems from './Components/Dashboard/ManageItems';
+import RegistrationPass from './Components/Dashboard/Registration';
+import RoomDetailCheck from './Components/Dashboard/RoomDetailCheck';
+import LocalBookingForm from './Components/Booking/LocalBookingForm';
+import CheckOut from './Components/CheckOut/CheckOut';
+
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -84,8 +92,8 @@ const AppContent = () => {
           <Route path="/room/:roomNumber" element={<RoomDetail />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/buyerForm" element={<BuyerRegistrationForm />} />
-          <Route path="/registro-comprador" element={<ParentBuyerRegistration />} />
+          {/* <Route path="/buyerForm" element={<BuyerRegistrationForm />} />
+          <Route path="/registro-comprador" element={<ParentBuyerRegistration />} /> */}
           <Route path="/unauthorized" element={<Unauthorized />} />
 
           {/* Rutas protegidas */}
@@ -114,6 +122,22 @@ const AppContent = () => {
             }
           />
           <Route
+            path="/admin/CheckIn"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
+                <CheckIn />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/CheckOut"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
+                <CheckOut />
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/admin/rooms"
             element={
               <PrivateRoute allowedRoles={['owner', 'admin']}>
@@ -122,13 +146,21 @@ const AppContent = () => {
             }
           />
           <Route
+            path="/admin/localBooking"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
+                <LocalBookingForm />
+              </PrivateRoute>
+            }
+          />
+          {/* <Route
             path="/admin/pendientesFactura"
             element={
               <PrivateRoute allowedRoles={['owner', 'admin']}>
                 <BookingsPendientes />
               </PrivateRoute>
             }
-          />
+          /> */}
               <Route
             path="/bookings/availability"
             element={
@@ -153,7 +185,38 @@ const AppContent = () => {
               </PrivateRoute>
             }
           />
-
+                      <Route
+            path="/inventory"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <CreateItems />
+              </PrivateRoute>
+            }
+          />
+               <Route
+            path="/allItems"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <ManageItems />
+              </PrivateRoute>
+            }
+          />
+                  <Route
+            path="/registerPass"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <RegistrationPass />
+              </PrivateRoute>
+            }
+          />
+                      <Route
+            path="/roomCheck"
+            element={
+              <PrivateRoute allowedRoles={['owner']}>
+                <RoomDetailCheck />
+              </PrivateRoute>
+            }
+          />
           {/* Ruta por defecto para 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>

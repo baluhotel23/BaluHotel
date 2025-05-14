@@ -17,7 +17,7 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     status: {
-      type: DataTypes.ENUM('pending', 'confirmed', 'checked-in', 'completed','advanced','cancelled'),
+      type: DataTypes.ENUM('pending', 'confirmed', 'checked-in', 'completed', 'advanced', 'cancelled', 'no_show_cancelled'), // <--- AÑADIR 'no_show_cancelled'
       defaultValue: 'pending'
     },
     pointOfSale: {
@@ -37,7 +37,7 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: true,
       references: {
-        model: 'buyers', 
+        model: 'Buyers', 
         key: 'sdocno'
       }
     },
@@ -50,7 +50,7 @@ module.exports = (sequelize) => {
       allowNull: true, 
     },
   }, {
-    tableName: 'bookings',
+    
     timestamps: true,
   });
 };

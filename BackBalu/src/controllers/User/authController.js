@@ -96,10 +96,10 @@ const login = async (req, res, next) => {
 
 const logout = async (req, res, next) => {
   try {
-    const { id } = req.user;
+    const { n_document } = req.user; // Cambiar id por n_document
     await User.update(
       { lastLogout: new Date() },
-      { where: { id } }
+      { where: { n_document } } // Usar n_document en la condición where
     );
 
     res.json({

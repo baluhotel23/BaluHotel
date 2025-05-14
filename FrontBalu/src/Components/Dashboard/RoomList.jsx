@@ -4,17 +4,21 @@ import { getAllRooms, updateRoom, deleteRoom } from '../../Redux/Actions/roomAct
 import { getAllServices } from '../../Redux/Actions/serviceActions';
 import DashboardLayout from './DashboardLayout';
 import { openCloudinaryWidget } from '../../cloudinaryConfig';
+import { toast } from "react-toastify";
 
 const RoomList = () => {
   const dispatch = useDispatch();
   const { rooms, loading, error } = useSelector(state => state.room);
   const { services } = useSelector(state => state.service);
-
+  const inventory = useSelector((state) => state.inventory.inventory || []);
   const [editingRoom, setEditingRoom] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(""); // ID del item seleccionado
+  const [newItemQuantity, setNewItemQuantity] = useState(1); // Cantidad del nuevo item
   const [formData, setFormData] = useState({
     roomNumber: '',
     price: '',
     services: [],
+    basicInventories: [], // Añadir este campo
     type: '',
     description: '',
     maxGuests: 1,
@@ -37,6 +41,7 @@ const RoomList = () => {
         roomNumber: editingRoom.roomNumber,
         price: editingRoom.price,
         services: editingRoom.Services ? editingRoom.Services.map(service => service.name) : [],
+        basicInventories: editingRoom.BasicInventories || [],
         type: editingRoom.type,
         description: editingRoom.description,
         maxGuests: editingRoom.maxGuests,
@@ -74,6 +79,40 @@ const RoomList = () => {
       });
     }
   };
+  const handleAddBasicInventory = () => {
+    if (!selectedItem || newItemQuantity <= 0) {
+      toast.error("Por favor, selecciona un item y una cantidad válida.");
+      return;
+    }
+
+    const item = inventory.find((inv) => inv.id === selectedItem);
+    if (!item) {
+      toast.error("El item seleccionado no existe.");
+      return;
+    }
+
+    // Verificar si el item ya está en los BasicInventories
+    const existingInventory = formData.basicInventories.find((inv) => inv.id === selectedItem);
+    if (existingInventory) {
+      toast.error("Este item ya está en el inventario básico.");
+      return;
+    }
+
+    // Agregar el nuevo item al estado
+    setFormData((prevFormData) => ({
+      ...prevFormData,
+      basicInventories: [
+        ...prevFormData.basicInventories,
+        { id: selectedItem, name: item.name, RoomBasics: { quantity: newItemQuantity } },
+      ],
+    }));
+
+    // Reiniciar los campos de selección
+    setSelectedItem("");
+    setNewItemQuantity(1);
+
+    toast.success("Item agregado correctamente.");
+  };
 
   const handleWidget = () => {
     openCloudinaryWidget((uploadedImageUrl) => {
@@ -94,21 +133,23 @@ const RoomList = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await dispatch(updateRoom(formData.roomNumber, formData));
+      const updatedData = {
+        ...formData,
+        basicInventories: formData.basicInventories.map((inventory) => ({
+          id: inventory.id,
+          quantity: inventory.RoomBasics.quantity, // Solo enviar ID y cantidad
+        })),
+      };
+
+      await dispatch(updateRoom(formData.roomNumber, updatedData));
       setEditingRoom(null);
       dispatch(getAllRooms()); // Refrescar la lista de habitaciones
+      toast.success("Habitación actualizada correctamente.");
     } catch (error) {
-      console.error('Error updating room:', error);
+      console.error("Error updating room:", error);
+      toast.error("Error al actualizar la habitación.");
     }
   };
-
-  const handleDelete = (roomNumber) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar esta habitación?')) {
-      dispatch(deleteRoom(roomNumber));
-      dispatch(getAllRooms()); // Refrescar la lista de habitaciones
-    }
-  };
-
   return (
     <DashboardLayout>
       <h1 className="text-2xl font-semibold mb-4">Lista de Habitaciones</h1>
@@ -122,14 +163,49 @@ const RoomList = () => {
             <div key={room.roomNumber} className="bg-white p-4 rounded-lg shadow-md">
               <div className="flex flex-col md:flex-row md:items-center">
                 <div className="flex-shrink-0">
-                  {room.image_url.map((img, index) => (
-                    <img
-                      key={index}
-                      src={img}
-                      alt={`Imagen ${index + 1}`}
-                      className="w-16 h-16 object-cover rounded-md mb-2 md:mb-0 md:mr-4"
-                    />
-                  ))}
+                <div className="mt-4">
+  <h4 className="text-md font-bold">Imágenes</h4>
+  <div className="grid grid-cols-3 gap-2">
+    {formData.image_url.map((img, index) => (
+      <div key={index} className="relative group">
+        <img
+          src={img}
+          alt={`Imagen ${index + 1}`}
+          className="w-full h-24 object-cover rounded-md"
+        />
+        {editingRoom && (
+          <button
+            type="button"
+            onClick={() => handleImageDelete(img)}
+            className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        )}
+      </div>
+    ))}
+  </div>
+  {editingRoom && (
+    <button
+      type="button"
+      onClick={handleWidget}
+      className="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+    >
+      Agregar Imagen
+    </button>
+  )}
+</div>
                 </div>
                 <div className="flex-1">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -197,6 +273,71 @@ const RoomList = () => {
                         </select>
                       ) : (
                         <p className="mt-1">{room.Services.map(service => service.name).join(', ')}</p>
+                      )}
+                    </div>
+                    <div className="mt-4">
+                      <h4 className="text-md font-bold">Inventario Básico</h4>
+                      {room.BasicInventories && room.BasicInventories.length > 0 ? (
+                        <ul className="list-disc pl-5">
+                          {room.BasicInventories.map((inventory) => (
+                            <li key={inventory.id}>
+                              {inventory.name} - Cantidad:{" "}
+                              {editingRoom && editingRoom.roomNumber === room.roomNumber ? (
+                                <input
+                                  type="number"
+                                  value={
+                                    formData.basicInventories.find((item) => item.id === inventory.id)
+                                      ?.RoomBasics.quantity || 0
+                                  }
+                                  onChange={(e) =>
+                                    handleBasicInventoryChange(inventory.id, Number(e.target.value))
+                                  }
+                                  className="w-16 px-2 py-1 border rounded"
+                                />
+                              ) : (
+                                inventory.RoomBasics.quantity
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-gray-500">No hay inventario básico asignado.</p>
+                      )}
+
+                      {/* Select para agregar nuevos items */}
+                      {/* Select para agregar nuevos items */}
+                      {editingRoom && editingRoom.roomNumber === room.roomNumber && (
+                        <div className="mt-4">
+                          <h5 className="text-sm font-bold">Agregar Nuevo Item</h5>
+                          <div className="flex items-center space-x-4">
+                            <select
+                              className="w-full px-3 py-2 border rounded"
+                              value={selectedItem}
+                              onChange={(e) => setSelectedItem(e.target.value)}
+                            >
+                              <option value="">Selecciona un item</option>
+                              {inventory.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name} (Stock: {item.currentStock})
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              type="number"
+                              placeholder="Cantidad"
+                              value={newItemQuantity}
+                              onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+                              className="w-20 px-3 py-2 border rounded"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleAddBasicInventory}
+                              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                            >
+                              Agregar
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                     <div className="border-b pb-2">

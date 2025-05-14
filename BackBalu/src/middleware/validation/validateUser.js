@@ -32,7 +32,7 @@ const validateRegister = (req, res, next) => {
     const { email, password, phone, n_document, wdoctype } = req.body;
 
     // Validaciones requeridas
-    if (!email || !password || !n_document || !phone) {
+    if (!email || !password || !n_document || !phone || !wdoctype) {
         throw new CustomError("Todos los campos obligatorios deben ser completados", 400);
     }
 

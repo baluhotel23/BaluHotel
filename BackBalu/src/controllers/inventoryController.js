@@ -1,4 +1,4 @@
-const { BasicInventory, Purchase, PurchaseItem } = require('../data');
+const { BasicInventory, Purchase, PurchaseItem, RoomCheckIn } = require('../data');
 const { CustomError } = require('../middleware/error');
 const { catchedAsync } = require('../utils/catchedAsync');
 
@@ -159,31 +159,38 @@ const getAllItems = async (req, res) => {
       data: newItem
     });
   };
-  
-  // Actualiza un item existente en el inventario
   const updateItem = async (req, res) => {
     const { id } = req.params;
-    const { name, description, category, currentStock, minStock, unitPrice } = req.body;
-    const item = await BasicInventory.findByPk(id);
-    if (!item) {
-      throw new CustomError('Item no encontrado', 404);
-    }
-    await item.update({
-      name,
-      description,
-      category,
-      currentStock,
-      minStock,
-      unitPrice,
-      updatedBy: req.user.n_document
-    });
-    res.json({
-      error: false,
-      message: 'Item actualizado exitosamente',
-      data: item
-    });
-  };
+    const { name, description, category, minStock, unitPrice, isActive } = req.body;
   
+    try {
+      const item = await BasicInventory.findByPk(id);
+      if (!item) {
+        throw new CustomError("Item no encontrado", 404);
+      }
+  
+      await item.update({
+        name,
+        description,
+        category,
+        minStock,
+        unitPrice,
+        isActive,
+      });
+  
+      res.json({
+        error: false,
+        message: "Item actualizado exitosamente",
+        data: item,
+      });
+    } catch (error) {
+      console.error("Error al actualizar el item:", error);
+      res.status(500).json({
+        error: true,
+        message: "Error al actualizar el item",
+      });
+    }
+  };
   // Elimina un item del inventario
   const deleteItem = async (req, res) => {
     const { id } = req.params;
@@ -195,7 +202,7 @@ const getAllItems = async (req, res) => {
     res.json({
       error: false,
       message: 'Item eliminado exitosamente',
-      data: item
+      
     });
   };
 
@@ -213,11 +220,13 @@ const getAllItems = async (req, res) => {
       throw new CustomError('Item no encontrado', 404);
     }
   
-    await item.increment('stock', { by: quantity });
+    // Incrementar currentStock en lugar de stock
+    await item.increment('currentStock', { by: quantity });
+  
     res.json({
       error: false,
       message: 'Stock añadido exitosamente',
-      data: item
+      data: item,
     });
   };
 
@@ -235,15 +244,17 @@ const getAllItems = async (req, res) => {
       throw new CustomError('Item no encontrado', 404);
     }
   
-    if (item.stock < quantity) {
+    if (item.currentStock < quantity) {
       throw new CustomError('No hay suficiente stock', 400);
     }
   
-    await item.decrement('stock', { by: quantity });
+    // Decrementar currentStock en lugar de stock
+    await item.decrement('currentStock', { by: quantity });
+  
     res.json({
       error: false,
       message: 'Stock removido exitosamente',
-      data: item
+      data: item,
     });
   };
 

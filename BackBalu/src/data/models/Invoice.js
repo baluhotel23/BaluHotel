@@ -45,6 +45,19 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: true,
       },
+      cufe: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      qrCode: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      orderReference: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      }
+      
     },
     {
       timestamps: true,

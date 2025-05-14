@@ -35,6 +35,26 @@ export const getRoomById = (roomNumber) => async (dispatch) => {
     dispatch({ type: 'GET_ROOM_FAILURE', payload: errorMessage });
   }
 };
+// Buscar una habitación por input (query string)
+export const searchRoomByInput = (roomNumber) => async (dispatch) => {
+  dispatch({ type: "SEARCH_ROOM_REQUEST" });
+  try {
+    const { data } = await api.get(`/rooms`, {
+      params: { roomNumber }, // Enviar como query string
+    });
+
+    // Si el backend devuelve un array, selecciona el primer elemento
+    const room = Array.isArray(data.data) ? data.data[0] : data.data;
+
+    dispatch({ type: "SEARCH_ROOM_SUCCESS", payload: room });
+    return { error: false, data: room }; // Devuelve un objeto con la propiedad `error`
+  } catch (error) {
+    const errorMessage =
+      error.response?.data?.message || "Error al buscar la habitación";
+    dispatch({ type: "SEARCH_ROOM_FAILURE", payload: errorMessage });
+    return { error: true, message: errorMessage }; // Devuelve un objeto con la propiedad `error`
+  }
+};
 
 // Verificar disponibilidad (se espera que "dates" tenga el formato requerido)
 export const checkAvailability = (dates) => async (dispatch) => {
@@ -50,13 +70,16 @@ export const checkAvailability = (dates) => async (dispatch) => {
 
 // Crear una habitación
 export const createRoom = (roomData) => async (dispatch) => {
-  dispatch({ type: 'CREATE_ROOM_REQUEST' });
+  dispatch({ type: "CREATE_ROOM_REQUEST" });
   try {
-    const { data } = await api.post('/rooms/create', roomData);
-    dispatch({ type: 'CREATE_ROOM_SUCCESS', payload: data });
+    const { data } = await api.post("/rooms/create", roomData); // Enviar roomData con basicInventory
+    dispatch({ type: "CREATE_ROOM_SUCCESS", payload: data });
+    return { success: true, data: data.data }; // Devolver la habitación creada
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Error al crear la habitación';
-    dispatch({ type: 'CREATE_ROOM_FAILURE', payload: errorMessage });
+    const errorMessage =
+      error.response?.data?.message || "Error al crear la habitación";
+    dispatch({ type: "CREATE_ROOM_FAILURE", payload: errorMessage });
+    return { success: false, error: errorMessage };
   }
 };
 
@@ -98,13 +121,16 @@ export const updateRoomStatus = (roomNumber, statusData) => async (dispatch) => 
 
 // Obtener amenities de una habitación
 export const getRoomAmenities = (roomNumber) => async (dispatch) => {
-  dispatch({ type: 'GET_ROOM_AMENITIES_REQUEST' });
+  dispatch({ type: "GET_ROOM_AMENITIES_REQUEST" });
   try {
     const { data } = await api.get(`/rooms/${roomNumber}/amenities`);
-    dispatch({ type: 'GET_ROOM_AMENITIES_SUCCESS', payload: data });
+    dispatch({ type: "GET_ROOM_AMENITIES_SUCCESS", payload: data });
+    return { error: false, data }; // Devuelve un objeto con la propiedad `error`
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Error al obtener amenities';
-    dispatch({ type: 'GET_ROOM_AMENITIES_FAILURE', payload: errorMessage });
+    const errorMessage =
+      error.response?.data?.message || "Error al obtener amenities";
+    dispatch({ type: "GET_ROOM_AMENITIES_FAILURE", payload: errorMessage });
+    return { error: true, message: errorMessage }; // Devuelve un objeto con la propiedad `error`
   }
 };
 
@@ -165,5 +191,31 @@ export const getRevenueByRoomType = () => async (dispatch) => {
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al obtener reporte de ingresos';
     dispatch({ type: 'GET_REVENUE_REPORT_FAILURE', payload: errorMessage });
+  }
+};
+
+export const getRoomsToPrepare = (date) => async (dispatch) => {
+  dispatch({ type: 'GET_ROOMS_TO_PREPARE_REQUEST' });
+  try {
+    const { data } = await api.get('/rooms/preparation-list', { params: { date } });
+    dispatch({ type: 'GET_ROOMS_TO_PREPARE_SUCCESS', payload: data.data });
+    return { success: true, data: data.data };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al obtener habitaciones a preparar';
+    dispatch({ type: 'GET_ROOMS_TO_PREPARE_FAILURE', payload: errorMessage });
+    return { success: false, error: errorMessage };
+  }
+};
+
+export const getRoomBasics = (roomNumber) => async (dispatch) => {
+  dispatch({ type: 'GET_ROOM_BASICS_REQUEST' });
+  try {
+    const { data } = await api.get(`/rooms/basicos/${roomNumber}`);
+    dispatch({ type: 'GET_ROOM_BASICS_SUCCESS', payload: data.data });
+    return { error: false, data: data.data };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al obtener básicos de la habitación';
+    dispatch({ type: 'GET_ROOM_BASICS_FAILURE', payload: errorMessage });
+    return { error: true, message: errorMessage };
   }
 };
