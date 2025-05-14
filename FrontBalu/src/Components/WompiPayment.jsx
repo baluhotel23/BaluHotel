@@ -48,7 +48,7 @@ const WompiPayment = ({ booking, onPaymentComplete }) => {
       console.error('Missing VITE_WOMPI_INTEGRITY_SECRET from .env');
       return;
     }
-    const redirectUrl = `${import.meta.env.VITE_FRONTEND_URL}/payment-status`;
+    const redirectUrl = `${import.meta.env.VITE_FRONTEND_URL}/thankyou`;
     try {
       new URL(redirectUrl); // Validate if the URL is well-formed
     } catch (e) {

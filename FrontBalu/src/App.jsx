@@ -34,6 +34,7 @@ import RegistrationPass from './Components/Dashboard/Registration';
 import RoomDetailCheck from './Components/Dashboard/RoomDetailCheck';
 import LocalBookingForm from './Components/Booking/LocalBookingForm';
 import CheckOut from './Components/CheckOut/CheckOut';
+import ThankYouPage from './Components/ThankYouPage';
 
 
 const AppContent = () => {
@@ -92,6 +93,7 @@ const AppContent = () => {
           <Route path="/room/:roomNumber" element={<RoomDetail />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/thankyou" element={<ThankYouPage />} />
           {/* <Route path="/buyerForm" element={<BuyerRegistrationForm />} />
           <Route path="/registro-comprador" element={<ParentBuyerRegistration />} /> */}
           <Route path="/unauthorized" element={<Unauthorized />} />
