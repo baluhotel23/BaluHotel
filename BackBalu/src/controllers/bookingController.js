@@ -509,7 +509,7 @@ const getBookingById = async (req, res) => {
 
 // Staff only endpoints
 const getAllBookings = async (req, res) => {
-  const { status, fromDate, toDate } = req.query;
+  const { status, roomStatus, fromDate, toDate } = req.query;
 
   const where = {};
   if (status) where.status = status;
@@ -519,10 +519,16 @@ const getAllBookings = async (req, res) => {
     };
   }
 
+  // Prepara el include de Room con filtro dinámico
+  const roomInclude = { model: Room };
+  if (roomStatus) {
+    roomInclude.where = { status: roomStatus };
+  }
+
   const bookings = await Booking.findAll({
     where,
     include: [
-      { model: Room },
+      roomInclude,
       { model: Buyer, as: "guest", attributes: ["sdocno"] },
       { model: Payment },
     ],

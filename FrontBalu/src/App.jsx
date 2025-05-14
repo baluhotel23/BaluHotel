@@ -33,6 +33,8 @@ import ManageItems from './Components/Dashboard/ManageItems';
 import RegistrationPass from './Components/Dashboard/Registration';
 import RoomDetailCheck from './Components/Dashboard/RoomDetailCheck';
 import LocalBookingForm from './Components/Booking/LocalBookingForm';
+import CheckOut from './Components/CheckOut/CheckOut';
+
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -124,6 +126,14 @@ const AppContent = () => {
             element={
               <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
                 <CheckIn />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/CheckOut"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
+                <CheckOut />
               </PrivateRoute>
             }
           />
