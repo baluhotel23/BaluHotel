@@ -400,7 +400,7 @@ const Booking = () => {
         status: transaction.status,
       };
       
-      // await dispatch(updateOnlinePayment(paymentPayload));
+      await dispatch(updateOnlinePayment(paymentPayload));
 
       toast.success("Reserva confirmada y pago registrado exitosamente.");
       if (createResponse.data.trackingLink) { 

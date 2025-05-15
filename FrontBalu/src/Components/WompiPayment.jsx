@@ -49,13 +49,14 @@ const WompiPayment = ({ booking, onPaymentComplete }) => {
       return;
     }
     const redirectUrl = `${import.meta.env.VITE_FRONTEND_URL}/thankyou`;
-    try {
-      new URL(redirectUrl); // Validate if the URL is well-formed
-    } catch (e) {
-      toast.error('La URL de redirección es inválida.');
-      console.error('Invalid redirectUrl:', redirectUrl, e);
-      return;
-    }
+console.log("redirectUrl:", redirectUrl); // <-- Agrega este log
+try {
+  new URL(redirectUrl); // Validate if the URL is well-formed
+} catch (e) {
+  toast.error('La URL de redirección es inválida.');
+  console.error('Invalid redirectUrl:', redirectUrl, e);
+  return;
+}
 
     const reference = `BALU-${booking.bookingId.replace(/[^a-zA-Z0-9-_]/g, '')}-${Date.now()}`;
     console.log("Wompi reference:", reference);
@@ -85,7 +86,7 @@ console.log({
       }
     };
     console.log("Wompi Checkout Data:", checkoutData); // Log the data being sent
-   console.log({ amountInCents, currency: booking.currency || 'COP', reference, integritySecret, publicKey });
+    console.log({ amountInCents, currency: booking.currency || 'COP', reference, integritySecret, publicKey });
     const checkout = new WidgetCheckout(checkoutData);
 
     checkout.open((result) => {
