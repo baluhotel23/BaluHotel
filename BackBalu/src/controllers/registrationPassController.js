@@ -4,9 +4,11 @@ const { Booking, Room, RegistrationPass } = require('../data');
 // Crear un nuevo registro de pasajero
 const createRegistrationPass = async (req, res) => {
   try {
+    console.log("Body recibido en createRegistrationPass:", req.body);
+
     const {
       bookingId,
-      passengers, // Array opcional de pasajeros
+      passengers,
       name,
       nationality,
       maritalStatus,
@@ -22,7 +24,10 @@ const createRegistrationPass = async (req, res) => {
       phoneNumber,
     } = req.body;
 
-    // Verificar que la reserva exista
+    if (!bookingId) {
+      return res.status(400).json({ error: true, message: "bookingId es requerido" });
+    }
+
     const booking = await Booking.findByPk(bookingId, {
       include: [{ model: Room }],
     });
@@ -31,24 +36,20 @@ const createRegistrationPass = async (req, res) => {
       return res.status(404).json({ error: true, message: "Reserva no encontrada" });
     }
 
-    // Extraer el roomNumber de la reserva
     const roomNumber = booking.roomNumber;
 
-    // Crear registros de pasajeros
     if (Array.isArray(passengers)) {
-      // Si se envía un array de pasajeros
       await Promise.all(
         passengers.map(async (passenger) => {
           await RegistrationPass.create({
             bookingId,
             roomNumber,
             checkInDate: booking.checkIn,
-            ...passenger, // Desestructurar los datos del pasajero
+            ...passenger,
           });
         })
       );
     } else {
-      // Si se envían datos individuales
       await RegistrationPass.create({
         bookingId,
         roomNumber,
@@ -69,7 +70,6 @@ const createRegistrationPass = async (req, res) => {
       });
     }
 
-    // Consultar todos los pasajeros de la misma reserva
     const allPassengers = await RegistrationPass.findAll({
       where: { bookingId },
       include: [
@@ -89,7 +89,7 @@ const createRegistrationPass = async (req, res) => {
     });
   } catch (error) {
     console.error("Error al crear el registro de pasajero:", error);
-    res.status(500).json({ error: true, message: "Error al crear el registro de pasajero" });
+    res.status(500).json({ error: true, message: "Error al crear el registro de pasajero", detalle: error.message });
   }
 };
   // Obtener todos los registros de pasajeros
@@ -195,10 +195,34 @@ const createRegistrationPass = async (req, res) => {
       res.status(500).json({ error: true, message: "Error al eliminar el registro de pasajero" });
     }
   };
+
+  // Obtener todos los pasajeros de una reserva específica
+const getRegistrationPassesByBooking = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const passengers = await RegistrationPass.findAll({
+      where: { bookingId },
+      include: [
+        { model: Room, as: "room" },
+        { model: Booking, as: "booking" },
+      ],
+    });
+
+    if (!passengers.length) {
+      return res.status(404).json({ error: true, message: "No se encontraron pasajeros para esta reserva" });
+    }
+
+    res.status(200).json({ error: false, data: passengers });
+  } catch (error) {
+    console.error("Error al obtener los pasajeros por reserva:", error);
+    res.status(500).json({ error: true, message: "Error al obtener los pasajeros por reserva" });
+  }
+};
   
   module.exports = {
     createRegistrationPass,
     getAllRegistrationPasses,
     updateRegistrationPass,
     deleteRegistrationPass,
+    getRegistrationPassesByBooking
   };

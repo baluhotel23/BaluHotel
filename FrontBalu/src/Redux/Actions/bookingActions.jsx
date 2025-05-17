@@ -128,15 +128,16 @@ export const checkOutBooking = (bookingId) => async (dispatch) => {
 };
 
 // ADD EXTRA CHARGES (POST /bookings/:id/extra-charges)
-export const addExtraCharges = (bookingId, chargeData) => async (dispatch) => {
-  dispatch({ type: 'ADD_EXTRA_CHARGE_REQUEST' });
+export const addExtraCharge = (data) => async (dispatch) => {
   try {
-    const { data } = await api.post(`/bookings/${bookingId}/extra-charges`, chargeData);
-    dispatch({ type: 'ADD_EXTRA_CHARGE_SUCCESS', payload: data.data });
+    const { bookingId, extraCharge } = data;
+    const response = await api.post(`/bookings/${bookingId}/extra-charges`, extraCharge);
+    dispatch({ type: 'ADD_EXTRA_CHARGE_SUCCESS', payload: response.data.data });
+    toast.success('Cargo extra añadido exitosamente');
+    return response.data.data;
   } catch (error) {
-    const errorMessage =
-      error.response?.data?.message || 'Error al agregar cargos extra';
-    dispatch({ type: 'ADD_EXTRA_CHARGE_FAILURE', payload: errorMessage });
+    toast.error(error.response?.data?.message || 'Error al añadir cargo extra');
+    throw error;
   }
 };
 

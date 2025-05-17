@@ -35,6 +35,7 @@ import RoomDetailCheck from './Components/Dashboard/RoomDetailCheck';
 import LocalBookingForm from './Components/Booking/LocalBookingForm';
 import CheckOut from './Components/CheckOut/CheckOut';
 import ThankYouPage from './Components/ThankYouPage';
+import BookingPassengerList from './Components/Dashboard/BookingPassengerList';
 
 
 const AppContent = () => {
@@ -128,6 +129,14 @@ const AppContent = () => {
             element={
               <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
                 <CheckIn />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/PassengerList"
+            element={
+              <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
+                <BookingPassengerList />
               </PrivateRoute>
             }
           />

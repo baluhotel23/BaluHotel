@@ -52,5 +52,6 @@ module.exports = (sequelize) => {
   }, {
     
     timestamps: true,
+    tableName: 'Bookings'
   });
 };

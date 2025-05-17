@@ -119,16 +119,16 @@ const Dashboard = () => {
         )}
               {(user.role === 'owner' || user.role === 'admin') && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
-            <h2 className="text-xl font-semibold mb-2"> REGISTRO DE PASAJEROS</h2>
-            <p className="text-gray-600 mb-4"> REGISTRO DE PASAJEROS</p>
-            <Link to="/registerPass">
+            <h2 className="text-xl font-semibold mb-2"> LISTADO DE PASAJEROS</h2>
+            <p className="text-gray-600 mb-4"> LISTADO DE PASAJEROS</p>
+            <Link to="/admin/PassengerList">
               <button className=" bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded">
-                REGISTRO DE PASAJEROS
+                LISTADO DE PASAJEROS
               </button>
             </Link>
           </div>
         )}
-           {(user.role === 'owner' || user.role === 'admin') && (
+           {/* {(user.role === 'owner' || user.role === 'admin') && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2"> CHEK ROOM</h2>
             <p className="text-gray-600 mb-4"> CHEK ROOM</p>
@@ -138,14 +138,14 @@ const Dashboard = () => {
               </button>
             </Link>
           </div>
-        )}
+        )} */}
          {(user.role === 'owner' ) && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">CARGAR INVENTARIO</h2>
             <p className="text-gray-600 mb-4">Crear y modificar inventario.</p>
             <Link to="/inventory">
             <button className="bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded">
-              CARGAR INVENTARIO
+              STOCK
             </button>
             </Link>
           </div>
