@@ -50,68 +50,75 @@ let capsEntries = entries.map((entry) => [
 ]);
 sequelize.models = Object.fromEntries(capsEntries);
 
-// En sequelize.models están todos los modelos importados como propiedades
-// Para relacionarlos hacemos un destructuring
-const { BasicInventory, ExtraCharge, Token, Buyer, Booking, Bill, Room, SellerData, Invoice, RoomBasics, User, Purchase, PurchaseItem, RoomCheckIn, Service, Payment, RegistrationPass } = sequelize.models;
+// ===== RELACIONES DE ROOM =====
 
+const { BasicInventory, ExtraCharge, Token, Buyer, Booking, Bill, Room, SellerData, Invoice, RoomBasics, User, Purchase, PurchaseItem, RoomCheckIn, Service, Payment, RegistrationPass } = sequelize.models;
+// Con BasicInventory (muchos a muchos)
 Room.belongsToMany(BasicInventory, { through: RoomBasics, foreignKey: 'roomNumber' });
 BasicInventory.belongsToMany(Room, { through: RoomBasics, foreignKey: 'basicId' });
 
+// Con RoomCheckIn (uno a uno)
 Room.hasOne(RoomCheckIn, { foreignKey: 'roomNumber', as: 'preparation' });
 RoomCheckIn.belongsTo(Room, { foreignKey: 'roomNumber', as: 'room' });
 
-
-Booking.belongsTo(Room);
-Room.hasMany(Booking, { foreignKey: 'roomNumber' })
-Booking.belongsTo(Room, { foreignKey: 'roomNumber' });
-    
-Booking.belongsTo(Buyer, { as: 'guest', foreignKey: 'guestId' });
-   
-Booking.hasMany(ExtraCharge, { foreignKey: 'bookingId' });
-Booking.hasOne(Bill, { foreignKey: 'bookingId' });
-
-Booking.hasMany(ExtraCharge);
-ExtraCharge.belongsTo(Booking);
-ExtraCharge.belongsTo(BasicInventory);
-BasicInventory.hasMany(ExtraCharge);
-
-Booking.hasOne(Bill);
-Bill.belongsTo(Booking);
-
-Purchase.hasMany(PurchaseItem, { foreignKey: 'purchaseId' }); // Asumiendo FK es purchaseId
-PurchaseItem.belongsTo(Purchase, { foreignKey: 'purchaseId' });
-PurchaseItem.belongsTo(BasicInventory, { foreignKey: 'basicId' }); // Asumiendo FK es basicId
-BasicInventory.hasMany(PurchaseItem, { foreignKey: 'basicId' });
-
+// Con Service (muchos a muchos)
 Room.belongsToMany(Service, { through: "RoomServices", foreignKey: "roomNumber" });
 Service.belongsToMany(Room, { through: "RoomServices", foreignKey: "serviceId" });
 
-Booking.hasMany(Payment, { foreignKey: 'bookingId' });
-Payment.belongsTo(Booking, { foreignKey: 'bookingId' });
-
-// --- NUEVA ASOCIACIÓN para Payment y User ---
-// Un Pago pertenece a un Usuario (el que lo procesó)
-Payment.belongsTo(User, {
-  foreignKey: 'processedBy', // La clave foránea en el modelo Payment
-  targetKey: 'n_document',   // La clave en el modelo User a la que processedBy hace referencia
-  as: 'processor'            // Alias para esta relación (opcional pero útil)
-});
-
-// Un Usuario puede haber procesado muchos Pagos
-User.hasMany(Payment, {
-  foreignKey: 'processedBy', // La clave foránea en el modelo Payment
-  sourceKey: 'n_document',   // La clave en el modelo User que se usa para la relación
-  as: 'processedPayments'    // Alias para esta relación (opcional pero útil)
-});
-// --- FIN DE NUEVA ASOCIACIÓN ---
-
-// Relación entre Room y RegistrationPass
+// Con RegistrationPass (uno a muchos)
 Room.hasMany(RegistrationPass, { foreignKey: 'roomNumber', sourceKey: 'roomNumber', as: 'registrationPasses' });
 RegistrationPass.belongsTo(Room, { foreignKey: 'roomNumber', targetKey: 'roomNumber', as: 'room' });
 
-// Relación entre Booking y RegistrationPass
+// ===== RELACIONES DE BOOKING =====
+// Con Room (muchos a uno)
+Room.hasMany(Booking, { foreignKey: 'roomNumber' });
+Booking.belongsTo(Room, { foreignKey: 'roomNumber' });
+
+// Con Buyer (muchos a uno)
+Booking.belongsTo(Buyer, { as: 'guest', foreignKey: 'guestId' });
+
+// Con ExtraCharge (uno a muchos)
+Booking.hasMany(ExtraCharge, { foreignKey: 'bookingId' });
+ExtraCharge.belongsTo(Booking, { foreignKey: 'bookingId' });
+
+// Con Bill (uno a uno)
+Booking.hasOne(Bill, { foreignKey: 'bookingId' });
+Bill.belongsTo(Booking, { foreignKey: 'bookingId' });
+
+// Con Payment (uno a muchos)
+Booking.hasMany(Payment, { foreignKey: 'bookingId' });
+Payment.belongsTo(Booking, { foreignKey: 'bookingId' });
+
+// Con RegistrationPass (uno a muchos)
 Booking.hasMany(RegistrationPass, { foreignKey: 'bookingId', sourceKey: 'bookingId', as: 'registrationPasses' });
 RegistrationPass.belongsTo(Booking, { foreignKey: 'bookingId', targetKey: 'bookingId', as: 'booking' });
+
+// ===== RELACIONES DE PAYMENT =====
+// Con User
+Payment.belongsTo(User, {
+  foreignKey: 'processedBy',
+  targetKey: 'n_document',
+  as: 'processor'
+});
+User.hasMany(Payment, {
+  foreignKey: 'processedBy',
+  sourceKey: 'n_document',
+  as: 'processedPayments'
+});
+
+// ===== RELACIONES DE EXTRACHARGE =====
+// Con BasicInventory
+ExtraCharge.belongsTo(BasicInventory, { foreignKey: 'basicId' });
+BasicInventory.hasMany(ExtraCharge, { foreignKey: 'basicId' });
+
+// ===== RELACIONES DE PURCHASE =====
+// Con PurchaseItem
+Purchase.hasMany(PurchaseItem, { foreignKey: 'purchaseId' });
+PurchaseItem.belongsTo(Purchase, { foreignKey: 'purchaseId' });
+
+// Con BasicInventory
+PurchaseItem.belongsTo(BasicInventory, { foreignKey: 'basicId' });
+BasicInventory.hasMany(PurchaseItem, { foreignKey: 'basicId' });
 
 
 

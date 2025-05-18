@@ -1,7 +1,7 @@
 const { catchedAsync } = require("../utils/catchedAsync");
 
 // Auth controllers
-const { login, register, logout, changePassword } = require("./User/authController");
+const { login, register, logout, changePassword} = require("./User/authController");
 
 // Email controllers
 const { 
@@ -47,7 +47,8 @@ const {
     createRegistrationPass,
     getAllRegistrationPasses,
     updateRegistrationPass,
-    deleteRegistrationPass
+    deleteRegistrationPass,
+    getRegistrationPassesByBooking
 } = require("./registrationPassController");
 
 module.exports = {
@@ -89,5 +90,12 @@ module.exports = {
     updateBookingStatus,
     cancelBooking,
     getOccupancyReport,
-    getRevenueReport
+    getRevenueReport,
+
+    // Registration Pass endpoints
+    createRegistrationPass,
+    getAllRegistrationPasses,
+    updateRegistrationPass,
+    deleteRegistrationPass,
+    getRegistrationPassesByBooking
 };

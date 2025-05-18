@@ -1,4 +1,4 @@
-const { BasicInventory, Purchase, PurchaseItem, RoomCheckIn } = require('../data');
+  const { BasicInventory, Purchase, PurchaseItem, RoomCheckIn } = require('../data');
 const { CustomError } = require('../middleware/error');
 const { catchedAsync } = require('../utils/catchedAsync');
 
@@ -15,7 +15,8 @@ const getInventory = async (req, res) => {
         where,
         attributes: [
             'id', 'name', 'description', 'category', 
-            'currentStock', 'minStock', 'unitPrice'
+            'currentStock', 'minStock', 'unitPrice',
+            'isSellable', 'salePrice' // Añadidos estos campos
         ],
         order: [['category', 'ASC'], ['name', 'ASC']]
     });
@@ -116,15 +117,20 @@ const getLowStockItems = async (req, res) => {
 
 const getAllItems = async (req, res) => {
     const items = await BasicInventory.findAll({
-      attributes: ['id', 'name', 'description', 'category', 'currentStock', 'minStock', 'unitPrice'],
-      order: [['name', 'ASC']]
+        attributes: [
+            'id', 'name', 'description', 'category', 
+            'currentStock', 'minStock', 'unitPrice',
+            'isSellable', 'salePrice' // Añadidos estos campos
+        ],
+        order: [['name', 'ASC']]
     });
+    
     res.json({
-      error: false,
-      message: 'Items recuperados exitosamente',
-      data: items
+        error: false,
+        message: 'Items recuperados exitosamente',
+        data: items
     });
-  };
+};
   
   // Obtiene un item por su id
   const getItemById = async (req, res) => {
@@ -142,55 +148,85 @@ const getAllItems = async (req, res) => {
   
   // Crea un nuevo item en el inventario
   const createItem = async (req, res) => {
-    const { name, description, category, currentStock, minStock, unitPrice } = req.body;
-    // Se asume que la validación previa se realiza con el middleware validateInventoryItem
+    const { 
+        name, description, category, currentStock, 
+        minStock, unitPrice, isSellable, salePrice 
+    } = req.body;
+    
+    // Validación para items vendibles
+    if (isSellable === true && (salePrice === undefined || salePrice <= 0)) {
+        throw new CustomError("Los items vendibles deben tener un precio de venta válido", 400);
+    }
+    
     const newItem = await BasicInventory.create({
-      name,
-      description,
-      category,
-      currentStock,
-      minStock,
-      unitPrice,
-      createdBy: req.user.n_document
-    });
-    res.status(201).json({
-      error: false,
-      message: 'Item creado exitosamente',
-      data: newItem
-    });
-  };
-  const updateItem = async (req, res) => {
-    const { id } = req.params;
-    const { name, description, category, minStock, unitPrice, isActive } = req.body;
-  
-    try {
-      const item = await BasicInventory.findByPk(id);
-      if (!item) {
-        throw new CustomError("Item no encontrado", 404);
-      }
-  
-      await item.update({
         name,
         description,
         category,
+        currentStock,
         minStock,
         unitPrice,
-        isActive,
-      });
-  
-      res.json({
+        isSellable: isSellable || false, // Por defecto no es vendible
+        salePrice: isSellable ? salePrice : null, // Solo establecer precio si es vendible
+        createdBy: req.user?.n_document
+    });
+    
+    res.status(201).json({
         error: false,
-        message: "Item actualizado exitosamente",
-        data: item,
-      });
+        message: 'Item creado exitosamente',
+        data: newItem
+    });
+};
+
+
+  const updateItem = async (req, res) => {
+    const { id } = req.params;
+    const { 
+        name, description, category, minStock, 
+        unitPrice, isActive, isSellable, salePrice 
+    } = req.body;
+
+    try {
+        const item = await BasicInventory.findByPk(id);
+        if (!item) {
+            throw new CustomError("Item no encontrado", 404);
+        }
+        
+        // Validación para items vendibles
+        if (isSellable === true && (salePrice === undefined || salePrice <= 0)) {
+            throw new CustomError("Los items vendibles deben tener un precio de venta válido", 400);
+        }
+
+        await item.update({
+            name,
+            description,
+            category,
+            minStock,
+            unitPrice,
+            isActive,
+            isSellable: isSellable || false,
+            salePrice: isSellable ? salePrice : null, // Solo establecer precio si es vendible
+        });
+
+        res.json({
+            error: false,
+            message: "Item actualizado exitosamente",
+            data: item,
+        });
     } catch (error) {
-      console.error("Error al actualizar el item:", error);
-      res.status(500).json({
-        error: true,
-        message: "Error al actualizar el item",
-      });
+        if (error instanceof CustomError) {
+            return res.status(error.statusCode).json({
+                error: true,
+                message: error.message
+            });
+        }
+        console.error("Error al actualizar el item:", error);
+        res.status(500).json({
+            error: true,
+            message: "Error al actualizar el item",
+        });
     }
-  };
+};
+
   // Elimina un item del inventario
   const deleteItem = async (req, res) => {
     const { id } = req.params;

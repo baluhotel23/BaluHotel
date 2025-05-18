@@ -37,9 +37,23 @@ export const getLowStockItems = () => async (dispatch) => {
 
 export const getAllItems = () => async (dispatch) => {
   try {
-    const { data } = await api.get('/inventory/');
-    dispatch({ type: 'GET_ALL_ITEMS', payload: data.data });
-    return { success: true, data: data.data };
+    const response = await api.get('/inventory/');
+    
+    // Mapear los datos al formato esperado por tu componente
+    const mappedItems = response.data.data.map(item => ({
+      itemId: item.id,
+      itemName: item.name,
+      description: item.description,
+      category: item.category,
+      currentStock: item.currentStock,
+      minStock: item.minStock,
+      unitPrice: parseFloat(item.unitPrice),
+      isSellable: item.isSellable || false,
+      salePrice: item.isSellable ? parseFloat(item.salePrice) : null
+    }));
+    
+    dispatch({ type: 'GET_ALL_ITEMS', payload: mappedItems });
+    return { success: true, data: mappedItems };
   } catch (error) {
     toast.error(error.response?.data?.message || 'Error al obtener los items');
     return { success: false, error };
@@ -59,6 +73,11 @@ export const getItemById = (id) => async (dispatch) => {
 
 export const createItem = (itemData) => async (dispatch) => {
   try {
+    // Asegúrate de que si isSellable es false, salePrice sea null
+    if (itemData.isSellable === false) {
+      itemData.salePrice = null;
+    }
+    
     const { data } = await api.post('/inventory/', itemData);
     dispatch({ type: 'CREATE_ITEM', payload: data.data });
     toast.success('Item creado exitosamente');
@@ -71,12 +90,43 @@ export const createItem = (itemData) => async (dispatch) => {
 
 export const updateItem = (id, itemData) => async (dispatch) => {
   try {
+    // Asegúrate de que si isSellable es false, salePrice sea null
+    if (itemData.isSellable === false) {
+      itemData.salePrice = null;
+    }
+    
     const { data } = await api.put(`/inventory/${id}`, itemData);
     dispatch({ type: 'UPDATE_ITEM', payload: data.data });
     toast.success('Item actualizado exitosamente');
     return { success: true, data: data.data };
   } catch (error) {
     toast.error(error.response?.data?.message || 'Error al actualizar el item');
+    return { success: false, error };
+  }
+};
+
+export const getSellableItems = () => async (dispatch) => {
+  try {
+    const response = await api.get('/inventory/');
+    
+    // Filtrar solo items vendibles y mapearlos
+    const mappedItems = response.data.data
+      .filter(item => item.isSellable && item.currentStock > 0)
+      .map(item => ({
+        itemId: item.id,
+        itemName: item.name,
+        description: item.description,
+        category: item.category,
+        currentStock: item.currentStock,
+        minStock: item.minStock,
+        unitPrice: parseFloat(item.unitPrice),
+        salePrice: parseFloat(item.salePrice)
+      }));
+    
+    dispatch({ type: 'GET_SELLABLE_ITEMS', payload: mappedItems });
+    return { success: true, data: mappedItems };
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Error al obtener los items vendibles');
     return { success: false, error };
   }
 };

@@ -8,6 +8,7 @@ import { differenceInDays, format } from 'date-fns';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from 'react-router-dom';
+import DashboardLayout from '../Dashboard/DashboardLayout'; // Asumiendo que tienes un layout de dashboard
 
 
 // Un componente simple para el Modal/Popup
@@ -88,6 +89,7 @@ const BuyerRegistrationFormPopup = ({ isOpen, onClose, onBuyerRegistered, initia
   };
 
   return (
+    
     <Modal isOpen={isOpen} onClose={onClose}>
       <h4>Registrar Nuevo Huésped</h4>
       <form onSubmit={handleSubmit}>
@@ -441,6 +443,7 @@ const LocalBookingForm = () => {
   const availableRooms = availability && !availabilityLoading && !availabilityError ? availability.filter(room => room.isAvailable) : [];
 
   return (
+    <DashboardLayout>
     <div style={{ padding: '20px', maxWidth: '800px', margin: 'auto' }}>
       <BuyerRegistrationFormPopup 
         isOpen={showBuyerPopup} 
@@ -585,6 +588,7 @@ const LocalBookingForm = () => {
         </fieldset>
       )}
     </div>
+    </DashboardLayout>
   );
 };
 

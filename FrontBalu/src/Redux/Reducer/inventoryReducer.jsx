@@ -1,13 +1,14 @@
 const initialState = {
     inventory: [],
-  lowStockItems: [],
-  currentItem: null,
-  purchases: [],
-  currentPurchase: null,
-  suppliers: [],
-  categories: [],
-  loading: false,
-  error: null
+    sellableItems: [], // Nueva propiedad para items vendibles
+    lowStockItems: [],
+    currentItem: null,
+    purchases: [],
+    currentPurchase: null,
+    suppliers: [],
+    categories: [],
+    loading: false,
+    error: null
 };
   
 const inventoryReducer = (state = initialState, action) => {
@@ -30,6 +31,14 @@ const inventoryReducer = (state = initialState, action) => {
         inventory: action.payload,
         loading: false
       };
+
+      case 'GET_SELLABLE_ITEMS':
+      return {
+        ...state,
+        sellableItems: action.payload,
+        loading: false
+      };
+      
     case 'GET_ITEM':
       return {
         ...state,

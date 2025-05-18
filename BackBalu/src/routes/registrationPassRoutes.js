@@ -8,6 +8,7 @@ const {
     getAllRegistrationPasses,
     updateRegistrationPass,
     deleteRegistrationPass,
+    getRegistrationPassesByBooking
   } = require("../controllers/registrationPassController");
   
 
@@ -23,6 +24,7 @@ router.use(isStaff);
 // Rutas para RegistrationPass
 router.post("/", allowRoles(['owner', 'admin']), createRegistrationPass); // Crear un nuevo registro
 router.get("/", allowRoles(['owner', 'admin']), getAllRegistrationPasses); // Obtener todos los registros
+router.get("/:bookingId", allowRoles(['owner', 'admin']), getRegistrationPassesByBooking); // Obtener registros por bookingId
 router.put("/:registrationNumber",allowRoles(['owner', 'admin']), updateRegistrationPass); // Actualizar un registro
 router.delete("/:registrationNumber",allowRoles(['owner', 'admin']), deleteRegistrationPass); // Eliminar un registro
 

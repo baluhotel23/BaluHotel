@@ -6,8 +6,10 @@ const {
   Service,
   Buyer,
   Payment,
-  conn, // <--- IMPORTAR LA INSTANCIA DE SEQUELIZE
+  RegistrationPass, 
+  conn, 
 } = require("../data");
+
 const { CustomError } = require("../middleware/error");
 const { Op } = require("sequelize");
 const jwt = require("jsonwebtoken");
@@ -489,14 +491,15 @@ const getBookingById = async (req, res) => {
 
   const booking = await Booking.findOne({
     where: { bookingId },
-    include: [
-      { model: Room },
-      { model: ExtraCharge },
-      { model: Bill },
-      { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername"] },
-      { model: Payment }, // <-- Agrega esta línea para incluir los pagos
-    ],
-  });
+  include: [
+    { model: Room },
+    { model: ExtraCharge },
+    { model: Bill },
+    { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername"] },
+    { model: Payment },
+    { model: RegistrationPass, as: "registrationPasses" }, // <-- Usa el alias aquí
+  ],
+});
 
   if (!booking) {
     throw new CustomError("Reserva no encontrada", 404);
@@ -724,6 +727,7 @@ const updateBookingStatus = async (req, res) => {
     "checked-in",
     "completed",
   ];
+  
   if (!validStatuses.includes(status)) {
     throw new CustomError("Estado de reserva inválido", 400);
   }
@@ -733,10 +737,13 @@ const updateBookingStatus = async (req, res) => {
     throw new CustomError("Reserva no encontrada", 404);
   }
 
+  // Solución: Manejar caso donde req.buyer o req.user puede no existir
+  const updatedBy = req.user?.n_document || req.buyer?.sdocno || "system";
+
   await booking.update({
     status,
     statusReason: reason,
-    statusUpdatedBy: req.buyer.sdocno,
+    statusUpdatedBy: updatedBy,  // Usar el valor seguro
     statusUpdatedAt: new Date(),
   });
 

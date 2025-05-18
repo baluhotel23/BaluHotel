@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { getAllBookings, getBookingById  } from "../../Redux/Actions/bookingActions";
+import { getAllBookings, getBookingById, updateBookingStatus  } from "../../Redux/Actions/bookingActions";
 import {
   updateRoomStatus,
   getRoomBasics,
 } from "../../Redux/Actions/roomActions";
+import DashboardLayout from "../Dashboard/DashboardLayout";
 import { createRegistrationPass } from "../../Redux/Actions/registerActions";
 import { removeStock } from "../../Redux/Actions/inventoryActions";
 import Registration from "../Dashboard/Registration";
@@ -126,6 +127,7 @@ const CheckIn = () => {
     return <div className="text-red-500 text-center py-8">{error}</div>;
 
   return (
+     <DashboardLayout>
   <div className="max-w-5xl mx-auto p-4">
     <h2 className="text-2xl font-bold mb-4">
       Habitaciones para preparar (Check-In)
@@ -303,6 +305,7 @@ const CheckIn = () => {
       })}
     </div>
   </div>
+  </DashboardLayout>
 );
 };
 
