@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { getAllItems, updateItem, deleteItem, addStock, removeStock } from "../../Redux/Actions/inventoryActions";
+import {
+  getAllItems,
+  updateItem,
+  deleteItem,
+  addStock,
+  removeStock,
+} from "../../Redux/Actions/inventoryActions";
 import { toast } from "react-toastify";
 import { FaEdit, FaTrash, FaBoxOpen } from "react-icons/fa";
 
@@ -11,37 +17,35 @@ const ManageItems = () => {
   useEffect(() => {
     dispatch(getAllItems());
   }, [dispatch]);
-console.log("Items del inventario:", inventory);
-  
-const handleEdit = (item) => {
-  if (!item) return;
-  
-  setEditingItem({
-    ...item,
-    id: item.id || null,
-    itemId: item.itemId || null,
-    name: item.name || item.itemName || null,
-    description: item.description || "",
-    isSellable: item.isSellable || false,
-    salePrice: item.salePrice || 0
-  }); 
-  
-  console.log("Editando item:", {
-    idItem: item.id || item.itemId,
-    editingId: item.id || null,
-    editingItemId: item.itemId || null
-  });
-};
+  console.log("Items del inventario:", inventory);
 
+  const handleEdit = (item) => {
+    if (!item) return;
 
+    setEditingItem({
+      ...item,
+      id: item.id || null,
+      itemId: item.itemId || null,
+      name: item.name || item.itemName || null,
+      description: item.description || "",
+      isSellable: item.isSellable || false,
+      salePrice: item.salePrice || 0,
+    });
+
+    console.log("Editando item:", {
+      idItem: item.id || item.itemId,
+      editingId: item.id || null,
+      editingItemId: item.itemId || null,
+    });
+  };
 
   const handleSave = async (id, updatedData) => {
     // Si no es vendible, asegurarse de que salePrice sea null
     const dataToSend = {
       ...updatedData,
-      salePrice: updatedData.isSellable ? updatedData.salePrice : null
+      salePrice: updatedData.isSellable ? updatedData.salePrice : null,
     };
-    
+
     console.log("Datos enviados al backend para actualizar:", dataToSend);
 
     const { success } = await dispatch(updateItem(id, dataToSend));
@@ -55,9 +59,9 @@ const handleEdit = (item) => {
   };
 
   // Define handleCancel
-const handleCancel = () => {
-  setEditingItem(null);
-};
+  const handleCancel = () => {
+    setEditingItem(null);
+  };
 
   // Define handleAddStock
   const handleAddStock = (id) => {
@@ -97,10 +101,10 @@ const handleCancel = () => {
     }
   };
 
-  const filteredInventory = (inventory || []).filter(item => 
-  item && (item.name || item.itemName)
-);
-  
+  const filteredInventory = (inventory || []).filter(
+    (item) => item && (item.name || item.itemName)
+  );
+
   const isInventoryEmpty = filteredInventory.length === 0;
 
   return (
@@ -109,9 +113,12 @@ const handleCancel = () => {
         // Mostrar mensaje cuando no hay items en el inventario
         <div className="text-center py-12">
           <FaBoxOpen className="mx-auto text-4xl text-gray-400 mb-4" />
-          <h3 className="text-xl font-medium text-gray-600 mb-2">No hay elementos en el inventario</h3>
+          <h3 className="text-xl font-medium text-gray-600 mb-2">
+            No hay elementos en el inventario
+          </h3>
           <p className="text-gray-500 mb-4">
-            Para comenzar, crea un nuevo elemento usando el formulario de la izquierda.
+            Para comenzar, crea un nuevo elemento usando el formulario de la
+            izquierda.
           </p>
         </div>
       ) : (
@@ -123,7 +130,9 @@ const handleCancel = () => {
               <th className="border border-gray-300 px-4 py-2">Descripción</th>
               <th className="border border-gray-300 px-4 py-2">Stock Actual</th>
               <th className="border border-gray-300 px-4 py-2">Stock Mínimo</th>
-              <th className="border border-gray-300 px-4 py-2">Precio Unitario</th>
+              <th className="border border-gray-300 px-4 py-2">
+                Precio Unitario
+              </th>
               <th className="border border-gray-300 px-4 py-2">Vendible</th>
               <th className="border border-gray-300 px-4 py-2">Precio Venta</th>
               <th className="border border-gray-300 px-4 py-2">Categoría</th>
@@ -140,20 +149,19 @@ const handleCancel = () => {
                 }`}
                 title={item.currentStock <= item.minStock ? "POCO STOCK" : ""}
               >
-                {(editingItem && (
-  (item.id && editingItem.id === item.id) || 
-  (item.itemId && editingItem.itemId === item.itemId)
-)) ? (
+                {editingItem &&
+                ((item.id && editingItem.id === item.id) ||
+                  (item.itemId && editingItem.itemId === item.itemId)) ? (
                   <>
                     <td className="border border-gray-300 px-4 py-2">
                       <input
                         type="text"
-                        value={(editingItem?.name || editingItem?.itemName || "")}
+                        value={editingItem?.name || editingItem?.itemName || ""}
                         onChange={(e) =>
-                          setEditingItem({ 
-                            ...editingItem, 
-                            name: e.target.value, 
-                            itemName: e.target.value 
+                          setEditingItem({
+                            ...editingItem,
+                            name: e.target.value,
+                            itemName: e.target.value,
                           })
                         }
                         className="w-full px-2 py-1 border rounded"
@@ -237,7 +245,9 @@ const handleCancel = () => {
                             salePrice: Number(e.target.value),
                           })
                         }
-                        className={`w-full px-2 py-1 border rounded ${!editingItem?.isSellable ? 'bg-gray-100' : 'bg-white'}`}
+                        className={`w-full px-2 py-1 border rounded ${
+                          !editingItem?.isSellable ? "bg-gray-100" : "bg-white"
+                        }`}
                         step="0.01"
                         disabled={!editingItem?.isSellable}
                       />
@@ -274,7 +284,9 @@ const handleCancel = () => {
                     </td>
                     <td className="border border-gray-300 px-4 py-2">
                       <button
-                        onClick={() => handleSave(item.id || item.itemId, editingItem)}
+                        onClick={() =>
+                          handleSave(item.id || item.itemId, editingItem)
+                        }
                         className="bg-green-500 text-white px-2 py-1 rounded mb-1 text-xs w-full"
                       >
                         Guardar
@@ -289,26 +301,44 @@ const handleCancel = () => {
                   </>
                 ) : (
                   <>
-                    <td className="border border-gray-300 px-4 py-2">{item.name || item.itemName}</td>
-                    <td className="border border-gray-300 px-4 py-2">{item.description}</td>
-                    <td className="border border-gray-300 px-4 py-2">{item.currentStock}</td>
-                    <td className="border border-gray-300 px-4 py-2">{item.minStock}</td>
-                    <td className="border border-gray-300 px-4 py-2">{item.unitPrice}</td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {item.name || item.itemName}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {item.description}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {item.currentStock}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {item.minStock}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {item.unitPrice}
+                    </td>
                     {/* Nuevo: Mostrar si es vendible */}
                     <td className="border border-gray-300 px-4 py-2 text-center">
-                      {item.isSellable ? 
-                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Sí</span> : 
-                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">No</span>
-                      }
+                      {item.isSellable ? (
+                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                          Sí
+                        </span>
+                      ) : (
+                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">
+                          No
+                        </span>
+                      )}
                     </td>
                     {/* Nuevo: Mostrar precio de venta */}
                     <td className="border border-gray-300 px-4 py-2">
-                      {item.isSellable ? 
-                        <span className="font-semibold">${item.salePrice}</span> : 
+                      {item.isSellable ? (
+                        <span className="font-semibold">${item.salePrice}</span>
+                      ) : (
                         <span className="text-gray-400">N/A</span>
-                      }
+                      )}
                     </td>
-                    <td className="border border-gray-300 px-4 py-2">{item.category}</td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {item.category}
+                    </td>
                     <td className="border border-gray-300 px-4 py-2">
                       {item.isActive ? "Sí" : "No"}
                     </td>
@@ -331,7 +361,9 @@ const handleCancel = () => {
                         + Stock
                       </button>
                       <button
-                        onClick={() => handleRemoveStock(item.id || item.itemId)}
+                        onClick={() =>
+                          handleRemoveStock(item.id || item.itemId)
+                        }
                         className="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600"
                         title="Remover Stock"
                       >
