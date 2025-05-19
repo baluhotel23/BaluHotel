@@ -29,19 +29,35 @@ const getInventory = async (req, res) => {
 };
 
 const createPurchase = async (req, res) => {
-    const { supplier, items, totalAmount } = req.body;
+    const { 
+        supplier, 
+        items, 
+        totalAmount, 
+        paymentMethod,
+        paymentStatus,
+        invoiceNumber,
+        purchaseDate
+    } = req.body;
 
     // Validar items
     if (!items || !items.length) {
         throw new CustomError('Debe incluir al menos un item', 400);
     }
+    
+    // Validar campo obligatorio
+    if (!paymentMethod) {
+        throw new CustomError('El método de pago es obligatorio', 400);
+    }
 
-    // Crear compra y sus items en una transacción
+    // Crear compra con todos los campos
     const purchase = await Purchase.create({
         supplier,
         totalAmount,
-        createdBy: req.user.n_document,
-        date: new Date()
+        paymentMethod,
+        paymentStatus: paymentStatus || 'pending',
+        invoiceNumber: invoiceNumber || null,
+        purchaseDate: purchaseDate || new Date(),
+        createdBy: req.user.n_document
     });
 
     // Crear items y actualizar stock
@@ -51,12 +67,19 @@ const createPurchase = async (req, res) => {
             throw new CustomError(`Item ${item.itemId} no encontrado`, 404);
         }
 
+        // Usa el campo price en lugar de unitPrice o maneja ambos
+        const itemPrice = item.price || item.unitPrice;
+        
+        if (itemPrice === undefined || itemPrice === null) {
+            throw new CustomError(`El precio es obligatorio para el item ${item.itemId}`, 400);
+        }
+
         await PurchaseItem.create({
             purchaseId: purchase.id,
             itemId: item.itemId,
             quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            subtotal: item.quantity * item.unitPrice
+            price: parseFloat(itemPrice),  // Usa el campo correcto
+            total: parseFloat(item.quantity * itemPrice)  // Calcula el total con el precio correcto
         });
 
         // Actualizar stock
@@ -314,7 +337,7 @@ const getAllItems = async (req, res) => {
         model: PurchaseItem,
         include: BasicInventory
       },
-      order: [['date', 'DESC']]
+      order: [['purchaseDate', 'DESC']]
     });
     res.json({
       error: false,

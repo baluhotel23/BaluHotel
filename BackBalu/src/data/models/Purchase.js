@@ -7,6 +7,7 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+    
     supplier: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -23,10 +24,10 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     paymentMethod: {
-      type: DataTypes.ENUM,
-      values: ['cash', 'credit_card', 'transfer', 'credit'],
-      allowNull: false,
-    },
+  type: DataTypes.ENUM,
+  values: ['cash', 'credit_card', 'transfer', 'credit'],
+  allowNull: false,
+},
     paymentStatus: {
       type: DataTypes.ENUM,
       values: ['pending', 'paid', 'partial'],
