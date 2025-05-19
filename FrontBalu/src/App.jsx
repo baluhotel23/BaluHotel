@@ -1,41 +1,46 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import {jwtDecode} from 'jwt-decode';
-import { login } from './Redux/Actions/authActions';
-import PrivateRoute from './Components/PrivateRoute';
-import 'react-toastify/dist/ReactToastify.css';
-import { ToastContainer } from 'react-toastify';
+import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { jwtDecode } from "jwt-decode";
+import { login } from "./Redux/Actions/authActions";
+import PrivateRoute from "./Components/PrivateRoute";
+import "react-toastify/dist/ReactToastify.css";
+import { ToastContainer } from "react-toastify";
 
 // Importa tus componentes
-import Login from './Components/Auth/Login';
-import Register from './Components/Auth/Register';
-import Dashboard from './Components/Dashboard/Dashboard';
-import RoomsSection from './Components/Rooms/RoomsSection';
-import NotFound from './Components/NotFound';
-import Unauthorized from './Components/Auth/Unauthorized';
-import Landing from './Components/Landing';
-import ServiceManagement from './Components/Dashboard/ServiceManagement';
-import CreateRoom from './Components/Dashboard/CreateRoom';
-import RoomList from './Components/Dashboard/RoomList';
-import Navbar from './Components/Navbar';
-import RoomDetail from './Components/Rooms/RoomDetail';
-import Booking from './Components/Booking/Booking';
-import CheckIn from './Components/CheckIn-CheckOut/CheckIn';
-//import BookingsPendientes from './Components/Taxxa/BookingsPendientes';
-//import BuyerRegistrationForm from './Components/Taxxa/BuyerRegistrationForm';
-//import ParentBuyerRegistration from './Components/Taxxa/ParentBuyerRegistration';
-import BookingStatusPage from './Components/Booking/BookingStatusPage';
-import RoomAvailability from './Components/Rooms/RoomAvailability';
-import HotelSetting from './Components/Dashboard/HotelSetting';
-import CreateItems from './Components/Dashboard/CreateItems';
-import ManageItems from './Components/Dashboard/ManageItems';
-import RegistrationPass from './Components/Dashboard/Registration';
-import RoomDetailCheck from './Components/Dashboard/RoomDetailCheck';
-import LocalBookingForm from './Components/Booking/LocalBookingForm';
-import CheckOut from './Components/CheckOut/CheckOut';
-import ThankYouPage from './Components/ThankYouPage';
-import BookingPassengerList from './Components/Dashboard/BookingPassengerList';
+import Login from "./Components/Auth/Login";
+import Register from "./Components/Auth/Register";
+import Dashboard from "./Components/Dashboard/Dashboard";
+import RoomsSection from "./Components/Rooms/RoomsSection";
+import NotFound from "./Components/NotFound";
+import Unauthorized from "./Components/Auth/Unauthorized";
+import Landing from "./Components/Landing";
+import ServiceManagement from "./Components/Dashboard/ServiceManagement";
+import CreateRoom from "./Components/Dashboard/CreateRoom";
+import RoomList from "./Components/Dashboard/RoomList";
+import Navbar from "./Components/Navbar";
+import RoomDetail from "./Components/Rooms/RoomDetail";
+import Booking from "./Components/Booking/Booking";
+import CheckIn from "./Components/CheckIn-CheckOut/CheckIn";
+import PurchaseList from "./Components/Purchases/PurchaseList";
+import PurchaseForm from "./Components/Purchases/PurchaseForm";
+import PurchaseDetail from "./Components/Purchases/PurchaseDetail";
+import BookingStatusPage from "./Components/Booking/BookingStatusPage";
+import RoomAvailability from "./Components/Rooms/RoomAvailability";
+import HotelSetting from "./Components/Dashboard/HotelSetting";
+import CreateItems from "./Components/Dashboard/CreateItems";
+import ManageItems from "./Components/Dashboard/ManageItems";
+import RegistrationPass from "./Components/Dashboard/Registration";
+import RoomDetailCheck from "./Components/Dashboard/RoomDetailCheck";
+import LocalBookingForm from "./Components/Booking/LocalBookingForm";
+import CheckOut from "./Components/CheckOut/CheckOut";
+import ThankYouPage from "./Components/ThankYouPage";
+import BookingPassengerList from "./Components/Dashboard/BookingPassengerList";
+import PurchasePanel from './Components/Purchases/PurchasePanel';
+import ExpenseForm from "./Components/Purchases/ExpensesForm";
+import ExpensesList from "./Components/Purchases/ExpensesList";
+import FinancialBalance from "./Components/Dashboard/FinancialBalance";
+
 
 
 const AppContent = () => {
@@ -45,38 +50,38 @@ const AppContent = () => {
   useEffect(() => {
     // Define las rutas públicas que no requieren autenticación
     const publicPaths = [
-      '/',
-      '/booking',
-      '/booking-status',
-      '/RoomsSection',
-      '/room',
-      '/login',
-      '/buyerForm',
-      '/registro-comprador',
-      '/unauthorized'
+      "/",
+      "/booking",
+      "/booking-status",
+      "/RoomsSection",
+      "/room",
+      "/login",
+      "/buyerForm",
+      "/registro-comprador",
+      "/unauthorized",
     ];
 
     // Si la ruta actual es pública, omite la verificación de token
-    if (publicPaths.some(path => location.pathname.startsWith(path))) {
+    if (publicPaths.some((path) => location.pathname.startsWith(path))) {
       return;
     }
 
     // Verificar si hay un token guardado al iniciar la app
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (token) {
       try {
         const decoded = jwtDecode(token);
         // Verificar que el token no haya expirado (exp en segundos)
         if (decoded.exp * 1000 < Date.now()) {
-          console.log('El token ha expirado');
+          console.log("El token ha expirado");
         } else {
-          const user = JSON.parse(localStorage.getItem('user'));
+          const user = JSON.parse(localStorage.getItem("user"));
           if (user) {
             dispatch(login({ token, user }));
           }
         }
       } catch (error) {
-        console.error('Error decodificando el token:', error);
+        console.error("Error decodificando el token:", error);
       }
     }
   }, [dispatch, location]);
@@ -89,7 +94,10 @@ const AppContent = () => {
         <Routes>
           {/* Rutas públicas */}
           <Route path="/" element={<Landing />} />
-          <Route path="/booking-status/:trackingToken" element={<BookingStatusPage />} />
+          <Route
+            path="/booking-status/:trackingToken"
+            element={<BookingStatusPage />}
+          />
           <Route path="/RoomsSection" element={<RoomsSection />} />
           <Route path="/room/:roomNumber" element={<RoomDetail />} />
           <Route path="/booking" element={<Booking />} />
@@ -103,7 +111,7 @@ const AppContent = () => {
           <Route
             path="/dashboard"
             element={
-              <PrivateRoute allowedRoles={['owner', 'admin']}>
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <Dashboard />
               </PrivateRoute>
             }
@@ -111,7 +119,7 @@ const AppContent = () => {
           <Route
             path="/admin/services"
             element={
-              <PrivateRoute allowedRoles={['owner', 'admin']}>
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <ServiceManagement />
               </PrivateRoute>
             }
@@ -119,7 +127,7 @@ const AppContent = () => {
           <Route
             path="/admin/create-room"
             element={
-              <PrivateRoute allowedRoles={['owner', 'admin']}>
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <CreateRoom />
               </PrivateRoute>
             }
@@ -127,7 +135,7 @@ const AppContent = () => {
           <Route
             path="/admin/CheckIn"
             element={
-              <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
+              <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
                 <CheckIn />
               </PrivateRoute>
             }
@@ -135,7 +143,7 @@ const AppContent = () => {
           <Route
             path="/admin/PassengerList"
             element={
-              <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
+              <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
                 <BookingPassengerList />
               </PrivateRoute>
             }
@@ -143,7 +151,7 @@ const AppContent = () => {
           <Route
             path="/admin/CheckOut"
             element={
-              <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
+              <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
                 <CheckOut />
               </PrivateRoute>
             }
@@ -151,7 +159,7 @@ const AppContent = () => {
           <Route
             path="/admin/rooms"
             element={
-              <PrivateRoute allowedRoles={['owner', 'admin']}>
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <RoomList />
               </PrivateRoute>
             }
@@ -159,7 +167,7 @@ const AppContent = () => {
           <Route
             path="/admin/localBooking"
             element={
-              <PrivateRoute allowedRoles={['owner', 'admin', 'recept']}>
+              <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
                 <LocalBookingForm />
               </PrivateRoute>
             }
@@ -172,62 +180,127 @@ const AppContent = () => {
               </PrivateRoute>
             }
           /> */}
-              <Route
+          <Route
             path="/bookings/availability"
             element={
-              <PrivateRoute allowedRoles={['owner', 'admin']}>
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <RoomAvailability />
               </PrivateRoute>
             }
           />
-                 <Route
+          <Route
             path="/hotelSetting"
             element={
-              <PrivateRoute allowedRoles={['owner']}>
+              <PrivateRoute allowedRoles={["owner"]}>
                 <HotelSetting />
               </PrivateRoute>
             }
           />
-                  <Route
+          <Route
             path="/register"
             element={
-              <PrivateRoute allowedRoles={['owner']}>
+              <PrivateRoute allowedRoles={["owner"]}>
                 <Register />
               </PrivateRoute>
             }
           />
-                      <Route
+          <Route
             path="/inventory"
             element={
-              <PrivateRoute allowedRoles={['owner']}>
+              <PrivateRoute allowedRoles={["owner"]}>
                 <CreateItems />
               </PrivateRoute>
             }
           />
-               <Route
+          <Route
             path="/allItems"
             element={
-              <PrivateRoute allowedRoles={['owner']}>
+              <PrivateRoute allowedRoles={["owner"]}>
                 <ManageItems />
               </PrivateRoute>
             }
           />
-                  <Route
+          <Route
             path="/registerPass"
             element={
-              <PrivateRoute allowedRoles={['owner']}>
+              <PrivateRoute allowedRoles={["owner"]}>
                 <RegistrationPass />
               </PrivateRoute>
             }
           />
-                      <Route
+          <Route
             path="/roomCheck"
             element={
-              <PrivateRoute allowedRoles={['owner']}>
+              <PrivateRoute allowedRoles={["owner"]}>
                 <RoomDetailCheck />
               </PrivateRoute>
             }
           />
+          <Route
+            path="/purchasePanel"
+            element={
+              <PrivateRoute allowedRoles={["owner"]}>
+                <PurchasePanel />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/purchaseList"
+            element={
+              <PrivateRoute allowedRoles={["owner"]}>
+                <PurchaseList />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/purchaseForm"
+            element={
+              <PrivateRoute allowedRoles={["owner"]}>
+                <PurchaseForm />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/purchases/:id"
+            element={
+              <PrivateRoute allowedRoles={["owner"]}>
+                <PurchaseDetail />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/expenses"
+            element={
+              <PrivateRoute allowedRoles={["owner"]}>
+                <ExpenseForm />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/expensesList"
+            element={
+              <PrivateRoute allowedRoles={["owner"]}>
+                <ExpensesList />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/expensesList"
+            element={
+              <PrivateRoute allowedRoles={["owner"]}>
+                <ExpensesList />
+              </PrivateRoute>
+            }
+          /><Route
+            path="/balance"
+            element={
+              <PrivateRoute allowedRoles={["owner"]}>
+                <FinancialBalance />
+              </PrivateRoute>
+            }
+          />
+
           {/* Ruta por defecto para 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -12,6 +12,8 @@ import paymentReducer from '../Reducer/paymentReducer';
 import hotelReducer from '../Reducer/hotelReducer';
 import taxxaReducer from '../Reducer/taxxaReducer';
 import registerReducer from '../Reducer/registrationPassReducer';
+import purchaseReducer from '../Reducer/purchaseReducer';
+import financialReducer from '../Reducer/financialReducer';
 
 
 const rootReducer = combineReducers({
@@ -25,7 +27,9 @@ const rootReducer = combineReducers({
   payment:paymentReducer,
   hotel: hotelReducer,
   taxxa: taxxaReducer,
-  registrationPass: registerReducer
+  registrationPass: registerReducer,
+  purchase: purchaseReducer,
+  financial: financialReducer
 
 });
 

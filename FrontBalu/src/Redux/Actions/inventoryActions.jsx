@@ -95,7 +95,7 @@ export const updateItem = (id, itemData) => async (dispatch) => {
       itemData.salePrice = null;
     }
     
-    const { data } = await api.put(`/inventory/${id}`, itemData);
+    const { data } = await api.put(`/inventory/${id}/general`, itemData);
     dispatch({ type: 'UPDATE_ITEM', payload: data.data });
     toast.success('Item actualizado exitosamente');
     return { success: true, data: data.data };

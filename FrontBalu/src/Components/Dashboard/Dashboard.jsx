@@ -150,6 +150,28 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
+        {(user.role === 'owner' ) && (
+          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+            <h2 className="text-xl font-semibold mb-2">COMPRAS Y GASTOS</h2>
+            <p className="text-gray-600 mb-4">CARGAR Y LISTAR COMPRAS Y GASTOS</p>
+            <Link to="/purchasePanel">
+            <button className="bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded">
+              COMPRAS Y GASTOS
+            </button>
+            </Link>
+          </div>
+        )}
+        {(user.role === 'owner' || user.role === 'admin') && (
+          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+            <h2 className="text-xl font-semibold mb-2"> BALANCE FINANCIERO</h2>
+            <p className="text-gray-600 mb-4"> BALANCE FINANCIERO</p>
+            <Link to="/balance">
+              <button className=" bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded">
+                BALANCE FINANCIERO
+              </button>
+            </Link>
+          </div>
+        )}
 
        
       </div>
