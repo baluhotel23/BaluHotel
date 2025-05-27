@@ -3,6 +3,7 @@ const router = express.Router();
 const { verifyToken } = require('../middleware/isAuth');
 const { isStaff, allowRoles } = require('../middleware/byRol');
 const { validateInventoryItem } = require('../middleware/validation/validateInventoryItem');
+const { upload } = require('../middleware/multer');
 const { 
     getInventory,
     createPurchase,
@@ -49,7 +50,7 @@ router.get('/low-stock', getLowStockItems);
 
 // Compras y proveedores - Rutas específicas
 router.get('/purchases', getAllPurchases);
-router.post('/purchase', allowRoles(['owner', 'admin']), createPurchase);
+router.post('/purchase', upload.single('file'), allowRoles(['owner', 'admin']), createPurchase);
 router.get('/purchases/:id', getPurchaseDetails);
 router.get('/suppliers', getAllSuppliers);
 router.post('/suppliers', allowRoles(['owner', 'admin']), createSupplier);

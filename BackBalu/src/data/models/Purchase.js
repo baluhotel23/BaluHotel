@@ -1,13 +1,12 @@
 const { DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
- const Purchase= sequelize.define("Purchase", {
+  const Purchase = sequelize.define("Purchase", {
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    
     supplier: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -24,15 +23,19 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     paymentMethod: {
-  type: DataTypes.ENUM,
-  values: ['cash', 'credit_card', 'transfer', 'credit'],
-  allowNull: false,
-},
+      type: DataTypes.ENUM,
+      values: ['cash', 'credit_card', 'transfer', 'credit'],
+      allowNull: false,
+    },
     paymentStatus: {
       type: DataTypes.ENUM,
       values: ['pending', 'paid', 'partial'],
       defaultValue: 'pending',
-    }
+    },
+    receiptUrl: { // Nuevo campo para la URL del comprobante
+      type: DataTypes.STRING,
+    },
   });
- return Purchase;
+
+  return Purchase;
 };

@@ -1,5 +1,9 @@
 const cloudinary = require('cloudinary').v2;
 
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  throw new Error('Faltan las credenciales de Cloudinary en las variables de entorno');
+}
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -7,5 +11,4 @@ cloudinary.config({
 });
 
 module.exports = cloudinary;
-
 

@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { getAllBookings, updateBookingStatus } from "../../Redux/Actions/bookingActions";
+import { getAllBookings, updateBookingStatus, generateBill } from "../../Redux/Actions/bookingActions"; // Asegúrate de importar generateBill
 import { updateRoomStatus } from "../../Redux/Actions/roomActions";
 import dayjs from "dayjs";
 import ExtraCharges from "./ExtraCharge";
@@ -20,22 +20,26 @@ const CheckOut = () => {
   const handleCheckOut = async (bookingId) => {
     try {
       // 1. Actualizar estado de la reserva a "completed"
-      await dispatch(updateBookingStatus(bookingId, { status: "completed" }));
+       await dispatch(updateBookingStatus(bookingId, { status: "completed" }));
+      toast.success(`Estado de la reserva #${bookingId} actualizado a "completed".`);
       
+      await dispatch(generateBill(bookingId));
+      toast.info(`Factura solicitada para la reserva #${bookingId}.`);
       // 2. Encontrar la habitación asociada con esta reserva
-      const booking = bookings.find(b => b.bookingId === bookingId);
+       const booking = bookings.find(b => b.bookingId === bookingId);
       if (booking && booking.Room) {
-        // 3. Actualizar estado de la habitación a "Disponible"
+        // 4. Actualizar estado de la habitación a "Disponible"
         await dispatch(updateRoomStatus(booking.Room.roomNumber, { status: "Disponible" }));
+        toast.success(`Habitación #${booking.Room.roomNumber} actualizada a "Disponible".`);
       }
-      
       // 4. Refrescar la lista de reservas
       dispatch(getAllBookings({ status: "checked-in" }));
       
-      toast.success(`Check-out completado para la reserva #${bookingId}`);
+      toast.success(`Check-out completado exitosamente para la reserva #${bookingId}`);
     } catch (error) {
       console.error("Error al realizar check-out:", error);
-      toast.error("Error al procesar el check-out. Por favor, intente nuevamente.");
+      // El error ya se muestra por las actions individuales, pero puedes agregar un toast general si quieres.
+      toast.error("Error al procesar el check-out. Verifique los mensajes anteriores o intente nuevamente.");
     }
   };
 
