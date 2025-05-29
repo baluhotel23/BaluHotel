@@ -62,17 +62,23 @@ try {
     console.log("Wompi reference:", reference);
 
     // Calcula la firma de integridad correctamente
-    const integrityString = `${amountInCents}${booking.currency || 'COP'}${reference}${integritySecret}`;
-    const integrity = sha256(integrityString).toString();
-console.log({
-  amountInCents,
-  currency: booking.currency || 'COP',
-  reference,
-  integritySecret,
-  publicKey
-});
+    const currencyForSignature = booking.currency || 'COP';
+    const integrityString = `${reference}${amountInCents}${currencyForSignature}${integritySecret}`;
+
+    console.log("String para firmar (integrityString):", integrityString); 
+    
+    const integrity = sha256(integrityString).toString(); // crypto-js/sha256 por defecto devuelve Hex
+console.log("Datos para la firma y checkout (Valores individuales):", {
+      reference,
+      amountInCents,
+      currency: currencyForSignature,
+      integritySecret, // Considera no loguear el secreto en producción por seguridad
+      publicKey,
+      calculatedIntegritySignature: integrity
+    });
+
     const checkoutData = {
-      currency: booking.currency || 'COP',
+      currency: currencyForSignature,
       amountInCents: amountInCents,
       reference: reference,
       publicKey: publicKey,
@@ -85,6 +91,7 @@ console.log({
         integrity: integrity, // <--- ¡Esto es lo que pide Wompi!
       }
     };
+    
     console.log("Wompi Checkout Data:", checkoutData); // Log the data being sent
     console.log({ amountInCents, currency: booking.currency || 'COP', reference, integritySecret, publicKey });
     const checkout = new WidgetCheckout(checkoutData);

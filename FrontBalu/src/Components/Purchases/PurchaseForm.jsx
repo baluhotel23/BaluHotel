@@ -8,14 +8,16 @@ import ItemSelector from './ItemSelector';
 import PurchaseItemForm from './PurchaseItemForm';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../Dashboard/DashboardLayout';
+import { openCloudinaryWidget } from '../../cloudinaryConfig';
 
 const PurchaseForm = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const inventory = useSelector((state) => state.inventory?.inventory || []);
   const { loading } = useSelector((state) => state.purchase || {});
-  
+
   const [showItemSelector, setShowItemSelector] = useState(false);
+  const [receipt, setReceipt] = useState(null); // Estado para el comprobante
   const [purchase, setPurchase] = useState({
     supplier: '',
     invoiceNumber: '',
@@ -24,7 +26,7 @@ const PurchaseForm = () => {
     paymentStatus: 'paid',
     notes: '',
     items: [],
-    totalAmount: 0
+    totalAmount: 0,
   });
 
   useEffect(() => {
@@ -210,45 +212,49 @@ const PurchaseForm = () => {
   return true;
 };
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (!validateForm()) {
-    return;
-  }
-  
-  // Preparar datos para enviar
-  const purchaseData = {
-    supplier: purchase.supplier,
-    invoiceNumber: purchase.invoiceNumber,
-    purchaseDate: purchase.purchaseDate,
-    paymentMethod: purchase.paymentMethod,
-    paymentStatus: purchase.paymentStatus,
-    notes: purchase.notes,
-    totalAmount: purchase.totalAmount,
-    items: purchase.items.map(item => ({
-      itemId: item.itemId,
-      quantity: parseInt(item.quantity),
-      price: parseFloat(item.price),
-      total: parseFloat(item.quantity * item.price)
-    }))
+const handleUploadReceipt = () => {
+    openCloudinaryWidget((url) => {
+      setReceipt(url); // Guarda la URL del comprobante
+      toast.success('Comprobante cargado exitosamente');
+    });
   };
-  
-  // Añadir este console.log para depurar
-  console.log('Datos enviados al backend:', JSON.stringify(purchaseData, null, 2));
-  
-  try {
-    const result = await dispatch(createPurchase(purchaseData));
-    
-    if (result.success) {
-      toast.success('Compra registrada exitosamente');
-      navigate('/purchaseList'); // Redireccionar a la lista de compras
+
+const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
     }
-  } catch (error) {
-    toast.error('Error al registrar la compra');
-    console.error(error);
-  }
-};
+
+    const purchaseData = {
+      supplier: purchase.supplier,
+      invoiceNumber: purchase.invoiceNumber,
+      purchaseDate: purchase.purchaseDate,
+      paymentMethod: purchase.paymentMethod,
+      paymentStatus: purchase.paymentStatus,
+      notes: purchase.notes,
+      totalAmount: purchase.totalAmount,
+      receiptUrl: receipt, // Agregar la URL del comprobante
+      items: purchase.items.map((item) => ({
+        itemId: item.itemId,
+        quantity: parseInt(item.quantity),
+        price: parseFloat(item.price),
+        total: parseFloat(item.quantity * item.price),
+      })),
+    };
+
+    try {
+      const result = await dispatch(createPurchase(purchaseData));
+
+      if (result.success) {
+        toast.success('Compra registrada exitosamente');
+        navigate('/purchaseList');
+      }
+    } catch (error) {
+      toast.error('Error al registrar la compra');
+      console.error(error);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -341,7 +347,35 @@ const PurchaseForm = () => {
               rows="2"
             ></textarea>
           </div>
-        </div>
+               <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Comprobante de Compra (Opcional)
+  </label>
+  <button
+    type="button"
+    onClick={handleUploadReceipt}
+    className="bg-blue-500 text-white px-4 py-2 rounded-md flex items-center text-sm hover:bg-blue-600"
+  >
+    Cargar Comprobante
+  </button>
+  {receipt ? (
+    <div className="mt-2">
+      <p className="text-green-600 mb-2">Comprobante cargado:</p>
+      <iframe
+        src={receipt}
+        width="100%"
+        height="500px"
+        className="border rounded"
+        title="Comprobante de Compra"
+      ></iframe>
+      <p className="text-gray-500 text-sm mt-2">
+        Si deseas reemplazar el comprobante, vuelve a cargar uno nuevo.
+      </p>
+    </div>
+  ) : (
+    <p className="text-gray-500 mt-2">No se ha cargado ningún comprobante.</p>
+  )}
+</div></div>
         
         {/* Sección de ítems */}
         <div className="mt-8 mb-6">

@@ -37,7 +37,7 @@ export const getLowStockItems = () => async (dispatch) => {
 
 export const getAllItems = () => async (dispatch) => {
   try {
-    const response = await api.get('/inventory/');
+    const response = await api.get('/inventory');
     
     // Mapear los datos al formato esperado por tu componente
     const mappedItems = response.data.data.map(item => ({

@@ -15,7 +15,7 @@ const CheckIn = () => {
   const dispatch = useDispatch();
   const { bookings, loading, error } = useSelector((state) => state.booking);
   const [selectedBooking, setSelectedBooking] = useState(null);
-
+  const [manualBookingId, setManualBookingId] = useState(""); // Nuevo estado para el número de reserva manual
   const { roomBasics } = useSelector((state) => state.room);
   const [checkedRooms, setCheckedRooms] = useState({});
   const [checkedBasics, setCheckedBasics] = useState({});
@@ -37,6 +37,8 @@ const CheckIn = () => {
   const handlePreparation = (roomNumber, status) => {
     dispatch(updateRoomStatus(roomNumber, { status }));
   };
+
+  
 
   //   // const handleAddGuest = () => {
   //   //   setExtraGuests([...extraGuests, { name: "", document: "" }]);
@@ -194,7 +196,7 @@ const CheckIn = () => {
             </div>
             <div>
               <span className="font-medium">Huésped principal:</span>{" "}
-              {booking.guest?.sdocno}
+              {booking.guest?.scostumername}
             </div>
             <div>
               <span className="font-medium">Check-in:</span>{" "}

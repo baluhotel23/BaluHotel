@@ -1,6 +1,7 @@
   const { BasicInventory, Purchase, PurchaseItem, RoomCheckIn } = require('../data');
 const { CustomError } = require('../middleware/error');
 const { catchedAsync } = require('../utils/catchedAsync');
+const { upload } = require('../middleware/multer');
 
 const getInventory = async (req, res) => {
     const { category, search } = req.query;
@@ -29,68 +30,65 @@ const getInventory = async (req, res) => {
 };
 
 const createPurchase = async (req, res) => {
-    const { 
-        supplier, 
-        items, 
-        totalAmount, 
-        paymentMethod,
-        paymentStatus,
-        invoiceNumber,
-        purchaseDate
-    } = req.body;
+  const { supplier, items, totalAmount, paymentMethod, paymentStatus, invoiceNumber, purchaseDate } = req.body;
 
-    // Validar items
-    if (!items || !items.length) {
-        throw new CustomError('Debe incluir al menos un item', 400);
-    }
-    
-    // Validar campo obligatorio
-    if (!paymentMethod) {
-        throw new CustomError('El método de pago es obligatorio', 400);
+  let receiptUrl = null;
+
+  // Subir el comprobante si existe
+ if (req.file) {
+  const { mimetype, path } = req.file;
+
+  // Verificar si el archivo es un PDF
+  if (mimetype !== 'application/pdf') {
+    throw new Error('El archivo debe ser un PDF');
+  }
+
+  try {
+    const uploadResult = await uploadToCloudinary(path, 'purchase_receipts');
+    receiptUrl = uploadResult.secure_url;
+  } catch (error) {
+    console.error('Error al subir el comprobante a Cloudinary:', error);
+    throw new Error('No se pudo subir el comprobante');
+  }
+}
+
+  // Crear la compra
+  const purchase = await Purchase.create({
+    supplier,
+    totalAmount,
+    paymentMethod,
+    paymentStatus: paymentStatus || 'pending',
+    invoiceNumber: invoiceNumber || null,
+    purchaseDate: purchaseDate || new Date(),
+    receiptUrl, // Guardar la URL del comprobante
+    createdBy: req.user.n_document,
+  });
+
+  // Crear items y actualizar stock
+  for (const item of items) {
+    const inventoryItem = await BasicInventory.findByPk(item.itemId);
+    if (!inventoryItem) {
+      throw new CustomError(`Item ${item.itemId} no encontrado`, 404);
     }
 
-    // Crear compra con todos los campos
-    const purchase = await Purchase.create({
-        supplier,
-        totalAmount,
-        paymentMethod,
-        paymentStatus: paymentStatus || 'pending',
-        invoiceNumber: invoiceNumber || null,
-        purchaseDate: purchaseDate || new Date(),
-        createdBy: req.user.n_document
+    const itemPrice = item.price || item.unitPrice;
+
+    await PurchaseItem.create({
+      purchaseId: purchase.id,
+      itemId: item.itemId,
+      quantity: item.quantity,
+      price: parseFloat(itemPrice),
+      total: parseFloat(item.quantity * itemPrice),
     });
 
-    // Crear items y actualizar stock
-    for (const item of items) {
-        const inventoryItem = await BasicInventory.findByPk(item.itemId);
-        if (!inventoryItem) {
-            throw new CustomError(`Item ${item.itemId} no encontrado`, 404);
-        }
+    await inventoryItem.increment('currentStock', { by: item.quantity });
+  }
 
-        // Usa el campo price en lugar de unitPrice o maneja ambos
-        const itemPrice = item.price || item.unitPrice;
-        
-        if (itemPrice === undefined || itemPrice === null) {
-            throw new CustomError(`El precio es obligatorio para el item ${item.itemId}`, 400);
-        }
-
-        await PurchaseItem.create({
-            purchaseId: purchase.id,
-            itemId: item.itemId,
-            quantity: item.quantity,
-            price: parseFloat(itemPrice),  // Usa el campo correcto
-            total: parseFloat(item.quantity * itemPrice)  // Calcula el total con el precio correcto
-        });
-
-        // Actualizar stock
-        await inventoryItem.increment('currentStock', { by: item.quantity });
-    }
-
-    res.status(201).json({
-        error: false,
-        message: 'Compra registrada exitosamente',
-        data: purchase
-    });
+  res.status(201).json({
+    error: false,
+    message: 'Compra registrada exitosamente',
+    data: purchase,
+  });
 };
 
 const updateInventory = async (req, res) => {

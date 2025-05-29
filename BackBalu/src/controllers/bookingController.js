@@ -7,6 +7,7 @@ const {
   Buyer,
   Payment,
   RegistrationPass, 
+  BasicInventory,
   conn, 
 } = require("../data");
 
@@ -532,8 +533,9 @@ const getAllBookings = async (req, res) => {
     where,
     include: [
       roomInclude,
-      { model: Buyer, as: "guest", attributes: ["sdocno"] },
+     { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername", "selectronicmail"] },
       { model: Payment },
+       { model: ExtraCharge },
     ],
     order: [["checkIn", "ASC"]],
   });
@@ -644,7 +646,10 @@ const calculateTotalAmount = (booking) => {
 const addExtraCharges = async (req, res, next) => {
   try {
     const { bookingId } = req.params;
-    const { price, quantity, description } = req.body;
+    const { price, quantity, description, itemId } = req.body;
+
+    // Validar que req.user exista
+    
 
     // Buscar la reserva usando el bookingId de los parámetros
     const booking = await Booking.findByPk(bookingId);
@@ -660,6 +665,23 @@ const addExtraCharges = async (req, res, next) => {
       );
     }
 
+    // Validar stock si se proporciona itemId
+    if (itemId) {
+      const inventoryItem = await BasicInventory.findByPk(itemId);
+      if (!inventoryItem) {
+        throw new CustomError("El ítem del inventario no existe", 404);
+      }
+
+      if (inventoryItem.currentStock < quantity) {
+        throw new CustomError(`Stock insuficiente para el ítem ${inventoryItem.name}. Disponible: ${inventoryItem.currentStock}`, 400);
+      }
+
+      // Reducir el stock después de crear el cargo extra
+      await inventoryItem.update({
+        currentStock: inventoryItem.currentStock - quantity,
+      });
+    }
+
     // Crear el cargo extra
     const extraCharge = await ExtraCharge.create({
       bookingId, // bookingId proveniente de req.params
@@ -667,7 +689,7 @@ const addExtraCharges = async (req, res, next) => {
       price,
       quantity,
       amount: price * quantity,
-      createdBy: req.buyer.sdocno,
+      createdBy: req.user.sdocno, // Usar req.user en lugar de req.buyer
     });
 
     res.status(201).json({
@@ -676,6 +698,7 @@ const addExtraCharges = async (req, res, next) => {
       data: extraCharge,
     });
   } catch (error) {
+    console.error("Error al agregar cargo extra:", error);
     next(error);
   }
 };
@@ -683,38 +706,80 @@ const addExtraCharges = async (req, res, next) => {
 const generateBill = async (req, res) => {
   const { bookingId } = req.params;
 
-  const booking = await Booking.findByPk(bookingId, {
-    include: [
-      { model: Room },
-      { model: ExtraCharge },
-      { model: Buyer, attributes: ["name", "email", "sdocno"] },
-    ],
-  });
+  try {
+    // Buscar la reserva
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        { model: Room },
+        { model: ExtraCharge },
+        { model: Buyer, as: "guest", attributes: ["scostumername", "selectronicmail", "sdocno"] },
+      ],
+    });
 
-  if (!booking) {
-    throw new CustomError("Reserva no encontrada", 404);
+    if (!booking) {
+      throw new CustomError("Reserva no encontrada", 404);
+    }
+
+    // Calcular los montos
+    const reservationAmount = parseFloat(booking.totalAmount) || 0; // Monto base de la reserva
+    const extraChargesAmount = booking.ExtraCharges.reduce(
+      (sum, charge) => sum + (parseFloat(charge.price) || 0),
+      0
+    ); // Total de cargos extra
+    const totalAmount = reservationAmount + extraChargesAmount; // Total final
+
+    // Crear la factura
+    const bill = await Bill.create({
+      bookingId: booking.bookingId,
+      reservationAmount,
+      extraChargesAmount,
+      totalAmount,
+      generatedBy: req.user?.n_document || "system",
+      details: {
+        roomCharge: reservationAmount,
+        extraCharges: booking.ExtraCharges,
+        nights: calculateNights(booking.checkIn, booking.checkOut),
+        roomDetails: booking.Room,
+        guestDetails: booking.guest,
+      },
+    });
+
+    res.json({
+      error: false,
+      message: "Factura generada exitosamente",
+      data: bill,
+    });
+  } catch (error) {
+    console.error("Error al generar la factura:", error);
+    res.status(500).json({
+      error: true,
+      message: "Error al generar la factura",
+      details: error.message,
+    });
   }
-
-  const totalAmount = calculateTotalAmount(booking);
-  const bill = await Bill.create({
-    bookingId: bookingId,
-    totalAmount,
-    generatedBy: req.buyer.sdocno,
-    details: {
-      roomCharge: calculateRoomCharge(booking),
-      extraCharges: booking.ExtraCharges,
-      nights: calculateNights(booking.checkIn, booking.checkOut),
-      roomDetails: booking.Room,
-      guestDetails: booking.buyer,
-    },
-  });
-
-  res.json({
-    error: false,
-    message: "Factura generada exitosamente",
-    data: bill,
-  });
 };
+
+const getAllBills = async (req, res) => {
+  try {
+    const bills = await Bill.findAll({
+      include: [
+        { model: Booking, include: [{ model: Buyer, as: "guest" }] },
+      ],
+    });
+
+    res.json({
+      error: false,
+      data: bills,
+    });
+  } catch (error) {
+    console.error("Error al obtener las facturas:", error);
+    res.status(500).json({
+      error: true,
+      message: "Error al obtener las facturas",
+    });
+  }
+};
+
 
 const updateBookingStatus = async (req, res) => {
   const { bookingId } = req.params;
@@ -878,6 +943,7 @@ module.exports = {
   checkAvailability,
   getRoomTypes,
   createBooking,
+  getAllBills,
   getUserBookings,
   getBookingById,
   getAllBookings,

@@ -233,18 +233,18 @@ const CreateRoom = () => {
         <div className="bg-white p-4 rounded-lg shadow-md">
           <h4 className="text-md font-bold">Agregar Amenities</h4>
           <div className="flex items-center space-x-4">
-            <select
-              value={selectedAmenity}
-              onChange={(e) => setSelectedAmenity(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
-            >
-              <option value="">Selecciona un amenity</option>
-              {inventory.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} (Stock: {item.currentStock})
-                </option>
-              ))}
-            </select>
+           <select
+  value={selectedAmenity}
+  onChange={(e) => setSelectedAmenity(e.target.value)}
+  className="w-full px-3 py-2 border rounded"
+>
+  <option value="">Selecciona un amenity</option>
+  {inventory.map((item) => (
+    <option key={item.itemId} value={item.itemId}>
+      {item.itemName} (Stock: {item.currentStock})
+    </option>
+  ))}
+</select>
             <input
               type="number"
               placeholder="Cantidad"

@@ -1,4 +1,4 @@
-import  { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { createRegistrationPass, getRegistrationPassesByBooking } from "../../Redux/Actions/registerActions";
 import { toast } from "react-toastify";
@@ -9,7 +9,7 @@ function RegistrationPass({ onCheckInComplete }) {
 
   // Booking y pasajeros ya registrados del store
   const booking = useSelector((state) => state.booking.bookingDetails);
-  
+
   // Corregir el selector para acceder correctamente a los datos
   const registrationPasses = useSelector(
     (state) => state.registrationPass?.registrationPasses || []
@@ -28,7 +28,7 @@ function RegistrationPass({ onCheckInComplete }) {
     idIssuingPlace: "",
     foreignIdOrPassport: "",
     address: "",
-    phoneNumber: ""
+    phoneNumber: "",
   };
 
   const [bookingIdInput, setBookingIdInput] = useState("");
@@ -37,6 +37,17 @@ function RegistrationPass({ onCheckInComplete }) {
 
   // guestCount se obtiene directamente del booking
   const guestCount = booking?.guestCount || 0;
+
+  // Validar campos obligatorios
+  const validatePassenger = (passenger) => {
+    const requiredFields = ["name", "nationality", "stayDuration", "numberOfPeople", "idNumber"];
+    for (const field of requiredFields) {
+      if (!passenger[field]) {
+        return false;
+      }
+    }
+    return true;
+  };
 
   // Verificar reserva y obtener pasajeros ya registrados
   const handleVerifyBooking = () => {
@@ -58,7 +69,7 @@ function RegistrationPass({ onCheckInComplete }) {
   useEffect(() => {
     return () => {
       dispatch({ type: "CLEAR_BOOKING_DETAILS" });
-      dispatch({ type: "CLEAR_REGISTRATION_PASSES" }); 
+      dispatch({ type: "CLEAR_REGISTRATION_PASSES" });
     };
   }, [dispatch]);
 
@@ -79,14 +90,13 @@ function RegistrationPass({ onCheckInComplete }) {
       toast.error("Primero verifica la reserva.");
       return;
     }
-    
+
     // Validar campos requeridos
-    if (!formData.name || !formData.nationality || !formData.stayDuration || 
-        !formData.numberOfPeople || !formData.idNumber) {
+    if (!validatePassenger(formData)) {
       toast.error("Por favor completa todos los campos obligatorios (*)");
       return;
     }
-    
+
     const totalRegistrados = registrationPasses.length + passengers.length;
     if (totalRegistrados >= guestCount) {
       toast.error("No puedes agregar más pasajeros que los permitidos por la reserva.");
@@ -107,7 +117,20 @@ function RegistrationPass({ onCheckInComplete }) {
     toast.info("Pasajero removido de la lista.");
   };
 
- const handleSubmit = async (e) => {
+  const updateBookingToCheckedIn = async () => {
+    try {
+      await dispatch(updateBookingStatus(booking.bookingId, { status: "checked-in" }));
+      toast.success("Check-in completado y estado de reserva actualizado.");
+      if (onCheckInComplete) {
+        onCheckInComplete(booking.bookingId);
+      }
+    } catch (error) {
+      console.error("Error al actualizar estado de reserva:", error);
+      toast.error("No se pudo actualizar el estado de la reserva.");
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!booking || !booking.bookingId) {
       toast.error("Primero verifica la reserva.");
@@ -117,105 +140,69 @@ function RegistrationPass({ onCheckInComplete }) {
       toast.error("Por favor, agrega al menos un pasajero.");
       return;
     }
-    
+
     // Filtra pasajeros incompletos antes de enviar
-    const validPassengers = passengers.filter(
-      p => p.name && p.nationality && p.stayDuration && p.numberOfPeople && p.idNumber
-    );
-    
+    const validPassengers = passengers.filter(validatePassenger);
+
     if (validPassengers.length === 0) {
       toast.error("No hay pasajeros válidos para registrar.");
       return;
     }
-    
+
     // Añadir fecha de check-in desde la reserva
-    const passengersWithCheckInDate = validPassengers.map(p => ({
+    const passengersWithCheckInDate = validPassengers.map((p) => ({
       ...p,
       checkInDate: booking.checkIn,
-      roomNumber: booking.roomNumber
+      roomNumber: booking.roomNumber,
     }));
-    
+
     console.log("Enviando al backend:", passengersWithCheckInDate);
-    
+
     try {
-      // Esperar a que se complete la acción
-      await dispatch(createRegistrationPass({
-        bookingId: booking.bookingId,
-        passengers: passengersWithCheckInDate
-      }));
-      
+      await dispatch(
+        createRegistrationPass({
+          bookingId: booking.bookingId,
+          passengers: passengersWithCheckInDate,
+        })
+      );
+
       // Recargar los pasajeros ya registrados para esta reserva
       await dispatch(getRegistrationPassesByBooking(booking.bookingId));
-      
+
       setPassengers([]); // Limpiar pasajeros locales
       toast.success("Pasajeros registrados exitosamente.");
-      
+
       // Verificar si el check-in está completo después de registrar estos pasajeros
-      const updatedRegistrationPasses = await dispatch(getRegistrationPassesByBooking(booking.bookingId));
-      const totalRegistrados = updatedRegistrationPasses?.data?.length || 0;
-      
-      // Si el check-in está completo, actualizar el estado de la reserva
-      if (totalRegistrados >= booking.guestCount) {
+      const totalRegistrados = registrationPasses.length + passengers.length;
+      if (totalRegistrados >= guestCount) {
         console.log("Check-in completo, actualizando estado de reserva a checked-in");
-        try {
-          await dispatch(updateBookingStatus(booking.bookingId, { status: "checked-in" }));
-          toast.success("Check-in completado y estado de reserva actualizado.");
-          
-          // Si existe un callback desde el componente padre, ejecutarlo
-          if (onCheckInComplete) {
-            onCheckInComplete(booking.bookingId);
-          }
-        } catch (error) {
-          console.error("Error al actualizar estado de reserva:", error);
-          toast.error("No se pudo actualizar el estado de la reserva.");
-        }
+        updateBookingToCheckedIn();
       }
     } catch (error) {
       toast.error(`Error al registrar pasajeros: ${error.message}`);
     }
   };
 
-  // Validación para check-in completo
-  const checkInCompleto = (registrationPasses.length + passengers.length) >= guestCount;
-  useEffect(() => {
-    if (booking && booking.bookingId && checkInCompleto && booking.status !== "checked-in") {
-      // Si ya hay suficientes pasajeros registrados pero el estado no es checked-in
-      console.log("Check-in ya está completo, actualizando estado");
-      dispatch(updateBookingStatus(booking.bookingId, { status: "checked-in" }))
-        .then(() => {
-          toast.success("Estado de reserva actualizado a checked-in.");
-          if (onCheckInComplete) {
-            onCheckInComplete(booking.bookingId);
-          }
-        })
-        .catch(error => {
-          console.error("Error al actualizar estado:", error);
-        });
-    }
-  }, [booking, checkInCompleto, dispatch, onCheckInComplete]);
+  const checkInCompleto = registrationPasses.length + passengers.length >= guestCount;
 
            
   return (
     <div className="max-w-4xl mx-auto p-4 bg-white shadow-md rounded-lg">
       <h2 className="text-2xl font-bold mb-4">Crear Registro de Pasajeros</h2>
-      
+
       {/* Verificar reserva */}
       <div className="mb-4">
-        <label className="block text-sm font-medium">
-          ID de Reserva (Booking ID) *
-        </label>
+        <label className="block text-sm font-medium">ID de Reserva (Booking ID) *</label>
         <input
           type="text"
           value={bookingIdInput}
           onChange={(e) => setBookingIdInput(e.target.value)}
           className="w-full px-3 py-2 border rounded"
-          disabled={!!booking && !!booking.bookingId}
         />
         <button
           type="button"
           onClick={handleVerifyBooking}
           className="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-          disabled={!!booking && !!booking.bookingId}
         >
           Verificar Reserva
         </button>
@@ -223,8 +210,8 @@ function RegistrationPass({ onCheckInComplete }) {
           <span className="block text-green-600 mt-2">Reserva verificada: {booking.bookingId}</span>
         )}
       </div>
-      
-      {/* Info de pasajeros ya registrados */}
+
+      {/* Información de la reserva */}
       <div className="mb-4 p-3 bg-gray-50 rounded border">
         <h3 className="font-bold mb-2">Información de la reserva:</h3>
         <span className="block text-sm">
@@ -240,32 +227,19 @@ function RegistrationPass({ onCheckInComplete }) {
           <b>Disponibles:</b> {guestCount - registrationPasses.length - passengers.length}
         </span>
         <span className="block text-sm font-medium mt-1">
-          <b>¿Check-in completo?</b> 
+          <b>¿Check-in completo?</b>{" "}
           <span className={checkInCompleto ? "text-green-600" : "text-yellow-600"}>
             {checkInCompleto ? " Sí ✓" : " No ✗"}
           </span>
         </span>
       </div>
-      
-      {/* Mostrar pasajeros ya registrados */}
-      {registrationPasses && registrationPasses.length > 0 && (
-        <div className="mb-4 p-3 bg-green-50 rounded border border-green-200">
-          <h3 className="font-bold mb-2">Pasajeros Ya Registrados:</h3>
-          <ul className="list-disc pl-5">
-            {registrationPasses.map((pass) => (
-              <li key={pass.registrationNumber} className="text-green-700">
-                {pass.name} - {pass.idNumber} ({pass.nationality})
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      
+
       {/* Formulario para nuevos pasajeros */}
-      {booking && booking.bookingId && (registrationPasses.length < guestCount) && (
+      {booking && booking.bookingId && registrationPasses.length < guestCount && (
         <>
           <h3 className="text-xl font-semibold mb-3">Agregar Nuevo Pasajero:</h3>
-          <form onSubmit={e => e.preventDefault()} className="space-y-4">
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+            {/* Campos del formulario */}
             <div>
               <label className="block text-sm font-medium">Nombre *</label>
               <input
@@ -443,19 +417,17 @@ function RegistrationPass({ onCheckInComplete }) {
                 </li>
               ))}
             </ul>
-            
-            {/* Botón para enviar todos los pasajeros */}
             <button
               type="button"
               onClick={handleSubmit}
               className="mt-4 w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
             >
-              Registrar {passengers.length} Pasajero{passengers.length !== 1 ? 's' : ''}
+              Registrar {passengers.length} Pasajero{passengers.length !== 1 ? "s" : ""}
             </button>
           </div>
         </div>
       )}
-      
+
       {/* Mensaje cuando la reserva está completa */}
       {booking && booking.bookingId && checkInCompleto && (
         <div className="mt-4 bg-green-100 text-green-800 p-3 rounded border border-green-300">
