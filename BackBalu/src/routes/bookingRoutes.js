@@ -22,7 +22,8 @@ const {
     getOccupancyReport,
     getRevenueReport,
     getBookingByToken,
-    updateOnlinePayment} = require('../controllers/bookingController');
+    updateOnlinePayment,
+    getAllBills} = require('../controllers/bookingController');
 
 // Rutas públicas (no requieren autenticación)
 router.get('/availability', checkAvailability);
@@ -38,7 +39,7 @@ router.put('/online-payment', updateOnlinePayment);
 router.use(verifyToken);
 
 router.get('/user/:sdocno', getUserBookings);
-router.get('/:bookingId', getBookingById);
+
 router.post('/:bookingId/cancel', cancelBooking);
 
 
@@ -51,10 +52,12 @@ router.get('/user/my-bookings/:sdocno', getUserBookings);
 router.use(isStaff);
 
 // Rutas de gestión de reservas (solo staff)
+router.get('/facturas', getAllBills)
 router.get('/reservas/all', getAllBookings);
+router.get('/:bookingId', getBookingById);
 router.put('/:bookingId/check-in', checkIn);
 router.put('/:bookingId/check-out', checkOut);
-router.post('/:bookingId/extra-charges', validateExtraCharge, addExtraCharges);
+router.post('/:bookingId/extra-charges', addExtraCharges);
 router.get('/:bookingId/bill', generateBill);
 router.put('/:bookingId/status', updateBookingStatus);
 

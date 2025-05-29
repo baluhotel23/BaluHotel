@@ -1,84 +1,87 @@
-const { SellerData, User, Booking } = require('../../data');
-const { generateToken, sendDocument } = require('./taxxaUtils');
+const { SellerData, User, Buyer, Booking, Bill } = require('../../data'); // Asegúrate de incluir Bill
 
 const createInvoice = async (req, res) => {
   try {
-    console.log('=== Iniciando proceso de facturación ===');
-    console.log('Received payload:', JSON.stringify(req.body, null, 2));
+    console.log('=== Datos recibidos en el backend ===');
+    console.log('Body:', JSON.stringify(req.body, null, 2)); // Log para verificar los datos recibidos
 
-    const { invoiceData, sellerId } = req.body;
+    const { idBill } = req.body;
 
-    if (!invoiceData || !sellerId) {
-      console.error('Datos de factura o vendedor faltantes');
+    if (!idBill) {
+      console.error('Error: El ID de la factura (Bill) es obligatorio');
       return res.status(400).json({
-        message: 'Datos de factura o vendedor faltantes',
-        success: false
+        message: 'El ID de la factura (Bill) es obligatorio',
+        success: false,
       });
     }
 
-    const bookingId = invoiceData.bookingId;
-    console.log('Procesando reserva:', bookingId);
-
-    // Buscar la reserva con bookingId
-    const bookingInstance = await Booking.findOne({
-      where: { bookingId }
+    // Buscar la factura (Bill) y la reserva asociada
+    const bill = await Bill.findOne({
+      where: { idBill },
+      include: [
+        {
+          model: Booking,
+          include: [
+            {
+              model: Buyer,
+              as: 'guest', // Usa el alias configurado en las relaciones
+            },
+          ],
+        },
+      ],
     });
 
-    // Validar que la reserva exista
-    if (!bookingInstance) {
-      console.error('Reserva no encontrada:', bookingId);
+    if (!bill) {
+      console.error('Error: Factura no encontrada');
       return res.status(404).json({
-        message: 'Reserva no encontrada',
+        message: 'Factura no encontrada',
         success: false,
-        orderReference: bookingId
       });
     }
 
-    // Registrar estado actual
-    console.log('Estado actual de la reserva:', bookingInstance.status);
+    console.log('Factura encontrada:', JSON.stringify(bill, null, 2));
 
-    // Validar si la reserva ya está facturada (suponiendo que estado 'confirmed' indica facturación)
-    if (bookingInstance.status === 'confirmed') {
-      console.log('=== Reserva previamente facturada ===');
+    const booking = bill.Booking;
+    if (!booking) {
+      console.error('Error: Reserva asociada no encontrada');
+      return res.status(404).json({
+        message: 'Reserva asociada no encontrada',
+        success: false,
+      });
+    }
+
+    console.log('Reserva asociada encontrada:', JSON.stringify(booking, null, 2));
+
+    const buyer = booking.guest; // Accede al Buyer usando el alias 'guest'
+    if (!buyer) {
+      console.error('Error: Buyer no asociado a la reserva');
+      return res.status(404).json({
+        message: 'Buyer no asociado a la reserva',
+        success: false,
+      });
+    }
+
+    console.log('Buyer asociado encontrado:', JSON.stringify(buyer, null, 2));
+
+    // Validar que el estado de la factura sea "pending"
+    if (bill.status !== 'pending') {
+      console.error('Error: La factura ya fue procesada o está cancelada');
       return res.status(400).json({
-        message: 'La reserva ya está facturada',
+        message: 'La factura ya fue procesada o está cancelada',
         success: false,
-        orderReference: bookingId,
-        invoicedAt: bookingInstance.updatedAt
       });
     }
 
-    // Obtener datos del vendedor y del comprador en paralelo
-    console.log('=== Consultando datos adicionales ===');
-    const [sellerData, userData] = await Promise.all([
-      SellerData.findOne({ where: { sdocno: sellerId } }),
-      User.findOne({ where: { n_document: bookingInstance.n_document } })
-    ]);
+    console.log('=== Construyendo documento para Taxxa ===');
 
-    // Validar datos del vendedor
+    // Obtener datos del vendedor
+    const sellerData = await SellerData.findOne({ where: { sdocno: booking.sellerId } });
     if (!sellerData) {
-      console.error('Datos del vendedor no encontrados:', sellerId);
       return res.status(404).json({
         message: 'Datos del vendedor no encontrados',
         success: false,
-        sellerId
       });
     }
-    console.log('Datos del vendedor encontrados:', sellerData.ssellername);
-
-    // Validar datos del comprador
-    if (!userData) {
-      console.error('Datos del comprador no encontrados:', bookingInstance.n_document);
-      return res.status(404).json({
-        message: 'Datos del comprador no encontrados',
-        success: false,
-        buyerId: bookingInstance.n_document
-      });
-    }
-    console.log('Datos del comprador encontrados:', userData.first_name, userData.last_name);
-
-    // Construir el array de items del documento
-    const documentItemsArray = Object.values(invoiceData.jdocumentitems);
 
     console.log('=== Construyendo documento para Taxxa ===');
     const documentBody = {
@@ -97,11 +100,11 @@ const createInvoice = async (req, res) => {
           tduedate: new Date().toISOString().slice(0, 10),
           wpaymentmeans: 1,
           wpaymentmethod: "10",
-          nlineextensionamount: 21008.4,
-          ntaxexclusiveamount: 21008.4,
-          ntaxinclusiveamount: 25000,
-          npayableamount: 25000,
-          sorderreference: bookingId,
+          nlineextensionamount: 0,
+          ntaxexclusiveamount: 0,
+          ntaxinclusiveamount: 0,
+          npayableamount: 0,
+          sorderreference: booking.bookingId,
           tdatereference: new Date().toISOString().slice(0, 10),
           jextrainfo: {},
           jdocumentitems: documentItemsArray,
@@ -127,28 +130,28 @@ const createInvoice = async (req, res) => {
                 wprovincecode: sellerData.registration_wprovincecode,
                 szip: sellerData.registration_szip,
                 sdepartmentname: sellerData.registration_sdepartmentname,
-              }
-            }
+              },
+            },
           },
           jbuyer: {
-            wlegalorganizationtype: "person",
-            scostumername: userData.first_name + ' ' + userData.last_name,
-            stributaryidentificationkey: "O-1",
-            sfiscalresponsibilities: "R-99-PN",
-            sfiscalregime: "48",
+            wlegalorganizationtype: buyer.wlegalorganizationtype,
+            scostumername: buyer.scostumername,
+            stributaryidentificationkey: buyer.stributaryidentificationkey,
+            sfiscalresponsibilities: buyer.sfiscalresponsibilities,
+            sfiscalregime: buyer.sfiscalregime,
             jpartylegalentity: {
-              wdoctype: userData.wdoctype,
-              sdocno: userData.n_document,
-              scorporateregistrationschemename: userData.first_name + ' ' + userData.last_name
+              wdoctype: buyer.wdoctype,
+              sdocno: buyer.sdocno,
+              scorporateregistrationschemename: buyer.scorporateregistrationschemename,
             },
             jcontact: {
-              scontactperson: userData.first_name + ' ' + userData.last_name,
-              selectronicmail: userData.email,
-              stelephone: userData.phone
-            }
-          }
-        }
-      }
+              scontactperson: buyer.scontactperson,
+              selectronicmail: buyer.selectronicmail,
+              stelephone: buyer.stelephone,
+            },
+          },
+        },
+      },
     };
 
     console.log('=== Generando token para Taxxa ===');
@@ -161,7 +164,7 @@ const createInvoice = async (req, res) => {
     console.log('=== Enviando documento a Taxxa ===');
     const taxxaPayload = {
       stoken: token,
-      jApi: documentBody
+      jApi: documentBody,
     };
     console.log('Payload completo:', JSON.stringify(taxxaPayload, null, 2));
 
@@ -169,40 +172,38 @@ const createInvoice = async (req, res) => {
     console.log('Respuesta de Taxxa:', JSON.stringify(taxxaResponse, null, 2));
 
     if (taxxaResponse && taxxaResponse.rerror === 0) {
-      console.log('=== Actualizando estado de la reserva ===');
-      // Actualizamos la reserva; si bookingInstance es una instancia de modelo puedes usar update directamente:
-      await bookingInstance.update({ status: 'facturada' });
-      // Otra opción: Booking.update({ status: 'facturada' }, { where: { bookingId } });
+      // Actualizar el estado de la factura y crear un registro en Invoice
+      await bill.update({ status: 'paid' });
+      await Invoice.create({
+        buyerId: buyer.sdocno,
+        sellerId: sellerData.sdocno,
+        invoiceNumber: taxxaResponse.invoiceNumber,
+        status: 'sent',
+        totalAmount: bill.totalAmount,
+        taxxaResponse,
+        cufe: taxxaResponse.cufe,
+        qrCode: taxxaResponse.qrCode,
+        orderReference: booking.bookingId,
+      });
 
       return res.status(200).json({
         message: 'Factura creada y enviada con éxito',
         success: true,
         response: taxxaResponse,
-        orderReference: bookingId
       });
     }
 
     throw new Error(`Error en la respuesta de Taxxa: ${JSON.stringify(taxxaResponse)}`);
-
   } catch (error) {
-    console.error('=== Error en el proceso de facturación ===');
-    console.error('Error:', error.message);
-    console.error('Stack:', error.stack);
-
-    if (error.response) {
-      console.error('Response data:', JSON.stringify(error.response.data, null, 2));
-      console.error('Response status:', error.response.status);
-    }
-
+    console.error('Error en el proceso de facturación:', error.message);
     return res.status(500).json({
       message: 'Error al procesar la factura',
       success: false,
       error: error.message,
-      details: error.response?.data
     });
   }
 };
 
 module.exports = {
-  createInvoice
+  createInvoice,
 };

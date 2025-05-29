@@ -7,6 +7,17 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+     bookingId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'Bookings', // Nombre de la tabla de Booking
+        key: 'bookingId',
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'CASCADE',
+    },
+    
     reservationAmount: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,

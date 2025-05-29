@@ -40,8 +40,9 @@ import PurchasePanel from './Components/Purchases/PurchasePanel';
 import ExpenseForm from "./Components/Purchases/ExpensesForm";
 import ExpensesList from "./Components/Purchases/ExpensesList";
 import FinancialBalance from "./Components/Dashboard/FinancialBalance";
-
-
+import FacturasPendientes from "./Components/Taxxa/FacturasPendientes";
+import PanelTaxxa from "./Components/Taxxa/PanelTaxxa";
+import InvoiceList from "./Components/Taxxa/InvoiceList";
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -252,14 +253,25 @@ const AppContent = () => {
               </PrivateRoute>
             }
           />
+          
           <Route
-            path="/purchaseForm"
+            path="/pendientInvoices"
             element={
-              <PrivateRoute allowedRoles={["owner"]}>
-                <PurchaseForm />
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
+                <FacturasPendientes />
               </PrivateRoute>
             }
           />
+
+          <Route
+            path="/invoiceList"
+            element={
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
+                <InvoiceList />
+              </PrivateRoute>
+            }
+          />
+
           <Route
             path="/purchases/:id"
             element={
@@ -268,6 +280,15 @@ const AppContent = () => {
               </PrivateRoute>
             }
           />
+          <Route
+            path="panelTaxxa"
+            element={
+              <PrivateRoute allowedRoles={["owner"]}>
+                <PanelTaxxa />
+              </PrivateRoute>
+            }
+          />
+
           <Route
             path="/expenses"
             element={

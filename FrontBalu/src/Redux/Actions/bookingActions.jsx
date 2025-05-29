@@ -145,14 +145,53 @@ export const addExtraCharge = (data) => async (dispatch) => {
 export const generateBill = (bookingId) => async (dispatch) => {
   dispatch({ type: 'GENERATE_BILL_REQUEST' });
   try {
-    const { data } = await api.get(`/bookings/${bookingId}/bill`);
-    dispatch({ type: 'GENERATE_BILL_SUCCESS', payload: data.data });
+    // Generar la factura
+    const { data: billData } = await api.get(`/bookings/${bookingId}/bill`);
+    dispatch({ type: 'GENERATE_BILL_SUCCESS', payload: billData.data });
+
+    // Enviar la factura a Taxxa
+    const { data: taxxaResponse } = await api.post('/taxxa/invoice', { idBill: billData.data.idBill });
+    dispatch({ type: 'SEND_BILL_TO_TAXXA_SUCCESS', payload: taxxaResponse });
+    toast.success('Factura generada y enviada a Taxxa con éxito');
   } catch (error) {
     const errorMessage =
-      error.response?.data?.message || 'Error al generar factura';
+      error.response?.data?.message || 'Error al generar o enviar la factura';
     dispatch({ type: 'GENERATE_BILL_FAILURE', payload: errorMessage });
+    toast.error(errorMessage);
   }
 };
+export const getAllBills = (queryParams) => async (dispatch) => {
+  dispatch({ type: 'GET_ALL_BILLS_REQUEST' });
+  try {
+    const { data } = await api.get('/bookings/facturas', { params: queryParams });
+    console.log('Datos recibidos desde el backend (getAllBills):', data); // Log para verificar la respuesta
+    dispatch({ type: 'GET_ALL_BILLS_SUCCESS', payload: data.data }); // Asegúrate de que sea data.data
+    toast.success('Facturas obtenidas exitosamente');
+  } catch (error) {
+    const errorMessage =
+      error.response?.data?.message || 'Error al obtener las facturas';
+    console.error('Error en getAllBills:', errorMessage); // Log para errores
+    dispatch({ type: 'GET_ALL_BILLS_FAILURE', payload: errorMessage });
+    toast.error(errorMessage);
+  }
+};
+
+export const sendBillToTaxxa = (idBill) => async (dispatch) => {
+  dispatch({ type: 'SEND_BILL_TO_TAXXA_REQUEST' });
+  try {
+    const response = await fetch(`/api/taxxa/invoice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idBill }),
+    });
+    const data = await response.json();
+    dispatch({ type: 'SEND_BILL_TO_TAXXA_SUCCESS', payload: data });
+  } catch (error) {
+    dispatch({ type: 'SEND_BILL_TO_TAXXA_FAILURE', payload: error.message });
+    throw error;
+  }
+};
+
 
 // UPDATE BOOKING STATUS (PUT /bookings/:id/status)
 export const updateBookingStatus = (bookingId, statusData) => async (dispatch) => {

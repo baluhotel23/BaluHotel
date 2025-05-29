@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { getBookingById } from "../../Redux/Actions/bookingActions";
 import { toast } from "react-toastify";
-import { useReactToPrint } from "react-to-print";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 import DashboardLayout from "./DashboardLayout";
 
 const BookingPassengerList = () => {
@@ -10,15 +11,18 @@ const BookingPassengerList = () => {
   const [bookingIdInput, setBookingIdInput] = useState("");
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [loading, setLoading] = useState(false);
-  const contentRef = useRef(null); // Referencia para el contenido imprimible
 
   const registrationPasses = useSelector(
     (state) => state.booking.bookingDetails?.registrationPasses || []
   );
 
+  const bookingDetails = useSelector((state) => state.booking.bookingDetails);
+
   useEffect(() => {
-    console.log("registrationPasses cambiado:", registrationPasses);
-  }, [registrationPasses]);
+    if (bookingDetails) {
+      setSelectedBooking(bookingDetails);
+    }
+  }, [bookingDetails]);
 
   const handleSearchBooking = async () => {
     if (!bookingIdInput) {
@@ -38,17 +42,84 @@ const BookingPassengerList = () => {
     }
   };
 
-  const bookingDetails = useSelector((state) => state.booking.bookingDetails);
+  const handleGeneratePDF = () => {
+  if (!selectedBooking || registrationPasses.length === 0) {
+    toast.error("No hay datos para generar el PDF.");
+    return;
+  }
 
-  useEffect(() => {
-    if (bookingDetails) {
-      setSelectedBooking(bookingDetails);
-    }
-  }, [bookingDetails]);
-
-  const handlePrint = useReactToPrint({
-    content: () => contentRef.current, // Devuelve el contenido a imprimir
+  const doc = new jsPDF({
+    orientation: "landscape", // A4 horizontal
+    unit: "pt",
+    format: "a4",
   });
+
+  // Título del documento
+  doc.setFontSize(18);
+  doc.text(
+    `Listado de Pasajeros - Reserva #${selectedBooking.bookingId}`,
+    doc.internal.pageSize.getWidth() / 2,
+    30,
+    { align: "center" }
+  );
+
+  // Información de la reserva
+  doc.setFontSize(12);
+  doc.text(`Habitación: ${selectedBooking.roomNumber}`, 40, 60);
+  doc.text(
+    `Check-in: ${new Date(selectedBooking.checkIn).toLocaleDateString()}`,
+    40,
+    80
+  );
+  doc.text(
+    `Check-out: ${new Date(selectedBooking.checkOut).toLocaleDateString()}`,
+    40,
+    100
+  );
+  doc.text(`Titular: ${selectedBooking.guest?.scostumername}`, 40, 120);
+  doc.text(`Documento: ${selectedBooking.guestId}`, 40, 140);
+  doc.text(`Estado: ${selectedBooking.status}`, 40, 160);
+
+  // Tabla de pasajeros
+  const tableColumnHeaders = [
+    "Nombre",
+    "Documento",
+    "País de Origen",
+    "Nacionalidad",
+    "Domicilio",
+    "Estado Civil",
+    "Profesión",
+    "Fecha CheckIn",
+    "Destino",
+    "Teléfono",
+    "Duración",
+  ];
+
+  const tableRows = registrationPasses.map((passenger) => [
+    passenger.name,
+    passenger.idNumber,
+    passenger.idIssuingPlace,
+    passenger.nationality,
+    passenger.address,
+    passenger.maritalStatus,
+    passenger.profession,
+    passenger.checkInTime,
+    passenger.destination,
+    passenger.phoneNumber,
+    `${passenger.stayDuration} días`,
+  ]);
+
+  doc.autoTable({
+    head: [tableColumnHeaders],
+    body: tableRows,
+    startY: 180,
+    styles: { fontSize: 10, cellPadding: 5 },
+    headStyles: { fillColor: [22, 160, 133] }, // Color de encabezado
+  });
+
+  // Guardar o abrir el PDF
+  doc.save(`Listado_Pasajeros_Reserva_${selectedBooking.bookingId}.pdf`);
+};
 
   return (
     <DashboardLayout>
@@ -89,20 +160,19 @@ const BookingPassengerList = () => {
                 Reserva #{selectedBooking.bookingId}
               </h3>
               <button
-                onClick={handlePrint}
+                onClick={handleGeneratePDF}
                 className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
               >
-                Imprimir Listado
+                Generar PDF
               </button>
             </div>
 
-            {/* Contenido imprimible */}
-            <div ref={contentRef} className="bg-white p-6 rounded-lg shadow">
+            {/* Detalles de la reserva */}
+            <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-xl font-bold mb-2 text-center">
                 Listado de Pasajeros - Reserva #{selectedBooking.bookingId}
               </h3>
 
-              {/* Detalles de la reserva */}
               <div className="mb-6 grid grid-cols-2 gap-4">
                 <div>
                   <p>
@@ -191,14 +261,6 @@ const BookingPassengerList = () => {
               )}
             </div>
           </div>
-        )}
-
-        {/* Mensaje cuando no hay reserva seleccionada */}
-        {!selectedBooking && !loading && bookingIdInput && (
-          <p className="text-center py-4 italic">
-            Ingresa un ID de reserva y haz clic en Buscar para ver sus
-            pasajeros.
-          </p>
         )}
       </div>
     </DashboardLayout>

@@ -20,7 +20,15 @@ const Modal = ({ children, isOpen, onClose }) => {
       backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
       alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
-      <div style={{ background: 'white', padding: '20px', borderRadius: '8px', minWidth: '300px', maxWidth: '500px' }}>
+      <div style={{
+        background: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        minWidth: '300px',
+        maxWidth: '500px',
+        maxHeight: '80vh', // Limitar la altura máxima del popup
+        overflowY: 'auto', // Habilitar scroll vertical si el contenido excede la altura
+      }}>
         {children}
         <button onClick={onClose} style={{ marginTop: '10px', padding: '8px 12px', float: 'right' }}>Cerrar</button>
       </div>

@@ -26,12 +26,11 @@ const inventoryReducer = (state = initialState, action) => {
         loading: false
       };
     case 'GET_ALL_ITEMS':
-      return {
-        ...state,
-        inventory: action.payload,
-        loading: false
-      };
-
+  return {
+    ...state,
+    inventory: action.payload, // Asegúrate de que `inventory` se actualice con los datos
+    loading: false,
+  };
       case 'GET_SELLABLE_ITEMS':
       return {
         ...state,
