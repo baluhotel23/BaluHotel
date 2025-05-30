@@ -1,17 +1,8 @@
 import api from '../../utils/axios';
 import {
-  registerRequest,
-  registerSuccess,
-  registerFailure,
-  loginRequest,
-  loginSuccess,
-  loginFailure,
-  logoutRequest,
-  logoutSuccess,
-  logoutFailure,
-  changePasswordRequest,
-  changePasswordSuccess,
-  changePasswordFailure,
+  registerRequest, registerSuccess, registerFailure, loginRequest,
+  loginSuccess, loginFailure, logoutRequest, logoutSuccess, logoutFailure,
+  changePasswordRequest,  changePasswordSuccess, changePasswordFailure,
 } from '../Reducer/authReducer';
 
 // Acción para registrar un usuario

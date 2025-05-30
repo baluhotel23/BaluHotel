@@ -14,7 +14,7 @@ import taxxaReducer from '../Reducer/taxxaReducer';
 import registerReducer from '../Reducer/registrationPassReducer';
 import purchaseReducer from '../Reducer/purchaseReducer';
 import financialReducer from '../Reducer/financialReducer';
-
+import userReducer from '../Reducer/userReducer';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -29,7 +29,8 @@ const rootReducer = combineReducers({
   taxxa: taxxaReducer,
   registrationPass: registerReducer,
   purchase: purchaseReducer,
-  financial: financialReducer
+  financial: financialReducer,
+  users: userReducer,
 
 });
 

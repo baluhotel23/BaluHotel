@@ -117,10 +117,39 @@ const BookingPassengerList = () => {
     headStyles: { fillColor: [22, 160, 133] }, // Color de encabezado
   });
 
+  // ⭐ AGREGAR PIE DE PÁGINA CON LÍNEAS DE FIRMA Y CÉDULA
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  
+  // Posición desde el bottom de la página
+  const footerY = pageHeight - 80; // 80 puntos desde abajo
+  
+  // Línea para firma
+  const firmaX = 50;
+  const firmaWidth = 200;
+  doc.line(firmaX, footerY, firmaX + firmaWidth, footerY); // Línea horizontal
+  doc.setFontSize(10);
+  doc.text("Firma del Responsable", firmaX, footerY + 15);
+  
+  // Línea para cédula
+  const cedulaX = pageWidth - 250; // Posición desde la derecha
+  const cedulaWidth = 200;
+  doc.line(cedulaX, footerY, cedulaX + cedulaWidth, footerY); // Línea horizontal
+  doc.text("Número de Cédula", cedulaX, footerY + 15);
+  
+  // Fecha y hora de generación (opcional)
+  const fechaGeneracion = new Date().toLocaleString('es-ES');
+  doc.setFontSize(8);
+  doc.text(
+    `Documento generado el: ${fechaGeneracion}`,
+    pageWidth / 2,
+    pageHeight - 20,
+    { align: "center" }
+  );
+
   // Guardar o abrir el PDF
   doc.save(`Listado_Pasajeros_Reserva_${selectedBooking.bookingId}.pdf`);
 };
-
   return (
     <DashboardLayout>
       <div className="container mx-auto p-4">

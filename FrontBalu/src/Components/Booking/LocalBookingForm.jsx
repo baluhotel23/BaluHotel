@@ -9,7 +9,7 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../Dashboard/DashboardLayout'; // Asumiendo que tienes un layout de dashboard
-
+import RoomStatusGrid from './RoomStatusGrid';
 
 // Un componente simple para el Modal/Popup
 const Modal = ({ children, isOpen, onClose }) => {
@@ -20,15 +20,7 @@ const Modal = ({ children, isOpen, onClose }) => {
       backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
       alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
-      <div style={{
-        background: 'white',
-        padding: '20px',
-        borderRadius: '8px',
-        minWidth: '300px',
-        maxWidth: '500px',
-        maxHeight: '80vh', // Limitar la altura máxima del popup
-        overflowY: 'auto', // Habilitar scroll vertical si el contenido excede la altura
-      }}>
+      <div style={{ background: 'white', padding: '20px', borderRadius: '8px', minWidth: '300px', maxWidth: '500px' }}>
         {children}
         <button onClick={onClose} style={{ marginTop: '10px', padding: '8px 12px', float: 'right' }}>Cerrar</button>
       </div>
@@ -595,6 +587,12 @@ const LocalBookingForm = () => {
           </button>
         </fieldset>
       )}
+      {availability && (
+          <div>
+            <h3>Estado de las Habitaciones</h3>
+            <RoomStatusGrid rooms={availability} />
+          </div>
+        )}
     </div>
     </DashboardLayout>
   );

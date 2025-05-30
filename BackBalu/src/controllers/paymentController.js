@@ -1,4 +1,4 @@
-const { Booking, Payment, User, Buyer, sequelize } = require('../data'); // Asegúrate de importar 'sequelize' (o 'conn' y luego usa conn.transaction)
+const { Booking, Payment, User, Buyer, sequelize , ExtraCharge, Room, Bill} = require('../data'); // Asegúrate de importar 'sequelize' (o 'conn' y luego usa conn.transaction)
 const { CustomError } = require('../middleware/error');
 const { Op } = require("sequelize");
 

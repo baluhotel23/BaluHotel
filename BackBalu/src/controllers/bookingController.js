@@ -21,64 +21,93 @@ const checkAvailability = async (req, res) => {
   try {
     const { checkIn, checkOut, roomType } = req.query;
 
-    const where = {};
+    // Validar que las fechas sean obligatorias
+    if (!checkIn || !checkOut) {
+      return res.status(400).json({
+        error: true,
+        message: "Las fechas checkIn y checkOut son obligatorias",
+      });
+    }
+
+    // Validar formato de fechas
+    const requestStart = new Date(checkIn);
+    const requestEnd = new Date(checkOut);
+    
+    if (isNaN(requestStart.getTime()) || isNaN(requestEnd.getTime())) {
+      return res.status(400).json({
+        error: true,
+        message: "Formato de fecha inválido. Use YYYY-MM-DD",
+      });
+    }
+
+    if (requestStart >= requestEnd) {
+      return res.status(400).json({
+        error: true,
+        message: "La fecha de salida debe ser posterior a la fecha de entrada",
+      });
+    }
+
+    // Construir filtros
+    const where = { isActive: true }; // Solo habitaciones activas
     if (roomType) where.type = roomType;
 
-    // Get all rooms with their bookings
+    // Obtener todas las habitaciones con sus reservas activas
     const rooms = await Room.findAll({
       where,
       include: [
         {
           model: Booking,
           attributes: ["bookingId", "checkIn", "checkOut", "status"],
-          // Remove the where clause to get ALL bookings
-          required: false,
+          where: {
+            status: {
+              [Op.not]: 'cancelled' // Excluir reservas canceladas
+            }
+          },
+          required: false, // LEFT JOIN para incluir habitaciones sin reservas
         },
         {
           model: Service,
           through: { attributes: [] },
+          attributes: ["serviceId", "name"],
         },
       ],
+      order: [['roomNumber', 'ASC']], // Ordenar por número de habitación
     });
 
-    // Process rooms to include availability info
+    // Procesar habitaciones con información de disponibilidad y estado
     const roomsWithAvailability = rooms.map((room) => {
-      // Filter active bookings (not cancelled)
-      const activeBookings = room.Bookings.filter(
-        (booking) => booking.status !== "cancelled"
-      );
-
-      // Check if room is available for requested dates
-      const isAvailable = !activeBookings.some((booking) => {
-        const bookingStart = new Date(booking.checkIn);
-        const bookingEnd = new Date(booking.checkOut);
-        const requestStart = new Date(checkIn);
-        const requestEnd = new Date(checkOut);
-
-        return (
-          (bookingStart <= requestEnd && bookingEnd >= requestStart) ||
-          (requestStart <= bookingEnd && requestEnd >= bookingStart)
-        );
-      });
-
-      // Get all booked dates
+      const activeBookings = room.Bookings || [];
+      
+      // Determinar el estado actual de la habitación
+      const roomStatus = determineRoomStatus(room, activeBookings, requestStart, requestEnd);
+      
+      // Verificar disponibilidad para las fechas solicitadas
+      const isAvailable = checkDateAvailability(activeBookings, requestStart, requestEnd);
+      
+      // Obtener fechas ocupadas
       const bookedDates = activeBookings.map((booking) => ({
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
         bookingId: booking.bookingId,
+        status: booking.status,
       }));
 
       return {
         roomNumber: room.roomNumber,
         type: room.type,
+        status: roomStatus, // ⭐ CAMPO AGREGADO: Estado actual de la habitación
         price: room.price,
         maxGuests: room.maxGuests,
         description: room.description,
         image_url: room.image_url,
         Services: room.Services,
-        isAvailable,
+        isAvailable, // Disponible para las fechas solicitadas
         bookedDates,
         currentBookings: activeBookings.length,
+        // Información adicional útil
+        capacity: room.maxGuests,
+        isPromo: room.isPromo || false,
+        promotionPrice: room.promotionPrice || null,
       };
     });
 
@@ -86,15 +115,88 @@ const checkAvailability = async (req, res) => {
       error: false,
       message: "Disponibilidad consultada exitosamente",
       data: roomsWithAvailability,
+      meta: {
+        totalRooms: roomsWithAvailability.length,
+        availableRooms: roomsWithAvailability.filter(room => room.isAvailable).length,
+        requestedPeriod: {
+          checkIn: checkIn,
+          checkOut: checkOut,
+          nights: Math.ceil((requestEnd - requestStart) / (1000 * 60 * 60 * 24))
+        }
+      }
     });
+
   } catch (error) {
+    console.error('Error en checkAvailability:', error);
     res.status(500).json({
       error: true,
-      message: "Error al consultar disponibilidad",
-      details: error.message,
+      message: "Error interno del servidor al consultar disponibilidad",
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
+
+// ⭐ FUNCIÓN AUXILIAR MEJORADA para determinar el estado de la habitación
+function determineRoomStatus(room, activeBookings, requestStart, requestEnd) {
+  const now = new Date();
+  
+  // 1. Si la habitación tiene un estado específico en la BD (Mantenimiento)
+  if (room.status === 'Mantenimiento') {
+    return 'Mantenimiento';
+  }
+  
+  // 2. Verificar si hay una reserva activa que incluya la fecha actual
+  const currentBooking = activeBookings.find(booking => {
+    const bookingStart = new Date(booking.checkIn);
+    const bookingEnd = new Date(booking.checkOut);
+    return now >= bookingStart && now < bookingEnd;
+  });
+  
+  if (currentBooking) {
+    // Verificar el estado específico de la reserva
+    switch (currentBooking.status) {
+      case 'confirmed':
+      case 'pending':
+      case 'advanced':
+        return 'Reservada';
+      case 'checked-in':
+        return 'Ocupada';
+      case 'completed':
+        return 'Limpia'; // Asumiendo que se limpia después del checkout
+      default:
+        return 'Reservada';
+    }
+  }
+  
+  // 3. Verificar si hay reservas futuras próximas (dentro de las próximas 24 horas)
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const upcomingBooking = activeBookings.find(booking => {
+    const bookingStart = new Date(booking.checkIn);
+    return bookingStart > now && bookingStart <= tomorrow;
+  });
+  
+  if (upcomingBooking) {
+    return 'Reservada';
+  }
+  
+  // 4. Si no hay reservas activas, la habitación está disponible/limpia
+  return 'Limpia';
+}
+
+// Función auxiliar para verificar disponibilidad en fechas específicas
+function checkDateAvailability(activeBookings, requestStart, requestEnd) {
+  return !activeBookings.some((booking) => {
+    const bookingStart = new Date(booking.checkIn);
+    const bookingEnd = new Date(booking.checkOut);
+
+    // Verificar si hay solapamiento de fechas
+    return (
+      (requestStart < bookingEnd && requestEnd > bookingStart)
+    );
+  });
+}
 
 const getRoomTypes = async (req, res) => {
   const types = await Room.findAll({
