@@ -1,4 +1,4 @@
-const { Room,RoomCheckIn, RoomBasics, Booking, Payment, BasicInventory, Service  } = require('../data'); // Asegúrate de que estos modelos estén correctamente exportados
+const { Room, RoomCheckIn, RoomBasics, Booking, Payment, BasicInventory, Service } = require('../data');
 const { Op } = require("sequelize");
 
 // Obtener todas las habitaciones
@@ -8,13 +8,13 @@ const getAllRooms = async (req, res, next) => {
       include: [
         {
           model: Service,
-          attributes: ['name'], // Solo incluir el campo 'name' de los servicios
-          through: { attributes: [] } // Excluir atributos de la tabla intermedia
+          attributes: ['name'],
+          through: { attributes: [] }
         },
         {
-          model: BasicInventory, // Incluir el modelo BasicInventory
-          attributes: ["id", "name"], // Campos que deseas incluir
-          through: { attributes: ["quantity"] }, // Excluir atributos de la tabla intermedia
+          model: BasicInventory,
+          attributes: ["id", "name"],
+          through: { attributes: ["quantity"] },
         },
       ]
     });
@@ -28,10 +28,9 @@ const getAllRooms = async (req, res, next) => {
   }
 };
 
-// Obtener tipos de habitación (se asume que los tipos se definen en los "tags")
+// Obtener tipos de habitación
 const getRoomTypes = async (req, res, next) => {
   try {
-    // Obtenemos el campo tags de todas las habitaciones y extraemos los tipos únicos
     const rooms = await Room.findAll({
       attributes: ['tags']
     });
@@ -51,10 +50,9 @@ const getRoomTypes = async (req, res, next) => {
   }
 };
 
-// Obtener una habitación en particular por su roomNumber
+// Obtener una habitación por ID
 const getRoomById = async (req, res, next) => {
   try {
-    // Obtener el roomNumber desde params o query
     const roomNumber = req.params.roomNumber || req.query.roomNumber;
 
     if (!roomNumber) {
@@ -64,18 +62,17 @@ const getRoomById = async (req, res, next) => {
       });
     }
 
-    // Buscar la habitación por roomNumber e incluir los amenities (BasicInventory)
     const room = await Room.findByPk(roomNumber, {
       include: [
         {
-          model: BasicInventory, // Incluir el modelo BasicInventory
-          attributes: ["id", "name"], // Campos que deseas incluir
-          through: { attributes: ["quantity"] }, // Excluir atributos de la tabla intermedia
+          model: BasicInventory,
+          attributes: ["id", "name"],
+          through: { attributes: ["quantity"] },
         },
         {
-          model: Service, // Incluir servicios si es necesario
-          attributes: ["name"], // Campos que deseas incluir
-          through: { attributes: [] }, // Excluir atributos de la tabla intermedia
+          model: Service,
+          attributes: ["name"],
+          through: { attributes: [] },
         },
       ],
     });
@@ -97,13 +94,11 @@ const getRoomById = async (req, res, next) => {
   }
 };
 
-// Revisar disponibilidad (ejemplo básico: habitaciones con available = true)
+// Revisar disponibilidad
 const checkAvailability = async (req, res, next) => {
   try {
-    // Suponemos que se reciben fechas en el parámetro (formato: "YYYY-MM-DD,YYYY-MM-DD")
     const { dates } = req.params;
     const [startDate, endDate] = dates.split(',');
-    // Esta lógica puede modificarse para validar según reservas existentes.
     const availableRooms = await Room.findAll({
       where: { available: true }
     });
@@ -117,25 +112,38 @@ const checkAvailability = async (req, res, next) => {
   }
 };
 
-
 // Crear una nueva habitación
 const createRoom = async (req, res, next) => {
   try {
     const {
       roomNumber,
-      price,
+      priceSingle,
+      priceDouble,
+      priceMultiple,
+      pricePerExtraGuest,
       description,
       image_url,
       maxGuests,
       services,
       type,
-      basicInventories, // Array de amenities con id y quantity
+      basicInventories,
     } = req.body;
+
+    // Validaciones básicas
+    if (!roomNumber || !priceSingle || !priceDouble || !priceMultiple) {
+      return res.status(400).json({
+        error: true,
+        message: "Faltan campos requeridos: roomNumber, priceSingle, priceDouble, priceMultiple"
+      });
+    }
 
     // Crear la habitación
     const newRoom = await Room.create({
       roomNumber,
-      price,
+      priceSingle,
+      priceDouble,
+      priceMultiple,
+      pricePerExtraGuest: pricePerExtraGuest || 0,
       description,
       image_url,
       maxGuests,
@@ -152,7 +160,7 @@ const createRoom = async (req, res, next) => {
       await newRoom.addServices(serviceInstances);
     }
 
-    // Asociar los BasicInventories a la habitación y actualizar el stock
+    // Asociar los BasicInventories a la habitación
     if (basicInventories && basicInventories.length > 0) {
       await Promise.all(
         basicInventories.map(async (amenity) => {
@@ -160,9 +168,8 @@ const createRoom = async (req, res, next) => {
           if (inventory) {
             // Verificar si hay suficiente stock
             if (inventory.currentStock < amenity.quantity) {
-              throw new CustomError(
-                `No hay suficiente stock para el item ${inventory.name}`,
-                400
+              throw new Error(
+                `No hay suficiente stock para el item ${inventory.name}`
               );
             }
 
@@ -188,8 +195,8 @@ const createRoom = async (req, res, next) => {
         },
         {
           model: BasicInventory,
-          attributes: ["id", "name"], // Incluir solo los campos necesarios
-          through: { attributes: ["quantity"] }, // Incluir la cantidad asignada desde RoomBasics
+          attributes: ["id", "name"],
+          through: { attributes: ["quantity"] },
         },
       ],
     });
@@ -203,13 +210,13 @@ const createRoom = async (req, res, next) => {
     next(error);
   }
 };
+
 // Actualizar una habitación
 const updateRoom = async (req, res, next) => {
   try {
     const { roomNumber } = req.params;
     const { services, basicInventories, ...roomData } = req.body;
 
-    // Buscar la habitación
     const room = await Room.findByPk(roomNumber);
     if (!room) {
       return res.status(404).json({
@@ -233,38 +240,30 @@ const updateRoom = async (req, res, next) => {
 
     // Actualizar los BasicInventories
     if (basicInventories && basicInventories.length > 0) {
-      // Obtener los inventarios actuales asociados a la habitación
       const currentInventories = await room.getBasicInventories();
 
-      // Crear un mapa de los inventarios actuales
       const currentInventoryMap = new Map(
         currentInventories.map((inv) => [inv.id, inv.RoomBasics.quantity])
       );
 
-      // Procesar los nuevos inventarios
       for (const inventory of basicInventories) {
         const { id, quantity } = inventory;
 
-        // Verificar si el inventario ya está asociado
         if (currentInventoryMap.has(id)) {
-          // Actualizar la cantidad si es diferente
           if (currentInventoryMap.get(id) !== quantity) {
             await room.addBasicInventory(id, { through: { quantity } });
           }
-          currentInventoryMap.delete(id); // Marcar como procesado
+          currentInventoryMap.delete(id);
         } else {
-          // Agregar un nuevo inventario
           await room.addBasicInventory(id, { through: { quantity } });
         }
       }
 
-      // Eliminar los inventarios que ya no están en la lista
       for (const [id] of currentInventoryMap) {
         await room.removeBasicInventory(id);
       }
     }
 
-    // Incluir servicios y BasicInventories en la respuesta
     const roomWithDetails = await Room.findByPk(updatedRoom.roomNumber, {
       include: [
         {
@@ -289,6 +288,8 @@ const updateRoom = async (req, res, next) => {
     next(error);
   }
 };
+
+// Eliminar habitación
 const deleteRoom = async (req, res, next) => {
   try {
     const { roomNumber } = req.params;
@@ -300,9 +301,7 @@ const deleteRoom = async (req, res, next) => {
       });
     }
 
-    // Eliminar las asociaciones con servicios
     await room.setServices([]);
-
     await room.destroy();
     res.status(200).json({
       error: false,
@@ -313,8 +312,7 @@ const deleteRoom = async (req, res, next) => {
   }
 };
 
-
-// Actualizar el estado de la habitación (campo status)
+// Actualizar el estado de la habitación
 const updateRoomStatus = async (req, res, next) => {
   try {
     const { roomNumber } = req.params;
@@ -344,7 +342,7 @@ const updateRoomStatus = async (req, res, next) => {
   }
 };
 
-// Obtener amenities de una habitación (se asume que están en el campo "tags")
+// Obtener amenities de una habitación
 const getRoomAmenities = async (req, res, next) => {
   try {
     const { roomNumber } = req.params;
@@ -369,7 +367,7 @@ const getRoomAmenities = async (req, res, next) => {
 const updateRoomAmenities = async (req, res, next) => {
   try {
     const { roomNumber } = req.params;
-    const { amenities } = req.body; // array de strings
+    const { amenities } = req.body;
     const room = await Room.findByPk(roomNumber);
     if (!room) {
       return res.status(404).json({
@@ -388,10 +386,10 @@ const updateRoomAmenities = async (req, res, next) => {
   }
 };
 
-// Obtener servicios de una habitación (campo service)
+// Obtener servicios de una habitación
 const getRoomServices = async (req, res, next) => {
   try {
-    const {roomNumber } = req.params;
+    const { roomNumber } = req.params;
     const room = await Room.findByPk(roomNumber);
     if (!room) {
       return res.status(404).json({
@@ -413,7 +411,7 @@ const getRoomServices = async (req, res, next) => {
 const updateRoomServices = async (req, res, next) => {
   try {
     const { roomNumber } = req.params;
-    const { services } = req.body; // array de strings
+    const { services } = req.body;
     const room = await Room.findByPk(roomNumber);
     if (!room) {
       return res.status(404).json({
@@ -448,10 +446,9 @@ const getOccupancyReport = async (req, res, next) => {
   }
 };
 
-// Reporte de ingresos por tipo de habitación (ejemplo dummy)
+// Reporte de ingresos por tipo de habitación
 const getRevenueByRoomType = async (req, res, next) => {
   try {
-    // Este reporte se basa en lógica de negocio; se muestra un ejemplo fijo
     const revenue = [
       { roomType: 'Suite', totalRevenue: 10000 },
       { roomType: 'Doble', totalRevenue: 8000 },
@@ -467,6 +464,7 @@ const getRevenueByRoomType = async (req, res, next) => {
   }
 };
 
+// Obtener promociones activas
 const getActivePromotions = async (req, res, next) => {
   try {
     const promotions = await Room.findAll({
@@ -492,7 +490,7 @@ const getActivePromotions = async (req, res, next) => {
   }
 };
 
-// Obtener ofertas especiales (habitaciones en promoción que tienen precio promocional definido)
+// Obtener ofertas especiales
 const getSpecialOffers = async (req, res, next) => {
   try {
     const specialOffers = await Room.findAll({
@@ -521,24 +519,28 @@ const getSpecialOffers = async (req, res, next) => {
   }
 };
 
-const getRoomPreparationStatus = async (req, res) => {
+// Obtener estado de preparación de la habitación
+const getRoomPreparationStatus = async (req, res, next) => {
   try {
     const { roomNumber } = req.params;
     const room = await Room.findOne({
-  where: { roomNumber },
-  include: [
-    { model: Service, attributes: ['name'] },
-    { model: RoomCheckIn, as: 'preparation' },
-    {
-      model: BasicInventory,
-      attributes: ['id', 'name'],
-      through: { attributes: ['quantity'] }, // Aquí accedes a RoomBasics
-    },
-  ]
-});
+      where: { roomNumber },
+      include: [
+        { model: Service, attributes: ['name'] },
+        { model: RoomCheckIn, as: 'preparation' },
+        {
+          model: BasicInventory,
+          attributes: ['id', 'name'],
+          through: { attributes: ['quantity'] },
+        },
+      ]
+    });
 
     if (!room) {
-      return res.status(404).json({ error: true, message: 'Habitación no encontrada' });
+      return res.status(404).json({ 
+        error: true, 
+        message: 'Habitación no encontrada' 
+      });
     }
 
     res.json({
@@ -547,15 +549,16 @@ const getRoomPreparationStatus = async (req, res) => {
         roomNumber: room.roomNumber,
         status: room.status,
         services: room.Services,
-        lastPreparation: room.preparation || null, // <-- Usa el alias aquí
-        basics: room.RoomBasics
+        lastPreparation: room.preparation || null,
+        basics: room.BasicInventories
       }
     });
   } catch (error) {
-    res.status(500).json({ error: true, message: error.message });
+    next(error);
   }
 };
 
+// Obtener básicos de la habitación
 const getRoomBasics = async (req, res, next) => {
   try {
     const { roomNumber } = req.params;
@@ -568,15 +571,21 @@ const getRoomBasics = async (req, res, next) => {
         }
       ]
     });
+    
     if (!room) {
-      return res.status(404).json({ error: true, message: 'Habitación no encontrada' });
+      return res.status(404).json({ 
+        error: true, 
+        message: 'Habitación no encontrada' 
+      });
     }
+    
     const basics = room.BasicInventories.map(basic => ({
       id: basic.id,
       name: basic.name,
       description: basic.description,
       quantity: basic.RoomBasics.quantity
     }));
+    
     res.json({
       error: false,
       data: basics,
@@ -585,8 +594,211 @@ const getRoomBasics = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-}; 
+};
 
+// ⭐ NUEVO: Calcular precio de habitación
+const calculateRoomPrice = async (req, res, next) => {
+  try {
+    const { roomNumber, guestCount, checkIn, checkOut, promoCode } = req.body;
+
+    // Validaciones de entrada
+    if (!roomNumber || !guestCount || !checkIn || !checkOut) {
+      return res.status(400).json({
+        error: true,
+        message: 'Faltan parámetros requeridos: roomNumber, guestCount, checkIn, checkOut'
+      });
+    }
+
+    if (guestCount <= 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'La cantidad de huéspedes debe ser mayor a 0'
+      });
+    }
+
+    // Buscar la habitación
+    const room = await Room.findByPk(roomNumber);
+    
+    if (!room) {
+      return res.status(404).json({
+        error: true,
+        message: 'Habitación no encontrada'
+      });
+    }
+
+    if (!room.isActive) {
+      return res.status(400).json({
+        error: true,
+        message: 'Habitación no disponible'
+      });
+    }
+
+    // Calcular noches
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+    
+    if (nights < 1) {
+      return res.status(400).json({
+        error: true,
+        message: 'La fecha de salida debe ser posterior a la fecha de entrada'
+      });
+    }
+
+    // Aplicar código promocional si existe
+    if (promoCode && room.promotionPrice) {
+      room.isPromo = true;
+    }
+
+    // Calcular precio usando el método del modelo (si existe)
+    let priceCalculation;
+    if (typeof room.calculatePrice === 'function') {
+      try {
+        priceCalculation = room.calculatePrice(guestCount, nights);
+      } catch (calculationError) {
+        return res.status(400).json({
+          error: true,
+          message: calculationError.message
+        });
+      }
+    } else {
+      // ⭐ FALLBACK: Cálculo manual si no existe el método
+      let pricePerNight;
+      
+      if (room.isPromo && room.promotionPrice) {
+        pricePerNight = parseFloat(room.promotionPrice);
+      } else {
+        if (guestCount === 1) {
+          pricePerNight = parseFloat(room.priceSingle || room.price || 0);
+        } else if (guestCount === 2) {
+          pricePerNight = parseFloat(room.priceDouble || room.price || 0);
+        } else {
+          pricePerNight = parseFloat(room.priceMultiple || room.price || 0);
+        }
+      }
+
+      const totalAmount = pricePerNight * nights;
+      
+      priceCalculation = {
+        pricePerNight,
+        totalAmount,
+        isPromotion: room.isPromo && room.promotionPrice ? true : false,
+        breakdown: {
+          basePrice: pricePerNight,
+          nights,
+          guestCount,
+          extraGuestCharges: 0
+        }
+      };
+    }
+
+    // Respuesta exitosa
+    res.json({
+      error: false,
+      message: 'Precio calculado exitosamente',
+      data: {
+        roomNumber: room.roomNumber,
+        roomType: room.type,
+        guestCount,
+        nights,
+        checkIn: checkInDate.toISOString(),
+        checkOut: checkOutDate.toISOString(),
+        ...priceCalculation,
+        roomDetails: {
+          description: room.description,
+          maxGuests: room.maxGuests,
+          available: room.available,
+          status: room.status
+        }
+      }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ⭐ NUEVO: Calcular precios de múltiples habitaciones
+const calculateMultipleRoomPrices = async (req, res, next) => {
+  try {
+    const { roomNumbers, guestCount, checkIn, checkOut } = req.body;
+
+    if (!Array.isArray(roomNumbers) || roomNumbers.length === 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'Debe proporcionar al menos un número de habitación'
+      });
+    }
+
+    const rooms = await Room.findAll({
+      where: {
+        roomNumber: roomNumbers,
+        isActive: true
+      }
+    });
+
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+
+    const calculations = rooms.map(room => {
+      try {
+        let priceCalculation;
+        
+        if (typeof room.calculatePrice === 'function') {
+          priceCalculation = room.calculatePrice(guestCount, nights);
+        } else {
+          // Fallback calculation
+          let pricePerNight;
+          
+          if (guestCount === 1) {
+            pricePerNight = parseFloat(room.priceSingle || room.price || 0);
+          } else if (guestCount === 2) {
+            pricePerNight = parseFloat(room.priceDouble || room.price || 0);
+          } else {
+            pricePerNight = parseFloat(room.priceMultiple || room.price || 0);
+          }
+
+          priceCalculation = {
+            pricePerNight,
+            totalAmount: pricePerNight * nights,
+            isPromotion: false
+          };
+        }
+
+        return {
+          roomNumber: room.roomNumber,
+          roomType: room.type,
+          maxGuests: room.maxGuests,
+          available: room.available,
+          ...priceCalculation,
+          error: null
+        };
+      } catch (error) {
+        return {
+          roomNumber: room.roomNumber,
+          error: error.message,
+          available: false
+        };
+      }
+    });
+
+    res.json({
+      error: false,
+      message: 'Precios calculados exitosamente',
+      data: {
+        guestCount,
+        nights,
+        checkIn: checkInDate.toISOString(),
+        checkOut: checkOutDate.toISOString(),
+        rooms: calculations
+      }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   getActivePromotions,
@@ -598,7 +810,7 @@ module.exports = {
   createRoom,
   updateRoom,
   deleteRoom,
- updateRoomStatus,
+  updateRoomStatus,
   getRoomAmenities,
   updateRoomAmenities,
   getRoomServices,
@@ -606,5 +818,7 @@ module.exports = {
   getOccupancyReport,
   getRevenueByRoomType,
   getRoomPreparationStatus,
-  getRoomBasics
+  getRoomBasics,
+  calculateRoomPrice,
+  calculateMultipleRoomPrices
 };

@@ -5,6 +5,7 @@ import {
   createBooking,
   updateOnlinePayment
 } from "../../Redux/Actions/bookingActions";
+import { calculateRoomPrice } from "../../Redux/Actions/roomActions"; // ⭐ NUEVA IMPORTACIÓN
 import { fetchBuyerByDocument, createBuyer } from '../../Redux/Actions/taxxaActions';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -242,6 +243,11 @@ const Booking = () => {
   const [currentBuyerData, setCurrentBuyerData] = useState(null);
   const [paymentOption, setPaymentOption] = useState("total");
   const [lastSearchedSdocno, setLastSearchedSdocno] = useState('');
+  
+  // ⭐ NUEVOS ESTADOS PARA MANEJO DE PRECIOS
+  const [priceBreakdown, setPriceBreakdown] = useState(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
 
   // ... (handleSearch, handleSelectRoom, handleContinuePassengers sin cambios) ...
  const handleSearch = () => {
@@ -257,29 +263,58 @@ const Booking = () => {
   };
 
 
-  const handleContinuePassengers = () => {
+  const handleContinuePassengers = async () => {
     const totalGuests = adults + children;
     if (totalGuests === 0) {
-        toast.warning('Debe seleccionar al menos un huésped.');
-        return;
+      toast.warning('Debe seleccionar al menos un huésped.');
+      return;
     }
     if (totalGuests > maxCapacity) {
       toast.warning(`Máximo ${maxCapacity} huéspedes para esta habitación.`);
       return;
     }
-    let pricePerPerson;
-    if (totalGuests <= 2) pricePerPerson = 70000;
-    else if (totalGuests === 3) pricePerPerson = 60000;
-    else pricePerPerson = 50000; 
 
     const nights = differenceInDays(checkOut, checkIn);
     if (nights < 1) {
-        toast.warning('La fecha de salida debe ser posterior a la fecha de entrada.');
-        return;
+      toast.warning('La fecha de salida debe ser posterior a la fecha de entrada.');
+      return;
     }
-    setBookingTotal(pricePerPerson * totalGuests * nights);
-    setStep(3);
+
+    setPriceLoading(true);
+    
+    try {
+      // ⭐ LLAMAR AL BACKEND PARA CALCULAR PRECIO
+      const result = await dispatch(calculateRoomPrice({
+        roomNumber: selectedRoom.roomNumber,
+        guestCount: totalGuests,
+        checkIn: checkIn.toISOString(),
+        checkOut: checkOut.toISOString(),
+        promoCode: promoCode || null
+      }));
+
+      if (result.success) {
+        const priceData = result.data;
+        setBookingTotal(priceData.totalAmount);
+        setPriceBreakdown(priceData.breakdown);
+        
+        if (priceData.isPromotion) {
+          toast.success(`¡Precio promocional aplicado! $${priceData.pricePerNight.toLocaleString()} por noche`);
+        }
+        
+        setStep(3);
+      } else {
+        toast.error(result.error || 'Error al calcular el precio');
+      }
+    } catch (error) {
+      console.error('Error calculando precio:', error);
+      toast.error('Error al calcular el precio. Intente nuevamente.');
+    } finally {
+      setPriceLoading(false);
+    }
   };
+
+ 
+
 
   // Paso 3: Iniciar la verificación o registro del buyer
   const handleVerifyOrRegisterBuyer = async () => {
@@ -457,7 +492,7 @@ const Booking = () => {
               Buscar Disponibilidad
             </button>
           </div>
-           {availabilityLoading && <p className="text-center">Cargando habitaciones...</p>}
+          {availabilityLoading && <p className="text-center">Cargando habitaciones...</p>}
           {availabilityError && <p className="text-center text-red-400">Error: {typeof availabilityError === 'string' ? availabilityError : (availabilityError.message || 'Error al buscar habitaciones')}</p>}
           {availability && availability.length > 0 && !availabilityLoading && (
             <div>
@@ -474,7 +509,16 @@ const Booking = () => {
                       <h3 className="text-lg font-bold mb-2">{room.type} - Habitación {room.roomNumber}</h3>
                       <p className="text-gray-300 mb-2">{room.description}</p>
                       <p className="text-xl font-bold text-yellow-400">Capacidad: {room.maxGuests} personas</p>
-                       <p className="text-lg font-semibold text-green-400">Precio por noche: {new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(room.price)}</p>
+                      {/* ⭐ MOSTRAR RANGO DE PRECIOS */}
+                      <div className="text-sm text-green-400 mt-2">
+                        <p>Desde: ${room.priceSingle?.toLocaleString() || 'N/A'} (1 huésped)</p>
+                        <p>Hasta: ${room.priceMultiple?.toLocaleString() || 'N/A'} (3+ huéspedes)</p>
+                        {room.isPromo && room.promotionPrice && (
+                          <p className="text-yellow-300 font-bold">
+                            ¡Oferta! ${room.promotionPrice.toLocaleString()}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-4 md:mt-0 md:ml-6">
                       <button
@@ -489,15 +533,28 @@ const Booking = () => {
               </div>
             </div>
           )}
-           {availability && availability.length === 0 && !availabilityLoading && (
-             <p className="text-center text-yellow-400 mt-4">No hay habitaciones disponibles para las fechas o tipo seleccionado.</p>
-           )}
+          {availability && availability.length === 0 && !availabilityLoading && (
+            <p className="text-center text-yellow-400 mt-4">No hay habitaciones disponibles para las fechas o tipo seleccionado.</p>
+          )}
         </div>
       )}
 
       {step === 2 && selectedRoom && (
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
           <h2 className="text-xl font-bold mb-4">Selecciona la cantidad de pasajeros</h2>
+          
+          {/* ⭐ CAMPO DE CÓDIGO PROMOCIONAL */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold mb-1">Código Promocional (Opcional)</label>
+            <input
+              type="text"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              className="w-full p-2 rounded-lg bg-gray-700 text-white border border-gray-600"
+              placeholder="Ingrese código promocional"
+            />
+          </div>
+
           <div className="flex space-x-4 mb-4">
             <div>
               <label className="block text-sm">Adultos (Máx. {maxCapacity})</label>
@@ -525,28 +582,17 @@ const Booking = () => {
               </select>
             </div>
           </div>
+
           <div className="mb-4">
             <p>Habitación: <b>{selectedRoom.type} - {selectedRoom.roomNumber}</b></p>
             <p>Desde: <b>{format(checkIn, "dd-MM-yyyy", { locale: es })}</b></p>
             <p>Hasta: <b>{format(checkOut, "dd-MM-yyyy", { locale: es })}</b></p>
             <p>Noches: <b>{differenceInDays(checkOut, checkIn)}</b></p>
-            <p>
-              Total Estimado: <b>
-                {new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(
-                  (() => {
-                    const totalGuests = adults + children;
-                    if (totalGuests === 0) return 0;
-                    let pricePerPerson;
-                     if (totalGuests <= 2) pricePerPerson = 70000;
-                    else if (totalGuests === 3) pricePerPerson = 60000;
-                    else pricePerPerson = 50000;
-                    const nights = differenceInDays(checkOut, checkIn);
-                    return pricePerPerson * totalGuests * nights;
-                  })()
-                )}
-              </b>
+            <p className="text-yellow-300">
+              <small>El precio exacto se calculará en el siguiente paso</small>
             </p>
           </div>
+
           <div className="flex gap-4">
             <button
               onClick={() => setStep(1)}
@@ -556,17 +602,37 @@ const Booking = () => {
             </button>
             <button
               onClick={handleContinuePassengers}
-              className="w-full p-2 bg-stone-500 hover:bg-stone-600 rounded-full font-bold"
+              disabled={priceLoading}
+              className="w-full p-2 bg-stone-500 hover:bg-stone-600 rounded-full font-bold disabled:opacity-50"
             >
-              Continuar
+              {priceLoading ? 'Calculando...' : 'Continuar'}
             </button>
           </div>
         </div>
       )}
 
+      {/* ⭐ RESTO DE LOS STEPS SIN CAMBIOS SIGNIFICATIVOS, SOLO MOSTRAR BREAKDOWN SI ESTÁ DISPONIBLE */}
       {step === 3 && (
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
           <h2 className="text-xl font-bold mb-4">Datos del Huésped Principal</h2>
+          
+          {/* ⭐ MOSTRAR BREAKDOWN DE PRECIO */}
+          {priceBreakdown && (
+            <div className="bg-gray-700 p-4 rounded-lg mb-4">
+              <h3 className="text-lg font-semibold mb-2">Detalle del Precio</h3>
+              <div className="text-sm space-y-1">
+                <p>Precio base por noche: ${priceBreakdown.basePrice?.toLocaleString()}</p>
+                <p>Noches: {priceBreakdown.nights}</p>
+                <p>Huéspedes: {priceBreakdown.guestCount}</p>
+                {priceBreakdown.extraGuestCharges > 0 && (
+                  <p>Cargo por huéspedes extra: ${priceBreakdown.extraGuestCharges?.toLocaleString()}</p>
+                )}
+                <hr className="border-gray-600" />
+                <p className="font-bold text-lg">Total: ${bookingTotal.toLocaleString()}</p>
+              </div>
+            </div>
+          )}
+
           <div className="mb-4">
             <label className="block text-sm font-semibold mb-1">Documento del huésped</label>
             <input
@@ -586,29 +652,27 @@ const Booking = () => {
             </button>
             {buyerLoading && <p className="text-yellow-400 mt-2 text-center">Buscando huésped...</p>}
             {currentBuyerData && !showBuyerPopup && !buyerLoading && (
-                <p className="text-green-400 mt-2">Huésped: {currentBuyerData.scostumername} ({currentBuyerData.sdocno})</p>
+              <p className="text-green-400 mt-2">Huésped: {currentBuyerData.scostumername} ({currentBuyerData.sdocno})</p>
             )}
           </div>
-           <button
-              onClick={() => setStep(2)}
-              className="w-full p-2 bg-gray-500 hover:bg-gray-600 rounded-full font-bold mt-4"
-              disabled={buyerLoading}
-            >
-              Volver a Pasajeros
-            </button>
+          <button
+            onClick={() => setStep(2)}
+            className="w-full p-2 bg-gray-500 hover:bg-gray-600 rounded-full font-bold mt-4"
+            disabled={buyerLoading}
+          >
+            Volver a Pasajeros
+          </button>
         </div>
       )}
 
-     <BuyerRegistrationFormPopup
+      {/* ⭐ RESTO DEL COMPONENTE PERMANECE IGUAL */}
+      <BuyerRegistrationFormPopup
         isOpen={showBuyerPopup}
-        onClose={() => {
-            setShowBuyerPopup(false);
-            // Opcional: Considerar limpiar lastSearchedSdocno si el usuario cierra el popup
-            // setLastSearchedSdocno(''); 
-        }}
+        onClose={() => setShowBuyerPopup(false)}
         onBuyerRegistered={handleBuyerRegistered}
-        initialSdocno={buyerSdocnoInput} // Podría ser lastSearchedSdocno si quieres que el popup se llene con lo que se buscó
-    />
+        initialSdocno={buyerSdocnoInput}
+      />
+
       {step === 4 && currentBuyerData && (
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
           <h2 className="text-xl font-bold mb-4">Resumen y Pago</h2>
@@ -616,7 +680,23 @@ const Booking = () => {
           <p>Desde: <b>{format(checkIn, "dd-MM-yyyy", { locale: es })}</b> Hasta: <b>{format(checkOut, "dd-MM-yyyy", { locale: es })}</b> ({differenceInDays(checkOut, checkIn)} noches)</p>
           <p>Adultos: <b>{adults}</b> | Niños: <b>{children}</b> (Total: {adults+children} huéspedes)</p>
           <p>Huésped Principal: <b>{currentBuyerData.scostumername} ({currentBuyerData.sdocno})</b></p>
-          <p className="text-2xl font-bold text-yellow-400">Total Reserva: <b>{new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(bookingTotal)}</b></p>
+          
+          {/* ⭐ MOSTRAR BREAKDOWN DETALLADO */}
+          {priceBreakdown && (
+            <div className="bg-gray-700 p-4 rounded-lg my-4">
+              <h3 className="text-lg font-semibold mb-2">Detalle del Precio</h3>
+              <div className="text-sm space-y-1">
+                <p>Precio base: ${priceBreakdown.basePrice?.toLocaleString()}</p>
+                <p>Noches: {priceBreakdown.nights}</p>
+                <p>Huéspedes: {priceBreakdown.guestCount}</p>
+                {priceBreakdown.extraGuestCharges > 0 && (
+                  <p>Huéspedes extra: ${priceBreakdown.extraGuestCharges?.toLocaleString()}</p>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <p className="text-2xl font-bold text-yellow-400">Total Reserva: <b>${bookingTotal.toLocaleString()}</b></p>
           <div className="my-4">
             <label className="block text-sm font-semibold mb-1">Opción de Pago:</label>
             <select
@@ -624,11 +704,11 @@ const Booking = () => {
               onChange={e => setPaymentOption(e.target.value)}
               className="w-full p-2 rounded-lg bg-gray-700 text-white border border-gray-600"
             >
-              <option value="total">Pagar Total ({new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(bookingTotal)})</option>
-              <option value="mitad">Pagar 50% ({new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(Math.round(bookingTotal / 2))})</option>
+              <option value="total">Pagar Total (${bookingTotal.toLocaleString()})</option>
+              <option value="mitad">Pagar 50% (${Math.round(bookingTotal / 2).toLocaleString()})</option>
             </select>
           </div>
-          <p className="text-xl font-semibold mb-4">Monto a Pagar Ahora: {new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(amountToPay)}</p>
+          <p className="text-xl font-semibold mb-4">Monto a Pagar Ahora: ${amountToPay.toLocaleString()}</p>
           <WompiPayment
             booking={{ 
               bookingId: `reserva-${selectedRoom.roomNumber}-${Date.now()}`, 

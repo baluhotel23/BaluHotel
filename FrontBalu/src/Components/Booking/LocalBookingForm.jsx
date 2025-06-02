@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { checkAvailability, createBooking, getBookingById } from '../../Redux/Actions/bookingActions'; // Asumiendo getBookingById existe
 import { registerLocalPayment } from '../../Redux/Actions/paymentActions';
+import { calculateRoomPrice } from '../../Redux/Actions/roomActions'; // ⭐ NUEVA IMPORTACIÓN
 import { fetchBuyerByDocument, createBuyer } from '../../Redux/Actions/taxxaActions'; // Asumiendo estas acciones existen
 import { toast } from 'react-toastify';
 import { differenceInDays, format } from 'date-fns';
@@ -208,7 +209,10 @@ const LocalBookingForm = () => {
   const { buyer: verifiedBuyer, loading: buyerLoading, error: buyerError } = useSelector(state => state.taxxa);
   const roomsSlice = useSelector(state => state.rooms); 
   const listOfRooms = roomsSlice && roomsSlice.rooms ? roomsSlice.rooms : []; 
-
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [priceBreakdown, setPriceBreakdown] = useState(null); // ⭐ NUEVO ESTADO
+  const [priceLoading, setPriceLoading] = useState(false); // ⭐ NUEVO ESTADO
+  
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -224,7 +228,7 @@ const LocalBookingForm = () => {
   
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
-  const [totalAmount, setTotalAmount] = useState(0); // Para el cálculo dinámico de la reserva actual
+ 
   
   const [createdBookingId, setCreatedBookingId] = useState(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -293,45 +297,63 @@ const LocalBookingForm = () => {
     setSelectedRoom(room);
   };
 
-  const calculateLocalBookingTotal = () => {
-    if (!selectedRoom || !checkIn || !checkOut) return 0;
-    const nights = differenceInDays(checkOut, checkIn);
-    if (nights <= 0) return 0;
+  const calculateBookingTotal = async () => {
+    if (!selectedRoom || !checkIn || !checkOut || (parseInt(adults, 10) + parseInt(children, 10)) === 0) {
+      setTotalAmount(0);
+      setPriceBreakdown(null);
+      return;
+    }
 
     const guestCount = parseInt(adults, 10) + parseInt(children, 10);
-    let pricePerPersonPerNight;
-
-    // console.log('Calculating total: Adults:', adults, 'Children:', children, 'GuestCount:', guestCount, 'Nights:', nights);
-
-    if (guestCount === 0) pricePerPersonPerNight = 0;
-    else if (guestCount === 1) pricePerPersonPerNight = 70000;
-    else if (guestCount === 2) pricePerPersonPerNight = 70000;
-    else if (guestCount === 3) pricePerPersonPerNight = 60000;
-    else if (guestCount >= 4) pricePerPersonPerNight = 50000;
-    else pricePerPersonPerNight = 0;
+    const nights = differenceInDays(checkOut, checkIn);
     
-    const calculatedTotal = pricePerPersonPerNight * guestCount * nights;
-    // console.log('Calculated total:', calculatedTotal);
-    return calculatedTotal;
+    if (nights <= 0 || guestCount <= 0 || parseInt(adults, 10) < 1) {
+      setTotalAmount(0);
+      setPriceBreakdown(null);
+      return;
+    }
+
+    setPriceLoading(true);
+    
+    try {
+      const result = await dispatch(calculateRoomPrice({
+        roomNumber: selectedRoom.roomNumber,
+        guestCount: guestCount,
+        checkIn: checkIn.toISOString(),
+        checkOut: checkOut.toISOString()
+      }));
+
+      if (result.success) {
+        setTotalAmount(result.data.totalAmount);
+        setPriceBreakdown(result.data.breakdown);
+      } else {
+        console.error('Error calculating price:', result.error);
+        setTotalAmount(0);
+        setPriceBreakdown(null);
+      }
+    } catch (error) {
+      console.error('Error calculating price:', error);
+      setTotalAmount(0);
+      setPriceBreakdown(null);
+    } finally {
+      setPriceLoading(false);
+    }
   };
 
-  useEffect(() => {
-    if (selectedRoom && checkIn && checkOut && (parseInt(adults, 10) >= 0 || parseInt(children, 10) >= 0)) { // Permitir 0 para resetear
-        const nights = differenceInDays(checkOut, checkIn);
-        const currentGuestCount = parseInt(adults, 10) + parseInt(children, 10);
+   useEffect(() => {
+    if (selectedRoom && checkIn && checkOut && (parseInt(adults, 10) >= 0 || parseInt(children, 10) >= 0)) {
+      const nights = differenceInDays(checkOut, checkIn);
+      const currentGuestCount = parseInt(adults, 10) + parseInt(children, 10);
 
-        if (nights > 0 && currentGuestCount > 0 && parseInt(adults, 10) >= 1) {
-            const newTotal = calculateLocalBookingTotal();
-            setTotalAmount(newTotal);
-            // No establecer paymentAmount aquí directamente si tenemos opciones de pago
-            // setPaymentAmount(newTotal); 
-        } else {
-            setTotalAmount(0);
-            // setPaymentAmount(0);
-        }
-    } else {
+      if (nights > 0 && currentGuestCount > 0 && parseInt(adults, 10) >= 1) {
+        calculateBookingTotal();
+      } else {
         setTotalAmount(0);
-        // setPaymentAmount(0);
+        setPriceBreakdown(null);
+      }
+    } else {
+      setTotalAmount(0);
+      setPriceBreakdown(null);
     }
   }, [selectedRoom, checkIn, checkOut, adults, children]);
 
@@ -508,8 +530,8 @@ const LocalBookingForm = () => {
 
       {/* Sección 3: Datos de la Reserva y Huésped */}
       {selectedRoom && !createdBookingId && (
-        <fieldset style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ccc' }}>
-          <legend>3. Detalles de Reserva para Habitación N°{selectedRoom.roomNumber}</legend>
+         <fieldset style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ccc' }}>
+            <legend>3. Detalles de Reserva para Habitación N°{selectedRoom.roomNumber}</legend>
           {/* ... (Inputs de sdocno y nombre del huésped sin cambios) ... */}
           <div style={{ marginBottom: '10px' }}>
             <label htmlFor="buyerSdocnoInput">Documento del Huésped (sdocno):</label><br />
@@ -535,16 +557,56 @@ const LocalBookingForm = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-            <div>
-              <label htmlFor="adults">Adultos:</label><br />
-              <input type="number" id="adults" value={adults} onChange={(e) => setAdults(e.target.value)} min="1" style={{ padding: '8px', width: '80px' }}/>
+              <div>
+                <label htmlFor="adults">Adultos:</label><br />
+                <input 
+                  type="number" 
+                  id="adults" 
+                  value={adults} 
+                  onChange={(e) => setAdults(e.target.value)} 
+                  min="1" 
+                  style={{ padding: '8px', width: '80px' }}
+                />
+              </div>
+              <div>
+                <label htmlFor="children">Niños:</label><br />
+                <input 
+                  type="number" 
+                  id="children" 
+                  value={children} 
+                  onChange={(e) => setChildren(e.target.value)} 
+                  min="0" 
+                  style={{ padding: '8px', width: '80px' }}
+                />
+              </div>
             </div>
-            <div>
-              <label htmlFor="children">Niños:</label><br />
-              <input type="number" id="children" value={children} onChange={(e) => setChildren(e.target.value)} min="0" style={{ padding: '8px', width: '80px' }}/>
-            </div>
-          </div>
-           <p style={{ fontWeight: 'bold' }}>Total Estimado: ${totalAmount.toFixed(2)}</p>
+
+            {/* ⭐ MOSTRAR BREAKDOWN DE PRECIO */}
+            {priceLoading && (
+              <div style={{ padding: '10px', backgroundColor: '#f0f0f0', marginBottom: '10px', borderRadius: '5px' }}>
+                <p>Calculando precio...</p>
+              </div>
+            )}
+
+            {priceBreakdown && !priceLoading && (
+              <div style={{ padding: '10px', backgroundColor: '#e7f3ff', marginBottom: '10px', borderRadius: '5px' }}>
+                <h4 style={{ margin: '0 0 10px 0' }}>Detalle del Precio:</h4>
+                <p style={{ margin: '5px 0' }}>Precio base por noche: ${priceBreakdown.basePrice?.toLocaleString()}</p>
+                <p style={{ margin: '5px 0' }}>Noches: {priceBreakdown.nights}</p>
+                <p style={{ margin: '5px 0' }}>Huéspedes: {priceBreakdown.guestCount}</p>
+                {priceBreakdown.extraGuestCharges > 0 && (
+                  <p style={{ margin: '5px 0' }}>Cargo por huéspedes extra: ${priceBreakdown.extraGuestCharges?.toLocaleString()}</p>
+                )}
+                <hr style={{ margin: '10px 0' }} />
+                <p style={{ margin: '5px 0', fontWeight: 'bold', fontSize: '16px' }}>
+                  Total: ${totalAmount.toLocaleString()}
+                </p>
+              </div>
+            )}
+
+            {!priceBreakdown && !priceLoading && totalAmount > 0 && (
+              <p style={{ fontWeight: 'bold' }}>Total Estimado: ${totalAmount.toFixed(2)}</p>
+            )}
 
           {/* NUEVO: Opciones de Confirmación */}
           <div style={{ marginBottom: '15px', marginTop: '10px' }}>
@@ -562,14 +624,14 @@ const LocalBookingForm = () => {
           </div>
 
           <button 
-            onClick={handleSubmitLocalBooking} 
-            disabled={!buyerSdocno || totalAmount <= 0 || (parseInt(adults,10) + parseInt(children,10) === 0) || parseInt(adults,10) < 1} 
-            style={{ padding: '10px 15px', backgroundColor: 'green', color: 'white' }}
-          >
-            Confirmar y Crear Reserva Local
-          </button>
-        </fieldset>
-      )}
+              onClick={handleSubmitLocalBooking} 
+              disabled={!buyerSdocno || totalAmount <= 0 || (parseInt(adults,10) + parseInt(children,10) === 0) || parseInt(adults,10) < 1 || priceLoading} 
+              style={{ padding: '10px 15px', backgroundColor: 'green', color: 'white' }}
+            >
+              {priceLoading ? 'Calculando...' : 'Confirmar y Crear Reserva Local'}
+            </button>
+          </fieldset>
+        )}
       
       {/* Sección 4: Formulario de Pago Local */}
       {showPaymentForm && createdBookingId && (

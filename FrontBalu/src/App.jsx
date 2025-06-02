@@ -246,6 +246,15 @@ const AppContent = () => {
             }
           />
           <Route
+            path="/purchaseForm"
+            element={
+              <PrivateRoute allowedRoles={["owner"]}>
+                <PurchaseForm />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
             path="/purchaseList"
             element={
               <PrivateRoute allowedRoles={["owner"]}>

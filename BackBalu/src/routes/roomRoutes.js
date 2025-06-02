@@ -2,63 +2,107 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/isAuth');
 const { allowRoles } = require('../middleware/byRol');
-const {getAllRooms,
+const {
+    getAllRooms,
     getRoomTypes,
     getRoomById,
     checkAvailability,
     createRoom,
     updateRoom,
     deleteRoom,
-   updateRoomStatus,
+    updateRoomStatus,
     getRoomAmenities,
     updateRoomAmenities,
     getRoomServices,
     updateRoomServices,
     getOccupancyReport,
-    getRevenueByRoomType,getRoomBasics, getRoomPreparationStatus} = require('../controllers/roomController');
+    getRevenueByRoomType,
+    getRoomBasics, 
+    getRoomPreparationStatus,
+    getActivePromotions,
+    getSpecialOffers,
+    calculateRoomPrice,           // ⭐ NUEVA FUNCIÓN
+    calculateMultipleRoomPrices   // ⭐ NUEVA FUNCIÓN
+} = require('../controllers/roomController');
 
-// Rutas públicas
+// ⭐ RUTAS PÚBLICAS
 router.get('/', getAllRooms);
 router.get('/types', getRoomTypes);
-router.get('/:roomNumber', getRoomById);
-router.get("/", getRoomById);
+router.get('/promotions', getActivePromotions);          // ⭐ NUEVA RUTA
+router.get('/special-offers', getSpecialOffers);         // ⭐ NUEVA RUTA
 router.get('/availability/:dates', checkAvailability);
+router.get('/:roomNumber', getRoomById);
 
-// Rutas protegidas
+// ⭐ RUTAS PÚBLICAS PARA CÁLCULO DE PRECIOS (sin autenticación para cotizaciones)
+router.post('/pricing/calculate', calculateRoomPrice);            // ⭐ NUEVA RUTA
+router.post('/pricing/calculate-multiple', calculateMultipleRoomPrices); // ⭐ NUEVA RUTA
+
+// ⭐ MIDDLEWARE DE AUTENTICACIÓN PARA RUTAS PROTEGIDAS
 router.use(verifyToken);
 
-// Gestión de habitaciones (admin y owner)
+// ⭐ GESTIÓN DE HABITACIONES (admin y owner)
 router.post('/create', 
     allowRoles(['owner', 'admin']), 
-    
     createRoom
 );
+
 router.put('/:roomNumber', 
     allowRoles(['owner', 'admin']), 
-    
     updateRoom
- );
+);
+
 router.delete('/:roomNumber', 
     allowRoles(['owner', 'admin']), 
     deleteRoom
 );
 
- // Mantenimiento y estado
-// router.get('/maintenance/history/:id', allowRoles(['owner', 'admin']), getMaintenanceHistory);
-// router.post('/maintenance/:id', allowRoles(['owner', 'admin']), createMaintenanceRecord);
-router.put('/status/:roomNumber', allowRoles(['owner', 'admin']), updateRoomStatus);
+// ⭐ MANTENIMIENTO Y ESTADO
+router.put('/status/:roomNumber', 
+    allowRoles(['owner', 'admin', 'receptionist']), 
+    updateRoomStatus
+);
 
-// Amenities y servicios
-router.get('/:roomNumber/amenities', getRoomAmenities);
-router.put('/:roomNumber/amenities', allowRoles(['owner', 'admin']), updateRoomAmenities);
-router.get('/:roomNumber/services', getRoomServices);
-router.put('/:roomNumber/services', allowRoles(['owner', 'admin']), updateRoomServices);
+// ⭐ AMENITIES Y SERVICIOS
+router.get('/:roomNumber/amenities', 
+    allowRoles(['owner', 'admin', 'receptionist']), 
+    getRoomAmenities
+);
 
-// // Reportes
- router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyReport);
- router.get('/reports/revenue', allowRoles(['owner', 'admin']), getRevenueByRoomType);
-router.get('/reports/preparation-status/:roomNumber', allowRoles(['owner', 'admin']), getRoomPreparationStatus);
-router.get('/basicos/:roomNumber', allowRoles(['owner', 'admin', 'recept']), getRoomBasics);
+router.put('/:roomNumber/amenities', 
+    allowRoles(['owner', 'admin']), 
+    updateRoomAmenities
+);
 
+router.get('/:roomNumber/services', 
+    allowRoles(['owner', 'admin', 'receptionist']), 
+    getRoomServices
+);
+
+router.put('/:roomNumber/services', 
+    allowRoles(['owner', 'admin']), 
+    updateRoomServices
+);
+
+// ⭐ BÁSICOS DE HABITACIÓN
+router.get('/basicos/:roomNumber', 
+    allowRoles(['owner', 'admin', 'receptionist']), 
+    getRoomBasics
+);
+
+// ⭐ REPORTES Y ANÁLISIS
+router.get('/reports/occupancy', 
+    allowRoles(['owner', 'admin']), 
+    getOccupancyReport
+);
+
+router.get('/reports/revenue', 
+    allowRoles(['owner', 'admin']), 
+    getRevenueByRoomType
+);
+
+router.get('/reports/preparation-status/:roomNumber', 
+    allowRoles(['owner', 'admin', 'receptionist']), 
+    getRoomPreparationStatus
+);
 
 module.exports = router;
