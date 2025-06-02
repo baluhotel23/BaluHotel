@@ -15,7 +15,7 @@ import { toast } from "react-toastify";
 import WompiPayment from "../WompiPayment";
 import { useNavigate } from "react-router-dom";
 
-const ROOM_TYPES = ["Sencilla", "Doble", "Triple", "Cuadruple", "Pareja"];
+const ROOM_TYPES = [ "Doble", "Triple", "Cuadruple", "Pareja"];
 
 // Definición del Modal
 const Modal = ({ children, isOpen, onClose }) => {
