@@ -4,7 +4,7 @@ import { logout } from '../Redux/Reducer/authReducer';
 
 // Crear instancia de axios con la URL base
 const api = axios.create({
-  baseURL: 'http://localhost:3001/', // Ajusta esto a tu URL de backend
+  baseURL: 'https://baluhotel.onrender.com/', // Ajusta esto a tu URL de backend
   timeout: 5000,
   headers: {
     'Content-Type': 'application/json'
