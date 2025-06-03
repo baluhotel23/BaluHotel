@@ -9,6 +9,15 @@ const initialState = {
   revenueReport: null,
   roomsToPrepare: [],
   roomBasics: [], // <-- NUEVO ESTADO
+  activePromotions: [],
+  specialOffers: [],
+  priceCalculations: {},
+  multipleRoomPrices: null,
+  roomPreparationStatus: {},
+  tempPriceCalculation: null,
+  fullRoomQuote: null,
+  availabilityWithPricing: null,
+  promoCodeValidation: null,
   loading: false,
   error: null,
 };
@@ -169,6 +178,82 @@ const roomReducer = (state = initialState, action) => {
       return { ...state, loading: false, roomBasics: action.payload };
     case "GET_ROOM_BASICS_FAILURE":
       return { ...state, loading: false, error: action.payload };
+
+      case "CALCULATE_ROOM_PRICE_REQUEST":
+      return { ...state, loading: true, error: null };
+    case "CALCULATE_ROOM_PRICE_SUCCESS":
+      return {
+        ...state,
+        loading: false,
+        priceCalculations: {
+          ...state.priceCalculations,
+          [action.payload.roomNumber]: action.payload.calculation
+        }
+      };
+    case "CALCULATE_ROOM_PRICE_FAILURE":
+      return { ...state, loading: false, error: action.payload };
+
+    case "CALCULATE_MULTIPLE_ROOM_PRICES_REQUEST":
+      return { ...state, loading: true, error: null };
+    case "CALCULATE_MULTIPLE_ROOM_PRICES_SUCCESS":
+      return { ...state, loading: false, multipleRoomPrices: action.payload };
+    case "CALCULATE_MULTIPLE_ROOM_PRICES_FAILURE":
+      return { ...state, loading: false, error: action.payload };
+
+    // ⭐ ESTADO DE PREPARACIÓN DE HABITACIONES
+    case "GET_ROOM_PREPARATION_STATUS_REQUEST":
+      return { ...state, loading: true, error: null };
+    case "GET_ROOM_PREPARATION_STATUS_SUCCESS":
+      return {
+        ...state,
+        loading: false,
+        roomPreparationStatus: {
+          ...state.roomPreparationStatus,
+          [action.payload.roomNumber]: action.payload.status
+        }
+      };
+    case "GET_ROOM_PREPARATION_STATUS_FAILURE":
+      return { ...state, loading: false, error: action.payload };
+
+    // ⭐ MANEJO DE PRECIOS TEMPORALES
+    case "CLEAR_PRICE_CALCULATIONS":
+      return {
+        ...state,
+        priceCalculations: {},
+        multipleRoomPrices: null,
+        tempPriceCalculation: null
+      };
+
+    case "SAVE_TEMP_PRICE_CALCULATION":
+      return {
+        ...state,
+        tempPriceCalculation: action.payload
+      };
+
+    // ⭐ COTIZACIÓN COMPLETA
+    case "GET_FULL_ROOM_QUOTE_REQUEST":
+      return { ...state, loading: true, error: null };
+    case "GET_FULL_ROOM_QUOTE_SUCCESS":
+      return { ...state, loading: false, fullRoomQuote: action.payload };
+    case "GET_FULL_ROOM_QUOTE_FAILURE":
+      return { ...state, loading: false, error: action.payload };
+
+    // ⭐ DISPONIBILIDAD CON PRECIOS
+    case "CHECK_AVAILABILITY_WITH_PRICING_REQUEST":
+      return { ...state, loading: true, error: null };
+    case "CHECK_AVAILABILITY_WITH_PRICING_SUCCESS":
+      return { ...state, loading: false, availabilityWithPricing: action.payload };
+    case "CHECK_AVAILABILITY_WITH_PRICING_FAILURE":
+      return { ...state, loading: false, error: action.payload };
+
+    // ⭐ VALIDACIÓN DE CÓDIGOS PROMOCIONALES
+    case "VALIDATE_PROMO_CODE_REQUEST":
+      return { ...state, loading: true, error: null };
+    case "VALIDATE_PROMO_CODE_SUCCESS":
+      return { ...state, loading: false, promoCodeValidation: action.payload };
+    case "VALIDATE_PROMO_CODE_FAILURE":
+      return { ...state, loading: false, error: action.payload, promoCodeValidation: null };
+
 
     default:
       return state;
