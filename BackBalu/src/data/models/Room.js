@@ -57,13 +57,13 @@ module.exports = (sequelize) => {
 
     type: {
       type: DataTypes.ENUM,
-      values: ["Individual", "Doble", "Triple", "Cuadruple", "Suite"],
+      values: ["Doble", "Triple", "Cuadruple", "Pareja"],
       allowNull: true,
     },
     status: {
       type: DataTypes.ENUM,
-      values: ["Limpia", "Ocupada", "Mantenimiento", "Reservada"],
-      defaultValue: "Limpia"
+      values: ["Limpia", "Ocupada", "Mantenimiento", "Reservada", "Para Limpiar"],
+      defaultValue: "Para Limpiar"
     },
 
     maxGuests: {

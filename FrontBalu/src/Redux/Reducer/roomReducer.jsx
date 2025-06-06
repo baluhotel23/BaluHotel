@@ -8,7 +8,8 @@ const initialState = {
   occupancyReport: null,
   revenueReport: null,
   roomsToPrepare: [],
-  roomBasics: [], // <-- NUEVO ESTADO
+  roomBasics: {}, // ⭐ CAMBIAR DE ARRAY A OBJETO para guardar por habitación
+  roomBasicsByRoom: {}, // ⭐ AGREGAR ESTADO ESPECÍFICO POR HABITACIÓN
   activePromotions: [],
   specialOffers: [],
   priceCalculations: {},
@@ -172,14 +173,43 @@ const roomReducer = (state = initialState, action) => {
     case "GET_ROOMS_TO_PREPARE_FAILURE":
       return { ...state, loading: false, error: action.payload };
 
-    case "GET_ROOM_BASICS_REQUEST":
+   case "GET_ROOM_BASICS_REQUEST":
       return { ...state, loading: true, error: null };
+    
     case "GET_ROOM_BASICS_SUCCESS":
-      return { ...state, loading: false, roomBasics: action.payload };
+      console.log('🔄 Reducer recibió payload:', action.payload);
+      return { 
+        ...state, 
+        loading: false, 
+        roomBasics: action.payload.basics, // ⭐ Usar el array de básicos
+        roomBasicsByRoom: {
+          ...state.roomBasicsByRoom,
+          [action.payload.roomNumber]: action.payload.basics // ⭐ Guardar por habitación
+        }
+      };
+    
     case "GET_ROOM_BASICS_FAILURE":
       return { ...state, loading: false, error: action.payload };
 
-      case "CALCULATE_ROOM_PRICE_REQUEST":
+       case "UPDATE_ROOM_BASICS_STOCK":
+      return {
+        ...state,
+        roomBasics: state.roomBasics.map(item => 
+          item.id === action.payload.itemId 
+            ? { ...item, quantity: item.quantity - action.payload.quantity }
+            : item
+        ),
+        roomBasicsByRoom: {
+          ...state.roomBasicsByRoom,
+          [action.payload.roomNumber]: (state.roomBasicsByRoom[action.payload.roomNumber] || []).map(item => 
+            item.id === action.payload.itemId 
+              ? { ...item, quantity: item.quantity - action.payload.quantity }
+              : item
+          )
+        }
+      };
+
+    case "CALCULATE_ROOM_PRICE_REQUEST":
       return { ...state, loading: true, error: null };
     case "CALCULATE_ROOM_PRICE_SUCCESS":
       return {

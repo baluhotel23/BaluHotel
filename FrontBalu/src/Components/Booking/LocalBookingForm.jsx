@@ -16,17 +16,69 @@ const Modal = ({ children, isOpen, onClose }) => {
   if (!isOpen) return null;
   return (
     <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
-      alignItems: 'center', justifyContent: 'center', zIndex: 1000
+      position: 'fixed', 
+      top: 0, 
+      left: 0, 
+      right: 0, 
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)', 
+      display: 'flex',
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      zIndex: 1000,
+      padding: '20px' // ⭐ AGREGAR PADDING PARA MEJOR VISUALIZACIÓN
     }}>
-      <div style={{ background: 'white', padding: '20px', borderRadius: '8px', minWidth: '300px', maxWidth: '500px' }}>
-        {children}
-        <button onClick={onClose} style={{ marginTop: '10px', padding: '8px 12px', float: 'right' }}>Cerrar</button>
+      <div style={{ 
+        background: 'white', 
+        borderRadius: '8px', 
+        minWidth: '300px', 
+        maxWidth: '600px', // ⭐ INCREMENTAR ANCHO MÁXIMO
+        width: '90%', // ⭐ ANCHO RESPONSIVO
+        maxHeight: '90vh', // ⭐ ALTURA MÁXIMA BASADA EN VIEWPORT
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* ⭐ CONTENEDOR SCROLLEABLE */}
+        <div style={{
+          padding: '20px',
+          overflowY: 'auto', // ⭐ SCROLL VERTICAL
+          maxHeight: 'calc(90vh - 60px)', // ⭐ ALTURA MÁXIMA MENOS ESPACIO PARA BOTÓN
+          scrollbarWidth: 'thin', // ⭐ SCROLLBAR DELGADO (Firefox)
+          scrollbarColor: '#888 #f1f1f1' // ⭐ COLOR SCROLLBAR (Firefox)
+        }}>
+          {children}
+        </div>
+        
+        {/* ⭐ BOTÓN FIJO EN LA PARTE INFERIOR */}
+        <div style={{
+          padding: '15px 20px',
+          borderTop: '1px solid #e0e0e0',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          backgroundColor: '#f8f9fa'
+        }}>
+          <button 
+            onClick={onClose} 
+            style={{ 
+              padding: '8px 16px',
+              backgroundColor: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Cerrar
+          </button>
+        </div>
       </div>
+      
+      
+      
     </div>
   );
 };
+
 
 
 
@@ -191,7 +243,7 @@ const BuyerRegistrationFormPopup = ({ isOpen, onClose, onBuyerRegistered, initia
 
 
 
-const ROOM_TYPES = ["Sencilla", "Doble", "Triple", "Cuadruple", "Pareja"];
+const ROOM_TYPES = [ "Doble", "Triple", "Cuadruple", "Pareja"];
 
 const LocalBookingForm = () => {
   const dispatch = useDispatch();
@@ -404,41 +456,109 @@ const LocalBookingForm = () => {
     }
   };
   
-   const handleRegisterLocalPayment = async () => {
-    if (!createdBookingId || paymentAmount <= 0 || !paymentMethodLocal) {
-        toast.error('Datos de pago incompletos o reserva no creada.');
-        return;
-    }
-   const paymentPayload = {
-        bookingId: createdBookingId,
-        amount: parseFloat(paymentAmount),
-        paymentMethod: paymentMethodLocal,
-        paymentType: (parseFloat(paymentAmount) >= currentBookingTotalForPayment) ? 'full' : 'partial', 
-    };
-    
-    const resultPaymentAction = await dispatch(registerLocalPayment(paymentPayload));
-
-    if(resultPaymentAction && resultPaymentAction.success) { // Comprobar la propiedad success
-        toast.success('Pago local registrado exitosamente.'); // Toast de éxito aquí o en la acción
-        setShowPaymentForm(false);
-        setCreatedBookingId(null);
-        setSelectedRoom(null); 
-        setTotalAmount(0); 
-        setCurrentBookingTotalForPayment(0); 
-        setPaymentAmount(0);
-        setBuyerSdocnoInput(''); 
-        setBuyerSdocno('');
-        setBuyerName('');
-        setAdults(1);
-        setChildren(0);
-        setCheckIn(today);
-        setCheckOut(tomorrow);
-        setRoomType(ROOM_TYPES[0]);
-        setConfirmationOption('payNow'); 
-    } else {
-        toast.error(resultPaymentAction.message || 'Error al registrar el pago local.');
-    }
+const handleRegisterLocalPayment = async () => {
+  if (!createdBookingId || paymentAmount <= 0 || !paymentMethodLocal) {
+    toast.error('Datos de pago incompletos o reserva no creada.');
+    return;
+  }
+  
+  const paymentPayload = {
+    bookingId: createdBookingId,
+    amount: parseFloat(paymentAmount),
+    paymentMethod: paymentMethodLocal,
+    paymentType: (parseFloat(paymentAmount) >= currentBookingTotalForPayment) ? 'full' : 'partial', 
   };
+  
+  try {
+    console.log('Enviando pago...', paymentPayload); // ⭐ DEBUG
+    const resultPaymentAction = await dispatch(registerLocalPayment(paymentPayload));
+    console.log('Resultado del pago:', resultPaymentAction); // ⭐ DEBUG
+
+    // ⭐ VERIFICAR DIFERENTES FORMAS DE SUCCESS
+    const isSuccess = resultPaymentAction && (
+      resultPaymentAction.success || 
+      resultPaymentAction.type?.includes('fulfilled') ||
+      resultPaymentAction.payload?.success ||
+      !resultPaymentAction.error
+    );
+
+    if (isSuccess) {
+      const isFullPayment = parseFloat(paymentAmount) >= currentBookingTotalForPayment;
+      const remainingAmount = currentBookingTotalForPayment - parseFloat(paymentAmount);
+      
+      // ⭐ MOSTRAR TOAST PRIMERO
+      if (isFullPayment) {
+        toast.success('¡Pago completo registrado exitosamente! Reserva totalmente pagada.');
+      } else {
+        toast.success(`Pago parcial registrado exitosamente. Restante: $${remainingAmount.toFixed(2)}`);
+      }
+      
+      console.log('Pago exitoso, iniciando reset y navegación...'); // ⭐ DEBUG
+      
+      // ⭐ RESET DEL FORMULARIO
+      resetFormToInitialState();
+      
+      // ⭐ NAVEGACIÓN CON DIFERENTES INTENTOS
+      setTimeout(() => {
+        console.log('Navegando a dashboard...'); // ⭐ DEBUG
+        navigate('/dashboard', { replace: true });
+      }, 1500);
+      
+      // ⭐ NAVEGACIÓN DE RESPALDO SIN DELAY
+      setTimeout(() => {
+        console.log('Navegación de respaldo...'); // ⭐ DEBUG
+        window.location.href = '/dashboard';
+      }, 3000);
+      
+    } else {
+      console.error('Error en pago:', resultPaymentAction); // ⭐ DEBUG
+      toast.error(resultPaymentAction?.message || resultPaymentAction?.error || 'Error al registrar el pago local.');
+    }
+  } catch (error) {
+    console.error('Error en handleRegisterLocalPayment:', error);
+    toast.error('Error inesperado al registrar el pago.');
+  }
+};
+
+// ⭐ MEJORAR LA FUNCIÓN DE RESET CON CONSOLE.LOG
+const resetFormToInitialState = () => {
+  console.log('🔄 Iniciando reset del formulario...'); // ⭐ DEBUG
+  
+  // Reset de estados de pago
+  setShowPaymentForm(false);
+  setCreatedBookingId(null);
+  setPaymentAmount(0);
+  setCurrentBookingTotalForPayment(0);
+  setPaymentMethodLocal('cash');
+  
+  // Reset de estados de reserva
+  setSelectedRoom(null);
+  setTotalAmount(0);
+  setConfirmationOption('payNow');
+  
+  // Reset de estados de huésped
+  setBuyerSdocnoInput('');
+  setBuyerSdocno('');
+  setBuyerName('');
+  setShowBuyerPopup(false);
+  
+  // Reset de fechas y huéspedes con nuevas instancias
+  setAdults(1);
+  setChildren(0);
+  
+  // ⭐ CREAR NUEVAS INSTANCIAS DE FECHA
+  const newToday = new Date();
+  const newTomorrow = new Date(newToday);
+  newTomorrow.setDate(newTomorrow.getDate() + 1);
+  
+  setCheckIn(newToday);
+  setCheckOut(newTomorrow);
+  setRoomType(ROOM_TYPES[0]);
+  
+  console.log('✅ Reset del formulario completado'); // ⭐ DEBUG
+};
+
+
 
   const availableRooms = availability && !availabilityLoading && !availabilityError ? availability.filter(room => room.isAvailable) : [];
 
