@@ -492,19 +492,33 @@ const getBookingById = async (req, res) => {
 
   const booking = await Booking.findOne({
     where: { bookingId },
-  include: [
-    { model: Room },
-    { model: ExtraCharge },
-    { model: Bill },
-    { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername"] },
-    { model: Payment },
-    { model: RegistrationPass, as: "registrationPasses" }, // <-- Usa el alias aquí
-  ],
-});
+    include: [
+      { 
+        model: Room,
+        // ⭐ INCLUIR BASIC INVENTORY A TRAVÉS DE LA RELACIÓN MANY-TO-MANY
+        include: [
+          {
+            model: BasicInventory,
+            through: { 
+              attributes: ['quantity'], // Obtener cantidad de la tabla intermedia RoomBasics
+              as: 'RoomBasics'
+            },
+            attributes: ['id', 'name', 'description', 'currentStock']
+          }
+        ]
+      },
+      { model: ExtraCharge },
+      { model: Bill },
+      { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername"] },
+      { model: Payment },
+      { model: RegistrationPass, as: "registrationPasses" },
+    ],
+  });
 
   if (!booking) {
     throw new CustomError("Reserva no encontrada", 404);
   }
+  
   res.json({
     error: false,
     data: booking,
@@ -523,8 +537,21 @@ const getAllBookings = async (req, res) => {
     };
   }
 
-  // Prepara el include de Room con filtro dinámico
-  const roomInclude = { model: Room };
+  // ⭐ INCLUDE CORREGIDO PARA ROOM CON BASIC INVENTORY
+  const roomInclude = { 
+    model: Room,
+    include: [
+      {
+        model: BasicInventory,
+        through: { 
+          attributes: ['quantity'],
+          as: 'RoomBasics'
+        },
+        attributes: ['id', 'name', 'description', 'currentStock']
+      }
+    ]
+  };
+  
   if (roomStatus) {
     roomInclude.where = { status: roomStatus };
   }
@@ -533,9 +560,9 @@ const getAllBookings = async (req, res) => {
     where,
     include: [
       roomInclude,
-     { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername", "selectronicmail"] },
+      { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername", "selectronicmail"] },
       { model: Payment },
-       { model: ExtraCharge },
+      { model: ExtraCharge },
     ],
     order: [["checkIn", "ASC"]],
   });

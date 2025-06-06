@@ -20,12 +20,27 @@ export const registerLocalPayment = (paymentData) => {
   return async (dispatch) => {
     dispatch(registerLocalPaymentRequest());
     try {
-      const response = await api.post('/admin/paymentLocal', paymentData); // Ajusta la ruta si es necesario
+      const response = await api.post('/admin/paymentLocal', paymentData);
       dispatch(registerLocalPaymentSuccess(response.data));
-      toast.success('Pago local registrado exitosamente'); // Muestra un toast de éxito
+      toast.success('Pago local registrado exitosamente');
+      
+      // ⭐ RETORNAR EL RESULTADO PARA QUE EL COMPONENTE LO PUEDA USAR
+      return {
+        success: true,
+        data: response.data,
+        message: 'Pago registrado exitosamente'
+      };
     } catch (error) {
+      const errorMessage = error.response ? error.response.data.message : 'Error al registrar el pago local';
       dispatch(registerLocalPaymentFailure(error.response ? error.response.data : error));
-      toast.error(error.response ? error.response.data.message : 'Error al registrar el pago local'); // Muestra un toast de error
+      toast.error(errorMessage);
+      
+      // ⭐ RETORNAR ERROR TAMBIÉN
+      return {
+        success: false,
+        error: errorMessage,
+        data: null
+      };
     }
   };
 };

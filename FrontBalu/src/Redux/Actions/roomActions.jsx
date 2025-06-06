@@ -211,13 +211,44 @@ export const getRoomBasics = (roomNumber) => async (dispatch) => {
   dispatch({ type: 'GET_ROOM_BASICS_REQUEST' });
   try {
     const { data } = await api.get(`/rooms/basicos/${roomNumber}`);
-    dispatch({ type: 'GET_ROOM_BASICS_SUCCESS', payload: data.data });
-    return { error: false, data: data.data };
+    
+    // ⭐ AGREGAR CONSOLE.LOG PARA DEBUG
+    console.log('🔍 Respuesta completa del endpoint:', data);
+    console.log('🔍 Data array recibido:', data.data);
+    console.log('🔍 Room Number:', roomNumber);
+    
+    // ⭐ CORREGIR EL PAYLOAD - data.data es un array, no un objeto
+    const payload = {
+      roomNumber: roomNumber,
+      basics: data.data, // ⭐ Guardar el array en una propiedad específica
+      message: data.message
+    };
+    
+    console.log('📦 Payload que se enviará al reducer:', payload);
+    
+    dispatch({ type: 'GET_ROOM_BASICS_SUCCESS', payload });
+    return { error: false, data: payload };
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al obtener básicos de la habitación';
+    console.error('❌ Error en getRoomBasics:', errorMessage);
     dispatch({ type: 'GET_ROOM_BASICS_FAILURE', payload: errorMessage });
     return { error: true, message: errorMessage };
   }
+};
+
+export const updateRoomBasicsStock = (roomNumber, itemId, quantity) => (dispatch) => {
+  dispatch({ 
+    type: 'UPDATE_ROOM_BASICS_STOCK', 
+    payload: { roomNumber, itemId, quantity } 
+  });
+};
+
+// ⭐ NUEVA ACTION PARA LIMPIAR BÁSICOS DE UNA HABITACIÓN
+export const clearRoomBasics = (roomNumber) => (dispatch) => {
+  dispatch({ 
+    type: 'CLEAR_ROOM_BASICS', 
+    payload: { roomNumber } 
+  });
 };
 
 export const getActivePromotions = () => async (dispatch) => {

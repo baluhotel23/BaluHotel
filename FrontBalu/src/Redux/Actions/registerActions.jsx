@@ -12,30 +12,42 @@ export const getRegistrationPasses = () => async (dispatch) => {
   };
   
   // Crear un nuevo registro de pasajero
-  export const createRegistrationPass = (registrationData) => async (dispatch) => {
+ export const createRegistrationPass = (registrationData) => async (dispatch) => {
+  dispatch({ type: 'CREATE_REGISTRATION_PASS_REQUEST' });
   try {
     const { data } = await api.post("/registrationPass", registrationData);
-    // data.data.passengers puede ser un array, pero si solo envías uno, puede ser un objeto
+    
     const passengers = Array.isArray(data.data.passengers)
       ? data.data.passengers
       : [data.data.passengers];
-    dispatch({ type: "CREATE_REGISTRATION_PASS", payload: passengers });
+    
+    // ⭐ INCLUIR bookingId EN EL PAYLOAD
+    const payload = {
+      passengers,
+      bookingId: registrationData.bookingId
+    };
+    
+    dispatch({ type: "CREATE_REGISTRATION_PASS", payload });
     toast.success("Registro de pasajero creado exitosamente");
+    return { success: true, data: payload };
   } catch (error) {
-    toast.error(error.response?.data?.message || "Error al crear el registro de pasajero");
+    const errorMessage = error.response?.data?.message || "Error al crear el registro de pasajero";
+    dispatch({ type: 'CREATE_REGISTRATION_PASS_FAILURE', payload: errorMessage });
+    toast.error(errorMessage);
+    return { success: false, error: errorMessage };
   }
 };
-  
-  // Actualizar un registro de pasajero
-  export const updateRegistrationPass = (registrationNumber, updatedData) => async (dispatch) => {
-    try {
-      const { data } = await api.put(`/registrationPass/${registrationNumber}`, updatedData);
-      dispatch({ type: "UPDATE_REGISTRATION_PASS", payload: data.data });
-      toast.success("Registro de pasajero actualizado exitosamente");
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Error al actualizar el registro de pasajero");
-    }
-  };
+
+// Actualizar un registro de pasajero
+export const updateRegistrationPass = (registrationNumber, updatedData) => async (dispatch) => {
+  try {
+    const { data } = await api.put(`/registrationPass/${registrationNumber}`, updatedData);
+    dispatch({ type: "UPDATE_REGISTRATION_PASS", payload: data.data });
+    toast.success("Registro de pasajero actualizado exitosamente");
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Error al actualizar el registro de pasajero");
+  }
+};
   
   // Eliminar un registro de pasajero
   export const deleteRegistrationPass = (registrationNumber) => async (dispatch) => {
