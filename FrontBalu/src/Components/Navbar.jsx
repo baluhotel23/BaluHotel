@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInstagram, faFacebook, faWhatsapp } from '@fortawesome/free-brands-svg-icons';
@@ -6,16 +6,13 @@ import { faInstagram, faFacebook, faWhatsapp } from '@fortawesome/free-brands-sv
 function Navbar() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
   const publicRoutes = [
     "/", "/RoomsSection", "/services", "/activities", 
     "/contact", "/booking", "/login", "/register", "/unauthorized"
   ];
   const isRoomDetailRoute = location.pathname.startsWith("/room/");
-
-  if (!publicRoutes.includes(location.pathname) && !isRoomDetailRoute) {
-    return null;
-  }
 
   const navLinks = [
     { to: "/", text: "Inicio" },
@@ -28,8 +25,32 @@ function Navbar() {
   // Check if we're on the home page
   const isHomePage = location.pathname === "/";
 
+  // Only add scroll effect - keep all original responsive styling
+  useEffect(() => {
+    if (!isHomePage) {
+      setIsVisible(true);
+      return;
+    }
+
+    const handleScroll = () => {
+      const scrolled = window.scrollY;
+      const triggerPoint = window.innerHeight * 0.7;
+      
+      setIsVisible(scrolled <= triggerPoint);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isHomePage]);
+
+  if (!publicRoutes.includes(location.pathname) && !isRoomDetailRoute) {
+    return null;
+  }
+
   return (
-    <div className="fixed top-0 w-full z-50">
+    <div className={`fixed top-0 w-full z-50 transition-transform duration-300 ease-in-out ${
+      isVisible ? 'translate-y-0' : '-translate-y-full'
+    }`}>
       {/* Top Informational Bar */}
       <div className="bg-white bg-opacity-95 text-gray-700 text-xs py-2 px-6 backdrop-blur-sm">
         <div className="container mx-auto flex justify-between items-center">
@@ -53,44 +74,49 @@ function Navbar() {
         </div>
       </div>
 
-      {/* Main Navigation Bar */}
+      {/* Main Navigation Bar - RESTORED ORIGINAL RESPONSIVE STYLING */}
       <nav className={`backdrop-blur-sm ${
         isHomePage 
-          ? 'bg-transparent'                    // Transparent for home page
-          : 'bg-black bg-opacity-80'            // Dark opaque for other pages
+          ? 'bg-transparent'
+          : 'bg-black bg-opacity-80'
       }`}>
         <div className={`container mx-auto flex justify-between items-center ${
           isHomePage 
-            ? 'py-4 sm:py-6 md:py-8 px-3 sm:px-6 md:px-10' // Better mobile progression for home page
-            : 'py-2 sm:py-3 md:py-4 px-3 sm:px-4 md:px-6'  // Better mobile progression for other pages
+            ? 'py-2 sm:py-4 md:py-6 lg:py-8 px-3 sm:px-6 md:px-10'
+            : 'py-1 sm:py-2 md:py-3 lg:py-4 px-3 sm:px-4 md:px-6'
         }`}>
           <Link to="/">
             <img 
               src="/logo2.png" 
               alt="Hotel Balú" 
-              className={isHomePage ? 'h-8 sm:h-12 md:h-16 lg:h-18 xl:h-22' : 'h-6 sm:h-10 md:h-12 lg:h-14'} // Much smaller on mobile
+              className={isHomePage 
+                ? 'h-6 sm:h-8 md:h-12 lg:h-16 xl:h-20' 
+                : 'h-5 sm:h-6 md:h-10 lg:h-12 xl:h-14'
+              }
             />
           </Link>
+          
           <div className="md:hidden">
             <button onClick={() => setIsOpen(!isOpen)} className="text-white focus:outline-none">
-              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"> {/* Smaller hamburger on mobile */}
+              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16m-7 6h7"}></path>
               </svg>
             </button>
           </div>
+          
           <ul className={`hidden md:flex items-center ${
             isHomePage 
-              ? 'space-x-3 lg:space-x-8 xl:space-x-12' // Reduced spacing for better fit
-              : 'space-x-2 lg:space-x-4 xl:space-x-6'   // Reduced spacing for other pages
+              ? 'space-x-3 lg:space-x-8 xl:space-x-12' // Restored original spacing
+              : 'space-x-2 lg:space-x-4 xl:space-x-6'
           }`}>
             {navLinks.map(link => (
               <li key={link.to}>
                 <Link 
                   to={link.to} 
-                  className={`font-medium hover:text-yellow-400 border-b-2 border-transparent hover:border-yellow-400 transition-all duration-200 ${
+                  className={`font-medium hover:text-yellow-400 border-b-2 border-transparent hover:border-yellow-400 transition-all duration-200 whitespace-nowrap ${
                     isHomePage 
-                      ? 'text-sm lg:text-lg xl:text-xl py-1 lg:py-2 xl:py-4 text-white'     // Smaller base text for home
-                      : 'text-xs lg:text-md xl:text-lg py-1 lg:py-1 xl:py-2 text-gray-100'  // Smaller base text for other pages
+                      ? 'text-sm lg:text-lg xl:text-xl py-1 lg:py-2 xl:py-4 text-white'     // Restored original large sizes
+                      : 'text-xs lg:text-md xl:text-lg py-1 lg:py-1 xl:py-2 text-gray-100'  // Restored original sizes
                   }`}
                 >
                   {link.text}
@@ -100,10 +126,10 @@ function Navbar() {
             <li>
               <Link 
                 to="/booking" 
-                className={`bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 ${
+                className={`bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 whitespace-nowrap ${
                   isHomePage 
-                    ? 'text-sm lg:text-lg xl:text-xl px-3 lg:px-8 xl:px-12 py-1 lg:py-3 xl:py-5'  // Smaller base button for home
-                    : 'text-xs lg:text-md xl:text-lg px-2 lg:px-4 xl:px-8 py-1 lg:py-2 xl:py-3'   // Smaller base button for other pages
+                    ? 'text-sm lg:text-lg xl:text-xl px-3 lg:px-8 xl:px-12 py-1 lg:py-3 xl:py-5'  // Restored original large button
+                    : 'text-xs lg:text-md xl:text-lg px-2 lg:px-4 xl:px-8 py-1 lg:py-2 xl:py-3'   // Restored original button
                 }`}
               >
                 Reserva Ahora
@@ -111,14 +137,16 @@ function Navbar() {
             </li>
           </ul>
         </div>
+        
+        {/* Mobile menu */}
         {isOpen && (
           <div className="md:hidden bg-black bg-opacity-80 backdrop-blur-sm border-t">
-            <ul className="flex flex-col items-center space-y-4 py-6">
+            <ul className="flex flex-col items-center space-y-3 py-4">
               {navLinks.map(link => (
                 <li key={link.to}>
                   <Link 
                     to={link.to} 
-                    className="text-white font-medium hover:text-yellow-400" // Changed to white text
+                    className="text-white font-medium hover:text-yellow-400 text-sm"
                     onClick={() => setIsOpen(false)}
                   >
                     {link.text}
@@ -128,16 +156,16 @@ function Navbar() {
               <li>
                 <Link 
                   to="/booking" 
-                  className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-semibold px-8 py-3 rounded-full shadow-lg mt-4" 
+                  className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-semibold px-6 py-2 rounded-full shadow-lg text-sm" 
                   onClick={() => setIsOpen(false)}
                 >
                   Reserva Ahora
                 </Link>
               </li>
-              <li className="mt-2">
+              <li className="pt-2">
                 <Link 
                   to="/login" 
-                  className="text-gray-300 hover:text-yellow-400" // Adjusted for visibility
+                  className="text-gray-300 hover:text-yellow-400 text-sm"
                   onClick={() => setIsOpen(false)}
                 >
                   Staff
