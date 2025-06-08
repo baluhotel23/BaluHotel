@@ -34,7 +34,7 @@ function Navbar() {
 
     const handleScroll = () => {
       const scrolled = window.scrollY;
-      const triggerPoint = window.innerHeight * 0.7;
+      const triggerPoint = window.innerHeight * 0.4; // Changed from 0.7 to 0.4 to match sticky form
       
       setIsVisible(scrolled <= triggerPoint);
     };

@@ -36,7 +36,7 @@ const BookingSearchForm = ({ isCompact = false }) => {
     <div 
       className={`bg-white bg-opacity-95 backdrop-blur-sm rounded-2xl shadow-xl mx-auto ${
         isCompact 
-          ? 'p-3 max-w-5xl' 
+          ? 'p-2 sm:p-3 md:p-4 max-w-full'
           : 'p-4 md:p-6 max-w-6xl'
       }`}
       style={{ 
@@ -49,7 +49,9 @@ const BookingSearchForm = ({ isCompact = false }) => {
       <div className={`block md:hidden ${isCompact ? 'space-y-2' : 'space-y-4'}`}>
         {/* Check-in Date */}
         <div>
-          <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>ENTRADA</label>
+          <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>
+            ENTRADA
+          </label>
           <DatePicker
             selected={checkIn}
             onChange={(date) => setCheckIn(date)}
@@ -65,7 +67,9 @@ const BookingSearchForm = ({ isCompact = false }) => {
 
         {/* Check-out Date */}
         <div>
-          <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>SALIDA</label>
+          <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>
+            SALIDA
+          </label>
           <DatePicker
             selected={checkOut}
             onChange={(date) => setCheckOut(date)}
@@ -82,7 +86,9 @@ const BookingSearchForm = ({ isCompact = false }) => {
         {/* Room Type and Guests in same row */}
         <div className={`grid grid-cols-2 ${isCompact ? 'gap-1' : 'gap-2'}`}>
           <div>
-            <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>HABITACIÓN</label>
+            <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>
+              HABITACIÓN
+            </label>
             <select
               value={roomType}
               onChange={(e) => setRoomType(e.target.value)}
@@ -98,7 +104,9 @@ const BookingSearchForm = ({ isCompact = false }) => {
           </div>
 
           <div>
-            <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>HUÉSPEDES</label>
+            <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>
+              HUÉSPEDES
+            </label>
             <select
               value={guests}
               onChange={(e) => setGuests(Number(e.target.value))}
@@ -108,7 +116,7 @@ const BookingSearchForm = ({ isCompact = false }) => {
             >
               {[1, 2, 3, 4, 5, 6].map((num) => (
                 <option key={num} value={num}>
-                  {num} {num === 1 ? 'Pers.' : 'Pers.'}
+                  {num} {num === 1 ? 'P.' : 'P.'}
                 </option>
               ))}
             </select>
@@ -129,20 +137,22 @@ const BookingSearchForm = ({ isCompact = false }) => {
       {/* Desktop Layout - Horizontal */}
       <div className={`hidden md:grid lg:grid-cols-5 items-end ${
         isCompact 
-          ? 'grid-cols-5 gap-2' 
+          ? 'grid-cols-5 gap-2 lg:gap-3 xl:gap-4'
           : 'grid-cols-2 lg:grid-cols-5 gap-4'
       }`}>
         {/* Check-in Date */}
         <div>
           <label className={`block font-semibold text-gray-700 ${
-            isCompact ? 'text-xs mb-1' : 'text-sm mb-2'
-          }`}>ENTRADA</label>
+            isCompact ? 'text-xs mb-1 lg:text-sm lg:mb-2' : 'text-sm mb-2'
+          }`}>
+            ENTRADA
+          </label>
           <DatePicker
             selected={checkIn}
             onChange={(date) => setCheckIn(date)}
             minDate={new Date()}
             className={`w-full rounded-lg border border-gray-300 text-gray-700 font-medium ${
-              isCompact ? 'p-2 text-xs' : 'p-3'
+              isCompact ? 'p-2 text-xs lg:p-3 lg:text-sm' : 'p-3'
             }`}
             dateFormat="dd MMM yyyy"
             locale={es}
@@ -153,14 +163,16 @@ const BookingSearchForm = ({ isCompact = false }) => {
         {/* Check-out Date */}
         <div>
           <label className={`block font-semibold text-gray-700 ${
-            isCompact ? 'text-xs mb-1' : 'text-sm mb-2'
-          }`}>SALIDA</label>
+            isCompact ? 'text-xs mb-1 lg:text-sm lg:mb-2' : 'text-sm mb-2'
+          }`}>
+            SALIDA
+          </label>
           <DatePicker
             selected={checkOut}
             onChange={(date) => setCheckOut(date)}
             minDate={new Date(new Date(checkIn).getTime() + 86400000)}
             className={`w-full rounded-lg border border-gray-300 text-gray-700 font-medium ${
-              isCompact ? 'p-2 text-xs' : 'p-3'
+              isCompact ? 'p-2 text-xs lg:p-3 lg:text-sm' : 'p-3'
             }`}
             dateFormat="dd MMM yyyy"
             locale={es}
@@ -171,13 +183,15 @@ const BookingSearchForm = ({ isCompact = false }) => {
         {/* Room Type */}
         <div>
           <label className={`block font-semibold text-gray-700 ${
-            isCompact ? 'text-xs mb-1' : 'text-sm mb-2'
-          }`}>HABITACIÓN</label>
+            isCompact ? 'text-xs mb-1 lg:text-sm lg:mb-2' : 'text-sm mb-2'
+          }`}>
+            HABITACIÓN
+          </label>
           <select
             value={roomType}
             onChange={(e) => setRoomType(e.target.value)}
             className={`w-full rounded-lg border border-gray-300 text-gray-700 font-medium ${
-              isCompact ? 'p-2 text-xs' : 'p-3'
+              isCompact ? 'p-2 text-xs lg:p-3 lg:text-sm' : 'p-3'
             }`}
           >
             <option value="">{isCompact ? 'Tipo' : 'Tipo de habitación'}</option>
@@ -190,13 +204,15 @@ const BookingSearchForm = ({ isCompact = false }) => {
         {/* Guests */}
         <div>
           <label className={`block font-semibold text-gray-700 ${
-            isCompact ? 'text-xs mb-1' : 'text-sm mb-2'
-          }`}>HUÉSPEDES</label>
+            isCompact ? 'text-xs mb-1 lg:text-sm lg:mb-2' : 'text-sm mb-2'
+          }`}>
+            HUÉSPEDES
+          </label>
           <select
             value={guests}
             onChange={(e) => setGuests(Number(e.target.value))}
             className={`w-full rounded-lg border border-gray-300 text-gray-700 font-medium ${
-              isCompact ? 'p-2 text-xs' : 'p-3'
+              isCompact ? 'p-2 text-xs lg:p-3 lg:text-sm' : 'p-3'
             }`}
           >
             {[1, 2, 3, 4, 5, 6].map((num) => (
@@ -212,7 +228,7 @@ const BookingSearchForm = ({ isCompact = false }) => {
           <button
             onClick={handleSearch}
             className={`w-full bg-blue-800 hover:bg-blue-900 text-white font-bold rounded-lg transition-colors duration-200 ${
-              isCompact ? 'p-2 text-xs' : 'p-3'
+              isCompact ? 'p-2 text-xs lg:p-3 lg:text-sm' : 'p-3'
             }`}
           >
             RESERVAR
