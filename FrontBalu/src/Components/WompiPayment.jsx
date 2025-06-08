@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';
 import sha256 from "crypto-js/sha256";
 
 const WompiPayment = ({ booking, onPaymentComplete }) => {
+  const [selectedMethod, setSelectedMethod] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedAmount, setSelectedAmount] = useState(0);
+
   const handlePaymentOption = async (percentage) => {
   try {
     const baseAmount = parseFloat(booking.totalAmount);
@@ -117,22 +122,57 @@ console.log("Datos para la firma y checkout (Valores individuales):", {
 };
 
   return (
-    <div className="p-4 bg-gray-800 rounded-xl">
-      <h2 className="text-xl font-bold mb-4">Seleccione forma de pago</h2>
-      <div className="space-y-4">
+    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200 shadow-lg"
+         style={{ 
+           boxShadow: '0 0 0 2px rgba(255, 255, 255, 0.1), 0 10px 25px -5px rgba(0, 0, 0, 0.1)' 
+         }}>
+      <h3 className="text-xl font-bold mb-4 text-gray-800 text-center">
+        💳 Seleccione forma de pago
+      </h3>
+      
+      <div className="space-y-3 mb-6">
         <button
-          onClick={() => handlePaymentOption(100)}
-          className="w-full p-3 bg-gray-600 hover:bg-gray-700 rounded-full"
+          onClick={() => { handlePaymentOption(100); setSelectedMethod('card'); setSelectedAmount(booking.totalAmount); }}
+          className={`w-full p-4 rounded-xl border-2 font-medium transition-all duration-200 transform hover:scale-105 ${
+            selectedMethod === 'card'
+              ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+              : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+          }`}
         >
-          Pagar 100% (${booking.totalAmount ? parseFloat(booking.totalAmount).toFixed(2) : '0.00'})
+          <div className="flex items-center justify-center space-x-3">
+            <span className="text-2xl">💳</span>
+            <span>Pagar 100% (${(booking.totalAmount).toLocaleString()})</span>
+          </div>
         </button>
+        
         <button
-          onClick={() => handlePaymentOption(50)}
-          className="w-full p-3 bg-stone-600 hover:bg-stone-700 rounded-full"
+          onClick={() => { handlePaymentOption(50); setSelectedMethod('partial'); setSelectedAmount(booking.totalAmount * 0.5); }}
+          className={`w-full p-4 rounded-xl border-2 font-medium transition-all duration-200 transform hover:scale-105 ${
+            selectedMethod === 'partial'
+              ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-md'
+              : 'border-gray-200 bg-white text-gray-700 hover:border-yellow-300 hover:bg-yellow-50'
+          }`}
         >
-          Pagar 50% (${booking.totalAmount ? (parseFloat(booking.totalAmount) * 0.5).toFixed(2) : '0.00'})
+          <div className="flex items-center justify-center space-x-3">
+            <span className="text-2xl">💰</span>
+            <span>Pagar 50% (${(booking.totalAmount * 0.5).toLocaleString()})</span>
+          </div>
         </button>
       </div>
+
+      {selectedAmount > 0 && (
+        <div className="text-center mb-6 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+          <p className="text-lg font-bold text-gray-800">
+            💸 Monto a pagar: <span className="text-green-600">${selectedAmount.toLocaleString()}</span>
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <p className="text-red-600 text-center">❌ {error}</p>
+        </div>
+      )}
     </div>
   );
 };
