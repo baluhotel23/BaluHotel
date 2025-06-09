@@ -43,14 +43,11 @@ const StickyBookingForm = () => {
 
   return (
     <div 
-      className={`fixed left-0 right-0 z-40 transform transition-all duration-500 ease-in-out ${
+      className={`fixed left-0 right-0 top-0 z-40 transform transition-all duration-500 ease-in-out ${
         isVisible 
           ? 'translate-y-0 opacity-100' 
           : '-translate-y-full opacity-0 pointer-events-none'
       }`}
-      style={{
-        top: 'clamp(0px, 2vh, 20px)' // Usar clamp para un posicionamiento más adaptativo
-      }}
     >
       <div 
         className="bg-white bg-opacity-95 backdrop-blur-sm border-b border-gray-200"

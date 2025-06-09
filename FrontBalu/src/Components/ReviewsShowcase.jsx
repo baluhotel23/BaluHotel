@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faStar, faStarHalfAlt, faQuoteLeft, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { faStar, faStarHalfAlt, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 
 const ReviewsShowcase = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -104,7 +104,7 @@ const ReviewsShowcase = () => {
   return (
     <section 
       id="reviews-showcase-section" 
-      className="py-16 md:py-24 bg-gradient-to-b from-white to-gray-50"
+      className="py-8 md:py-12 bg-gradient-to-b from-white to-gray-50"
     >
       <div className="container mx-auto px-4 md:px-8">
         {/* Header Section */}
@@ -155,30 +155,22 @@ const ReviewsShowcase = () => {
                  }}>
               
               {/* Google Reviews Header */}
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 text-center">
+              <div className="bg-gradient-to-r from-blue-800 to-indigo-800 text-white p-6 text-center">
                 <div className="flex items-center justify-center space-x-4">
-                  <div className="bg-white rounded-full p-3">
-                    <span className="text-2xl">📍</span>
-                  </div>
+                 
                   <div>
                     <h3 className="text-2xl font-bold">Hotel Balú - Restrepo</h3>
-                    <div className="flex items-center justify-center mt-2">
-                      <div className="flex mr-2">
-                        {renderStars(4.8)}
-                      </div>
-                      <span className="text-yellow-100">4.8 • 156 reseñas</span>
-                    </div>
+                   
                   </div>
                 </div>
               </div>
 
               {/* Review Content */}
-              <div className="p-8 md:p-12 min-h-[400px] flex items-center">
+              <div className="p-6 md:p-8 min-h-[300px] flex items-center">
                 <div className="w-full text-center">
-                  {/* Quote Icon */}
-                  <div className="mb-6">
-                   
-                  </div>
+               
+
+                
 
                   {/* Review Text */}
                   <p className="text-xl md:text-2xl text-gray-700 leading-relaxed mb-8 max-w-4xl mx-auto font-light italic">
