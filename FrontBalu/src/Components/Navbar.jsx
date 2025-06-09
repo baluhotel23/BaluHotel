@@ -17,9 +17,9 @@ function Navbar() {
   const navLinks = [
     { to: "/", text: "Inicio" },
     { to: "/RoomsSection", text: "Habitaciones" },
-    { to: "/services", text: "Servicios" },
-    { to: "/activities", text: "Qué hacer en Restrepo" },
-    { to: "/contact", text: "Contacto / Reservas" },
+    { to: "/#room-showcase", text: "Servicios" }, // Changed for section navigation
+    { to: "/#activities-showcase", text: "Qué hacer en Restrepo" }, // Changed for section navigation
+    { to: "/#contact-section", text: "Contacto / Reservas" }, // Changed for section navigation
   ];
 
   // Check if we're on the home page
