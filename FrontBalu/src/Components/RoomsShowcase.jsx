@@ -248,13 +248,13 @@ const RoomsShowcase = () => {
                 to="/contact"
                 className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
-                📞 Contactanos
+                Contactanos
               </Link>
               <Link 
                 to="/RoomsSection"
                 className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
-                🏨 Ver Todas las Habitaciones
+                Ver Todas las Habitaciones
               </Link>
             </div>
           </div>
