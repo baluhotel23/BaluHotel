@@ -139,19 +139,24 @@ const ActivitiesShowcase = () => {
                 }}
               >
                 {/* Image Container - Enhanced Shadow */}
-                <div className="relative h-80 md:h-96 w-full overflow-hidden"
+                <div className="relative h-80 md:h-96 w-full overflow-hidden rounded-2xl"
                      style={{
-                       // Additional shadow specifically for the image
-                       filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.3))',
-                       boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)'
+                       // Enhanced shadow around the image
+                       boxShadow: `
+                         0 25px 50px -12px rgba(0, 0, 0, 0.4),
+                         0 10px 20px -8px rgba(0, 0, 0, 0.3),
+                         0 4px 8px -4px rgba(0, 0, 0, 0.2),
+                         inset 0 0 0 1px rgba(255, 255, 255, 0.1)
+                       `,
+                       filter: 'drop-shadow(0 15px 30px rgba(0,0,0,0.35))'
                      }}>
                   <img
                     src={activity.image}
                     alt={activity.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 rounded-2xl"
                     style={{
-                      // Inner shadow for depth
-                      boxShadow: 'inset 0 0 50px rgba(0,0,0,0.2)'
+                      // Additional inner shadow for depth
+                      boxShadow: 'inset 0 0 60px rgba(0,0,0,0.25)'
                     }}
                   />
                   {/* Overlay for Title and Icon */}
