@@ -47,40 +47,41 @@ const BookingSearchForm = ({ isCompact = false }) => {
     >
       {/* Mobile Layout - Stack vertically */}
       <div className={`block md:hidden ${isCompact ? 'space-y-2' : 'space-y-4'}`}>
-        {/* Check-in Date */}
-        <div>
-          <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>
-            ENTRADA
-          </label>
-          <DatePicker
-            selected={checkIn}
-            onChange={(date) => setCheckIn(date)}
-            minDate={new Date()}
-            className={`w-full rounded-lg border border-gray-300 text-gray-700 font-medium ${
-              isCompact ? 'p-2 text-xs' : 'p-2 text-sm'
-            }`}
-            dateFormat="dd MMM yyyy"
-            locale={es}
-            placeholderText="Fecha de entrada"
-          />
-        </div>
+        {/* Check-in and Check-out Dates in same row */}
+        <div className={`grid grid-cols-2 ${isCompact ? 'gap-1' : 'gap-2'}`}>
+          <div>
+            <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>
+              ENTRADA
+            </label>
+            <DatePicker
+              selected={checkIn}
+              onChange={(date) => setCheckIn(date)}
+              minDate={new Date()}
+              className={`w-full rounded-lg border border-gray-300 text-gray-700 font-medium ${
+                isCompact ? 'p-2 text-xs' : 'p-2 text-sm'
+              }`}
+              dateFormat="dd MMM yyyy"
+              locale={es}
+              placeholderText="Fecha de entrada"
+            />
+          </div>
 
-        {/* Check-out Date */}
-        <div>
-          <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>
-            SALIDA
-          </label>
-          <DatePicker
-            selected={checkOut}
-            onChange={(date) => setCheckOut(date)}
-            minDate={new Date(new Date(checkIn).getTime() + 86400000)}
-            className={`w-full rounded-lg border border-gray-300 text-gray-700 font-medium ${
-              isCompact ? 'p-2 text-xs' : 'p-2 text-sm'
-            }`}
-            dateFormat="dd MMM yyyy"
-            locale={es}
-            placeholderText="Fecha de salida"
-          />
+          <div>
+            <label className={`block font-semibold text-gray-700 ${isCompact ? 'text-xs mb-1' : 'text-xs mb-1'}`}>
+              SALIDA
+            </label>
+            <DatePicker
+              selected={checkOut}
+              onChange={(date) => setCheckOut(date)}
+              minDate={new Date(new Date(checkIn).getTime() + 86400000)}
+              className={`w-full rounded-lg border border-gray-300 text-gray-700 font-medium ${
+                isCompact ? 'p-2 text-xs' : 'p-2 text-sm'
+              }`}
+              dateFormat="dd MMM yyyy"
+              locale={es}
+              placeholderText="Fecha de salida"
+            />
+          </div>
         </div>
 
         {/* Room Type and Guests in same row */}
