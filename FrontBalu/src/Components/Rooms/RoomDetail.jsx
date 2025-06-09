@@ -10,7 +10,7 @@ import 'swiper/css/autoplay';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import { Autoplay, Navigation, Pagination } from 'swiper/modules';
-
+import BookingSearchForm from '../Booking/BookingSearchForm'; // Import BookingSearchForm
 
 const RoomDetail = () => {
   const { roomNumber } = useParams();
@@ -70,15 +70,26 @@ const RoomDetail = () => {
     <div className="bg-gray-100">
       {/* Hero Image Section */}
       <div 
-        className="h-[50vh] md:h-[65vh] bg-cover bg-center relative flex items-center justify-center text-white"
+        className="h-[50vh] md:h-[60vh] bg-cover bg-center relative flex items-center justify-center text-white" // Adjusted height, items-center, justify-center
         style={{ backgroundImage: `url(${heroImage})` }}
       >
         <div className="absolute inset-0 bg-black opacity-40"></div> {/* Overlay */}
+        
+        {/* Room Type Text - Centered */}
         <div className="relative z-10 text-center p-4">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight shadow-text">
             {room.type}
           </h1>
           <p className="text-lg md:text-xl mt-2 shadow-text">Hotel Balú - Confort y Naturaleza</p>
+        </div>
+        {/* BookingSearchForm removed from here */}
+      </div>
+
+      {/* BookingSearchForm Section - Positioned between Hero and Main Content */}
+      <div className="bg-gray-50 py-8 md:py-12"> {/* New section for the form */}
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          {/* isCompact can be false or omitted for the standard version */}
+          <BookingSearchForm isCompact={false} /> 
         </div>
       </div>
 
@@ -212,7 +223,15 @@ const RoomDetail = () => {
         </div>
       </div>
       
-     
+      {/* StickyBookingForm Section - REMAINS REMOVED as per previous step */}
+      {/* 
+      <div className="py-8 md:py-12 bg-white border-t border-gray-200">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-6 text-center">Verifica Disponibilidad</h2>
+          <StickyBookingForm />
+        </div>
+      </div> 
+      */}
 
     </div>
   );
