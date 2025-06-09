@@ -5,22 +5,9 @@ import { useNavigate } from "react-router-dom";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faSearch, faSortAmountDown, faSortAmountUp, faFilter, faBed, faDollarSign, faUsers } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faSortAmountDown, faSortAmountUp, faFilter, faBed, faUsers } from '@fortawesome/free-solid-svg-icons';
 
-// IMPORTANT: For the entrance animation to work, add the following to your global CSS file (e.g., src/index.css):
-// @keyframes fadeInUp {
-//   from { opacity: 0; transform: translateY(20px); }
-//   to { opacity: 1; transform: translateY(0); }
-// }
-// .animate-fadeInUp { animation: fadeInUp 0.5s ease-out forwards; }
-//
-// /* Optional: For multi-line text truncation */
-// .line-clamp-2 {
-//   overflow: hidden;
-//   display: -webkit-box;
-//   -webkit-box-orient: vertical;
-//   -webkit-line-clamp: 2;
-// }
+
 
 function RoomsSection() {
   const dispatch = useDispatch();
