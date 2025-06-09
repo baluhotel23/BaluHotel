@@ -4,8 +4,10 @@ import Header from './Header'
 import HotelShowcase from './HotelShowcase'
 import StickyBookingForm from './StickyBookingForm'
 import RoomsShowcase from './RoomsShowcase'
-import ActivitiesShowcase from './ActivitiesShowcase'; // Import the new component
-
+import ActivitiesShowcase from './ActivitiesShowcase';
+import ReviewsShowcase from './ReviewsShowcase';
+import ContactSection from './ContactSection';
+import Footer from './Footer';
 
 
 
@@ -16,7 +18,10 @@ const Landing = () => {
       <StickyBookingForm />
       <HotelShowcase />
       <RoomsShowcase />
-      <ActivitiesShowcase /> {/* Add the new component here */}
+      <ActivitiesShowcase />
+      <ReviewsShowcase />
+      <ContactSection />
+      <Footer />
       
     </div>
   )
