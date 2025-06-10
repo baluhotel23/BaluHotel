@@ -2,11 +2,18 @@ import api from '../../utils/axios';
 
 // Obtener todas las habitaciones
 export const getAllRooms = () => async (dispatch) => {
+  console.log('🚀 Iniciando getAllRooms...');
   dispatch({ type: 'GET_ROOMS_REQUEST' });
   try {
+    console.log('📡 Haciendo petición a /rooms...');
     const { data } = await api.get('/rooms');
+    console.log('📥 Respuesta recibida:', data);
+    console.log('🏨 Habitaciones:', data.data);
+    
     dispatch({ type: 'GET_ROOMS_SUCCESS', payload: data.data });
+    console.log('✅ Dispatch exitoso');
   } catch (error) {
+    console.error('❌ Error en getAllRooms:', error);
     const errorMessage = error.response?.data?.message || 'Error al obtener habitaciones';
     dispatch({ type: 'GET_ROOMS_FAILURE', payload: errorMessage });
   }
