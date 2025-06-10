@@ -1,13 +1,15 @@
-  const { BasicInventory, Purchase, PurchaseItem, RoomCheckIn } = require('../data');
+const { BasicInventory, Purchase, PurchaseItem, RoomCheckIn, LaundryMovement } = require('../data');
 const { CustomError } = require('../middleware/error');
 const { catchedAsync } = require('../utils/catchedAsync');
 const { upload } = require('../middleware/multer');
+const { Op, sequelize } = require('sequelize');
 
 const getInventory = async (req, res) => {
-    const { category, search } = req.query;
+    const { category, search, inventoryType } = req.query;
     
-    const where = {};
+    const where = { isActive: true };
     if (category) where.category = category;
+    if (inventoryType) where.inventoryType = inventoryType;
     if (search) {
         where.name = { [Op.iLike]: `%${search}%` };
     }
@@ -15,16 +17,90 @@ const getInventory = async (req, res) => {
     const inventory = await BasicInventory.findAll({
         where,
         attributes: [
-            'id', 'name', 'description', 'category', 
-            'currentStock', 'minStock', 'unitPrice',
-            'isSellable', 'salePrice' // Añadidos estos campos
+            'id', 'name', 'description', 'category', 'inventoryType',
+            'currentStock', 'cleanStock', 'dirtyStock', 'totalReusableStock',
+            'minStock', 'minCleanStock', 'unitPrice', 'salePrice',
+            'washingTime', 'createdAt', 'updatedAt'
         ],
-        order: [['category', 'ASC'], ['name', 'ASC']]
+        order: [['category', 'ASC'], ['inventoryType', 'ASC'], ['name', 'ASC']]
+    });
+
+    const itemsWithAlerts = inventory.map(item => {
+        const alerts = [];
+        
+        if (item.inventoryType === 'consumable' || item.inventoryType === 'sellable') {
+            if (item.currentStock <= item.minStock) {
+                alerts.push({
+                    type: 'low_stock',
+                    message: `Stock bajo: ${item.currentStock}/${item.minStock}`
+                });
+            }
+        }
+        
+        if (item.inventoryType === 'reusable') {
+            if (item.cleanStock <= (item.minCleanStock || 0)) {
+                alerts.push({
+                    type: 'low_clean_stock',
+                    message: `Stock limpio bajo: ${item.cleanStock}/${item.minCleanStock || 0}`
+                });
+            }
+            
+            const dirtyPercentage = item.totalReusableStock > 0 
+                ? (item.dirtyStock / item.totalReusableStock) * 100 
+                : 0;
+            
+            if (dirtyPercentage > 70) {
+                alerts.push({
+                    type: 'high_dirty_stock',
+                    message: `Mucho stock sucio: ${dirtyPercentage.toFixed(1)}%`
+                });
+            }
+        }
+        
+        return {
+            ...item.toJSON(),
+            alerts,
+            stockStatus: alerts.length > 0 ? 'warning' : 'ok'
+        };
     });
 
     res.json({
         error: false,
         message: 'Inventario recuperado exitosamente',
+        data: itemsWithAlerts,
+        summary: {
+            total: inventory.length,
+            consumable: inventory.filter(i => i.inventoryType === 'consumable').length,
+            reusable: inventory.filter(i => i.inventoryType === 'reusable').length,
+            sellable: inventory.filter(i => i.inventoryType === 'sellable').length,
+            withAlerts: itemsWithAlerts.filter(i => i.alerts.length > 0).length
+        }
+    });
+};
+
+// ⭐ NUEVO: Obtener inventario por tipo específico
+const getInventoryByType = async (req, res) => {
+    const { type } = req.params;
+    
+    const validTypes = ['consumable', 'reusable', 'sellable'];
+    if (!validTypes.includes(type)) {
+        throw new CustomError('Tipo de inventario inválido', 400);
+    }
+
+    const inventory = await BasicInventory.findAll({
+        where: { 
+            inventoryType: type,
+            isActive: true 
+        },
+        attributes: type === 'reusable' 
+            ? ['id', 'name', 'description', 'cleanStock', 'dirtyStock', 'totalReusableStock', 'minCleanStock', 'washingTime']
+            : ['id', 'name', 'description', 'currentStock', 'minStock', 'unitPrice', 'salePrice'],
+        order: [['name', 'ASC']]
+    });
+
+    res.json({
+        error: false,
+        message: `Inventario tipo ${type} recuperado exitosamente`,
         data: inventory
     });
 };
@@ -35,22 +111,21 @@ const createPurchase = async (req, res) => {
   let receiptUrl = null;
 
   // Subir el comprobante si existe
- if (req.file) {
-  const { mimetype, path } = req.file;
+  if (req.file) {
+    const { mimetype, path } = req.file;
 
-  // Verificar si el archivo es un PDF
-  if (mimetype !== 'application/pdf') {
-    throw new Error('El archivo debe ser un PDF');
-  }
+    if (mimetype !== 'application/pdf') {
+      throw new Error('El archivo debe ser un PDF');
+    }
 
-  try {
-    const uploadResult = await uploadToCloudinary(path, 'purchase_receipts');
-    receiptUrl = uploadResult.secure_url;
-  } catch (error) {
-    console.error('Error al subir el comprobante a Cloudinary:', error);
-    throw new Error('No se pudo subir el comprobante');
+    try {
+      const uploadResult = await uploadToCloudinary(path, 'purchase_receipts');
+      receiptUrl = uploadResult.secure_url;
+    } catch (error) {
+      console.error('Error al subir el comprobante a Cloudinary:', error);
+      throw new Error('No se pudo subir el comprobante');
+    }
   }
-}
 
   // Crear la compra
   const purchase = await Purchase.create({
@@ -60,11 +135,11 @@ const createPurchase = async (req, res) => {
     paymentStatus: paymentStatus || 'pending',
     invoiceNumber: invoiceNumber || null,
     purchaseDate: purchaseDate || new Date(),
-    receiptUrl, // Guardar la URL del comprobante
+    receiptUrl,
     createdBy: req.user.n_document,
   });
 
-  // Crear items y actualizar stock
+  // ⭐ CORREGIR: Crear items con el campo correcto
   for (const item of items) {
     const inventoryItem = await BasicInventory.findByPk(item.itemId);
     if (!inventoryItem) {
@@ -75,13 +150,20 @@ const createPurchase = async (req, res) => {
 
     await PurchaseItem.create({
       purchaseId: purchase.id,
-      itemId: item.itemId,
+      basicId: item.itemId, // ⭐ USAR basicId en lugar de itemId
       quantity: item.quantity,
       price: parseFloat(itemPrice),
       total: parseFloat(item.quantity * itemPrice),
     });
 
-    await inventoryItem.increment('currentStock', { by: item.quantity });
+    // ⭐ ACTUALIZAR STOCK CORRECTAMENTE SEGÚN TIPO
+    if (inventoryItem.inventoryType === 'reusable') {
+      // Para reutilizables, agregar al stock limpio
+      await inventoryItem.increment('cleanStock', { by: item.quantity });
+    } else {
+      // Para consumibles/vendibles, agregar al stock actual
+      await inventoryItem.increment('currentStock', { by: item.quantity });
+    }
   }
 
   res.status(201).json({
@@ -116,32 +198,66 @@ const updateInventory = async (req, res) => {
 };
 
 const getLowStockItems = async (req, res) => {
-    const lowStockItems = await BasicInventory.findAll({
+    const consumableItems = await BasicInventory.findAll({
         where: {
+            inventoryType: ['consumable', 'sellable'],
             currentStock: {
                 [Op.lte]: sequelize.col('minStock')
-            }
+            },
+            isActive: true
         },
         attributes: [
-            'id', 'name', 'category', 
+            'id', 'name', 'category', 'inventoryType',
             'currentStock', 'minStock', 'unitPrice'
-        ],
-        order: [['currentStock', 'ASC']]
+        ]
     });
+    
+    const reusableItems = await BasicInventory.findAll({
+        where: {
+            inventoryType: 'reusable',
+            cleanStock: {
+                [Op.lte]: sequelize.col('minCleanStock')
+            },
+            isActive: true
+        },
+        attributes: [
+            'id', 'name', 'category', 'inventoryType',
+            'cleanStock', 'minCleanStock', 'dirtyStock', 'totalReusableStock'
+        ]
+    });
+
+    const allLowStockItems = [
+        ...consumableItems.map(item => ({
+            ...item.toJSON(),
+            alertType: 'low_stock',
+            alertMessage: `Stock: ${item.currentStock}/${item.minStock}`
+        })),
+        ...reusableItems.map(item => ({
+            ...item.toJSON(),
+            alertType: 'low_clean_stock',
+            alertMessage: `Stock limpio: ${item.cleanStock}/${item.minCleanStock}`
+        }))
+    ];
 
     res.json({
         error: false,
         message: 'Items con bajo stock recuperados exitosamente',
-        data: lowStockItems
+        data: allLowStockItems,
+        summary: {
+            totalItems: allLowStockItems.length,
+            consumableItems: consumableItems.length,
+            reusableItems: reusableItems.length
+        }
     });
 };
 
 const getAllItems = async (req, res) => {
     const items = await BasicInventory.findAll({
+        where: { isActive: true },
         attributes: [
-            'id', 'name', 'description', 'category', 
-            'currentStock', 'minStock', 'unitPrice',
-            'isSellable', 'salePrice' // Añadidos estos campos
+            'id', 'name', 'description', 'category', 'inventoryType',
+            'currentStock', 'cleanStock', 'dirtyStock', 'totalReusableStock',
+            'minStock', 'minCleanStock', 'unitPrice', 'salePrice'
         ],
         order: [['name', 'ASC']]
     });
@@ -168,28 +284,50 @@ const getAllItems = async (req, res) => {
   };
   
   // Crea un nuevo item en el inventario
-  const createItem = async (req, res) => {
+const createItem = async (req, res) => {
     const { 
-        name, description, category, currentStock, 
-        minStock, unitPrice, isSellable, salePrice 
+        name, description, category, inventoryType,
+        currentStock, cleanStock, dirtyStock, totalReusableStock,
+        minStock, minCleanStock, unitPrice, salePrice, washingTime
     } = req.body;
     
-    // Validación para items vendibles
-    if (isSellable === true && (salePrice === undefined || salePrice <= 0)) {
+    // Validaciones específicas por tipo
+    if (inventoryType === 'sellable' && (!salePrice || salePrice <= 0)) {
         throw new CustomError("Los items vendibles deben tener un precio de venta válido", 400);
     }
     
-    const newItem = await BasicInventory.create({
+    if (inventoryType === 'reusable') {
+        if (totalReusableStock && (cleanStock + dirtyStock) > totalReusableStock) {
+            throw new CustomError("La suma de stock limpio y sucio no puede exceder el stock total", 400);
+        }
+    }
+    
+    const itemData = {
         name,
         description,
         category,
-        currentStock,
-        minStock,
+        inventoryType: inventoryType || 'consumable',
         unitPrice,
-        isSellable: isSellable || false, // Por defecto no es vendible
-        salePrice: isSellable ? salePrice : null, // Solo establecer precio si es vendible
         createdBy: req.user?.n_document
-    });
+    };
+    
+    // Campos específicos por tipo
+    if (inventoryType === 'reusable') {
+        itemData.cleanStock = cleanStock || 0;
+        itemData.dirtyStock = dirtyStock || 0;
+        itemData.totalReusableStock = totalReusableStock || (cleanStock + dirtyStock);
+        itemData.minCleanStock = minCleanStock || 5;
+        itemData.washingTime = washingTime || 24;
+    } else {
+        itemData.currentStock = currentStock || 0;
+        itemData.minStock = minStock || 10;
+    }
+    
+    if (inventoryType === 'sellable') {
+        itemData.salePrice = salePrice;
+    }
+    
+    const newItem = await BasicInventory.create(itemData);
     
     res.status(201).json({
         error: false,
@@ -199,55 +337,37 @@ const getAllItems = async (req, res) => {
 };
 
 
-  const updateItem = async (req, res) => {
+const updateItem = async (req, res) => {
     const { id } = req.params;
-    const { 
-        name, description, category, minStock, 
-        unitPrice, isActive, isSellable, salePrice 
-    } = req.body;
+    const updateData = req.body;
 
-    try {
-        const item = await BasicInventory.findByPk(id);
-        if (!item) {
-            throw new CustomError("Item no encontrado", 404);
-        }
-        
-        // Validación para items vendibles
-        if (isSellable === true && (salePrice === undefined || salePrice <= 0)) {
-            throw new CustomError("Los items vendibles deben tener un precio de venta válido", 400);
-        }
-
-        await item.update({
-            name,
-            description,
-            category,
-            minStock,
-            unitPrice,
-            isActive,
-            isSellable: isSellable || false,
-            salePrice: isSellable ? salePrice : null, // Solo establecer precio si es vendible
-        });
-
-        res.json({
-            error: false,
-            message: "Item actualizado exitosamente",
-            data: item,
-        });
-    } catch (error) {
-        if (error instanceof CustomError) {
-            return res.status(error.statusCode).json({
-                error: true,
-                message: error.message
-            });
-        }
-        console.error("Error al actualizar el item:", error);
-        res.status(500).json({
-            error: true,
-            message: "Error al actualizar el item",
-        });
+    const item = await BasicInventory.findByPk(id);
+    if (!item) {
+        throw new CustomError("Item no encontrado", 404);
     }
-};
+    
+    // Validaciones específicas por tipo
+    if (updateData.inventoryType === 'sellable' && updateData.salePrice && updateData.salePrice <= 0) {
+        throw new CustomError("Los items vendibles deben tener un precio de venta válido", 400);
+    }
+    
+    if (item.inventoryType === 'reusable' && updateData.totalReusableStock) {
+        const newCleanStock = updateData.cleanStock ?? item.cleanStock;
+        const newDirtyStock = updateData.dirtyStock ?? item.dirtyStock;
+        
+        if ((newCleanStock + newDirtyStock) > updateData.totalReusableStock) {
+            throw new CustomError("La suma de stock limpio y sucio no puede exceder el stock total", 400);
+        }
+    }
 
+    await item.update(updateData);
+
+    res.json({
+        error: false,
+        message: "Item actualizado exitosamente",
+        data: item,
+    });
+};
   // Elimina un item del inventario
   const deleteItem = async (req, res) => {
     const { id } = req.params;
@@ -263,57 +383,199 @@ const getAllItems = async (req, res) => {
     });
   };
 
-  const addStock = async (req, res) => {
+ const addStock = async (req, res) => {
     const { id } = req.params;
-    const { quantity } = req.body;
-  
-    // Validación: quantity debe ser un número y mayor que cero
-    if (typeof quantity !== 'number' || quantity <= 0) {
-      throw new CustomError('La cantidad debe ser un número positivo', 400);
-    }
-  
-    const item = await BasicInventory.findByPk(id);
-    if (!item) {
-      throw new CustomError('Item no encontrado', 404);
-    }
-  
-    // Incrementar currentStock en lugar de stock
-    await item.increment('currentStock', { by: quantity });
-  
-    res.json({
-      error: false,
-      message: 'Stock añadido exitosamente',
-      data: item,
-    });
-  };
+    const { quantity, stockType = 'clean' } = req.body;
 
-  const removeStock = async (req, res) => {
-    const { id } = req.params;
-    const { quantity } = req.body;
-  
-    // Validación: quantity debe ser un número y mayor que cero
     if (typeof quantity !== 'number' || quantity <= 0) {
-      throw new CustomError('La cantidad debe ser un número positivo', 400);
+        throw new CustomError('La cantidad debe ser un número positivo', 400);
     }
-  
+
     const item = await BasicInventory.findByPk(id);
     if (!item) {
-      throw new CustomError('Item no encontrado', 404);
+        throw new CustomError('Item no encontrado', 404);
     }
-  
-    if (item.currentStock < quantity) {
-      throw new CustomError('No hay suficiente stock', 400);
+
+    if (item.inventoryType === 'reusable') {
+        // Para reutilizables, se puede especificar si agregar a stock limpio o total
+        if (stockType === 'clean') {
+            await item.increment('cleanStock', { by: quantity });
+        } else if (stockType === 'total') {
+            await item.increment(['totalReusableStock', 'cleanStock'], { by: quantity });
+        }
+    } else {
+        // Para consumibles y vendibles
+        await item.increment('currentStock', { by: quantity });
     }
-  
-    // Decrementar currentStock en lugar de stock
-    await item.decrement('currentStock', { by: quantity });
-  
+
     res.json({
-      error: false,
-      message: 'Stock removido exitosamente',
-      data: item,
+        error: false,
+        message: `Stock ${stockType} añadido exitosamente`,
+        data: item,
     });
-  };
+};
+
+
+
+const getInventorySummary = async (req, res) => {
+    const summary = await BasicInventory.findAll({
+        where: { isActive: true },
+        attributes: [
+            'inventoryType',
+            [sequelize.fn('COUNT', sequelize.col('id')), 'totalItems'],
+            [sequelize.fn('SUM', sequelize.col('currentStock')), 'totalCurrentStock'],
+            [sequelize.fn('SUM', sequelize.col('cleanStock')), 'totalCleanStock'],
+            [sequelize.fn('SUM', sequelize.col('dirtyStock')), 'totalDirtyStock'],
+            [sequelize.fn('AVG', sequelize.col('unitPrice')), 'avgUnitPrice']
+        ],
+        group: ['inventoryType']
+    });
+
+    // Calcular valor total del inventario
+    const valuationByType = await BasicInventory.findAll({
+        where: { isActive: true },
+        attributes: [
+            'inventoryType',
+            [sequelize.literal('SUM(COALESCE("currentStock", 0) * "unitPrice")'), 'consumableValue'],
+            [sequelize.literal('SUM(COALESCE("totalReusableStock", 0) * "unitPrice")'), 'reusableValue']
+        ],
+        group: ['inventoryType']
+    });
+
+    res.json({
+        error: false,
+        message: 'Resumen de inventario obtenido exitosamente',
+        data: {
+            stockSummary: summary,
+            valuationSummary: valuationByType
+        }
+    });
+};
+
+const removeStock = async (req, res) => {
+    const { id } = req.params;
+    const { quantity } = req.body;
+
+    if (typeof quantity !== 'number' || quantity <= 0) {
+        throw new CustomError('La cantidad debe ser un número positivo', 400);
+    }
+
+    const item = await BasicInventory.findByPk(id);
+    if (!item) {
+        throw new CustomError('Item no encontrado', 404);
+    }
+
+    let availableStock = 0;
+    let stockField = '';
+
+    if (item.inventoryType === 'reusable') {
+        availableStock = item.cleanStock;
+        stockField = 'cleanStock';
+    } else {
+        availableStock = item.currentStock;
+        stockField = 'currentStock';
+    }
+
+    if (availableStock < quantity) {
+        throw new CustomError(`No hay suficiente stock disponible. Disponible: ${availableStock}`, 400);
+    }
+
+    await item.decrement(stockField, { by: quantity });
+
+    res.json({
+        error: false,
+        message: 'Stock removido exitosamente',
+        data: item,
+    });
+};
+
+const transferDirtyToClean = async (req, res) => {
+    const { id } = req.params;
+    const { quantity } = req.body;
+
+    if (typeof quantity !== 'number' || quantity <= 0) {
+        throw new CustomError('La cantidad debe ser un número positivo', 400);
+    }
+
+    const item = await BasicInventory.findByPk(id);
+    if (!item) {
+        throw new CustomError('Item no encontrado', 404);
+    }
+
+    if (item.inventoryType !== 'reusable') {
+        throw new CustomError('Esta operación solo aplica para items reutilizables', 400);
+    }
+
+    if (item.dirtyStock < quantity) {
+        throw new CustomError(`No hay suficiente stock sucio. Disponible: ${item.dirtyStock}`, 400);
+    }
+
+    // Transferir de sucio a limpio
+    await item.update({
+        dirtyStock: item.dirtyStock - quantity,
+        cleanStock: item.cleanStock + quantity
+    });
+
+    // Registrar movimiento de lavandería
+    await LaundryMovement.create({
+        basicInventoryId: id,
+        movementType: 'washing_to_clean',
+        quantity,
+        notes: 'Transferencia manual de stock sucio a limpio'
+    });
+
+    res.json({
+        error: false,
+        message: 'Stock transferido de sucio a limpio exitosamente',
+        data: item,
+    });
+};
+
+const markAsDirty = async (req, res) => {
+    const { id } = req.params;
+    const { quantity, roomNumber, bookingId } = req.body;
+
+    if (typeof quantity !== 'number' || quantity <= 0) {
+        throw new CustomError('La cantidad debe ser un número positivo', 400);
+    }
+
+    const item = await BasicInventory.findByPk(id);
+    if (!item) {
+        throw new CustomError('Item no encontrado', 404);
+    }
+
+    if (item.inventoryType !== 'reusable') {
+        throw new CustomError('Esta operación solo aplica para items reutilizables', 400);
+    }
+
+    if (item.cleanStock < quantity) {
+        throw new CustomError(`No hay suficiente stock limpio. Disponible: ${item.cleanStock}`, 400);
+    }
+
+    // Transferir de limpio a sucio
+    await item.update({
+        cleanStock: item.cleanStock - quantity,
+        dirtyStock: item.dirtyStock + quantity
+    });
+
+    // Registrar movimiento de lavandería
+    await LaundryMovement.create({
+        basicInventoryId: id,
+        movementType: 'clean_to_dirty',
+        quantity,
+        roomId: roomNumber,
+        bookingId,
+        notes: `Marcado como sucio desde habitación ${roomNumber}`
+    });
+
+    res.json({
+        error: false,
+        message: 'Items marcados como sucios exitosamente',
+        data: item,
+    });
+};
+
+
 
   const getStockHistory = async (req, res) => {
     const { id } = req.params;
@@ -434,58 +696,119 @@ const getAllItems = async (req, res) => {
   // Reporte de consumo: Este reporte podría mostrar, por ejemplo, el porcentaje de stock consumido o la diferencia entre el stock inicial y el actual.
 // Aquí se presenta un ejemplo simple que lista cada ítem y su consumo basado en una cantidad fija (ajusta según tu lógica real).
 const getConsumptionReport = async (req, res) => {
-    // Ejemplo: calcular "consumo" como la diferencia entre un stock teórico y el stock actual.
-    // En un escenario real, deberías tener un campo o una tabla que registre los consumos.
+    // ❌ ANTES: Campos incorrectos
+    // const items = await BasicInventory.findAll({
+    //   attributes: ['id', 'name', 'stock', 'minimumStock', 'price']
+    // });
+    
+    // ✅ DESPUÉS: Campos correctos
     const items = await BasicInventory.findAll({
-      attributes: ['id', 'name', 'stock', 'minimumStock', 'price']
+      where: { isActive: true },
+      attributes: [
+        'id', 'name', 'inventoryType', 
+        'currentStock', 'cleanStock', 'dirtyStock',
+        'minStock', 'minCleanStock', 'unitPrice'
+      ]
     });
-  
-    // Supongamos que el consumo se define (por ejemplificar) como: (stock inicial - stock actual).
-    // Aquí asumimos que el stock inicial es (minimumStock + 50) de forma arbitraria.
+
     const report = items.map(item => {
-      const stockInicial = item.minimumStock + 50;
+      let stockInicial, stockActual, consumo;
+      
+      if (item.inventoryType === 'reusable') {
+        stockInicial = item.minStock + 50; // Stock teórico inicial
+        stockActual = (item.cleanStock || 0) + (item.dirtyStock || 0);
+        consumo = stockInicial - stockActual;
+      } else {
+        stockInicial = item.minStock + 50;
+        stockActual = item.currentStock;
+        consumo = stockInicial - stockActual;
+      }
+      
       return {
         id: item.id,
         name: item.name,
+        inventoryType: item.inventoryType,
         stockInicial,
-        stockActual: item.stock,
-        consumo: stockInicial - item.stock
+        stockActual,
+        consumo: Math.max(0, consumo) // No negativos
       };
     });
-  
+
     res.json({
       error: false,
       message: 'Reporte de consumo generado exitosamente',
       data: report
     });
-  };
-  
-  // Reporte de valoración del inventario: Calcula el valor total de cada ítem (stock * price) y el valor global.
+};
   const getInventoryValuation = async (req, res) => {
+    // ❌ ANTES: Campos incorrectos
+    // const items = await BasicInventory.findAll({
+    //   attributes: ['id', 'name', 'stock', 'price']
+    // });
+    
+    // ✅ DESPUÉS: Campos correctos
     const items = await BasicInventory.findAll({
-      attributes: ['id', 'name', 'stock', 'price']
+      where: { isActive: true },
+      attributes: [
+        'id', 'name', 'inventoryType',
+        'currentStock', 'cleanStock', 'dirtyStock', 
+        'unitPrice', 'salePrice'
+      ]
     });
-  
-    const report = items.map(item => ({
-      id: item.id,
-      name: item.name,
-      stock: item.stock,
-      price: item.price,
-      totalValue: parseFloat(item.stock) * parseFloat(item.price)
-    }));
-  
+
+    const report = items.map(item => {
+      let effectiveStock = 0;
+      let effectivePrice = item.unitPrice;
+      
+      if (item.inventoryType === 'reusable') {
+        effectiveStock = (item.cleanStock || 0) + (item.dirtyStock || 0);
+      } else {
+        effectiveStock = item.currentStock || 0;
+      }
+      
+      // Para items vendibles, usar precio de venta si existe
+      if (item.inventoryType === 'sellable' && item.salePrice) {
+        effectivePrice = item.salePrice;
+      }
+      
+      return {
+        id: item.id,
+        name: item.name,
+        inventoryType: item.inventoryType,
+        stock: effectiveStock,
+        unitPrice: parseFloat(item.unitPrice || 0),
+        salePrice: parseFloat(item.salePrice || 0),
+        effectivePrice: parseFloat(effectivePrice),
+        totalValue: effectiveStock * parseFloat(effectivePrice)
+      };
+    });
+
     // Valor global del inventario
     const globalValuation = report.reduce((acc, cur) => acc + cur.totalValue, 0);
-  
+
     res.json({
       error: false,
       message: 'Reporte de valoración del inventario generado exitosamente',
       data: {
         items: report,
-        globalValuation
+        globalValuation: parseFloat(globalValuation.toFixed(2)),
+        summary: {
+          consumableValue: report
+            .filter(i => i.inventoryType === 'consumable')
+            .reduce((acc, cur) => acc + cur.totalValue, 0),
+          reusableValue: report
+            .filter(i => i.inventoryType === 'reusable')
+            .reduce((acc, cur) => acc + cur.totalValue, 0),
+          sellableValue: report
+            .filter(i => i.inventoryType === 'sellable')
+            .reduce((acc, cur) => acc + cur.totalValue, 0)
+        }
       }
     });
-  };
+};
+
+  // Reporte de valoración del inventario: Calcula el valor total de cada ítem (stock * price) y el valor global.
+  
   
   // Reporte de movimientos del inventario: Muestra los registros de movimientos (por ejemplo, compras, incrementos o decrementos)
   // Aquí se ejemplifica obteniendo la información de PurchaseItem si es que éste almacena movimientos.
@@ -510,68 +833,86 @@ const getConsumptionReport = async (req, res) => {
   };
 
   const getRoomAssignments = async (req, res) => {
-    const assignments = await RoomCheckIn.findAll({
+    // ❌ PROBLEMA: RoomCheckIn no tiene relación directa con BasicInventory
+    // ❌ RoomCheckIn es para preparación de habitaciones, no para asignación de inventario
+    
+    // ✅ SOLUCIÓN: Usar RoomBasics que SÍ relaciona Room con BasicInventory
+    const { RoomBasics, Room, BasicInventory } = require('../data');
+    
+    const assignments = await RoomBasics.findAll({
       include: [
         {
+          model: Room,
+          as: 'room',
+          attributes: ['roomNumber', 'type', 'status']
+        },
+        {
           model: BasicInventory,
-          as: 'item', // Ajusta el alias según tu relación
-          attributes: ['id', 'name']
+          as: 'inventory',
+          attributes: ['id', 'name', 'category', 'inventoryType']
         }
       ],
-      order: [['roomId', 'ASC']]
+      order: [['roomNumber', 'ASC']]
     });
     
     res.json({
       error: false,
-      message: 'Asignaciones de habitaciones recuperadas exitosamente',
+      message: 'Asignaciones de inventario por habitación recuperadas exitosamente',
       data: assignments
     });
-  };
-  
+};
   // Crea una nueva asignación a una habitación
   const createRoomAssignment = async (req, res) => {
-    const { roomId, inventoryId, quantity } = req.body;
+    const { roomNumber, basicId, quantity, isRequired = true } = req.body;
     
     // Validar campos
-    if (!roomId || !inventoryId || typeof quantity !== 'number' || quantity <= 0) {
-      throw new CustomError('roomId, inventoryId y una cantidad positiva son requeridos', 400);
+    if (!roomNumber || !basicId || typeof quantity !== 'number' || quantity <= 0) {
+      throw new CustomError('roomNumber, basicId y una cantidad positiva son requeridos', 400);
     }
     
     // Verificar que el item exista en el inventario
-    const item = await BasicInventory.findByPk(inventoryId);
+    const item = await BasicInventory.findByPk(basicId);
     if (!item) {
       throw new CustomError('Item de inventario no encontrado', 404);
     }
     
-    // Opcional: podrías validar que la habitación exista si cuentas con un modelo Room
+    // Verificar que la habitación exista
+    const room = await Room.findOne({ where: { roomNumber } });
+    if (!room) {
+      throw new CustomError('Habitación no encontrada', 404);
+    }
     
-    // Crear la asignación
-    const assignment = await RoomCheckIn.create({
-      roomId,
-      inventoryId,
+    // Crear la asignación usando RoomBasics
+    const assignment = await RoomBasics.create({
+      roomNumber,
+      basicId,
       quantity,
-      assignedBy: req.user.n_document // Se asume que req.user contiene el id del usuario autenticado
+      isRequired
     });
     
     res.status(201).json({
       error: false,
-      message: 'Asignación creada exitosamente',
+      message: 'Asignación de inventario creada exitosamente',
       data: assignment
     });
-  };
+};
+
   
   // Obtiene detalles de asignación para una habitación específica
   const getRoomAssignmentDetails = async (req, res) => {
-    const { roomId } = req.params;
+    const { roomNumber } = req.params;
     
-    // Se pueden tener múltiples asignaciones para una habitación; aquí se obtienen todas
-    const assignments = await RoomCheckIn.findAll({
-      where: { roomId },
+    const assignments = await RoomBasics.findAll({
+      where: { roomNumber },
       include: [
         {
           model: BasicInventory,
-          as: 'item',
-          attributes: ['id', 'name']
+          as: 'inventory',
+          attributes: [
+            'id', 'name', 'description', 'category', 
+            'inventoryType', 'currentStock', 'cleanStock', 
+            'dirtyStock', 'unitPrice'
+          ]
         }
       ]
     });
@@ -580,19 +921,40 @@ const getConsumptionReport = async (req, res) => {
       throw new CustomError('No se encontraron asignaciones para esta habitación', 404);
     }
     
+    // Agrupar por categoría para mejor organización
+    const assignmentsByCategory = assignments.reduce((acc, assignment) => {
+      const category = assignment.inventory.category;
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push({
+        id: assignment.id,
+        quantity: assignment.quantity,
+        isRequired: assignment.isRequired,
+        inventory: assignment.inventory
+      });
+      return acc;
+    }, {});
+    
     res.json({
       error: false,
       message: 'Detalles de asignación recuperados exitosamente',
-      data: assignments
+      data: {
+        roomNumber,
+        totalAssignments: assignments.length,
+        assignmentsByCategory
+      }
     });
-  };
+};
   
 
 module.exports = {
-    getInventory ,
-    createPurchase ,
+    getInventory,
+    createPurchase,
+    markAsDirty,
     updateInventory,
     getLowStockItems,
+    getInventoryByType,
     getAllItems,
     getItemById,
     createItem,
@@ -608,10 +970,12 @@ module.exports = {
     getCategories,
     createCategory,
     updateCategory,
-    getInventoryMovements,
-    getInventoryValuation,
-    getConsumptionReport,
+    transferDirtyToClean,
+    getInventoryMovements: getInventoryMovements, // ⭐ CORREGIDO
+    getInventoryValuation: getInventoryValuation, // ⭐ CORREGIDO
+    getConsumptionReport: getConsumptionReport, // ⭐ CORREGIDO
     getRoomAssignments,
     createRoomAssignment,
-    getRoomAssignmentDetails
+    getRoomAssignmentDetails,
+    getInventorySummary
 };

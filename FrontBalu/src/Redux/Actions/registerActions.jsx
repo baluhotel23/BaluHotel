@@ -3,13 +3,13 @@ import { toast } from 'react-toastify';
 
 // Obtener todos los registros de pasajeros
 export const getRegistrationPasses = () => async (dispatch) => {
-    try {
-      const { data } = await api.get("/registrationPass");
-      dispatch({ type: "GET_REGISTRATION_PASSES", payload: data.data });
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Error al obtener los registros de pasajeros");
-    }
-  };
+  try {
+    const { data } = await api.get("/registrationPass");
+    dispatch({ type: "GET_REGISTRATION_PASSES", payload: data.data });
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Error al obtener los registros de pasajeros");
+  }
+};
   
   // Crear un nuevo registro de pasajero
  export const createRegistrationPass = (registrationData) => async (dispatch) => {
@@ -38,6 +38,7 @@ export const getRegistrationPasses = () => async (dispatch) => {
   }
 };
 
+
 // Actualizar un registro de pasajero
 export const updateRegistrationPass = (registrationNumber, updatedData) => async (dispatch) => {
   try {
@@ -51,17 +52,20 @@ export const updateRegistrationPass = (registrationNumber, updatedData) => async
   
   // Eliminar un registro de pasajero
   export const deleteRegistrationPass = (registrationNumber) => async (dispatch) => {
-    try {
-      await api.delete(`/registrationPass/${registrationNumber}`);
-      dispatch({ type: "DELETE_REGISTRATION_PASS", payload: registrationNumber });
-      toast.success("Registro de pasajero eliminado exitosamente");
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Error al eliminar el registro de pasajero");
-    }
-  };
-
-  export const getRegistrationPassesByBooking = (bookingId) => async (dispatch) => {
   try {
+    await api.delete(`/registrationPass/${registrationNumber}`);
+    dispatch({ type: "DELETE_REGISTRATION_PASS", payload: registrationNumber });
+    toast.success("Registro de pasajero eliminado exitosamente");
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Error al eliminar el registro de pasajero");
+  }
+};
+
+
+ export const getRegistrationPassesByBooking = (bookingId) => async (dispatch) => {
+  try {
+    console.log("🔍 Obteniendo pasajeros para booking:", bookingId);
+    
     const { data } = await api.get(`/registrationPass/${bookingId}`);
     
     // Procesa la respuesta para extraer solo los pasajeros
@@ -76,11 +80,25 @@ export const updateRegistrationPass = (registrationNumber, updatedData) => async
       });
     }
     
-    dispatch({ type: "GET_REGISTRATION_PASSES_BY_BOOKING", payload: passengers });
-    return { success: true };
+    console.log("📦 Pasajeros encontrados:", passengers);
+    
+    // ⭐ INCLUIR bookingId EN EL PAYLOAD
+    const payload = {
+      bookingId,
+      passengers
+    };
+    
+    dispatch({ type: "GET_REGISTRATION_PASSES_BY_BOOKING", payload });
+    return { success: true, passengers };
   } catch (error) {
+    console.error("❌ Error al obtener pasajeros:", error);
     toast.error(error.response?.data?.message || "Error al obtener los pasajeros de la reserva");
-    dispatch({ type: "GET_REGISTRATION_PASSES_BY_BOOKING", payload: [] });
+    
+    // ⭐ INCLUIR bookingId INCLUSO EN ERROR
+    dispatch({ 
+      type: "GET_REGISTRATION_PASSES_BY_BOOKING", 
+      payload: { bookingId, passengers: [] } 
+    });
     return { success: false };
   }
 };

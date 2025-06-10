@@ -249,6 +249,30 @@ const Booking = () => {
   const [priceLoading, setPriceLoading] = useState(false);
   const [promoCode, setPromoCode] = useState('');
 
+  // Load search parameters from localStorage if available
+  useEffect(() => {
+    const storedParams = localStorage.getItem('bookingSearchParams');
+    if (storedParams) {
+      const params = JSON.parse(storedParams);
+      setCheckIn(new Date(params.checkIn));
+      setCheckOut(new Date(params.checkOut));
+      setRoomType(params.roomType || "");
+      setAdults(params.guests || 1);
+      
+      // Auto-trigger search with stored parameters
+      setTimeout(() => {
+        dispatch(checkAvailability({ 
+          checkIn: new Date(params.checkIn), 
+          checkOut: new Date(params.checkOut), 
+          roomType: params.roomType 
+        }));
+      }, 100);
+      
+      // Clear stored parameters
+      localStorage.removeItem('bookingSearchParams');
+    }
+  }, [dispatch]);
+
   // ... (handleSearch, handleSelectRoom, handleContinuePassengers sin cambios) ...
  const handleSearch = () => {
     dispatch(checkAvailability({ checkIn, checkOut, roomType }));
@@ -450,282 +474,369 @@ const Booking = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 max-w-3xl">
-      {/* Paso 1: Selección de habitación y fechas */}
-      {step === 1 && (
-        <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
-          <h1 className="text-2xl font-bold mb-4">Reservar Habitación</h1>
-          <div className="mb-4">
-            <label className="block mb-2">Desde</label>
-            <DatePicker
-              selected={checkIn}
-              onChange={(date) => setCheckIn(date)}
-              minDate={new Date()}
-              className="w-full p-2 rounded-lg bg-gray-700 text-white"
-              dateFormat="dd-MM-yyyy"
-              locale={es}
-            />
-            <label className="block mt-4 mb-2">Hasta</label>
-            <DatePicker
-              selected={checkOut}
-              onChange={(date) => setCheckOut(date)}
-              minDate={new Date(new Date(checkIn).getTime() + 86400000)} 
-              className="w-full p-2 rounded-lg bg-gray-700 text-white"
-              dateFormat="dd-MM-yyyy"
-              locale={es}
-            />
-            <label className="block mt-4 mb-2">Tipo de Habitación</label>
-            <select
-              value={roomType}
-              onChange={(e) => setRoomType(e.target.value)}
-              className="w-full p-2 rounded-lg bg-gray-700 text-white"
-            >
-              <option value="">Todos los tipos</option>
-              {ROOM_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
-            <button
-              onClick={handleSearch}
-              className="mt-4 w-full p-3 bg-stone-500 hover:bg-stone-600 rounded-full font-bold"
-            >
-              Buscar Disponibilidad
-            </button>
-          </div>
-          {availabilityLoading && <p className="text-center">Cargando habitaciones...</p>}
-          {availabilityError && <p className="text-center text-red-400">Error: {typeof availabilityError === 'string' ? availabilityError : (availabilityError.message || 'Error al buscar habitaciones')}</p>}
-          {availability && availability.length > 0 && !availabilityLoading && (
-            <div>
-              <h2 className="text-xl font-bold mb-4">Habitaciones Disponibles</h2>
-              <div className="space-y-6">
-                {availability.map((room) => (
-                  <div key={room.roomNumber} className="bg-gray-700 p-4 rounded-lg flex flex-col md:flex-row items-center">
-                    <img
-                      src={room.image_url && room.image_url[0] ? room.image_url[0] : 'https://via.placeholder.com/100'}
-                      alt={`Habitación ${room.roomNumber}`}
-                      className="w-full md:w-32 h-32 object-cover rounded-lg mb-4 md:mb-0 md:mr-6"
-                    />
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold mb-2">{room.type} - Habitación {room.roomNumber}</h3>
-                      <p className="text-gray-300 mb-2">{room.description}</p>
-                      <p className="text-xl font-bold text-yellow-400">Capacidad: {room.maxGuests} personas</p>
-                      {/* ⭐ MOSTRAR RANGO DE PRECIOS */}
-                      <div className="text-sm text-green-400 mt-2">
-                        <p>Desde: ${room.priceSingle?.toLocaleString() || 'N/A'} (1 huésped)</p>
-                        <p>Hasta: ${room.priceMultiple?.toLocaleString() || 'N/A'} (3+ huéspedes)</p>
-                        {room.isPromo && room.promotionPrice && (
-                          <p className="text-yellow-300 font-bold">
-                            ¡Oferta! ${room.promotionPrice.toLocaleString()}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pt-32"> {/* Added top padding to account for navbar */}
+      <div className="container mx-auto p-4 max-w-4xl">
+        {/* Paso 1: Selección de habitación y fechas */}
+        {step === 1 && (
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200"
+               style={{ 
+                 boxShadow: '0 0 0 4px rgba(255, 255, 255, 0.1), 0 20px 40px -12px rgba(0, 0, 0, 0.15)' 
+               }}>
+            <h1 className="text-3xl font-bold mb-6 text-gray-800 text-center">Reservar Habitación</h1>
+            
+            {/* Show current search parameters if they exist */}
+            <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+              <h3 className="text-xl font-semibold mb-3 text-gray-700 flex items-center">
+                <span className="mr-2">🔍</span> Búsqueda Actual
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-gray-600">
+                <p><span className="font-medium">Entrada:</span> {format(checkIn, "dd-MM-yyyy", { locale: es })}</p>
+                <p><span className="font-medium">Salida:</span> {format(checkOut, "dd-MM-yyyy", { locale: es })}</p>
+                {roomType && <p><span className="font-medium">Tipo:</span> {roomType}</p>}
+              </div>
+            </div>
+
+            {/* Existing form for modifying search */}
+            <div className="mb-6 p-6 bg-gray-50 rounded-xl">
+              <h3 className="text-lg font-semibold mb-4 text-gray-700">Modificar Búsqueda</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-gray-700">Desde</label>
+                  <DatePicker
+                    selected={checkIn}
+                    onChange={(date) => setCheckIn(date)}
+                    minDate={new Date()}
+                    className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    dateFormat="dd-MM-yyyy"
+                    locale={es}
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-gray-700">Hasta</label>
+                  <DatePicker
+                    selected={checkOut}
+                    onChange={(date) => setCheckOut(date)}
+                    minDate={new Date(new Date(checkIn).getTime() + 86400000)} 
+                    className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    dateFormat="dd-MM-yyyy"
+                    locale={es}
+                  />
+                </div>
+              </div>
+              <div className="mt-4">
+                <label className="block mb-2 text-sm font-medium text-gray-700">Tipo de Habitación</label>
+                <select
+                  value={roomType}
+                  onChange={(e) => setRoomType(e.target.value)}
+                  className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Todos los tipos</option>
+                  {ROOM_TYPES.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleSearch}
+                className="mt-6 w-full p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-bold transition-all duration-200 transform hover:scale-105 shadow-lg"
+              >
+                🔎 Buscar Disponibilidad
+              </button>
+            </div>
+
+            {availabilityLoading && (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p className="mt-2 text-gray-600">Cargando habitaciones...</p>
+              </div>
+            )}
+
+            {availabilityError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                <p className="text-red-600 text-center">
+                  ❌ Error: {typeof availabilityError === 'string' ? availabilityError : (availabilityError.message || 'Error al buscar habitaciones')}
+                </p>
+              </div>
+            )}
+
+            {availability && availability.length > 0 && !availabilityLoading && (
+              <div>
+                <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">🏨 Habitaciones Disponibles</h2>
+                <div className="space-y-6">
+                  {availability.map((room) => (
+                    <div key={room.roomNumber} className="bg-white border border-gray-200 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                      <div className="flex flex-col lg:flex-row items-center">
+                        <img
+                          src={room.image_url && room.image_url[0] ? room.image_url[0] : 'https://via.placeholder.com/200x150'}
+                          alt={`Habitación ${room.roomNumber}`}
+                          className="w-full lg:w-48 h-36 object-cover rounded-xl mb-4 lg:mb-0 lg:mr-6"
+                        />
+                        <div className="flex-1 text-center lg:text-left">
+                          <h3 className="text-xl font-bold mb-2 text-gray-800">{room.type} - Habitación {room.roomNumber}</h3>
+                          <p className="text-gray-600 mb-3">{room.description}</p>
+                          <p className="text-lg font-bold text-yellow-600 mb-3">
+                            👥 Capacidad: {room.maxGuests} personas
                           </p>
-                        )}
+                          <div className="text-sm text-green-600 space-y-1">
+                            <p>💰 Desde: ${room.priceSingle?.toLocaleString() || 'N/A'} (1 huésped)</p>
+                            <p>💰 Hasta: ${room.priceMultiple?.toLocaleString() || 'N/A'} (3+ huéspedes)</p>
+                            {room.isPromo && room.promotionPrice && (
+                              <p className="text-yellow-600 font-bold">
+                                🎉 ¡Oferta! ${room.promotionPrice.toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-4 lg:mt-0 lg:ml-6">
+                          <button
+                            onClick={() => handleSelectRoom(room)}
+                            className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white rounded-full font-bold transition-all duration-200 transform hover:scale-105 shadow-lg"
+                          >
+                            ✨ Seleccionar
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <div className="mt-4 md:mt-0 md:ml-6">
-                      <button
-                        onClick={() => handleSelectRoom(room)}
-                        className="w-full p-2 bg-stone-500 hover:bg-stone-600 rounded-full font-bold"
-                      >
-                        Seleccionar
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          {availability && availability.length === 0 && !availabilityLoading && (
-            <p className="text-center text-yellow-400 mt-4">No hay habitaciones disponibles para las fechas o tipo seleccionado.</p>
-          )}
-        </div>
-      )}
+            )}
 
-      {step === 2 && selectedRoom && (
-        <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
-          <h2 className="text-xl font-bold mb-4">Selecciona la cantidad de pasajeros</h2>
-          
-          {/* ⭐ CAMPO DE CÓDIGO PROMOCIONAL */}
-          <div className="mb-4">
-            <label className="block text-sm font-semibold mb-1">Código Promocional (Opcional)</label>
-            <input
-              type="text"
-              value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-              className="w-full p-2 rounded-lg bg-gray-700 text-white border border-gray-600"
-              placeholder="Ingrese código promocional"
-            />
-          </div>
-
-          <div className="flex space-x-4 mb-4">
-            <div>
-              <label className="block text-sm">Adultos (Máx. {maxCapacity})</label>
-              <select
-                value={adults}
-                onChange={(e) => setAdults(Number(e.target.value))}
-                className="w-full p-2 rounded-lg bg-gray-700 text-white"
-              >
-                {[...Array(maxCapacity + 1)].map((_, index) => (
-                  <option key={`adult-${index}`} value={index}>{index}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm">Niños (Máx. {maxCapacity - adults})</label>
-              <select
-                value={children}
-                onChange={(e) => setChildren(Number(e.target.value))}
-                className="w-full p-2 rounded-lg bg-gray-700 text-white"
-                disabled={(maxCapacity - adults) < 0}
-              >
-                {[...Array(Math.max(0, maxCapacity - adults) + 1)].map((_, index) => (
-                  <option key={`child-${index}`} value={index}>{index}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <p>Habitación: <b>{selectedRoom.type} - {selectedRoom.roomNumber}</b></p>
-            <p>Desde: <b>{format(checkIn, "dd-MM-yyyy", { locale: es })}</b></p>
-            <p>Hasta: <b>{format(checkOut, "dd-MM-yyyy", { locale: es })}</b></p>
-            <p>Noches: <b>{differenceInDays(checkOut, checkIn)}</b></p>
-            <p className="text-yellow-300">
-              <small>El precio exacto se calculará en el siguiente paso</small>
-            </p>
-          </div>
-
-          <div className="flex gap-4">
-            <button
-              onClick={() => setStep(1)}
-              className="w-full p-2 bg-gray-500 hover:bg-gray-600 rounded-full font-bold"
-            >
-              Volver
-            </button>
-            <button
-              onClick={handleContinuePassengers}
-              disabled={priceLoading}
-              className="w-full p-2 bg-stone-500 hover:bg-stone-600 rounded-full font-bold disabled:opacity-50"
-            >
-              {priceLoading ? 'Calculando...' : 'Continuar'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ⭐ RESTO DE LOS STEPS SIN CAMBIOS SIGNIFICATIVOS, SOLO MOSTRAR BREAKDOWN SI ESTÁ DISPONIBLE */}
-      {step === 3 && (
-        <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
-          <h2 className="text-xl font-bold mb-4">Datos del Huésped Principal</h2>
-          
-          {/* ⭐ MOSTRAR BREAKDOWN DE PRECIO */}
-          {priceBreakdown && (
-            <div className="bg-gray-700 p-4 rounded-lg mb-4">
-              <h3 className="text-lg font-semibold mb-2">Detalle del Precio</h3>
-              <div className="text-sm space-y-1">
-                <p>Precio base por noche: ${priceBreakdown.basePrice?.toLocaleString()}</p>
-                <p>Noches: {priceBreakdown.nights}</p>
-                <p>Huéspedes: {priceBreakdown.guestCount}</p>
-                {priceBreakdown.extraGuestCharges > 0 && (
-                  <p>Cargo por huéspedes extra: ${priceBreakdown.extraGuestCharges?.toLocaleString()}</p>
-                )}
-                <hr className="border-gray-600" />
-                <p className="font-bold text-lg">Total: ${bookingTotal.toLocaleString()}</p>
+            {availability && availability.length === 0 && !availabilityLoading && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+                <p className="text-yellow-700">
+                  😔 No hay habitaciones disponibles para las fechas o tipo seleccionado.
+                </p>
               </div>
-            </div>
-          )}
-
-          <div className="mb-4">
-            <label className="block text-sm font-semibold mb-1">Documento del huésped</label>
-            <input
-              type="text"
-              value={buyerSdocnoInput}
-              onChange={e => setBuyerSdocnoInput(e.target.value)}
-              className="w-full p-2 rounded-lg bg-gray-700 text-white border border-gray-600"
-              placeholder="Ingrese documento y verifique"
-              disabled={buyerLoading} 
-            />
-            <button
-              onClick={handleVerifyOrRegisterBuyer}
-              className="mt-4 w-full p-3 bg-stone-500 hover:bg-stone-600 rounded-full font-bold"
-              disabled={buyerLoading} 
-            >
-              {buyerLoading ? 'Verificando...' : 'Verificar / Registrar Huésped'}
-            </button>
-            {buyerLoading && <p className="text-yellow-400 mt-2 text-center">Buscando huésped...</p>}
-            {currentBuyerData && !showBuyerPopup && !buyerLoading && (
-              <p className="text-green-400 mt-2">Huésped: {currentBuyerData.scostumername} ({currentBuyerData.sdocno})</p>
             )}
           </div>
-          <button
-            onClick={() => setStep(2)}
-            className="w-full p-2 bg-gray-500 hover:bg-gray-600 rounded-full font-bold mt-4"
-            disabled={buyerLoading}
-          >
-            Volver a Pasajeros
-          </button>
-        </div>
-      )}
+        )}
 
-      {/* ⭐ RESTO DEL COMPONENTE PERMANECE IGUAL */}
-      <BuyerRegistrationFormPopup
-        isOpen={showBuyerPopup}
-        onClose={() => setShowBuyerPopup(false)}
-        onBuyerRegistered={handleBuyerRegistered}
-        initialSdocno={buyerSdocnoInput}
-      />
+        {step === 2 && selectedRoom && (
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200"
+               style={{ 
+                 boxShadow: '0 0 0 4px rgba(255, 255, 255, 0.1), 0 20px 40px -12px rgba(0, 0, 0, 0.15)' 
+               }}>
+            <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">👥 Selecciona la cantidad de pasajeros</h2>
+            
+            {/* Código promocional */}
+            <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+              <label className="block text-sm font-semibold mb-2 text-gray-700">🎟️ Código Promocional (Opcional)</label>
+              <input
+                type="text"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                placeholder="Ingrese código promocional"
+              />
+            </div>
 
-      {step === 4 && currentBuyerData && (
-        <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-white">
-          <h2 className="text-xl font-bold mb-4">Resumen y Pago</h2>
-          <p>Habitación: <b>{selectedRoom.type} - {selectedRoom.roomNumber}</b></p>
-          <p>Desde: <b>{format(checkIn, "dd-MM-yyyy", { locale: es })}</b> Hasta: <b>{format(checkOut, "dd-MM-yyyy", { locale: es })}</b> ({differenceInDays(checkOut, checkIn)} noches)</p>
-          <p>Adultos: <b>{adults}</b> | Niños: <b>{children}</b> (Total: {adults+children} huéspedes)</p>
-          <p>Huésped Principal: <b>{currentBuyerData.scostumername} ({currentBuyerData.sdocno})</b></p>
-          
-          {/* ⭐ MOSTRAR BREAKDOWN DETALLADO */}
-          {priceBreakdown && (
-            <div className="bg-gray-700 p-4 rounded-lg my-4">
-              <h3 className="text-lg font-semibold mb-2">Detalle del Precio</h3>
-              <div className="text-sm space-y-1">
-                <p>Precio base: ${priceBreakdown.basePrice?.toLocaleString()}</p>
-                <p>Noches: {priceBreakdown.nights}</p>
-                <p>Huéspedes: {priceBreakdown.guestCount}</p>
-                {priceBreakdown.extraGuestCharges > 0 && (
-                  <p>Huéspedes extra: ${priceBreakdown.extraGuestCharges?.toLocaleString()}</p>
-                )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="p-4 bg-gray-50 rounded-xl">
+                <label className="block text-sm font-medium text-gray-700 mb-2">👨‍👩‍👧‍👦 Adultos (Máx. {maxCapacity})</label>
+                <select
+                  value={adults}
+                  onChange={(e) => setAdults(Number(e.target.value))}
+                  className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {[...Array(maxCapacity + 1)].map((_, index) => (
+                    <option key={`adult-${index}`} value={index}>{index}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-xl">
+                <label className="block text-sm font-medium text-gray-700 mb-2">👶 Niños (Máx. {maxCapacity - adults})</label>
+                <select
+                  value={children}
+                  onChange={(e) => setChildren(Number(e.target.value))}
+                  className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={(maxCapacity - adults) < 0}
+                >
+                  {[...Array(Math.max(0, maxCapacity - adults) + 1)].map((_, index) => (
+                    <option key={`child-${index}`} value={index}>{index}</option>
+                  ))}
+                </select>
               </div>
             </div>
-          )}
-          
-          <p className="text-2xl font-bold text-yellow-400">Total Reserva: <b>${bookingTotal.toLocaleString()}</b></p>
-          <div className="my-4">
-            <label className="block text-sm font-semibold mb-1">Opción de Pago:</label>
-            <select
-              value={paymentOption}
-              onChange={e => setPaymentOption(e.target.value)}
-              className="w-full p-2 rounded-lg bg-gray-700 text-white border border-gray-600"
-            >
-              <option value="total">Pagar Total (${bookingTotal.toLocaleString()})</option>
-              <option value="mitad">Pagar 50% (${Math.round(bookingTotal / 2).toLocaleString()})</option>
-            </select>
+
+            <div className="bg-blue-50 p-6 rounded-xl border border-blue-200 mb-6">
+              <h3 className="text-lg font-semibold mb-3 text-gray-700">📋 Resumen de Reserva</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-gray-600">
+                <p><span className="font-medium">🏨 Habitación:</span> {selectedRoom.type} - {selectedRoom.roomNumber}</p>
+                <p><span className="font-medium">📅 Desde:</span> {format(checkIn, "dd-MM-yyyy", { locale: es })}</p>
+                <p><span className="font-medium">📅 Hasta:</span> {format(checkOut, "dd-MM-yyyy", { locale: es })}</p>
+                <p><span className="font-medium">🌙 Noches:</span> {differenceInDays(checkOut, checkIn)}</p>
+              </div>
+              <p className="text-yellow-600 text-sm mt-3 text-center">
+                💡 El precio exacto se calculará en el siguiente paso
+              </p>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setStep(1)}
+                className="w-full p-4 bg-gray-500 hover:bg-gray-600 text-white rounded-xl font-bold transition-all duration-200"
+              >
+                ← Volver
+              </button>
+              <button
+                onClick={handleContinuePassengers}
+                disabled={priceLoading}
+                className="w-full p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {priceLoading ? '⏳ Calculando...' : 'Continuar →'}
+              </button>
+            </div>
           </div>
-          <p className="text-xl font-semibold mb-4">Monto a Pagar Ahora: ${amountToPay.toLocaleString()}</p>
-          <WompiPayment
-            booking={{ 
-              bookingId: `reserva-${selectedRoom.roomNumber}-${Date.now()}`, 
-              totalAmount: amountToPay, 
-              currency: "COP", 
-              customer_email: currentBuyerData.selectronicmail, 
-            }}
-            onPaymentComplete={handlePaymentSuccess}
-          />
-          <button
-            onClick={() => setStep(3)}
-            className="mt-4 w-full p-2 bg-gray-500 hover:bg-gray-600 rounded-full font-bold"
-          >
-            Volver a Datos del Huésped
-          </button>
-        </div>
-      )}
+        )}
+
+        {/* ⭐ RESTO DE LOS STEPS SIN CAMBIOS SIGNIFICATIVOS, SOLO MOSTRAR BREAKDOWN SI ESTÁ DISPONIBLE */}
+        {step === 3 && (
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200"
+               style={{ 
+                 boxShadow: '0 0 0 4px rgba(255, 255, 255, 0.1), 0 20px 40px -12px rgba(0, 0, 0, 0.15)' 
+               }}>
+            <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">👤 Datos del Huésped Principal</h2>
+            
+            {/* Price breakdown */}
+            {priceBreakdown && (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200 mb-6">
+                <h3 className="text-lg font-semibold mb-3 text-gray-700">💰 Detalle del Precio</h3>
+                <div className="text-sm space-y-2 text-gray-600">
+                  <p>🏷️ Precio base por noche: ${priceBreakdown.basePrice?.toLocaleString()}</p>
+                  <p>🌙 Noches: {priceBreakdown.nights}</p>
+                  <p>👥 Huéspedes: {priceBreakdown.guestCount}</p>
+                  {priceBreakdown.extraGuestCharges > 0 && (
+                    <p>💵 Cargo por huéspedes extra: ${priceBreakdown.extraGuestCharges?.toLocaleString()}</p>
+                  )}
+                  <hr className="border-green-300" />
+                  <p className="font-bold text-lg text-green-700">💳 Total: ${bookingTotal.toLocaleString()}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="mb-6">
+              <label className="block text-sm font-semibold mb-2 text-gray-700">📄 Documento del huésped</label>
+              <input
+                type="text"
+                value={buyerSdocnoInput}
+                onChange={e => setBuyerSdocnoInput(e.target.value)}
+                className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
+                placeholder="Ingrese documento y verifique"
+                disabled={buyerLoading} 
+              />
+              <button
+                onClick={handleVerifyOrRegisterBuyer}
+                className="w-full p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-bold transition-all duration-200 disabled:opacity-50"
+                disabled={buyerLoading} 
+              >
+                {buyerLoading ? '⏳ Verificando...' : '🔍 Verificar / Registrar Huésped'}
+              </button>
+              
+              {buyerLoading && (
+                <div className="text-center mt-4">
+                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <p className="text-yellow-600 mt-2">Buscando huésped...</p>
+                </div>
+              )}
+              
+              {currentBuyerData && !showBuyerPopup && !buyerLoading && (
+                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl">
+                  <p className="text-green-700">✅ Huésped: {currentBuyerData.scostumername} ({currentBuyerData.sdocno})</p>
+                </div>
+              )}
+            </div>
+            
+            <button
+              onClick={() => setStep(2)}
+              className="w-full p-4 bg-gray-500 hover:bg-gray-600 text-white rounded-xl font-bold transition-all duration-200"
+              disabled={buyerLoading}
+            >
+              ← Volver a Pasajeros
+            </button>
+          </div>
+        )}
+
+        {step === 4 && currentBuyerData && (
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200"
+               style={{ 
+                 boxShadow: '0 0 0 4px rgba(255, 255, 255, 0.1), 0 20px 40px -12px rgba(0, 0, 0, 0.15)' 
+               }}>
+            <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">💳 Resumen y Pago</h2>
+            
+            <div className="bg-blue-50 p-6 rounded-xl border border-blue-200 mb-6">
+              <h3 className="text-lg font-semibold mb-3 text-gray-700">📋 Detalles de la Reserva</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-gray-600">
+                <p><span className="font-medium">🏨 Habitación:</span> {selectedRoom.type} - {selectedRoom.roomNumber}</p>
+                <p><span className="font-medium">📅 Fechas:</span> {format(checkIn, "dd-MM-yyyy", { locale: es })} - {format(checkOut, "dd-MM-yyyy", { locale: es })}</p>
+                <p><span className="font-medium">🌙 Noches:</span> {differenceInDays(checkOut, checkIn)}</p>
+                <p><span className="font-medium">👥 Huéspedes:</span> {adults} adultos, {children} niños</p>
+              </div>
+              <p className="mt-3"><span className="font-medium text-gray-700">👤 Huésped Principal:</span> {currentBuyerData.scostumername} ({currentBuyerData.sdocno})</p>
+            </div>
+          
+            {/* Price breakdown detailed */}
+            {priceBreakdown && (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200 mb-6">
+                <h3 className="text-lg font-semibold mb-3 text-gray-700">💰 Detalle del Precio</h3>
+                <div className="text-sm space-y-2 text-gray-600">
+                  <p>🏷️ Precio base: ${priceBreakdown.basePrice?.toLocaleString()}</p>
+                  <p>🌙 Noches: {priceBreakdown.nights}</p>
+                  <p>👥 Huéspedes: {priceBreakdown.guestCount}</p>
+                  {priceBreakdown.extraGuestCharges > 0 && (
+                    <p>💵 Huéspedes extra: ${priceBreakdown.extraGuestCharges?.toLocaleString()}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <div className="text-center mb-6">
+              <p className="text-3xl font-bold text-green-600">💳 Total Reserva: ${bookingTotal.toLocaleString()}</p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-semibold mb-2 text-gray-700">💳 Opción de Pago:</label>
+              <select
+                value={paymentOption}
+                onChange={e => setPaymentOption(e.target.value)}
+                className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="total">Pagar Total (${bookingTotal.toLocaleString()})</option>
+                <option value="mitad">Pagar 50% (${Math.round(bookingTotal / 2).toLocaleString()})</option>
+              </select>
+            </div>
+
+            <div className="text-center mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <p className="text-xl font-semibold text-yellow-700">💰 Monto a Pagar Ahora: ${amountToPay.toLocaleString()}</p>
+            </div>
+
+            <WompiPayment
+              booking={{ 
+                bookingId: `reserva-${selectedRoom.roomNumber}-${Date.now()}`, 
+                totalAmount: amountToPay, 
+                currency: "COP", 
+                customer_email: currentBuyerData.selectronicmail, 
+              }}
+              onPaymentComplete={handlePaymentSuccess}
+            />
+
+            <button
+              onClick={() => setStep(3)}
+              className="mt-6 w-full p-4 bg-gray-500 hover:bg-gray-600 text-white rounded-xl font-bold transition-all duration-200"
+            >
+              ← Volver a Datos del Huésped
+            </button>
+          </div>
+        )}
+
+        {/* Buyer Registration Popup */}
+        <BuyerRegistrationFormPopup
+          isOpen={showBuyerPopup}
+          onClose={() => setShowBuyerPopup(false)}
+          onBuyerRegistered={handleBuyerRegistered}
+          initialSdocno={buyerSdocnoInput}
+        />
+      </div>
     </div>
   );
 };

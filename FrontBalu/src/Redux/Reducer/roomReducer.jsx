@@ -1,204 +1,487 @@
 const initialState = {
+  // ⭐ HABITACIONES PRINCIPALES
   rooms: [],
   roomTypes: [],
   selectedRoom: null,
   searchedRoom: null,
+  
+  // ⭐ INVENTARIO DE HABITACIONES
+  inventory: {
+    availability: {},
+    history: {},
+    currentCheck: null
+  },
+  
+  // ⭐ AMENITIES Y SERVICIOS
   amenities: [],
   services: [],
-  occupancyReport: null,
-  revenueReport: null,
-  roomsToPrepare: [],
-  roomBasics: {}, // ⭐ CAMBIAR DE ARRAY A OBJETO para guardar por habitación
-  roomBasicsByRoom: {}, // ⭐ AGREGAR ESTADO ESPECÍFICO POR HABITACIÓN
+  
+  // ⭐ BÁSICOS DE HABITACIÓN
+  roomBasics: {},
+  roomBasicsByRoom: {},
+  
+  // ⭐ PROMOCIONES Y OFERTAS
   activePromotions: [],
   specialOffers: [],
+  promoCodeValidation: null,
+  
+  // ⭐ PRECIOS Y COTIZACIONES
   priceCalculations: {},
   multipleRoomPrices: null,
-  roomPreparationStatus: {},
   tempPriceCalculation: null,
   fullRoomQuote: null,
   availabilityWithPricing: null,
-  promoCodeValidation: null,
-  loading: false,
-  error: null,
+  
+  // ⭐ REPORTES
+  occupancyReport: null,
+  revenueReport: null,
+  roomsToPrepare: [],
+  roomPreparationStatus: {},
+  
+  // ⭐ LOADING GRANULAR
+  loading: {
+    general: false,
+    rooms: false,        // ⭐ ESTE ES EL QUE NECESITAS EN CreateRoom
+    roomTypes: false,
+    amenities: false,
+    services: false,
+    basics: false,
+    inventory: false,
+    pricing: false,
+    reports: false,
+    promotions: false
+  },
+  
+  // ⭐ ERRORES ESPECÍFICOS
+  errors: {
+    general: null,
+    rooms: null,         // ⭐ ESTE ES EL ERROR ESPECÍFICO PARA ROOMS
+    roomTypes: null,
+    amenities: null,
+    services: null,
+    basics: null,
+    inventory: null,
+    pricing: null,
+    reports: null,
+    promotions: null
+  },
+  
+  // ⭐ FILTROS Y BÚSQUEDA
+  filters: {
+    roomType: null,
+    status: null,
+    floor: null,
+    availability: null
+  },
+  
+  // ⭐ CACHE Y OPTIMIZACIÓN
+  cache: {
+    lastUpdated: null,
+    roomsLastFetch: null,
+    roomTypesLastFetch: null,
+    basicsLastFetch: {},
+    promotionsLastFetch: null
+  }
 };
 
 const roomReducer = (state = initialState, action) => {
   switch (action.type) {
-    // Ejemplo para GET_ROOMS
+    
+    // ⭐ HABITACIONES PRINCIPALES - OPTIMIZADO
     case "GET_ROOMS_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: true }, 
+        errors: { ...state.errors, rooms: null } 
+      };
     case "GET_ROOMS_SUCCESS":
-      return { ...state, loading: false, rooms: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: false }, 
+        rooms: action.payload,
+        cache: { ...state.cache, roomsLastFetch: Date.now() }
+      };
     case "GET_ROOMS_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: false }, 
+        errors: { ...state.errors, rooms: action.payload }
+      };
 
-    // GET_ROOM_TYPES
+    // ⭐ TIPOS DE HABITACIÓN - OPTIMIZADO
     case "GET_ROOM_TYPES_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, roomTypes: true }, 
+        errors: { ...state.errors, roomTypes: null } 
+      };
     case "GET_ROOM_TYPES_SUCCESS":
-      return { ...state, loading: false, roomTypes: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, roomTypes: false }, 
+        roomTypes: action.payload,
+        cache: { ...state.cache, roomTypesLastFetch: Date.now() }
+      };
     case "GET_ROOM_TYPES_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, roomTypes: false }, 
+        errors: { ...state.errors, roomTypes: action.payload }
+      };
 
-    // GET_ROOM
+    // ⭐ HABITACIÓN INDIVIDUAL - OPTIMIZADO
     case "GET_ROOM_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, general: true }, 
+        errors: { ...state.errors, general: null } 
+      };
     case "GET_ROOM_SUCCESS":
-      return { ...state, loading: false, selectedRoom: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, general: false }, 
+        selectedRoom: action.payload
+      };
     case "GET_ROOM_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, general: false }, 
+        errors: { ...state.errors, general: action.payload }
+      };
 
+    // ⭐ BÚSQUEDA DE HABITACIÓN - OPTIMIZADO
     case "SEARCH_ROOM_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, general: true }, 
+        errors: { ...state.errors, general: null } 
+      };
     case "SEARCH_ROOM_SUCCESS":
-      return { ...state, loading: false, searchedRoom: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, general: false }, 
+        searchedRoom: action.payload
+      };
     case "SEARCH_ROOM_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, general: false }, 
+        errors: { ...state.errors, general: action.payload }
+      };
 
-    // CHECK_AVAILABILITY
+    // ⭐ VERIFICAR DISPONIBILIDAD - OPTIMIZADO
     case "CHECK_AVAILABILITY_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, general: true }, 
+        errors: { ...state.errors, general: null } 
+      };
     case "CHECK_AVAILABILITY_SUCCESS":
-      return { ...state, loading: false, rooms: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, general: false }, 
+        rooms: action.payload
+      };
     case "CHECK_AVAILABILITY_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, general: false }, 
+        errors: { ...state.errors, general: action.payload }
+      };
 
-    // CREATE_ROOM
+    // ⭐ CREAR HABITACIÓN - OPTIMIZADO
     case "CREATE_ROOM_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: true }, 
+        errors: { ...state.errors, rooms: null } 
+      };
     case "CREATE_ROOM_SUCCESS":
       return {
         ...state,
-        loading: false,
-        rooms: [...state.rooms, action.payload],
+        loading: { ...state.loading, rooms: false }, // ⭐ DESACTIVAR LOADING
+        errors: { ...state.errors, rooms: null },    // ⭐ LIMPIAR ERROR
+        rooms: [...state.rooms, action.payload.data], // ⭐ USAR action.payload.data
+        cache: { 
+          ...state.cache, 
+          roomsLastFetch: Date.now(),
+          lastUpdated: Date.now()
+        }
       };
     case "CREATE_ROOM_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: false }, // ⭐ DESACTIVAR LOADING
+        errors: { ...state.errors, rooms: action.payload } // ⭐ GUARDAR ERROR
+      };
 
-    // UPDATE_ROOM
+    // ⭐ ACTUALIZAR HABITACIÓN - OPTIMIZADO
     case "UPDATE_ROOM_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: true }, 
+        errors: { ...state.errors, rooms: null } 
+      };
     case "UPDATE_ROOM_SUCCESS":
       return {
         ...state,
-        loading: false,
+        loading: { ...state.loading, rooms: false },
         rooms: state.rooms.map((room) =>
           room.roomNumber === action.payload.roomNumber ? action.payload : room
         ),
+        selectedRoom: state.selectedRoom?.roomNumber === action.payload.roomNumber 
+          ? action.payload 
+          : state.selectedRoom
       };
     case "UPDATE_ROOM_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: false }, 
+        errors: { ...state.errors, rooms: action.payload }
+      };
 
-    // DELETE_ROOM
+    // ⭐ ELIMINAR HABITACIÓN - OPTIMIZADO
     case "DELETE_ROOM_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: true }, 
+        errors: { ...state.errors, rooms: null } 
+      };
     case "DELETE_ROOM_SUCCESS":
       return {
         ...state,
-        loading: false,
+        loading: { ...state.loading, rooms: false },
         rooms: state.rooms.filter(
           (room) => room.roomNumber !== action.payload.roomNumber
         ),
+        // Limpiar datos relacionados con la habitación eliminada
+        roomBasicsByRoom: {
+          ...state.roomBasicsByRoom,
+          [action.payload.roomNumber]: undefined
+        },
+        inventory: {
+          ...state.inventory,
+          availability: {
+            ...state.inventory.availability,
+            [action.payload.roomNumber]: undefined
+          },
+          history: {
+            ...state.inventory.history,
+            [action.payload.roomNumber]: undefined
+          }
+        }
       };
     case "DELETE_ROOM_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: false }, 
+        errors: { ...state.errors, rooms: action.payload }
+      };
 
-    // UPDATE_ROOM_STATUS
+    // ⭐ ACTUALIZAR ESTADO DE HABITACIÓN - OPTIMIZADO
     case "UPDATE_ROOM_STATUS_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: true }, 
+        errors: { ...state.errors, rooms: null } 
+      };
     case "UPDATE_ROOM_STATUS_SUCCESS":
       return {
         ...state,
-        loading: false,
+        loading: { ...state.loading, rooms: false },
         rooms: state.rooms.map((room) =>
           room.roomNumber === action.payload.roomNumber ? action.payload : room
         ),
+        selectedRoom: state.selectedRoom?.roomNumber === action.payload.roomNumber 
+          ? action.payload 
+          : state.selectedRoom
       };
     case "UPDATE_ROOM_STATUS_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, rooms: false }, 
+        errors: { ...state.errors, rooms: action.payload }
+      };
 
-    // GET_ROOM_AMENITIES
+    // ⭐ AMENITIES - OPTIMIZADO
     case "GET_ROOM_AMENITIES_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, amenities: true }, 
+        errors: { ...state.errors, amenities: null } 
+      };
     case "GET_ROOM_AMENITIES_SUCCESS":
-      return { ...state, loading: false, amenities: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, amenities: false }, 
+        amenities: action.payload
+      };
     case "GET_ROOM_AMENITIES_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, amenities: false }, 
+        errors: { ...state.errors, amenities: action.payload }
+      };
 
-    // UPDATE_ROOM_AMENITIES
     case "UPDATE_ROOM_AMENITIES_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, amenities: true }, 
+        errors: { ...state.errors, amenities: null } 
+      };
     case "UPDATE_ROOM_AMENITIES_SUCCESS":
-      return { ...state, loading: false, amenities: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, amenities: false }, 
+        amenities: action.payload
+      };
     case "UPDATE_ROOM_AMENITIES_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, amenities: false }, 
+        errors: { ...state.errors, amenities: action.payload }
+      };
 
-    // GET_ROOM_SERVICES
+    // ⭐ SERVICIOS - OPTIMIZADO
     case "GET_ROOM_SERVICES_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, services: true }, 
+        errors: { ...state.errors, services: null } 
+      };
     case "GET_ROOM_SERVICES_SUCCESS":
-      return { ...state, loading: false, services: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, services: false }, 
+        services: action.payload
+      };
     case "GET_ROOM_SERVICES_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, services: false }, 
+        errors: { ...state.errors, services: action.payload }
+      };
 
-    // UPDATE_ROOM_SERVICES
     case "UPDATE_ROOM_SERVICES_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, services: true }, 
+        errors: { ...state.errors, services: null } 
+      };
     case "UPDATE_ROOM_SERVICES_SUCCESS":
-      return { ...state, loading: false, services: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, services: false }, 
+        services: action.payload
+      };
     case "UPDATE_ROOM_SERVICES_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, services: false }, 
+        errors: { ...state.errors, services: action.payload }
+      };
 
-    // GET_OCCUPANCY_REPORT
+    // ⭐ REPORTES - OPTIMIZADO
     case "GET_OCCUPANCY_REPORT_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: true }, 
+        errors: { ...state.errors, reports: null } 
+      };
     case "GET_OCCUPANCY_REPORT_SUCCESS":
-      return { ...state, loading: false, occupancyReport: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: false }, 
+        occupancyReport: action.payload
+      };
     case "GET_OCCUPANCY_REPORT_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: false }, 
+        errors: { ...state.errors, reports: action.payload }
+      };
 
-    // GET_REVENUE_REPORT
     case "GET_REVENUE_REPORT_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: true }, 
+        errors: { ...state.errors, reports: null } 
+      };
     case "GET_REVENUE_REPORT_SUCCESS":
-      return { ...state, loading: false, revenueReport: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: false }, 
+        revenueReport: action.payload
+      };
     case "GET_REVENUE_REPORT_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: false }, 
+        errors: { ...state.errors, reports: action.payload }
+      };
 
+    // ⭐ HABITACIONES A PREPARAR - OPTIMIZADO
     case "GET_ROOMS_TO_PREPARE_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: true }, 
+        errors: { ...state.errors, reports: null } 
+      };
     case "GET_ROOMS_TO_PREPARE_SUCCESS":
-      return { ...state, loading: false, roomsToPrepare: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: false }, 
+        roomsToPrepare: action.payload
+      };
     case "GET_ROOMS_TO_PREPARE_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: false }, 
+        errors: { ...state.errors, reports: action.payload }
+      };
 
-   case "GET_ROOM_BASICS_REQUEST":
-      return { ...state, loading: true, error: null };
-    
+    // ⭐ BÁSICOS DE HABITACIÓN - OPTIMIZADO
+    case "GET_ROOM_BASICS_REQUEST":
+      return { 
+        ...state, 
+        loading: { ...state.loading, basics: true }, 
+        errors: { ...state.errors, basics: null } 
+      };
     case "GET_ROOM_BASICS_SUCCESS":
       console.log('🔄 Reducer recibió payload:', action.payload);
       return { 
         ...state, 
-        loading: false, 
+        loading: { ...state.loading, basics: false }, 
         roomBasics: action.payload.basics, // ⭐ Usar el array de básicos
         roomBasicsByRoom: {
           ...state.roomBasicsByRoom,
           [action.payload.roomNumber]: action.payload.basics // ⭐ Guardar por habitación
+        },
+        cache: {
+          ...state.cache,
+          basicsLastFetch: {
+            ...state.cache.basicsLastFetch,
+            [action.payload.roomNumber]: Date.now()
+          }
         }
       };
-    
     case "GET_ROOM_BASICS_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, basics: false }, 
+        errors: { ...state.errors, basics: action.payload }
+      };
 
-       case "UPDATE_ROOM_BASICS_STOCK":
+    case "UPDATE_ROOM_BASICS_STOCK":
       return {
         ...state,
-        roomBasics: state.roomBasics.map(item => 
-          item.id === action.payload.itemId 
-            ? { ...item, quantity: item.quantity - action.payload.quantity }
-            : item
-        ),
+        roomBasics: Array.isArray(state.roomBasics) 
+          ? state.roomBasics.map(item => 
+              item.id === action.payload.itemId 
+                ? { ...item, quantity: item.quantity - action.payload.quantity }
+                : item
+            )
+          : state.roomBasics,
         roomBasicsByRoom: {
           ...state.roomBasicsByRoom,
           [action.payload.roomNumber]: (state.roomBasicsByRoom[action.payload.roomNumber] || []).map(item => 
@@ -209,43 +492,204 @@ const roomReducer = (state = initialState, action) => {
         }
       };
 
+    // ⭐ NUEVO: LIMPIAR BÁSICOS DE HABITACIÓN
+    case "CLEAR_ROOM_BASICS":
+      return {
+        ...state,
+        roomBasicsByRoom: {
+          ...state.roomBasicsByRoom,
+          [action.payload.roomNumber]: []
+        }
+      };
+
+    // ⭐ VERIFICAR DISPONIBILIDAD DE INVENTARIO - NUEVO
+    case "CHECK_INVENTORY_AVAILABILITY_REQUEST":
+      return { 
+        ...state, 
+        loading: { ...state.loading, inventory: true }, 
+        errors: { ...state.errors, inventory: null },
+        inventory: {
+          ...state.inventory,
+          currentCheck: action.payload?.roomNumber || null
+        }
+      };
+    case "CHECK_INVENTORY_AVAILABILITY_SUCCESS":
+      return { 
+        ...state, 
+        loading: { ...state.loading, inventory: false },
+        inventory: {
+          ...state.inventory,
+          availability: {
+            ...state.inventory.availability,
+            [action.payload.roomNumber]: action.payload.availability
+          },
+          currentCheck: null
+        }
+      };
+    case "CHECK_INVENTORY_AVAILABILITY_FAILURE":
+      return { 
+        ...state, 
+        loading: { ...state.loading, inventory: false }, 
+        errors: { ...state.errors, inventory: action.payload },
+        inventory: {
+          ...state.inventory,
+          currentCheck: null
+        }
+      };
+
+    // ⭐ HISTORIAL DE INVENTARIO DE HABITACIÓN - NUEVO
+    case "GET_ROOM_INVENTORY_HISTORY_REQUEST":
+      return { 
+        ...state, 
+        loading: { ...state.loading, inventory: true }, 
+        errors: { ...state.errors, inventory: null } 
+      };
+    case "GET_ROOM_INVENTORY_HISTORY_SUCCESS":
+      return { 
+        ...state, 
+        loading: { ...state.loading, inventory: false },
+        inventory: {
+          ...state.inventory,
+          history: {
+            ...state.inventory.history,
+            [action.payload.roomNumber]: action.payload.history
+          }
+        }
+      };
+    case "GET_ROOM_INVENTORY_HISTORY_FAILURE":
+      return { 
+        ...state, 
+        loading: { ...state.loading, inventory: false }, 
+        errors: { ...state.errors, inventory: action.payload }
+      };
+
+    // ⭐ CÁLCULO DE PRECIOS - OPTIMIZADO
     case "CALCULATE_ROOM_PRICE_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: true }, 
+        errors: { ...state.errors, pricing: null } 
+      };
     case "CALCULATE_ROOM_PRICE_SUCCESS":
       return {
         ...state,
-        loading: false,
+        loading: { ...state.loading, pricing: false },
         priceCalculations: {
           ...state.priceCalculations,
           [action.payload.roomNumber]: action.payload.calculation
         }
       };
     case "CALCULATE_ROOM_PRICE_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: false }, 
+        errors: { ...state.errors, pricing: action.payload }
+      };
 
     case "CALCULATE_MULTIPLE_ROOM_PRICES_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: true }, 
+        errors: { ...state.errors, pricing: null } 
+      };
     case "CALCULATE_MULTIPLE_ROOM_PRICES_SUCCESS":
-      return { ...state, loading: false, multipleRoomPrices: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: false }, 
+        multipleRoomPrices: action.payload
+      };
     case "CALCULATE_MULTIPLE_ROOM_PRICES_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: false }, 
+        errors: { ...state.errors, pricing: action.payload }
+      };
 
-    // ⭐ ESTADO DE PREPARACIÓN DE HABITACIONES
+    // ⭐ ESTADO DE PREPARACIÓN DE HABITACIONES - OPTIMIZADO
     case "GET_ROOM_PREPARATION_STATUS_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: true }, 
+        errors: { ...state.errors, reports: null } 
+      };
     case "GET_ROOM_PREPARATION_STATUS_SUCCESS":
       return {
         ...state,
-        loading: false,
+        loading: { ...state.loading, reports: false },
         roomPreparationStatus: {
           ...state.roomPreparationStatus,
           [action.payload.roomNumber]: action.payload.status
         }
       };
     case "GET_ROOM_PREPARATION_STATUS_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, reports: false }, 
+        errors: { ...state.errors, reports: action.payload }
+      };
 
-    // ⭐ MANEJO DE PRECIOS TEMPORALES
+    // ⭐ PROMOCIONES - OPTIMIZADO
+    case "GET_ACTIVE_PROMOTIONS_REQUEST":
+      return { 
+        ...state, 
+        loading: { ...state.loading, promotions: true }, 
+        errors: { ...state.errors, promotions: null } 
+      };
+    case "GET_ACTIVE_PROMOTIONS_SUCCESS":
+      return { 
+        ...state, 
+        loading: { ...state.loading, promotions: false }, 
+        activePromotions: action.payload,
+        cache: { ...state.cache, promotionsLastFetch: Date.now() }
+      };
+    case "GET_ACTIVE_PROMOTIONS_FAILURE":
+      return { 
+        ...state, 
+        loading: { ...state.loading, promotions: false }, 
+        errors: { ...state.errors, promotions: action.payload }
+      };
+
+    case "GET_SPECIAL_OFFERS_REQUEST":
+      return { 
+        ...state, 
+        loading: { ...state.loading, promotions: true }, 
+        errors: { ...state.errors, promotions: null } 
+      };
+    case "GET_SPECIAL_OFFERS_SUCCESS":
+      return { 
+        ...state, 
+        loading: { ...state.loading, promotions: false }, 
+        specialOffers: action.payload
+      };
+    case "GET_SPECIAL_OFFERS_FAILURE":
+      return { 
+        ...state, 
+        loading: { ...state.loading, promotions: false }, 
+        errors: { ...state.errors, promotions: action.payload }
+      };
+
+    // ⭐ VALIDACIÓN DE CÓDIGOS PROMOCIONALES - OPTIMIZADO
+    case "VALIDATE_PROMO_CODE_REQUEST":
+      return { 
+        ...state, 
+        loading: { ...state.loading, promotions: true }, 
+        errors: { ...state.errors, promotions: null } 
+      };
+    case "VALIDATE_PROMO_CODE_SUCCESS":
+      return { 
+        ...state, 
+        loading: { ...state.loading, promotions: false }, 
+        promoCodeValidation: action.payload
+      };
+    case "VALIDATE_PROMO_CODE_FAILURE":
+      return { 
+        ...state, 
+        loading: { ...state.loading, promotions: false }, 
+        errors: { ...state.errors, promotions: action.payload }, 
+        promoCodeValidation: null
+      };
+
+    // ⭐ MANEJO DE PRECIOS TEMPORALES - OPTIMIZADO
     case "CLEAR_PRICE_CALCULATIONS":
       return {
         ...state,
@@ -260,30 +704,45 @@ const roomReducer = (state = initialState, action) => {
         tempPriceCalculation: action.payload
       };
 
-    // ⭐ COTIZACIÓN COMPLETA
+    // ⭐ COTIZACIÓN COMPLETA - OPTIMIZADO
     case "GET_FULL_ROOM_QUOTE_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: true }, 
+        errors: { ...state.errors, pricing: null } 
+      };
     case "GET_FULL_ROOM_QUOTE_SUCCESS":
-      return { ...state, loading: false, fullRoomQuote: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: false }, 
+        fullRoomQuote: action.payload
+      };
     case "GET_FULL_ROOM_QUOTE_FAILURE":
-      return { ...state, loading: false, error: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: false }, 
+        errors: { ...state.errors, pricing: action.payload }
+      };
 
-    // ⭐ DISPONIBILIDAD CON PRECIOS
+    // ⭐ DISPONIBILIDAD CON PRECIOS - OPTIMIZADO
     case "CHECK_AVAILABILITY_WITH_PRICING_REQUEST":
-      return { ...state, loading: true, error: null };
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: true }, 
+        errors: { ...state.errors, pricing: null } 
+      };
     case "CHECK_AVAILABILITY_WITH_PRICING_SUCCESS":
-      return { ...state, loading: false, availabilityWithPricing: action.payload };
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: false }, 
+        availabilityWithPricing: action.payload
+      };
     case "CHECK_AVAILABILITY_WITH_PRICING_FAILURE":
-      return { ...state, loading: false, error: action.payload };
-
-    // ⭐ VALIDACIÓN DE CÓDIGOS PROMOCIONALES
-    case "VALIDATE_PROMO_CODE_REQUEST":
-      return { ...state, loading: true, error: null };
-    case "VALIDATE_PROMO_CODE_SUCCESS":
-      return { ...state, loading: false, promoCodeValidation: action.payload };
-    case "VALIDATE_PROMO_CODE_FAILURE":
-      return { ...state, loading: false, error: action.payload, promoCodeValidation: null };
-
+      return { 
+        ...state, 
+        loading: { ...state.loading, pricing: false }, 
+        errors: { ...state.errors, pricing: action.payload }
+      };
 
     default:
       return state;
