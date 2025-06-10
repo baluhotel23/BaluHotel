@@ -13,10 +13,16 @@ const taxxaRouter = require('./taxxaRouter');
 const webhookRouter = require('../controllers/webhook');
 //const { registerLocalPayment } = require('../controllers/paymentController');
 const registrationPassRoutes = require('./registrationPassRoutes');
+
+// ⭐ NUEVAS RUTAS AGREGADAS
+const laundryRoutes = require('./laundryRoutes');
+const bookingInventoryRoutes = require('./bookingInventoryRoutes');
+
 // Rutas públicas
 router.use('/auth', authRoutes);
 router.use('/client', clientRoutes);
 router.use("/eventos", webhookRouter); 
+
 // Rutas protegidas
 router.use('/admin', adminRoutes);
 router.use('/financial', financialRoutes);
@@ -28,6 +34,8 @@ router.use('/taxxa', taxxaRouter);
 //router.use('/payment',   registerLocalPayment);
 router.use('/registrationPass', registrationPassRoutes);
 
-
+// ⭐ NUEVAS RUTAS DE INVENTARIO Y LAVANDERÍA
+router.use('/laundry', laundryRoutes);
+router.use('/booking-inventory', bookingInventoryRoutes);
 
 module.exports = router;

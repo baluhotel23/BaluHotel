@@ -6,6 +6,7 @@ const { validateInventoryItem } = require('../middleware/validation/validateInve
 const { upload } = require('../middleware/multer');
 const { 
     getInventory,
+    getInventoryByType, // ⭐ NUEVO
     createPurchase,
     updateInventory,
     getPurchaseDetails,
@@ -24,6 +25,9 @@ const {
     updateItem,
     deleteItem,
     removeStock,
+    transferDirtyToClean, // ⭐ NUEVO
+    markAsDirty, // ⭐ NUEVO
+    getInventorySummary, // ⭐ NUEVO
     getConsumptionReport,
     getInventoryValuation,
     getInventoryMovements,
@@ -36,43 +40,45 @@ const {
 router.use(verifyToken);
 router.use(isStaff);
 
-// IMPORTANTE: Rutas específicas primero, rutas con parámetros después
-
 // === RUTAS ESPECÍFICAS ===
 
-// Gestión de inventario básico - rutas base
+// Gestión de inventario básico
 router.get('/', getInventory);
-router.get('/items', getAllItems); // Cambiado a /items para evitar conflicto
+router.get('/items', getAllItems);
 router.post('/', validateInventoryItem, createItem);
+
+// ⭐ NUEVAS RUTAS POR TIPO DE INVENTARIO
+router.get('/type/:type', getInventoryByType); // consumable, reusable, sellable
+router.get('/summary', getInventorySummary); // Resumen general
 
 // Control de stock específico
 router.get('/low-stock', getLowStockItems);
 
-// Compras y proveedores - Rutas específicas
+// Compras y proveedores
 router.get('/purchases', getAllPurchases);
 router.post('/purchase', upload.single('file'), allowRoles(['owner', 'admin']), createPurchase);
 router.get('/purchases/:id', getPurchaseDetails);
 router.get('/suppliers', getAllSuppliers);
 router.post('/suppliers', allowRoles(['owner', 'admin']), createSupplier);
 
-// Categorías y tipos - Rutas específicas
+// Categorías y tipos
 router.get('/categories', getCategories);
 router.post('/categories', allowRoles(['owner', 'admin']), createCategory);
 router.put('/categories/:id', allowRoles(['owner', 'admin']), updateCategory);
 
-// Reportes de inventario - Rutas específicas
+// Reportes de inventario
 router.get('/reports/consumption', allowRoles(['owner', 'admin']), getConsumptionReport);
 router.get('/reports/valuation', allowRoles(['owner', 'admin']), getInventoryValuation);
 router.get('/reports/movements', allowRoles(['owner', 'admin']), getInventoryMovements);
 
-// Asignación a habitaciones - Rutas específicas
+// Asignación a habitaciones
 router.get('/room-assignments', getRoomAssignments);
 router.post('/room-assignments', createRoomAssignment);
 router.get('/room-assignments/:roomId', getRoomAssignmentDetails);
 
-// === RUTAS CON PARÁMETROS (deben ir al final) ===
+// === RUTAS CON PARÁMETROS ===
 
-// Rutas específicas para un ítem de inventario (con ID)
+// Rutas específicas para un ítem de inventario
 router.get('/:id', getItemById);
 router.put('/:id/general', updateInventory);
 router.put('/:id', validateInventoryItem, updateItem);
@@ -82,5 +88,9 @@ router.delete('/:id', allowRoles(['owner', 'admin']), deleteItem);
 router.post('/:id/stock/add', addStock);
 router.post('/:id/stock/remove', removeStock);
 router.get('/:id/stock/history', getStockHistory);
+
+// ⭐ NUEVAS RUTAS PARA REUTILIZABLES
+router.post('/:id/transfer-clean', transferDirtyToClean); // Transferir sucio → limpio
+router.post('/:id/mark-dirty', markAsDirty); // Marcar como sucio
 
 module.exports = router;

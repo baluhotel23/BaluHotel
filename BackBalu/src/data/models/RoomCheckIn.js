@@ -8,9 +8,10 @@ module.exports = (sequelize) => {
       primaryKey: true,
     },
     // Foreign key para relacionar con la habitación
-    RoomId: {
-      type: DataTypes.UUID,
+     roomNumber: {
+      type: DataTypes.STRING, // ⭐ USAR STRING PARA COINCIDIR
       allowNull: false,
+      // ⭐ NO REFERENCES - SE MANEJA EN ASSOCIATIONS
     },
     // Indicador si la habitación fue limpiada
     cleaningCompleted: {

@@ -2,11 +2,18 @@ import api from '../../utils/axios';
 
 // Obtener todas las habitaciones
 export const getAllRooms = () => async (dispatch) => {
+  console.log('🚀 Iniciando getAllRooms...');
   dispatch({ type: 'GET_ROOMS_REQUEST' });
   try {
+    console.log('📡 Haciendo petición a /rooms...');
     const { data } = await api.get('/rooms');
+    console.log('📥 Respuesta recibida:', data);
+    console.log('🏨 Habitaciones:', data.data);
+    
     dispatch({ type: 'GET_ROOMS_SUCCESS', payload: data.data });
+    console.log('✅ Dispatch exitoso');
   } catch (error) {
+    console.error('❌ Error en getAllRooms:', error);
     const errorMessage = error.response?.data?.message || 'Error al obtener habitaciones';
     dispatch({ type: 'GET_ROOMS_FAILURE', payload: errorMessage });
   }
@@ -57,29 +64,99 @@ export const searchRoomByInput = (roomNumber) => async (dispatch) => {
 };
 
 // Verificar disponibilidad (se espera que "dates" tenga el formato requerido)
-export const checkAvailability = (dates) => async (dispatch) => {
+export const checkAvailability = (params) => async (dispatch) => {
+  console.log('🚀 Redux checkAvailability called with params:', params);
   dispatch({ type: 'CHECK_AVAILABILITY_REQUEST' });
+  
   try {
-    const { data } = await api.get(`/rooms/availability/${dates}`);
-    dispatch({ type: 'CHECK_AVAILABILITY_SUCCESS', payload: data });
+    console.log('📡 Making request to /bookings/availability with params:', params);
+    
+    // ⭐ DEBUGGING: Verificar estructura de params
+    console.log('🔍 Params structure:');
+    console.log('  - checkIn:', params.checkIn);
+    console.log('  - checkOut:', params.checkOut);
+    console.log('  - roomType:', params.roomType);
+    
+    const { data } = await api.get('/bookings/availability', { params });
+    console.log('📥 Full response received from backend:', data);
+    
+    // ⭐ LOG DETALLADO DE CADA HABITACIÓN
+    if (data.data && Array.isArray(data.data)) {
+      console.log('🏨 Rooms received:');
+      data.data.forEach((room, index) => {
+        console.log(`  ${index + 1}. Room ${room.roomNumber} - Available: ${room.isAvailable} - Status: ${room.status} - Active: ${room.isActive}`);
+      });
+      
+      const availableCount = data.data.filter(r => r.isAvailable).length;
+      const totalCount = data.data.length;
+      console.log(`📊 Summary: ${availableCount}/${totalCount} rooms available`);
+    }
+    
+    if (data && !data.error && data.data && Array.isArray(data.data)) {
+      console.log('✅ Dispatching SUCCESS with', data.data.length, 'rooms');
+      dispatch({ 
+        type: 'CHECK_AVAILABILITY_SUCCESS', 
+        payload: data.data 
+      });
+      console.log('🎯 Action dispatched successfully');
+    } else {
+      console.warn('⚠️ Backend response structure unexpected:', data);
+      dispatch({ 
+        type: 'CHECK_AVAILABILITY_SUCCESS', 
+        payload: [] 
+      });
+    }
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Error al verificar disponibilidad';
-    dispatch({ type: 'CHECK_AVAILABILITY_FAILURE', payload: errorMessage });
+    console.error('❌ Error in checkAvailability action:', error);
+    console.error('❌ Error response:', error.response?.data);
+    console.error('❌ Error status:', error.response?.status);
+    const errorMessage = error.response?.data?.message || 'Error al consultar disponibilidad';
+    dispatch({ 
+      type: 'CHECK_AVAILABILITY_FAILURE', 
+      payload: errorMessage 
+    });
   }
 };
 
 // Crear una habitación
 export const createRoom = (roomData) => async (dispatch) => {
-  dispatch({ type: "CREATE_ROOM_REQUEST" });
   try {
-    const { data } = await api.post("/rooms/create", roomData); // Enviar roomData con basicInventory
-    dispatch({ type: "CREATE_ROOM_SUCCESS", payload: data });
-    return { success: true, data: data.data }; // Devolver la habitación creada
+    dispatch({ type: 'CREATE_ROOM_REQUEST' });
+    
+    console.log('🚀 Enviando datos a /rooms/create:', roomData);
+    
+    const response = await api.post('/rooms/create', roomData);
+    
+    console.log('📥 Respuesta de createRoom action:', response.data);
+    
+    dispatch({
+      type: 'CREATE_ROOM_SUCCESS',
+      payload: response.data
+    });
+    
+    // ⭐ IMPORTANTE: Retornar con estructura consistente
+    return {
+      success: true,        // ⭐ AGREGAR success: true
+      error: false,         // ⭐ AGREGAR error: false
+      data: response.data.data,  // ⭐ RETORNAR response.data.data (la habitación)
+      message: response.data.message
+    };
   } catch (error) {
-    const errorMessage =
-      error.response?.data?.message || "Error al crear la habitación";
-    dispatch({ type: "CREATE_ROOM_FAILURE", payload: errorMessage });
-    return { success: false, error: errorMessage };
+    console.error('❌ Error en createRoom action:', error);
+    
+    const errorMessage = error.response?.data?.message || error.message;
+    
+    dispatch({
+      type: 'CREATE_ROOM_FAILURE',
+      payload: errorMessage
+    });
+    
+    // ⭐ IMPORTANTE: Mantener estructura consistente
+    return { 
+      success: false,       // ⭐ CAMBIAR A success: false
+      error: true, 
+      message: errorMessage 
+    };
   }
 };
 
@@ -554,5 +631,55 @@ export const validatePromoCode = (promoCode, roomNumber) => async (dispatch) => 
       success: false, 
       error: errorMessage 
     };
+  }
+};
+
+export const checkInventoryAvailability = (roomNumber, bookingId = null) => async (dispatch) => {
+  dispatch({ type: 'CHECK_INVENTORY_AVAILABILITY_REQUEST' });
+  try {
+    const queryParams = bookingId ? { bookingId } : {};
+    const { data } = await api.get(`/rooms/${roomNumber}/inventory/check`, { params: queryParams });
+    
+    dispatch({ 
+      type: 'CHECK_INVENTORY_AVAILABILITY_SUCCESS', 
+      payload: {
+        roomNumber,
+        availability: data.data
+      }
+    });
+    
+    return { success: true, data: data.data };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al verificar disponibilidad de inventario';
+    dispatch({ 
+      type: 'CHECK_INVENTORY_AVAILABILITY_FAILURE', 
+      payload: errorMessage 
+    });
+    return { success: false, error: errorMessage };
+  }
+};
+
+// OBTENER HISTORIAL DE INVENTARIO DE HABITACIÓN
+export const getRoomInventoryHistory = (roomNumber, queryParams = {}) => async (dispatch) => {
+  dispatch({ type: 'GET_ROOM_INVENTORY_HISTORY_REQUEST' });
+  try {
+    const { data } = await api.get(`/rooms/${roomNumber}/inventory/history`, { params: queryParams });
+    
+    dispatch({ 
+      type: 'GET_ROOM_INVENTORY_HISTORY_SUCCESS', 
+      payload: {
+        roomNumber,
+        history: data.data
+      }
+    });
+    
+    return { success: true, data: data.data };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al obtener historial de inventario';
+    dispatch({ 
+      type: 'GET_ROOM_INVENTORY_HISTORY_FAILURE', 
+      payload: errorMessage 
+    });
+    return { success: false, error: errorMessage };
   }
 };

@@ -73,16 +73,34 @@ export const getItemById = (id) => async (dispatch) => {
 
 export const createItem = (itemData) => async (dispatch) => {
   try {
+    // ⭐ DISPATCH DE LOADING
+    dispatch({ type: 'CREATE_ITEM_REQUEST' });
+    
     // Asegúrate de que si isSellable es false, salePrice sea null
     if (itemData.isSellable === false) {
       itemData.salePrice = null;
     }
     
     const { data } = await api.post('/inventory/', itemData);
-    dispatch({ type: 'CREATE_ITEM', payload: data.data });
+    
+    // ⭐ DISPATCH DE ÉXITO CON TIPO
+    dispatch({ 
+      type: 'CREATE_ITEM_SUCCESS', 
+      payload: {
+        item: data.data,
+        message: 'Item creado exitosamente'
+      }
+    });
+    
     toast.success('Item creado exitosamente');
     return { success: true, data: data.data };
   } catch (error) {
+    // ⭐ DISPATCH DE ERROR
+    dispatch({ 
+      type: 'CREATE_ITEM_FAILURE', 
+      payload: error.response?.data?.message || 'Error al crear el item'
+    });
+    
     toast.error(error.response?.data?.message || 'Error al crear el item');
     return { success: false, error };
   }
@@ -224,5 +242,89 @@ export const updateCategory = (id, categoryData) => async (dispatch) => {
   } catch (error) {
     toast.error(error.response?.data?.message || 'Error al actualizar la categoría');
     return { success: false, error };
+  }
+};
+
+export const getInventoryByType = (type) => async (dispatch) => {
+  dispatch({ type: 'GET_INVENTORY_BY_TYPE_REQUEST' });
+  try {
+    const { data } = await api.get(`/inventory/type/${type}`);
+    dispatch({ 
+      type: 'GET_INVENTORY_BY_TYPE_SUCCESS', 
+      payload: { type, items: data.data } 
+    });
+    return { success: true, data: data.data };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al obtener inventario por tipo';
+    dispatch({ 
+      type: 'GET_INVENTORY_BY_TYPE_FAILURE', 
+      payload: errorMessage 
+    });
+    toast.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+};
+
+// TRANSFERIR STOCK SUCIO A LIMPIO
+export const transferDirtyToClean = (itemId, quantity) => async (dispatch) => {
+  dispatch({ type: 'TRANSFER_DIRTY_TO_CLEAN_REQUEST' });
+  try {
+    const { data } = await api.post(`/inventory/${itemId}/transfer-clean`, { quantity });
+    dispatch({ 
+      type: 'TRANSFER_DIRTY_TO_CLEAN_SUCCESS', 
+      payload: data.data 
+    });
+    toast.success('Stock transferido exitosamente');
+    return { success: true, data: data.data };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al transferir stock';
+    dispatch({ 
+      type: 'TRANSFER_DIRTY_TO_CLEAN_FAILURE', 
+      payload: errorMessage 
+    });
+    toast.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+};
+
+// MARCAR COMO SUCIO
+export const markInventoryAsDirty = (itemId, dirtyData) => async (dispatch) => {
+  dispatch({ type: 'MARK_INVENTORY_AS_DIRTY_REQUEST' });
+  try {
+    const { data } = await api.post(`/inventory/${itemId}/mark-dirty`, dirtyData);
+    dispatch({ 
+      type: 'MARK_INVENTORY_AS_DIRTY_SUCCESS', 
+      payload: data.data 
+    });
+    toast.success('Items marcados como sucios');
+    return { success: true, data: data.data };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al marcar como sucio';
+    dispatch({ 
+      type: 'MARK_INVENTORY_AS_DIRTY_FAILURE', 
+      payload: errorMessage 
+    });
+    toast.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+};
+
+// OBTENER RESUMEN DE INVENTARIO
+export const getInventorySummary = () => async (dispatch) => {
+  dispatch({ type: 'GET_INVENTORY_SUMMARY_REQUEST' });
+  try {
+    const { data } = await api.get('/inventory/summary');
+    dispatch({ 
+      type: 'GET_INVENTORY_SUMMARY_SUCCESS', 
+      payload: data.data 
+    });
+    return { success: true, data: data.data };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al obtener resumen de inventario';
+    dispatch({ 
+      type: 'GET_INVENTORY_SUMMARY_FAILURE', 
+      payload: errorMessage 
+    });
+    return { success: false, error: errorMessage };
   }
 };

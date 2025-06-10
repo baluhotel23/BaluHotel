@@ -10,10 +10,7 @@ module.exports = (sequelize) => {
     bookingId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      references: {
-        model: "Bookings",
-        key: "bookingId",
-      },
+      // ⭐ REMOVER REFERENCES - SE MANEJA EN ASSOCIATIONS
     },
     amount: {
       type: DataTypes.DECIMAL(10, 2),
@@ -22,7 +19,7 @@ module.exports = (sequelize) => {
     paymentMethod: {
       type: DataTypes.ENUM(
         "credit_card",
-        "debit_card",
+        "debit_card", 
         "cash",
         "transfer",
         "wompi",
@@ -55,14 +52,11 @@ module.exports = (sequelize) => {
     processedBy: {
       type: DataTypes.STRING,
       allowNull: true,
-      references: {
-        model: "Users", // Cambia a 'users' si tu tabla se llama así
-        key: "n_document",
-      },
+      // ⭐ REMOVER REFERENCES - SE MANEJA EN ASSOCIATIONS
     },
   }, {
-   
-    timestamps: true,      // <-- AQUÍ, fuera del objeto de atributos
+    timestamps: true,
   });
+  
   return Payment;
 };

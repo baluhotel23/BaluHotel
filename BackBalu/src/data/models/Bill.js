@@ -7,17 +7,11 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-     bookingId: {
+    bookingId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      references: {
-        model: 'Bookings', // Nombre de la tabla de Booking
-        key: 'bookingId',
-      },
-      onUpdate: 'CASCADE',
-      onDelete: 'CASCADE',
+      // ⭐ REMOVER REFERENCES - SE MANEJA EN ASSOCIATIONS
     },
-    
     reservationAmount: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
@@ -35,7 +29,7 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     taxInvoiceId: {
-      type: DataTypes.STRING, // Para almacenar el ID de la factura de Taxxa
+      type: DataTypes.STRING,
     },
     status: {
       type: DataTypes.ENUM,
@@ -49,7 +43,6 @@ module.exports = (sequelize) => {
   }, {
     timestamps: true,
     paranoid: true,
-   
   });
 
   return Bill;

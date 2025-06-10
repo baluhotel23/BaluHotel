@@ -3,7 +3,7 @@ const { DataTypes } = require("sequelize");
 module.exports = (sequelize) => {
   const Room = sequelize.define("Room", {
     roomNumber: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING, // ⭐ CAMBIAR DE INTEGER A STRING
       unique: true,
       allowNull: false,
       primaryKey: true,
