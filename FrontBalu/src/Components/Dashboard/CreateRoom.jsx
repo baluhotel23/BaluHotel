@@ -1,68 +1,85 @@
-import React, { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { createRoom } from '../../Redux/Actions/roomActions';
-import { getAllServices } from '../../Redux/Actions/serviceActions';
-import DashboardLayout from './DashboardLayout';
-import { openCloudinaryWidget } from '../../cloudinaryConfig';
-import { getAllItems } from '../../Redux/Actions/inventoryActions';
-import { toast } from 'react-toastify';
+import React, { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { createRoom } from "../../Redux/Actions/roomActions";
+import { getAllServices } from "../../Redux/Actions/serviceActions";
+import DashboardLayout from "./DashboardLayout";
+import { openCloudinaryWidget } from "../../cloudinaryConfig";
+import { getAllItems } from "../../Redux/Actions/inventoryActions";
+import { toast } from "react-toastify";
 
 const CreateRoom = () => {
+  // ⭐ ESTADOS LOCALES
   const [images, setImages] = useState([]);
   const [selectedAmenity, setSelectedAmenity] = useState("");
   const [amenityQuantity, setAmenityQuantity] = useState(1);
   const [roomAmenities, setRoomAmenities] = useState([]);
-  const dispatch = useDispatch();
-  const { loading, error } = useSelector(state => state.room);
-  const { services } = useSelector(state => state.service);
-  const inventory = useSelector((state) => state.inventory.inventory || []);
+  const [localLoading, setLocalLoading] = useState(false);
 
+  // ⭐ REDUX - SELECTORES CORREGIDOS
+  const dispatch = useDispatch();
+  const { loading, errors } = useSelector((state) => state.room);
+  const { services } = useSelector((state) => state.service);
+  const inventory = useSelector((state) => state.inventory.inventory || []);
+  
+  // ⭐ EXTRAER VALORES ESPECÍFICOS DE LOS OBJETOS GRANULARES
+  const isCreatingRoom = loading?.rooms || false;
+  const roomError = errors?.rooms || null; // ⭐ ESTO AHORA SERÁ null O string
+
+  // ⭐ FORMDATA INICIAL
+  const [formData, setFormData] = useState({
+    roomNumber: "",
+    priceSingle: "",
+    priceDouble: "",
+    priceMultiple: "",
+    pricePerExtraGuest: "",
+    services: [],
+    type: "",
+    description: "",
+    maxGuests: 1,
+    image_url: [],
+    isPromo: false,
+    promotionPrice: "",
+  });
+
+  // ⭐ EFECTOS
   useEffect(() => {
     dispatch(getAllServices());
     dispatch(getAllItems());
   }, [dispatch]);
 
+  // ⭐ DEBUG MEJORADO
+  console.log("🔍 Loading específico para rooms:", isCreatingRoom);
+  console.log("🔍 Error específico para rooms:", roomError);
+  console.log("🔍 Inventario disponible:", inventory.length);
+
+  // ⭐ HANDLERS... (sin cambios)
   const handleWidget = () => {
     openCloudinaryWidget((uploadedImageUrl) => {
       setImages((prevImages) => [...prevImages, uploadedImageUrl]);
     });
   };
 
-  // ⭐ ACTUALIZAR FORMDATA CON NUEVOS CAMPOS DE PRECIO
-  const [formData, setFormData] = useState({
-    roomNumber: '',
-    priceSingle: '',           // ⭐ NUEVO: Precio para 1 huésped
-    priceDouble: '',           // ⭐ NUEVO: Precio para 2 huéspedes
-    priceMultiple: '',         // ⭐ NUEVO: Precio para 3+ huéspedes
-    pricePerExtraGuest: '',    // ⭐ NUEVO: Precio por huésped extra
-    services: [],
-    type: '',
-    description: '',
-    maxGuests: 1,
-    image_url: [],
-    // ⭐ NUEVOS CAMPOS PROMOCIONALES
-    isPromo: false,
-    promotionPrice: ''
-  });
-
   const handleChange = (e) => {
     const { name, value, type, selectedOptions, checked } = e.target;
-    
-    if (type === 'select-multiple') {
-      const selectedServices = Array.from(selectedOptions, option => option.value);
+
+    if (type === "select-multiple") {
+      const selectedServices = Array.from(
+        selectedOptions,
+        (option) => option.value
+      );
       setFormData({
         ...formData,
-        [name]: selectedServices
+        [name]: selectedServices,
       });
-    } else if (type === 'checkbox') {
+    } else if (type === "checkbox") {
       setFormData({
         ...formData,
-        [name]: checked
+        [name]: checked,
       });
     } else {
       setFormData({
         ...formData,
-        [name]: value
+        [name]: value,
       });
     }
   };
@@ -79,28 +96,30 @@ const CreateRoom = () => {
       return;
     }
 
-    // Verificar si el amenity ya está en la lista
-    const existingAmenity = roomAmenities.find((item) => item.id === selectedAmenity);
+    const existingAmenity = roomAmenities.find(
+      (item) => item.itemId === selectedAmenity
+    );
     if (existingAmenity) {
       toast.error("Este amenity ya ha sido agregado.");
       return;
     }
 
-    // Agregar el amenity al estado
     setRoomAmenities((prev) => [
       ...prev,
-      { id: selectedAmenity, name: amenity.itemName, quantity: amenityQuantity },
+      { 
+        itemId: amenity.itemId,
+        name: amenity.itemName,
+        quantity: amenityQuantity 
+      },
     ]);
 
-    // Reiniciar los campos de selección
     setSelectedAmenity("");
     setAmenityQuantity(1);
   };
 
-  // ⭐ VALIDACIÓN MEJORADA PARA PRECIOS
   const validatePrices = () => {
     const { priceSingle, priceDouble, priceMultiple } = formData;
-    
+
     if (!priceSingle || !priceDouble || !priceMultiple) {
       toast.error("Todos los campos de precio son obligatorios.");
       return false;
@@ -115,9 +134,10 @@ const CreateRoom = () => {
       return false;
     }
 
-    // Validación lógica: el precio para más huéspedes podría ser menor por huésped
     if (single > double) {
-      toast.warning("El precio para 1 huésped es mayor que para 2. ¿Está seguro?");
+      toast.warning(
+        "El precio para 1 huésped es mayor que para 2. ¿Está seguro?"
+      );
     }
 
     return true;
@@ -125,30 +145,44 @@ const CreateRoom = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // ⭐ VALIDAR PRECIOS ANTES DE ENVIAR
+
     if (!validatePrices()) {
       return;
     }
 
-    try {
-      const response = await dispatch(
-        createRoom({
-          ...formData,
-          image_url: images,
-          basicInventories: roomAmenities,
-          // ⭐ ASEGURAR QUE LOS PRECIOS SEAN NÚMEROS
-          priceSingle: parseFloat(formData.priceSingle),
-          priceDouble: parseFloat(formData.priceDouble),
-          priceMultiple: parseFloat(formData.priceMultiple),
-          pricePerExtraGuest: formData.pricePerExtraGuest ? parseFloat(formData.pricePerExtraGuest) : 0,
-          promotionPrice: formData.promotionPrice ? parseFloat(formData.promotionPrice) : null
-        })
-      );
+    setLocalLoading(true);
 
-      if (response?.success) {
-        toast.success("Habitación creada correctamente.");
-        // ⭐ RESETEAR FORMULARIO COMPLETO
+    const dataToSend = {
+      ...formData,
+      image_url: images,
+      basicInventories: roomAmenities.map(amenity => ({
+        id: amenity.itemId,
+        quantity: amenity.quantity,
+        isRequired: true,
+        priority: 3
+      })),
+      priceSingle: parseFloat(formData.priceSingle),
+      priceDouble: parseFloat(formData.priceDouble),
+      priceMultiple: parseFloat(formData.priceMultiple),
+      pricePerExtraGuest: formData.pricePerExtraGuest
+        ? parseFloat(formData.pricePerExtraGuest)
+        : 0,
+      promotionPrice: formData.promotionPrice
+        ? parseFloat(formData.promotionPrice)
+        : null,
+    };
+
+    console.log('📤 Datos a enviar al backend:', JSON.stringify(dataToSend, null, 2));
+
+    try {
+      const response = await dispatch(createRoom(dataToSend));
+      console.log('📥 Respuesta del backend:', response);
+
+      if (response && response.success === true) {
+        toast.success(response.message || "Habitación creada correctamente.");
+        
+        console.log('✅ Habitación creada:', response.data);
+        
         setFormData({
           roomNumber: "",
           priceSingle: "",
@@ -161,30 +195,54 @@ const CreateRoom = () => {
           maxGuests: 1,
           image_url: [],
           isPromo: false,
-          promotionPrice: ""
+          promotionPrice: "",
         });
         setImages([]);
         setRoomAmenities([]);
+        setSelectedAmenity("");
+        setAmenityQuantity(1);
+        
+      } else if (response && response.error === true) {
+        console.error('❌ Error controlado:', response.message);
+        toast.error(response.message || "Error al crear la habitación.");
+        
       } else {
-        toast.error(response?.message || "Error al crear la habitación.");
+        console.error('❌ Respuesta inesperada:', response);
+        toast.error("Respuesta inesperada del servidor.");
       }
+      
     } catch (error) {
-      console.error("Error creando la habitación:", error);
-      toast.error("Error al crear la habitación.");
+      console.error("❌ Error capturado en catch:", error);
+      
+      if (error.response) {
+        const errorMessage = error.response.data?.message || error.response.statusText;
+        toast.error(`Error del servidor: ${errorMessage}`);
+      } else if (error.request) {
+        toast.error("Error de conexión. Verifica tu conexión a internet.");
+      } else {
+        toast.error("Error inesperado: " + error.message);
+      }
+    } finally {
+      setLocalLoading(false);
     }
   };
 
   return (
     <DashboardLayout>
-      <h1 className="text-2xl font-semibold bg-zinc-300 mb-4">Crear Habitación</h1>
+      <h1 className="text-2xl font-semibold bg-zinc-300 mb-4">
+        Crear Habitación
+      </h1>
+      
       <form onSubmit={handleSubmit} className="space-y-4">
-        
         {/* ⭐ INFORMACIÓN BÁSICA */}
         <div className="bg-white p-4 rounded-lg shadow-md">
           <h3 className="text-lg font-medium mb-3">Información Básica</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="roomNumber"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Número de Habitación
               </label>
               <input
@@ -197,9 +255,12 @@ const CreateRoom = () => {
                 className="mt-1 block w-full shadow-sm sm:text-sm border-2 rounded-md p-2"
               />
             </div>
-            
+
             <div>
-              <label htmlFor="type" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="type"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Tipo de Habitación
               </label>
               <select
@@ -220,7 +281,10 @@ const CreateRoom = () => {
             </div>
 
             <div>
-              <label htmlFor="maxGuests" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="maxGuests"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Capacidad Máxima
               </label>
               <select
@@ -231,8 +295,10 @@ const CreateRoom = () => {
                 required
                 className="mt-1 block w-full shadow-sm sm:text-sm border-2 rounded-md p-2"
               >
-                {[...Array(8).keys()].map(num => (
-                  <option key={num + 1} value={num + 1}>{num + 1}</option>
+                {[...Array(8).keys()].map((num) => (
+                  <option key={num + 1} value={num + 1}>
+                    {num + 1}
+                  </option>
                 ))}
               </select>
             </div>
@@ -244,7 +310,10 @@ const CreateRoom = () => {
           <h3 className="text-lg font-medium mb-3">Configuración de Precios</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label htmlFor="priceSingle" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="priceSingle"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Precio para 1 Huésped (COP) *
               </label>
               <input
@@ -262,7 +331,10 @@ const CreateRoom = () => {
             </div>
 
             <div>
-              <label htmlFor="priceDouble" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="priceDouble"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Precio para 2 Huéspedes (COP) *
               </label>
               <input
@@ -280,7 +352,10 @@ const CreateRoom = () => {
             </div>
 
             <div>
-              <label htmlFor="priceMultiple" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="priceMultiple"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Precio para 3+ Huéspedes (COP) *
               </label>
               <input
@@ -298,7 +373,10 @@ const CreateRoom = () => {
             </div>
 
             <div>
-              <label htmlFor="pricePerExtraGuest" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="pricePerExtraGuest"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Precio por Huésped Extra (COP)
               </label>
               <input
@@ -312,11 +390,12 @@ const CreateRoom = () => {
                 className="mt-1 block w-full shadow-sm border-2 rounded-md p-2"
                 placeholder="25000"
               />
-              <p className="text-xs text-gray-500 mt-1">Opcional: Costo adicional por huésped extra</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Opcional: Costo adicional por huésped extra
+              </p>
             </div>
           </div>
 
-          {/* ⭐ SECCIÓN DE PROMOCIONES */}
           <div className="mt-4 p-3 bg-yellow-50 rounded-md">
             <div className="flex items-center mb-3">
               <input
@@ -327,14 +406,20 @@ const CreateRoom = () => {
                 onChange={handleChange}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <label htmlFor="isPromo" className="ml-2 block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="isPromo"
+                className="ml-2 block text-sm font-medium text-gray-700"
+              >
                 Esta habitación tiene precio promocional
               </label>
             </div>
-            
+
             {formData.isPromo && (
               <div>
-                <label htmlFor="promotionPrice" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="promotionPrice"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Precio Promocional (COP)
                 </label>
                 <input
@@ -349,7 +434,8 @@ const CreateRoom = () => {
                   placeholder="90000"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  El precio promocional anula los precios regulares cuando está activo
+                  El precio promocional anula los precios regulares cuando está
+                  activo
                 </p>
               </div>
             )}
@@ -360,7 +446,10 @@ const CreateRoom = () => {
         <div className="bg-white p-4 rounded-lg shadow-md">
           <h3 className="text-lg font-medium mb-3">Servicios Incluidos</h3>
           <div>
-            <label htmlFor="services" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="services"
+              className="block text-sm font-medium text-gray-700"
+            >
               Selecciona varios Servicios
             </label>
             <select
@@ -372,14 +461,18 @@ const CreateRoom = () => {
               required
               className="mt-1 block w-full shadow-sm sm:text-sm border-2 rounded-md p-2 h-32"
             >
-              {services.map(service => (
-                <option key={service.id} value={service.name}>
+              {services && services.map((service) => (
+                <option
+                  key={service.serviceId || service.id}
+                  value={service.name}
+                >
                   {service.name}
                 </option>
               ))}
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Mantén presionada la tecla Ctrl (Cmd en Mac) para seleccionar múltiples servicios
+              Mantén presionada la tecla Ctrl (Cmd en Mac) para seleccionar
+              múltiples servicios
             </p>
           </div>
         </div>
@@ -388,7 +481,10 @@ const CreateRoom = () => {
         <div className="bg-white p-4 rounded-lg shadow-md">
           <h3 className="text-lg font-medium mb-3">Descripción</h3>
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium text-gray-700"
+            >
               Descripción de la Habitación
             </label>
             <textarea
@@ -404,7 +500,7 @@ const CreateRoom = () => {
           </div>
         </div>
 
-        {/* ⭐ AMENITIES (sin cambios significativos) */}
+        {/* ⭐ AMENITIES */}
         <div className="bg-white p-4 rounded-lg shadow-md">
           <h3 className="text-lg font-medium mb-3">Amenities</h3>
           <div className="flex items-center space-x-4">
@@ -414,9 +510,11 @@ const CreateRoom = () => {
               className="flex-1 px-3 py-2 border rounded"
             >
               <option value="">Selecciona un amenity</option>
-              {inventory.map((item) => (
+              {inventory && inventory.map((item) => (
                 <option key={item.itemId} value={item.itemId}>
-                  {item.itemName} (Stock: {item.currentStock})
+                  {`${item.itemName || "Sin nombre"} (Stock: ${
+                    item.currentStock || 0
+                  })`}
                 </option>
               ))}
             </select>
@@ -437,18 +535,21 @@ const CreateRoom = () => {
             </button>
           </div>
 
-          {/* Lista de Amenities Seleccionados */}
           <div className="mt-4">
             <h4 className="text-md font-bold">Amenities Seleccionados</h4>
             {roomAmenities.length > 0 ? (
               <ul className="list-disc pl-5">
                 {roomAmenities.map((amenity, index) => (
                   <li key={index} className="flex justify-between items-center">
-                    <span>{amenity.name} - Cantidad: {amenity.quantity}</span>
+                    <span>
+                      {amenity.name} - Cantidad: {amenity.quantity}
+                    </span>
                     <button
                       type="button"
                       onClick={() => {
-                        setRoomAmenities((prev) => prev.filter((item) => item.id !== amenity.id));
+                        setRoomAmenities((prev) =>
+                          prev.filter((item) => item.itemId !== amenity.itemId)
+                        );
                       }}
                       className="ml-2 text-red-500 hover:underline"
                     >
@@ -463,7 +564,7 @@ const CreateRoom = () => {
           </div>
         </div>
 
-        {/* ⭐ IMÁGENES (sin cambios) */}
+        {/* ⭐ IMÁGENES */}
         <div className="bg-white p-4 rounded-lg shadow-md">
           <h3 className="text-lg font-medium mb-3">Imágenes</h3>
           <button
@@ -489,16 +590,16 @@ const CreateRoom = () => {
                   }}
                   className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
                 >
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    className="h-4 w-4" 
-                    viewBox="0 0 20 20" 
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    viewBox="0 0 20 20"
                     fill="currentColor"
                   >
-                    <path 
-                      fillRule="evenodd" 
-                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" 
-                      clipRule="evenodd" 
+                    <path
+                      fillRule="evenodd"
+                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                      clipRule="evenodd"
                     />
                   </svg>
                 </button>
@@ -507,23 +608,25 @@ const CreateRoom = () => {
           </div>
         </div>
 
-        {error && (
+        {/* ⭐ MOSTRAR ERRORES - CORREGIDO */}
+        {roomError && typeof roomError === 'string' && (
           <div className="rounded-md bg-red-50 p-4">
             <div className="flex">
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">{error}</h3>
+                <h3 className="text-sm font-medium text-red-800">{roomError}</h3>
               </div>
             </div>
           </div>
         )}
 
+        {/* ⭐ BOTÓN DE SUBMIT */}
         <div>
           <button
             type="submit"
-            disabled={loading}
+            disabled={localLoading || isCreatingRoom}
             className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Creando...' : 'Crear Habitación'}
+            {(localLoading || isCreatingRoom) ? "Creando..." : "Crear Habitación"}
           </button>
         </div>
       </form>

@@ -11,10 +11,10 @@ import inventoryReducer from '../Reducer/inventoryReducer';
 import paymentReducer from '../Reducer/paymentReducer';
 import hotelReducer from '../Reducer/hotelReducer';
 import taxxaReducer from '../Reducer/taxxaReducer';
-import registerReducer from '../Reducer/registrationPassReducer';
+import registrationPassReducer from '../Reducer/registrationPassReducer'; // ⭐ Nombre corregido
 import purchaseReducer from '../Reducer/purchaseReducer';
 import financialReducer from '../Reducer/financialReducer';
-
+import laundryReducer from '../Reducer/laundryReducer'; // ⭐ NUEVO
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -24,13 +24,13 @@ const rootReducer = combineReducers({
   report: reportReducer,
   booking: bookingReducer,
   inventory: inventoryReducer,
-  payment:paymentReducer,
+  laundry: laundryReducer, // ⭐ NUEVO - Agregado el reducer de lavandería
+  payment: paymentReducer,
   hotel: hotelReducer,
   taxxa: taxxaReducer,
-  registrationPass: registerReducer,
+  registrationPass: registrationPassReducer, // ⭐ Nombre de variable corregido
   purchase: purchaseReducer,
   financial: financialReducer
-
 });
 
 export const store = configureStore({

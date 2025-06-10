@@ -1,29 +1,103 @@
-const { Room, RoomCheckIn, RoomBasics, Booking, Payment, BasicInventory, Service } = require('../data');
+const { Room, RoomCheckIn, RoomBasics, Booking, Payment, BasicInventory, Service, BookingInventoryUsage } = require('../data');
 const { Op } = require("sequelize");
 
 // Obtener todas las habitaciones
 const getAllRooms = async (req, res, next) => {
   try {
+    console.log('🚀 INICIANDO getAllRooms...');
+    
+    // ⭐ PASO 1: Verificar modelos disponibles
+    console.log('📋 Modelos disponibles:', Object.keys(require('../data').sequelize.models));
+    
+    // ⭐ PASO 2: Verificar asociaciones de Room
+    const { Room, Service, BasicInventory } = require('../data');
+    console.log('🔍 Asociaciones de Room:', Object.keys(Room.associations || {}));
+    console.log('🔍 Asociaciones de Service:', Object.keys(Service.associations || {}));
+    console.log('🔍 Asociaciones de BasicInventory:', Object.keys(BasicInventory.associations || {}));
+    
+    // ⭐ PASO 3: Probar query básica primero
+    console.log('🔄 Intentando query básica sin includes...');
+    const basicRooms = await Room.findAll({
+      attributes: ['roomNumber', 'type', 'description'],
+      limit: 2
+    });
+    console.log('✅ Query básica exitosa:', basicRooms.length, 'habitaciones encontradas');
+    
+    // ⭐ PASO 4: Probar solo con Services
+    console.log('🔄 Probando solo con Services...');
+    try {
+      const roomsWithServices = await Room.findAll({
+        include: [
+          {
+            model: Service,
+            as: 'Services',
+            attributes: ['serviceId', 'name'],
+            through: { attributes: [] },
+          }
+        ],
+        limit: 1
+      });
+      console.log('✅ Query con Services exitosa:', roomsWithServices.length);
+    } catch (serviceError) {
+      console.log('❌ Error con Services:', serviceError.message);
+    }
+    
+    // ⭐ PASO 5: Probar solo con BasicInventories
+    console.log('🔄 Probando solo con BasicInventories...');
+    try {
+      const roomsWithInventory = await Room.findAll({
+        include: [
+          {
+            model: BasicInventory,
+            as: 'BasicInventories',
+            attributes: ['id', 'name'],
+            through: { 
+              attributes: ['quantity'],
+              as: 'RoomBasics'
+            },
+          }
+        ],
+        limit: 1
+      });
+      console.log('✅ Query con BasicInventories exitosa:', roomsWithInventory.length);
+    } catch (inventoryError) {
+      console.log('❌ Error con BasicInventories:', inventoryError.message);
+    }
+    
+    // ⭐ PASO 6: Intentar query completa
+    console.log('🔄 Intentando query completa...');
     const rooms = await Room.findAll({
       include: [
         {
           model: Service,
-          attributes: ['name'],
-          through: { attributes: [] }
+          as: 'Services',
+          attributes: ['serviceId', 'name', 'category', 'icon'],
+          through: { attributes: [] },
         },
         {
           model: BasicInventory,
-          attributes: ["id", "name"],
-          through: { attributes: ["quantity"] },
+          as: 'BasicInventories',
+          attributes: ['id', 'name', 'category', 'currentStock'],
+          through: { 
+            attributes: ['quantity', 'isRequired', 'priority'],
+            as: 'RoomBasics'
+          },
         },
-      ]
+      ],
+      order: [['roomNumber', 'ASC']]
     });
-    res.status(200).json({
+
+    console.log('✅ Query completa exitosa:', rooms.length, 'habitaciones con relaciones');
+
+    res.json({
       error: false,
       data: rooms,
-      message: 'Habitaciones obtenidas correctamente'
+      message: 'Habitaciones obtenidas exitosamente'
     });
   } catch (error) {
+    console.error('❌ Error en getAllRooms:', error.message);
+    console.error('❌ Stack trace:', error.stack);
+    console.error('❌ SQL Query (si existe):', error.sql);
     next(error);
   }
 };
@@ -49,7 +123,6 @@ const getRoomTypes = async (req, res, next) => {
     next(error);
   }
 };
-
 // Obtener una habitación por ID
 const getRoomById = async (req, res, next) => {
   try {
@@ -66,14 +139,41 @@ const getRoomById = async (req, res, next) => {
       include: [
         {
           model: BasicInventory,
-          attributes: ["id", "name"],
-          through: { attributes: ["quantity"] },
+          as: 'BasicInventories',
+          attributes: [
+            "id", "name", "description", "inventoryType", 
+            "currentStock", "cleanStock", "dirtyStock", 
+            "minStock", "minCleanStock", "category"
+          ],
+          through: { 
+            attributes: ["quantity", "isRequired", "priority"],
+            as: 'RoomBasics'
+          },
         },
         {
           model: Service,
           attributes: ["name"],
           through: { attributes: [] },
         },
+        {
+          model: Booking,
+          where: { status: { [Op.in]: ['checked-in', 'confirmed'] } },
+          required: false,
+          attributes: ['bookingId', 'status', 'checkIn', 'checkOut'],
+          include: [
+            {
+              model: BookingInventoryUsage,
+              as: 'inventoryUsages',
+              include: [
+                {
+                  model: BasicInventory,
+                  as: 'inventory',
+                  attributes: ['name', 'inventoryType']
+                }
+              ]
+            }
+          ]
+        }
       ],
     });
 
@@ -84,9 +184,53 @@ const getRoomById = async (req, res, next) => {
       });
     }
 
+    // ⭐ CALCULAR DISPONIBILIDAD DE INVENTARIO
+    const roomData = room.toJSON();
+    let canCheckIn = true;
+    const inventoryChecklist = [];
+
+    if (roomData.BasicInventories) {
+      roomData.BasicInventories.forEach(item => {
+        const requiredQty = item.RoomBasics.quantity;
+        let availableQty = 0;
+        let status = 'available';
+
+        if (item.inventoryType === 'reusable') {
+          availableQty = item.cleanStock;
+          if (availableQty < requiredQty) {
+            status = item.RoomBasics.isRequired ? 'insufficient' : 'warning';
+            if (item.RoomBasics.isRequired) canCheckIn = false;
+          }
+        } else {
+          availableQty = item.currentStock;
+          if (availableQty < requiredQty) {
+            status = item.RoomBasics.isRequired ? 'insufficient' : 'warning';
+            if (item.RoomBasics.isRequired) canCheckIn = false;
+          }
+        }
+
+        inventoryChecklist.push({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          type: item.inventoryType,
+          required: requiredQty,
+          available: availableQty,
+          isRequired: item.RoomBasics.isRequired,
+          priority: item.RoomBasics.priority,
+          status
+        });
+      });
+    }
+
     res.status(200).json({
       error: false,
-      data: room,
+      data: {
+        ...roomData,
+        canCheckIn,
+        inventoryChecklist,
+        currentBookings: roomData.Bookings || []
+      },
       message: "Habitación obtenida correctamente",
     });
   } catch (error) {
@@ -112,9 +256,12 @@ const checkAvailability = async (req, res, next) => {
   }
 };
 
-// Crear una nueva habitación
+
+
 const createRoom = async (req, res, next) => {
   try {
+    console.log('📥 Datos recibidos en createRoom:', JSON.stringify(req.body, null, 2));
+    
     const {
       roomNumber,
       priceSingle,
@@ -127,13 +274,24 @@ const createRoom = async (req, res, next) => {
       services,
       type,
       basicInventories,
+      isPromo,
+      promotionPrice
     } = req.body;
 
     // Validaciones básicas
     if (!roomNumber || !priceSingle || !priceDouble || !priceMultiple) {
       return res.status(400).json({
         error: true,
-        message: "Faltan campos requeridos: roomNumber, priceSingle, priceDouble, priceMultiple"
+        message: "Campos requeridos faltantes"
+      });
+    }
+
+    // Verificar que no exista la habitación
+    const existingRoom = await Room.findByPk(roomNumber);
+    if (existingRoom) {
+      return res.status(400).json({
+        error: true,
+        message: "Ya existe una habitación con este número"
       });
     }
 
@@ -148,58 +306,90 @@ const createRoom = async (req, res, next) => {
       image_url,
       maxGuests,
       type,
+      isPromo: isPromo || false,
+      promotionPrice: promotionPrice || null
     });
 
-    // Asociar los servicios a la habitación
+    console.log('✅ Habitación creada:', newRoom.roomNumber);
+
+    // ⭐ ASOCIAR SERVICIOS
     if (services && services.length > 0) {
+      console.log('🔧 Buscando servicios por nombre:', services);
+      
       const serviceInstances = await Service.findAll({
         where: {
           name: services,
         },
       });
-      await newRoom.addServices(serviceInstances);
+
+      console.log('🔧 Servicios encontrados:', serviceInstances.length);
+      
+      if (serviceInstances.length > 0) {
+        await newRoom.setServices(serviceInstances);
+        console.log('✅ Servicios asociados correctamente');
+      }
     }
 
-    // Asociar los BasicInventories a la habitación
+    // ⭐ ASOCIAR INVENTARIO BÁSICO - CORREGIDO
     if (basicInventories && basicInventories.length > 0) {
-      await Promise.all(
-        basicInventories.map(async (amenity) => {
-          const inventory = await BasicInventory.findByPk(amenity.id);
-          if (inventory) {
-            // Verificar si hay suficiente stock
-            if (inventory.currentStock < amenity.quantity) {
-              throw new Error(
-                `No hay suficiente stock para el item ${inventory.name}`
-              );
-            }
+      console.log('🔧 Procesando basicInventories:', basicInventories);
+      
+      for (const inventoryConfig of basicInventories) {
+        const { id, quantity, isRequired = true, priority = 3 } = inventoryConfig;
+        
+        console.log('🔍 Buscando inventario con id:', id);
+        
+        // ⭐ BUSCAR EL ITEM - El 'id' que llega es realmente itemId en la base de datos
+        const inventory = await BasicInventory.findOne({
+          where: { id: id } // ⭐ Ahora debería funcionar porque enviamos itemId como id
+        });
+        
+        if (!inventory) {
+          console.log('❌ Item de inventario no encontrado:', id);
+          console.log('🔍 Disponibles en BD:', await BasicInventory.findAll({
+            attributes: ['id', 'name'],
+            limit: 5
+          }));
+          continue; // Continuar con los demás items
+        }
 
-            // Descontar del stock global
-            await inventory.decrement("currentStock", { by: amenity.quantity });
+        console.log('✅ Item encontrado:', inventory.name);
 
-            // Crear la relación en la tabla intermedia con la cantidad
-            await newRoom.addBasicInventory(inventory, {
-              through: { quantity: amenity.quantity },
-            });
-          }
-        })
-      );
+        // Crear la relación en RoomBasics
+        const roomBasic = await RoomBasics.create({
+          roomNumber: newRoom.roomNumber,
+          basicId: inventory.id,
+          quantity,
+          isRequired,
+          priority
+        });
+        
+        console.log('✅ RoomBasic creado:', roomBasic.toJSON());
+      }
     }
 
-    // Incluir servicios y amenities en la respuesta
-    const roomWithDetails = await Room.findByPk(newRoom.roomNumber, {
-      include: [
-        {
-          model: Service,
-          attributes: ["name"],
-          through: { attributes: [] },
-        },
-        {
-          model: BasicInventory,
-          attributes: ["id", "name"],
-          through: { attributes: ["quantity"] },
-        },
-      ],
-    });
+    // Obtener la habitación con todas las relaciones
+  const roomWithDetails = await Room.findByPk(newRoom.roomNumber, {
+  include: [
+    {
+      model: Service,
+      as: 'Services', // ⭐ AGREGAR ESTA LÍNEA SI NO ESTÁ
+      attributes: ['serviceId', 'name', 'category'],
+      through: { attributes: [] },
+    },
+    {
+      model: BasicInventory,
+      as: 'BasicInventories', // ⭐ ASEGURAR QUE ESTÉ
+      attributes: ['id', 'name', 'category', 'currentStock'],
+      through: { 
+        attributes: ['quantity', 'isRequired', 'priority'],
+        as: 'RoomBasics'
+      },
+    },
+  ],
+});
+
+    console.log('✅ Habitación creada exitosamente con detalles');
 
     res.status(201).json({
       error: false,
@@ -207,6 +397,7 @@ const createRoom = async (req, res, next) => {
       message: "Habitación creada correctamente",
     });
   } catch (error) {
+    console.error('❌ Error completo en createRoom:', error);
     next(error);
   }
 };
@@ -238,29 +429,24 @@ const updateRoom = async (req, res, next) => {
       await room.setServices(serviceInstances);
     }
 
-    // Actualizar los BasicInventories
+    // ⭐ NUEVA LÓGICA: Actualizar BasicInventories con configuración
     if (basicInventories && basicInventories.length > 0) {
-      const currentInventories = await room.getBasicInventories();
+      // Eliminar configuraciones actuales
+      await RoomBasics.destroy({
+        where: { roomNumber }
+      });
 
-      const currentInventoryMap = new Map(
-        currentInventories.map((inv) => [inv.id, inv.RoomBasics.quantity])
-      );
-
-      for (const inventory of basicInventories) {
-        const { id, quantity } = inventory;
-
-        if (currentInventoryMap.has(id)) {
-          if (currentInventoryMap.get(id) !== quantity) {
-            await room.addBasicInventory(id, { through: { quantity } });
-          }
-          currentInventoryMap.delete(id);
-        } else {
-          await room.addBasicInventory(id, { through: { quantity } });
-        }
-      }
-
-      for (const [id] of currentInventoryMap) {
-        await room.removeBasicInventory(id);
+      // Crear nuevas configuraciones
+      for (const inventoryConfig of basicInventories) {
+        const { id, quantity, isRequired = true, priority = 3 } = inventoryConfig;
+        
+        await RoomBasics.create({
+          roomNumber,
+          basicId: id,
+          quantity,
+          isRequired,
+          priority
+        });
       }
     }
 
@@ -273,8 +459,12 @@ const updateRoom = async (req, res, next) => {
         },
         {
           model: BasicInventory,
-          attributes: ["id", "name"],
-          through: { attributes: ["quantity"] },
+          as: 'BasicInventories',
+          attributes: ["id", "name", "inventoryType", "currentStock", "cleanStock"],
+          through: { 
+            attributes: ["quantity", "isRequired", "priority"],
+            as: 'RoomBasics'
+          },
         },
       ],
     });
@@ -566,8 +756,16 @@ const getRoomBasics = async (req, res, next) => {
       include: [
         {
           model: BasicInventory,
-          attributes: ['id', 'name', 'description'],
-          through: { attributes: ['quantity'] }
+          as: 'BasicInventories',
+          attributes: [
+            'id', 'name', 'description', 'inventoryType', 
+            'currentStock', 'cleanStock', 'dirtyStock',
+            'minStock', 'minCleanStock', 'category'
+          ],
+          through: { 
+            attributes: ['quantity', 'isRequired', 'priority'],
+            as: 'RoomBasics'
+          }
         }
       ]
     });
@@ -579,23 +777,159 @@ const getRoomBasics = async (req, res, next) => {
       });
     }
     
-    const basics = room.BasicInventories.map(basic => ({
-      id: basic.id,
-      name: basic.name,
-      description: basic.description,
-      quantity: basic.RoomBasics.quantity
-    }));
+    // ⭐ PROCESAR INVENTARIO CON ESTADO DETALLADO
+    const basics = room.BasicInventories.map(basic => {
+      const requiredQty = basic.RoomBasics.quantity;
+      let availableQty = 0;
+      let stockStatus = 'ok';
+      let stockInfo = {};
+
+      if (basic.inventoryType === 'reusable') {
+        availableQty = basic.cleanStock;
+        stockInfo = {
+          cleanStock: basic.cleanStock,
+          dirtyStock: basic.dirtyStock,
+          totalStock: basic.cleanStock + basic.dirtyStock,
+          minCleanStock: basic.minCleanStock
+        };
+        
+        if (availableQty < requiredQty) {
+          stockStatus = 'insufficient';
+        } else if (availableQty <= basic.minCleanStock) {
+          stockStatus = 'low';
+        }
+      } else {
+        availableQty = basic.currentStock;
+        stockInfo = {
+          currentStock: basic.currentStock,
+          minStock: basic.minStock
+        };
+        
+        if (availableQty < requiredQty) {
+          stockStatus = 'insufficient';
+        } else if (availableQty <= basic.minStock) {
+          stockStatus = 'low';
+        }
+      }
+
+      return {
+        id: basic.id,
+        name: basic.name,
+        description: basic.description,
+        category: basic.category,
+        inventoryType: basic.inventoryType,
+        required: requiredQty,
+        available: availableQty,
+        isRequired: basic.RoomBasics.isRequired,
+        priority: basic.RoomBasics.priority,
+        stockStatus,
+        stockInfo,
+        canAssign: availableQty >= requiredQty
+      };
+    });
+    
+    // ⭐ CALCULAR RESUMEN GENERAL
+    const summary = {
+      totalItems: basics.length,
+      readyItems: basics.filter(b => b.canAssign).length,
+      insufficientItems: basics.filter(b => !b.canAssign && b.isRequired).length,
+      warningItems: basics.filter(b => b.stockStatus === 'low').length,
+      canProceedCheckIn: basics.filter(b => b.isRequired && !b.canAssign).length === 0
+    };
     
     res.json({
       error: false,
-      data: basics,
-      message: 'Básicos de la habitación recuperados exitosamente'
+      data: {
+        roomNumber,
+        basics,
+        summary
+      },
+      message: 'Inventario básico de la habitación recuperado exitosamente'
     });
   } catch (error) {
     next(error);
   }
 };
 
+
+const checkInventoryAvailability = async (req, res, next) => {
+  try {
+    const { roomNumber } = req.params;
+    const { bookingId } = req.query;
+
+    const room = await Room.findByPk(roomNumber, {
+      include: [
+        {
+          model: BasicInventory,
+          as: 'BasicInventories',
+          attributes: ['id', 'name', 'inventoryType', 'currentStock', 'cleanStock'],
+          through: { 
+            attributes: ['quantity', 'isRequired'],
+            as: 'RoomBasics'
+          }
+        }
+      ]
+    });
+
+    if (!room) {
+      return res.status(404).json({
+        error: true,
+        message: 'Habitación no encontrada'
+      });
+    }
+
+    // Verificar si ya tiene inventario asignado
+    let existingAssignment = null;
+    if (bookingId) {
+      existingAssignment = await BookingInventoryUsage.findOne({
+        where: { bookingId }
+      });
+    }
+
+    const availabilityCheck = {
+      roomNumber,
+      canProceedCheckIn: true,
+      hasExistingAssignment: !!existingAssignment,
+      items: [],
+      issues: []
+    };
+
+    for (const item of room.BasicInventories) {
+      const requiredQty = item.RoomBasics.quantity;
+      const availableQty = item.inventoryType === 'reusable' ? item.cleanStock : item.currentStock;
+      const isAvailable = availableQty >= requiredQty;
+
+      if (!isAvailable && item.RoomBasics.isRequired) {
+        availabilityCheck.canProceedCheckIn = false;
+        availabilityCheck.issues.push({
+          item: item.name,
+          type: item.inventoryType,
+          required: requiredQty,
+          available: availableQty,
+          severity: 'critical'
+        });
+      }
+
+      availabilityCheck.items.push({
+        id: item.id,
+        name: item.name,
+        type: item.inventoryType,
+        required: requiredQty,
+        available: availableQty,
+        isRequired: item.RoomBasics.isRequired,
+        status: isAvailable ? 'ok' : (item.RoomBasics.isRequired ? 'critical' : 'warning')
+      });
+    }
+
+    res.json({
+      error: false,
+      data: availabilityCheck,
+      message: 'Verificación de disponibilidad de inventario completada'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 // ⭐ NUEVO: Calcular precio de habitación
 const calculateRoomPrice = async (req, res, next) => {
   try {
@@ -718,6 +1052,95 @@ const calculateRoomPrice = async (req, res, next) => {
   }
 };
 
+const getRoomInventoryHistory = async (req, res, next) => {
+  try {
+    const { roomNumber } = req.params;
+    const { startDate, endDate, limit = 20 } = req.query;
+
+    const whereClause = {};
+    if (startDate && endDate) {
+      whereClause.assignedAt = {
+        [Op.between]: [new Date(startDate), new Date(endDate)]
+      };
+    }
+
+    const usageHistory = await BookingInventoryUsage.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Booking,
+          as: 'booking',
+          where: { roomNumber },
+          attributes: ['bookingId', 'checkIn', 'checkOut', 'status']
+        },
+        {
+          model: BasicInventory,
+          as: 'inventory',
+          attributes: ['name', 'inventoryType', 'category']
+        }
+      ],
+      order: [['assignedAt', 'DESC']],
+      limit: parseInt(limit)
+    });
+
+    // Procesar estadísticas
+    const stats = {
+      totalUsages: usageHistory.length,
+      itemsSummary: {},
+      averageUsageByType: {}
+    };
+
+    usageHistory.forEach(usage => {
+      const itemName = usage.inventory.name;
+      const itemType = usage.inventory.inventoryType;
+
+      if (!stats.itemsSummary[itemName]) {
+        stats.itemsSummary[itemName] = {
+          name: itemName,
+          type: itemType,
+          totalAssigned: 0,
+          totalConsumed: 0,
+          totalReturned: 0,
+          usageCount: 0
+        };
+      }
+
+      stats.itemsSummary[itemName].totalAssigned += usage.quantityAssigned;
+      stats.itemsSummary[itemName].totalConsumed += usage.quantityConsumed;
+      stats.itemsSummary[itemName].totalReturned += usage.quantityReturned;
+      stats.itemsSummary[itemName].usageCount += 1;
+
+      if (!stats.averageUsageByType[itemType]) {
+        stats.averageUsageByType[itemType] = { total: 0, count: 0 };
+      }
+      stats.averageUsageByType[itemType].total += usage.quantityAssigned;
+      stats.averageUsageByType[itemType].count += 1;
+    });
+
+    // Calcular promedios
+    Object.keys(stats.averageUsageByType).forEach(type => {
+      const data = stats.averageUsageByType[type];
+      stats.averageUsageByType[type] = data.count > 0 ? (data.total / data.count).toFixed(2) : 0;
+    });
+
+    res.json({
+      error: false,
+      data: {
+        roomNumber,
+        period: { startDate, endDate },
+        usageHistory,
+        statistics: {
+          ...stats,
+          itemsSummary: Object.values(stats.itemsSummary)
+        }
+      },
+      message: 'Historial de inventario de habitación obtenido exitosamente'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ⭐ NUEVO: Calcular precios de múltiples habitaciones
 const calculateMultipleRoomPrices = async (req, res, next) => {
   try {
@@ -820,5 +1243,7 @@ module.exports = {
   getRoomPreparationStatus,
   getRoomBasics,
   calculateRoomPrice,
-  calculateMultipleRoomPrices
+  calculateMultipleRoomPrices,
+   checkInventoryAvailability, // ⭐ NUEVO
+  getRoomInventoryHistory, // ⭐ NUEVO
 };

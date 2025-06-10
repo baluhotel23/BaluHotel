@@ -1,18 +1,17 @@
-const {
-  Room,
-  Booking,
-  ExtraCharge,
-  Bill,
-  Service,
-  Buyer,
-  Payment,
-  RegistrationPass, 
+const { 
+  Booking, 
+  Room, 
+  Buyer, 
+  ExtraCharge, 
+  Bill, 
+  Payment, 
+  RegistrationPass,
   BasicInventory,
-  conn, 
-} = require("../data");
-
-const { CustomError } = require("../middleware/error");
-const { Op } = require("sequelize");
+  BookingInventoryUsage,
+  RoomBasics
+} = require('../data');
+const { Op } = require('sequelize');
+const { CustomError } = require('../middleware/error');
 const jwt = require("jsonwebtoken");
 const PDFDocument = require("pdfkit");
 
@@ -110,202 +109,109 @@ const getRoomTypes = async (req, res) => {
 
 // Client and staff endpoints
 const createBooking = async (req, res, next) => {
-  const t = await conn.transaction();  // <--- INICIAR TRANSACCIÓN
-  console.log('[BookingController] === Iniciando Proceso: createBooking ===');
-  console.log('[BookingController] [Paso 1/X] Timestamp de inicio:', new Date().toISOString());
-  console.log('[BookingController] [Paso 1/X] Request Body recibido:', JSON.stringify(req.body, null, 2));
-
   try {
     const {
+      guestId,
       roomNumber,
       checkIn,
       checkOut,
       guestCount,
-      totalAmount,
-      guestId,
-      paymentMethodLocal, // Para pagos locales hechos al momento de la reserva
-      paymentAmountLocal, // Monto del pago local si se hace al momento
-      paymentTypeLocal,   // 'full' o 'partial' para el pago local
+      totalPrice,
+      status = 'confirmed',
       notes,
-      adults,
-      children,
+      verifyInventory = true // ⭐ OPCIÓN PARA VERIFICAR INVENTARIO
     } = req.body;
 
-    const pointOfSale = req.body.pointOfSale || "Online";
-    console.log(`[BookingController] [Paso 2/X] Punto de Venta: ${pointOfSale}`);
-
-    const bookingGuestId = guestId;
-    console.log(`[BookingController] [Paso 3/X] Guest ID para la reserva: ${bookingGuestId}`);
-
-    if (!bookingGuestId) {
-      console.error('[BookingController] [ERROR Validación] Falta guestId.');
-      throw new CustomError("Se requiere el ID del huésped para la reserva.", 400);
+    // Validaciones básicas
+    if (!guestId || !roomNumber || !checkIn || !checkOut || !guestCount) {
+      return res.status(400).json({
+        error: true,
+        message: 'Faltan campos requeridos'
+      });
     }
 
-    const room = await Room.findByPk(roomNumber, { transaction: t }); // <--- USAR TRANSACCIÓN
-    if (!room) {
-      console.error(`[BookingController] [ERROR DB] Habitación no encontrada: ${roomNumber}`);
-      throw new CustomError("Habitación no encontrada", 404);
-    }
-    console.log(`[BookingController] [Paso 4/X] Habitación encontrada: ${room.roomNumber}`);
-
-    console.log(`[BookingController] [Paso 5/X] Verificando disponibilidad para habitación ${roomNumber} entre ${checkIn} y ${checkOut}`);
-    const existingBooking = await Booking.findOne({
-      where: {
-        roomNumber,
-        status: { [Op.notIn]: ["cancelled", "no_show_cancelled"] },
-        [Op.or]: [
-          { checkIn: { [Op.lt]: checkOut }, checkOut: { [Op.gt]: checkIn } },
-        ],
-      },
-      transaction: t, // <--- USAR TRANSACCIÓN
+    // Verificar que la habitación existe
+    const room = await Room.findByPk(roomNumber, {
+      include: [
+        {
+          model: BasicInventory,
+          as: 'BasicInventories',
+          attributes: ['id', 'name', 'inventoryType', 'currentStock', 'cleanStock'],
+          through: { 
+            attributes: ['quantity', 'isRequired'],
+            as: 'RoomBasics'
+          }
+        }
+      ]
     });
 
-    if (existingBooking) {
-      console.error(`[BookingController] [ERROR Lógica] Habitación ${roomNumber} no disponible. Reserva conflictiva: ${existingBooking.bookingId}`);
-      throw new CustomError("Habitación no disponible para las fechas seleccionadas", 400);
+    if (!room) {
+      return res.status(404).json({
+        error: true,
+        message: 'Habitación no encontrada'
+      });
     }
-    console.log(`[BookingController] [Paso 5/X] Habitación ${roomNumber} disponible.`);
 
-    // const nights = calculateNights(checkIn, checkOut); // Si lo necesitas para calcular totalAmount aquí
-
-    let initialStatus = "pending_payment"; // Default para online o local sin pago inmediato
-    if (pointOfSale === "Local") {
-      // Si es local y se proveen detalles de pago, podría ser 'confirmed'
-      // Esto se ajustará más adelante si se registra un pago local.
-      initialStatus = req.body.status || "confirmed"; // O 'pending_payment' si no se paga al instante
+    // ⭐ VERIFICAR DISPONIBILIDAD DE INVENTARIO SI SE SOLICITA
+    const inventoryIssues = [];
+    if (verifyInventory && room.BasicInventories) {
+      for (const item of room.BasicInventories) {
+        const requiredQty = item.RoomBasics.quantity;
+        const availableQty = item.inventoryType === 'reusable' ? item.cleanStock : item.currentStock;
+        
+        if (availableQty < requiredQty && item.RoomBasics.isRequired) {
+          inventoryIssues.push({
+            item: item.name,
+            required: requiredQty,
+            available: availableQty,
+            type: item.inventoryType
+          });
+        }
+      }
     }
-    console.log(`[BookingController] [Paso 6/X] Estado inicial determinado para la reserva: ${initialStatus}`);
 
-    const bookingData = {
-      guestId: bookingGuestId,
+    // Si hay problemas de inventario y la verificación está activada, alertar
+    if (inventoryIssues.length > 0 && verifyInventory) {
+      return res.status(400).json({
+        error: true,
+        message: 'Inventario insuficiente para la reserva',
+        data: {
+          inventoryIssues,
+          canCreateAnyway: true // Permitir crear la reserva de todas formas
+        }
+      });
+    }
+
+    // Crear la reserva
+    const newBooking = await Booking.create({
+      guestId,
       roomNumber,
-      checkIn,
-      checkOut,
-      totalAmount, // Asegúrate que este sea el monto correcto de la reserva
+      checkIn: new Date(checkIn),
+      checkOut: new Date(checkOut),
       guestCount,
-      status: initialStatus,
-      pointOfSale,
-      adults,
-      children,
-      notes,
-    };
-    console.log('[BookingController] [Paso 7/X] Datos para crear Booking:', JSON.stringify(bookingData, null, 2));
-    const newBooking = await Booking.create(bookingData, { transaction: t }); // <--- USAR TRANSACCIÓN
-    console.log('[BookingController] [Paso 7/X] Booking creado en DB (dentro de transacción):', JSON.stringify(newBooking.toJSON(), null, 2));
+      totalPrice,
+      status,
+      notes
+    });
 
-    let trackingLink = null;
-    let paymentRecord = null;
-
-    if (pointOfSale === "Online") {
-      console.log('[BookingController] [Paso 8/X - Online] Creando tracking token y pago pendiente.');
-      const token = jwt.sign(
-        { bookingId: newBooking.bookingId },
-        process.env.BOOKING_SECRET,
-        { expiresIn: "7d" }
-      );
-      await newBooking.update({ trackingToken: token }, { transaction: t }); // <--- USAR TRANSACCIÓN
-      trackingLink = `${process.env.FRONT_URL}/booking-status/${token}`;
-      console.log(`[BookingController] [Paso 8/X - Online] Tracking token generado: ${token}`);
-
-      const onlinePaymentData = {
-        bookingId: newBooking.bookingId,
-        amount: newBooking.totalAmount, // Usar el totalAmount de la reserva
-        paymentMethod: req.body.paymentMethodOnline || "wompi_checkout", // Ej: 'wompi_checkout'
-        paymentType: "online",
-        paymentStatus: "pending", // Siempre pendiente hasta confirmación del gateway
-        paymentDate: new Date(),
-        // processedBy no aplica para pagos online iniciados por el cliente
-      };
-      console.log('[BookingController] [Paso 8/X - Online] Datos para crear Payment (online pendiente):', JSON.stringify(onlinePaymentData, null, 2));
-      paymentRecord = await Payment.create(onlinePaymentData, { transaction: t }); // <--- USAR TRANSACCIÓN
-      console.log('[BookingController] [Paso 8/X - Online] Payment (online pendiente) creado en DB:', JSON.stringify(paymentRecord.toJSON(), null, 2));
-      
-      // El estado de la reserva online sigue siendo 'pending_payment' hasta que el webhook confirme.
-      if (newBooking.status !== 'pending_payment') {
-        newBooking.status = 'pending_payment'; // Asegurar estado correcto para online
-        await newBooking.save({ transaction: t });
-        console.log('[BookingController] [Paso 8/X - Online] Estado de Booking actualizado a pending_payment.');
-      }
-
-    } else if (pointOfSale === "Local") {
-      console.log('[BookingController] [Paso 8/X - Local] Procesando posible pago local inmediato.');
-      // Para reservas locales, el pago puede registrarse aquí si se proporcionan los detalles,
-      // o más tarde a través del endpoint /admin/paymentLocal.
-      if (paymentMethodLocal && paymentAmountLocal > 0) {
-        const localPaymentAmountFloat = parseFloat(paymentAmountLocal);
-        const localPaymentData = {
-          bookingId: newBooking.bookingId,
-          amount: localPaymentAmountFloat,
-          paymentMethod: paymentMethodLocal,
-          paymentType: paymentTypeLocal || (localPaymentAmountFloat >= parseFloat(newBooking.totalAmount) ? 'full' : 'partial'),
-          paymentStatus: 'completed', // Pagos locales en recepción se asumen completados
-          paymentDate: new Date(),
-          processedBy: req.user?.n_document, // Empleado que registra
-        };
-        console.log('[BookingController] [Paso 8/X - Local] Datos para crear Payment (local inmediato):', JSON.stringify(localPaymentData, null, 2));
-        paymentRecord = await Payment.create(localPaymentData, { transaction: t }); // <--- USAR TRANSACCIÓN
-        console.log('[BookingController] [Paso 8/X - Local] Payment (local inmediato) creado en DB:', JSON.stringify(paymentRecord.toJSON(), null, 2));
-
-        // Si se hizo un pago local, la reserva debe estar 'confirmed'.
-        if (newBooking.status !== "confirmed") {
-          newBooking.status = "confirmed";
-          await newBooking.save({ transaction: t }); // <--- USAR TRANSACCIÓN
-          console.log('[BookingController] [Paso 8/X - Local] Estado de Booking actualizado a confirmed debido a pago local.');
-        }
-      } else {
-        // Si es local pero no se pagan en el momento de crear la reserva,
-        // el estado podría ser 'confirmed' (si se confía en el cliente) o 'pending_payment'.
-        // Por ahora, si se envió 'confirmed' como status inicial y no hay pago, se mantiene.
-        // Si se envió 'pending_payment' o nada, y no hay pago, se mantiene/establece 'pending_payment'.
-        if (newBooking.status !== 'confirmed') { // Si no se pagó y no es 'confirmed'
-             newBooking.status = 'pending_payment'; // Dejarlo como pendiente de pago
-             await newBooking.save({ transaction: t });
-             console.log('[BookingController] [Paso 8/X - Local] Reserva local sin pago inmediato, estado establecido a pending_payment.');
-        } else {
-            console.log(`[BookingController] [Paso 8/X - Local] Reserva local sin pago inmediato, estado se mantiene como: ${newBooking.status}`);
-        }
-      }
-    }
-
-    await t.commit(); // <--- CONFIRMAR LA TRANSACCIÓN (HACER TODO PERMANENTE)
-    console.log('[BookingController] [Paso 9/X] Transacción completada (commit).');
-    console.log('[BookingController] === Proceso createBooking Finalizado Exitosamente ===');
+    // Incluir información completa en la respuesta
+    const bookingWithDetails = await Booking.findByPk(newBooking.bookingId, {
+      include: [
+        { model: Room },
+        { model: Buyer, as: "guest" }
+      ]
+    });
 
     res.status(201).json({
       error: false,
-      message: `Reserva ${pointOfSale} creada exitosamente`,
+      message: 'Reserva creada exitosamente',
       data: {
-        booking: newBooking.toJSON(), // Enviar como JSON plano
-        trackingLink,
-        payment: paymentRecord ? paymentRecord.toJSON() : null,
-      },
+        booking: bookingWithDetails,
+        inventoryWarnings: inventoryIssues.length > 0 ? inventoryIssues : null
+      }
     });
-
   } catch (error) {
-    if (t) await t.rollback(); // <--- REVERTIR LA TRANSACCIÓN SI HAY ERROR
-    console.error("[BookingController] [ERROR GLOBAL] Error capturado en createBooking. Nombre:", error.name, "Mensaje:", error.message);
-    if (error.original) {
-        console.error("[BookingController] [ERROR GLOBAL] Error Original (Sequelize/DB):", JSON.stringify(error.original, null, 2));
-    }
-    // console.error("[BookingController] [ERROR GLOBAL] Stack:", error.stack); // Útil en desarrollo
-
-    // Pasar el error al middleware de manejo de errores de Express
-    // Asegúrate de que tu middleware de errores esté configurado en app.js
-    // Si no es un CustomError, créalo para que el middleware lo maneje consistentemente.
-    if (!(error instanceof CustomError)) {
-        const statusCode = error.statusCode || 500;
-        // Intenta ser más específico si es un error de Sequelize
-        let message = "Error interno al crear la reserva.";
-        if (error.name === 'SequelizeValidationError' && error.errors && error.errors.length > 0) {
-            message = error.errors.map(e => e.message).join(', ');
-        } else if (error.message) {
-            message = error.message;
-        }
-        next(new CustomError(message, statusCode, error.name));
-    } else {
-        next(error); // Pasar el CustomError existente
-    }
+    next(error);
   }
 };
 
@@ -495,15 +401,15 @@ const getBookingById = async (req, res) => {
     include: [
       { 
         model: Room,
-        // ⭐ INCLUIR BASIC INVENTORY A TRAVÉS DE LA RELACIÓN MANY-TO-MANY
         include: [
           {
             model: BasicInventory,
+            as: 'BasicInventories',
+            attributes: ['id', 'name', 'description', 'inventoryType', 'currentStock', 'cleanStock'],
             through: { 
-              attributes: ['quantity'], // Obtener cantidad de la tabla intermedia RoomBasics
+              attributes: ['quantity', 'isRequired', 'priority'],
               as: 'RoomBasics'
-            },
-            attributes: ['id', 'name', 'description', 'currentStock']
+            }
           }
         ]
       },
@@ -512,100 +418,324 @@ const getBookingById = async (req, res) => {
       { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername"] },
       { model: Payment },
       { model: RegistrationPass, as: "registrationPasses" },
+      // ⭐ NUEVO: Incluir inventario asignado a esta reserva
+      {
+        model: BookingInventoryUsage,
+        as: 'inventoryUsages',
+        include: [
+          {
+            model: BasicInventory,
+            as: 'inventory',
+            attributes: ['id', 'name', 'inventoryType', 'category']
+          }
+        ]
+      }
     ],
   });
 
   if (!booking) {
-    throw new CustomError("Reserva no encontrada", 404);
+    return res.status(404).json({
+      error: true,
+      message: 'Reserva no encontrada'
+    });
   }
+
+  // ⭐ PROCESAR INFORMACIÓN DE INVENTARIO
+  const bookingData = booking.toJSON();
   
+  // Calcular estado del inventario
+  const inventoryStatus = {
+    hasInventoryAssigned: bookingData.inventoryUsages && bookingData.inventoryUsages.length > 0,
+    totalItemsAssigned: bookingData.inventoryUsages ? bookingData.inventoryUsages.length : 0,
+    itemsReturned: bookingData.inventoryUsages ? bookingData.inventoryUsages.filter(u => u.status === 'returned').length : 0,
+    itemsConsumed: bookingData.inventoryUsages ? bookingData.inventoryUsages.filter(u => u.status === 'consumed').length : 0,
+    canProceedCheckOut: bookingData.status === 'checked-in' && bookingData.inventoryUsages && bookingData.inventoryUsages.length > 0
+  };
+
   res.json({
     error: false,
-    data: booking,
+    data: {
+      ...bookingData,
+      inventoryStatus
+    }
   });
 };
 
 // Staff only endpoints
-const getAllBookings = async (req, res) => {
-  const { status, roomStatus, fromDate, toDate } = req.query;
+const getAllBookings = async (req, res, next) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      status, 
+      roomNumber, 
+      guestId,
+      includeInventory = false 
+    } = req.query;
 
-  const where = {};
-  if (status) where.status = status;
-  if (fromDate && toDate) {
-    where.checkIn = {
-      [Op.between]: [fromDate, toDate],
-    };
-  }
+    const where = {};
+    if (status) where.status = status;
+    if (roomNumber) where.roomNumber = roomNumber;
+    if (guestId) where.guestId = guestId;
 
-  // ⭐ INCLUDE CORREGIDO PARA ROOM CON BASIC INVENTORY
-  const roomInclude = { 
-    model: Room,
-    include: [
-      {
-        model: BasicInventory,
-        through: { 
-          attributes: ['quantity'],
-          as: 'RoomBasics'
-        },
-        attributes: ['id', 'name', 'description', 'currentStock']
+    const includeOptions = [
+      { 
+        model: Room,
+        attributes: ['roomNumber', 'type', 'status']
+      },
+      { 
+        model: Buyer, 
+        as: "guest", 
+        attributes: ["sdocno", "scostumername"] 
       }
-    ]
-  };
-  
-  if (roomStatus) {
-    roomInclude.where = { status: roomStatus };
+    ];
+
+    // ⭐ INCLUIR INVENTARIO SI SE SOLICITA
+    if (includeInventory === 'true') {
+      includeOptions.push({
+        model: BookingInventoryUsage,
+        as: 'inventoryUsages',
+        attributes: ['quantityAssigned', 'quantityConsumed', 'quantityReturned', 'status'],
+        include: [
+          {
+            model: BasicInventory,
+            as: 'inventory',
+            attributes: ['name', 'inventoryType']
+          }
+        ]
+      });
+    }
+
+    const { count, rows } = await Booking.findAndCountAll({
+      where,
+      include: includeOptions,
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    });
+
+    // ⭐ PROCESAR DATOS CON ESTADO DE INVENTARIO
+    const bookingsWithInventoryStatus = rows.map(booking => {
+      const bookingData = booking.toJSON();
+      
+      if (includeInventory === 'true' && bookingData.inventoryUsages) {
+        bookingData.inventoryStatus = {
+          hasInventoryAssigned: bookingData.inventoryUsages.length > 0,
+          totalItems: bookingData.inventoryUsages.length,
+          itemsReturned: bookingData.inventoryUsages.filter(u => u.status === 'returned').length,
+          itemsConsumed: bookingData.inventoryUsages.filter(u => u.status === 'consumed').length,
+          readyForCheckOut: booking.status === 'checked-in' && bookingData.inventoryUsages.length > 0
+        };
+      }
+      
+      return bookingData;
+    });
+
+    res.json({
+      error: false,
+      data: {
+        bookings: bookingsWithInventoryStatus,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / parseInt(limit))
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
   }
-
-  const bookings = await Booking.findAll({
-    where,
-    include: [
-      roomInclude,
-      { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername", "selectronicmail"] },
-      { model: Payment },
-      { model: ExtraCharge },
-    ],
-    order: [["checkIn", "ASC"]],
-  });
-
-  res.json({
-    error: false,
-    data: bookings,
-  });
 };
 
 const checkIn = async (req, res, next) => {
   try {
     const { bookingId } = req.params;
-    const booking = await Booking.findByPk(bookingId);
+    const { assignInventory = true, customItems = [] } = req.body;
+
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: Room,
+          include: [
+            {
+              model: BasicInventory,
+              as: 'BasicInventories',
+              attributes: ['id', 'name', 'inventoryType', 'currentStock', 'cleanStock'],
+              through: { 
+                attributes: ['quantity', 'isRequired', 'priority'],
+                as: 'RoomBasics'
+              }
+            }
+          ]
+        }
+      ]
+    });
 
     if (!booking) {
-      throw new CustomError("Reserva no encontrada", 404);
+      return res.status(404).json({
+        error: true,
+        message: 'Reserva no encontrada'
+      });
     }
 
-    // Comparación insensible a mayúsculas
-    const currentStatus = booking.status.toLowerCase();
+    if (booking.status !== 'confirmed') {
+      return res.status(400).json({
+        error: true,
+        message: 'Solo se pueden hacer check-in a reservas confirmadas'
+      });
+    }
 
-    if (currentStatus !== "pending") {
-      let errorMessage = "Estado de reserva inválido para check-in";
-      if (currentStatus === "cancelled") {
-        errorMessage =
-          "Esta reserva fue cancelada y no se puede realizar el check-in";
-      } else {
-        errorMessage = `No se puede realizar el check-in porque el estado de la reserva es "${booking.status}"`;
+    // Verificar si ya tiene inventario asignado
+    const existingInventory = await BookingInventoryUsage.findOne({
+      where: { bookingId }
+    });
+
+    if (existingInventory) {
+      return res.status(400).json({
+        error: true,
+        message: 'Esta reserva ya tiene inventario asignado'
+      });
+    }
+
+    // ⭐ ASIGNAR INVENTARIO AUTOMÁTICAMENTE
+    const inventoryAssignments = [];
+    const inventoryErrors = [];
+
+    if (assignInventory && booking.Room.BasicInventories) {
+      for (const item of booking.Room.BasicInventories) {
+        const requiredQty = item.RoomBasics.quantity;
+        let availableQty = 0;
+        
+        if (item.inventoryType === 'reusable') {
+          availableQty = item.cleanStock;
+        } else {
+          availableQty = item.currentStock;
+        }
+
+        if (availableQty < requiredQty) {
+          if (item.RoomBasics.isRequired) {
+            inventoryErrors.push({
+              item: item.name,
+              required: requiredQty,
+              available: availableQty,
+              severity: 'critical'
+            });
+          } else {
+            inventoryErrors.push({
+              item: item.name,
+              required: requiredQty,
+              available: availableQty,
+              severity: 'warning'
+            });
+          }
+          continue;
+        }
+
+        // Crear asignación de inventario
+        const assignment = await BookingInventoryUsage.create({
+          bookingId,
+          basicInventoryId: item.id,
+          quantityAssigned: requiredQty,
+          status: 'assigned',
+          assignedAt: new Date()
+        });
+
+        // Actualizar stock
+        if (item.inventoryType === 'reusable') {
+          await item.update({
+            cleanStock: item.cleanStock - requiredQty
+          });
+        } else {
+          await item.update({
+            currentStock: item.currentStock - requiredQty
+          });
+        }
+
+        inventoryAssignments.push({
+          item: item.name,
+          type: item.inventoryType,
+          assigned: requiredQty
+        });
       }
-      throw new CustomError(errorMessage, 400);
     }
 
+    // ⭐ PROCESAR ITEMS PERSONALIZADOS
+    for (const customItem of customItems) {
+      const { basicInventoryId, quantity } = customItem;
+      
+      const item = await BasicInventory.findByPk(basicInventoryId);
+      if (!item) continue;
+
+      const availableQty = item.inventoryType === 'reusable' ? item.cleanStock : item.currentStock;
+      
+      if (availableQty >= quantity) {
+        await BookingInventoryUsage.create({
+          bookingId,
+          basicInventoryId,
+          quantityAssigned: quantity,
+          status: 'assigned',
+          assignedAt: new Date()
+        });
+
+        // Actualizar stock
+        if (item.inventoryType === 'reusable') {
+          await item.update({
+            cleanStock: item.cleanStock - quantity
+          });
+        } else {
+          await item.update({
+            currentStock: item.currentStock - quantity
+          });
+        }
+
+        inventoryAssignments.push({
+          item: item.name,
+          type: item.inventoryType,
+          assigned: quantity,
+          isCustom: true
+        });
+      }
+    }
+
+    // Si hay errores críticos, no permitir check-in
+    const criticalErrors = inventoryErrors.filter(e => e.severity === 'critical');
+    if (criticalErrors.length > 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'No se puede completar el check-in debido a falta de inventario crítico',
+        data: {
+          criticalErrors,
+          warnings: inventoryErrors.filter(e => e.severity === 'warning')
+        }
+      });
+    }
+
+    // Actualizar estado de la reserva
     await booking.update({
-      status: "checked-in",
-      checkInTime: new Date(),
-      checkedInBy: req.buyer.sdocno,
+      status: 'checked-in',
+      actualCheckIn: new Date()
+    });
+
+    // Actualizar estado de la habitación
+    await booking.Room.update({
+      status: 'Ocupada',
+      available: false
     });
 
     res.json({
       error: false,
-      message: "Check-in realizado exitosamente",
-      data: booking,
+      message: 'Check-in realizado exitosamente',
+      data: {
+        booking: {
+          bookingId: booking.bookingId,
+          status: 'checked-in',
+          actualCheckIn: booking.actualCheckIn,
+          roomNumber: booking.roomNumber
+        },
+        inventoryAssigned: inventoryAssignments,
+        inventoryWarnings: inventoryErrors.filter(e => e.severity === 'warning')
+      }
     });
   } catch (error) {
     next(error);
@@ -615,45 +745,117 @@ const checkIn = async (req, res, next) => {
 const checkOut = async (req, res, next) => {
   try {
     const { bookingId } = req.params;
+    const { inventoryReturns = [] } = req.body; // [{basicInventoryId, quantityReturned, quantityConsumed, notes}]
+
     const booking = await Booking.findByPk(bookingId, {
-      include: [{ model: ExtraCharge }],
+      include: [
+        { model: Room },
+        {
+          model: BookingInventoryUsage,
+          as: 'inventoryUsages',
+          include: [
+            {
+              model: BasicInventory,
+              as: 'inventory'
+            }
+          ]
+        }
+      ]
     });
 
     if (!booking) {
-      throw new CustomError("Reserva no encontrada", 404);
+      return res.status(404).json({
+        error: true,
+        message: 'Reserva no encontrada'
+      });
     }
 
-    const currentStatus = booking.status.toLowerCase();
-    if (currentStatus !== "checked-in") {
-      let errorMessage = "Estado de reserva inválido para check-out";
-      if (currentStatus === "pending") {
-        errorMessage = "La reserva aún no ha realizado el check-in";
-      } else if (currentStatus === "cancelled") {
-        errorMessage =
-          "La reserva fue cancelada y no se puede proceder al check-out";
-      } else if (currentStatus === "completed") {
-        errorMessage = "El check-out ya fue realizado";
+    if (booking.status !== 'checked-in') {
+      return res.status(400).json({
+        error: true,
+        message: 'Solo se puede hacer check-out de reservas con check-in activo'
+      });
+    }
+
+    // ⭐ PROCESAR DEVOLUCIONES DE INVENTARIO
+    const processedReturns = [];
+    const laundryItems = [];
+
+    for (const usage of booking.inventoryUsages) {
+      const returnData = inventoryReturns.find(r => r.basicInventoryId === usage.basicInventoryId) || {};
+      const { quantityReturned = 0, quantityConsumed = 0, notes = '' } = returnData;
+
+      // Validar cantidades
+      const totalProcessed = quantityReturned + quantityConsumed;
+      if (totalProcessed > usage.quantityAssigned) {
+        return res.status(400).json({
+          error: true,
+          message: `Cantidad total procesada excede la asignada para ${usage.inventory.name}`
+        });
       }
-      throw new CustomError(errorMessage, 400);
+
+      // Actualizar registro de uso
+      await usage.update({
+        quantityReturned,
+        quantityConsumed,
+        status: quantityReturned > 0 ? 'returned' : 'consumed',
+        returnedAt: new Date(),
+        notes
+      });
+
+      // Procesar según tipo de inventario
+      if (usage.inventory.inventoryType === 'reusable' && quantityReturned > 0) {
+        // Items reutilizables van a stock sucio
+        await usage.inventory.update({
+          dirtyStock: usage.inventory.dirtyStock + quantityReturned
+        });
+
+        laundryItems.push({
+          item: usage.inventory.name,
+          quantity: quantityReturned,
+          fromRoom: booking.roomNumber
+        });
+      }
+
+      processedReturns.push({
+        item: usage.inventory.name,
+        type: usage.inventory.inventoryType,
+        assigned: usage.quantityAssigned,
+        returned: quantityReturned,
+        consumed: quantityConsumed,
+        status: usage.status
+      });
     }
 
-    // Suponiendo que calculateTotalAmount es una función que calcula el total a pagar
-    const bill = await Bill.create({
-      bookingId: bookingId,
-      totalAmount: calculateTotalAmount(booking),
-      generatedBy: req.buyer.sdocno,
+    // Actualizar estado de la reserva
+    await booking.update({
+      status: 'checked-out',
+      actualCheckOut: new Date()
     });
 
-    await booking.update({
-      status: "completed",
-      checkOutTime: new Date(),
-      checkedOutBy: req.buyer.sdocno,
+    // Actualizar estado de la habitación
+    await booking.Room.update({
+      status: 'Limpieza', // Necesita limpieza después del check-out
+      available: false // Disponible después de limpieza
     });
 
     res.json({
       error: false,
-      message: "Check-out realizado exitosamente",
-      data: { booking, bill },
+      message: 'Check-out realizado exitosamente',
+      data: {
+        booking: {
+          bookingId: booking.bookingId,
+          status: 'checked-out',
+          actualCheckOut: booking.actualCheckOut,
+          roomNumber: booking.roomNumber
+        },
+        inventoryProcessed: processedReturns,
+        laundryItems: laundryItems.length > 0 ? laundryItems : null,
+        nextActions: {
+          roomNeedsCleaning: true,
+          laundryRequired: laundryItems.length > 0
+        }
+      }
     });
   } catch (error) {
     next(error);
@@ -729,6 +931,182 @@ const addExtraCharges = async (req, res, next) => {
     next(error);
   }
 };
+
+const getBookingInventoryStatus = async (req, res, next) => {
+  try {
+    const { bookingId } = req.params;
+
+    const inventoryUsage = await BookingInventoryUsage.findAll({
+      where: { bookingId },
+      include: [
+        {
+          model: BasicInventory,
+          as: 'inventory',
+          attributes: ['id', 'name', 'inventoryType', 'category']
+        }
+      ]
+    });
+
+    if (inventoryUsage.length === 0) {
+      return res.json({
+        error: false,
+        message: 'No hay inventario asignado a esta reserva',
+        data: {
+          hasInventory: false,
+          items: []
+        }
+      });
+    }
+
+    // Procesar estado del inventario
+    const inventoryItems = inventoryUsage.map(usage => ({
+      id: usage.inventory.id,
+      name: usage.inventory.name,
+      type: usage.inventory.inventoryType,
+      category: usage.inventory.category,
+      quantityAssigned: usage.quantityAssigned,
+      quantityConsumed: usage.quantityConsumed,
+      quantityReturned: usage.quantityReturned,
+      status: usage.status,
+      assignedAt: usage.assignedAt,
+      returnedAt: usage.returnedAt,
+      notes: usage.notes
+    }));
+
+    const summary = {
+      hasInventory: true,
+      totalItems: inventoryItems.length,
+      totalAssigned: inventoryItems.reduce((sum, item) => sum + item.quantityAssigned, 0),
+      totalConsumed: inventoryItems.reduce((sum, item) => sum + item.quantityConsumed, 0),
+      totalReturned: inventoryItems.reduce((sum, item) => sum + item.quantityReturned, 0),
+      pendingReturn: inventoryItems.filter(item => item.status === 'assigned' || item.status === 'in_use').length,
+      readyForCheckOut: inventoryItems.every(item => item.status === 'returned' || item.status === 'consumed')
+    };
+
+    res.json({
+      error: false,
+      data: {
+        bookingId,
+        summary,
+        items: inventoryItems
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+const getInventoryUsageReport = async (req, res, next) => {
+  try {
+    const { startDate, endDate, roomNumber, inventoryType } = req.query;
+
+    const whereClause = {};
+    if (startDate && endDate) {
+      whereClause.assignedAt = {
+        [Op.between]: [new Date(startDate), new Date(endDate)]
+      };
+    }
+
+    const includeClause = [
+      {
+        model: BasicInventory,
+        as: 'inventory',
+        attributes: ['name', 'inventoryType', 'category'],
+        where: inventoryType ? { inventoryType } : {}
+      },
+      {
+        model: Booking,
+        as: 'booking',
+        attributes: ['bookingId', 'roomNumber', 'checkIn', 'checkOut'],
+        where: roomNumber ? { roomNumber } : {}
+      }
+    ];
+
+    const usageData = await BookingInventoryUsage.findAll({
+      where: whereClause,
+      include: includeClause,
+      order: [['assignedAt', 'DESC']]
+    });
+
+    // Procesar estadísticas
+    const stats = {
+      totalUsages: usageData.length,
+      itemStats: {},
+      roomStats: {},
+      typeStats: {}
+    };
+
+    usageData.forEach(usage => {
+      const itemName = usage.inventory.name;
+      const roomNum = usage.booking.roomNumber;
+      const itemType = usage.inventory.inventoryType;
+
+      // Estadísticas por item
+      if (!stats.itemStats[itemName]) {
+        stats.itemStats[itemName] = {
+          name: itemName,
+          type: itemType,
+          totalAssigned: 0,
+          totalConsumed: 0,
+          totalReturned: 0,
+          usageCount: 0
+        };
+      }
+      stats.itemStats[itemName].totalAssigned += usage.quantityAssigned;
+      stats.itemStats[itemName].totalConsumed += usage.quantityConsumed;
+      stats.itemStats[itemName].totalReturned += usage.quantityReturned;
+      stats.itemStats[itemName].usageCount += 1;
+
+      // Estadísticas por habitación
+      if (!stats.roomStats[roomNum]) {
+        stats.roomStats[roomNum] = {
+          roomNumber: roomNum,
+          totalAssignments: 0,
+          uniqueItems: new Set()
+        };
+      }
+      stats.roomStats[roomNum].totalAssignments += 1;
+      stats.roomStats[roomNum].uniqueItems.add(itemName);
+
+      // Estadísticas por tipo
+      if (!stats.typeStats[itemType]) {
+        stats.typeStats[itemType] = {
+          type: itemType,
+          totalAssigned: 0,
+          totalConsumed: 0,
+          totalReturned: 0
+        };
+      }
+      stats.typeStats[itemType].totalAssigned += usage.quantityAssigned;
+      stats.typeStats[itemType].totalConsumed += usage.quantityConsumed;
+      stats.typeStats[itemType].totalReturned += usage.quantityReturned;
+    });
+
+    // Convertir Sets a números
+    Object.keys(stats.roomStats).forEach(room => {
+      stats.roomStats[room].uniqueItems = stats.roomStats[room].uniqueItems.size;
+    });
+
+    res.json({
+      error: false,
+      data: {
+        period: { startDate, endDate },
+        filters: { roomNumber, inventoryType },
+        statistics: {
+          ...stats,
+          itemStats: Object.values(stats.itemStats),
+          roomStats: Object.values(stats.roomStats),
+          typeStats: Object.values(stats.typeStats)
+        },
+        usageDetails: usageData
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 const generateBill = async (req, res) => {
   const { bookingId } = req.params;
@@ -986,4 +1364,6 @@ module.exports = {
   getRevenueReport,
   getBookingByToken,
   updateOnlinePayment,
+  getBookingInventoryStatus, // ⭐ NUEVOn
+  getInventoryUsageReport, // ⭐ NUEVO
 };
