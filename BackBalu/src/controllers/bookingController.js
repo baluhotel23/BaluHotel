@@ -3,6 +3,7 @@ const {
   Room, 
   Buyer, 
   ExtraCharge, 
+  Service,
   Bill, 
   Payment, 
   RegistrationPass,
@@ -19,48 +20,84 @@ const PDFDocument = require("pdfkit");
 const checkAvailability = async (req, res) => {
   try {
     const { checkIn, checkOut, roomType } = req.query;
+    
+    console.log('🔍 checkAvailability called with:', { checkIn, checkOut, roomType });
 
     const where = {};
     if (roomType) where.type = roomType;
 
-    // Get all rooms with their bookings
     const rooms = await Room.findAll({
       where,
       include: [
         {
           model: Booking,
           attributes: ["bookingId", "checkIn", "checkOut", "status"],
-          // Remove the where clause to get ALL bookings
           required: false,
         },
         {
           model: Service,
           through: { attributes: [] },
         },
+        {
+          model: BasicInventory,
+          as: 'BasicInventories',
+          attributes: ['id', 'name', 'inventoryType'],
+          through: { 
+            attributes: ['quantity'],
+            as: 'RoomBasics'
+          },
+          required: false
+        }
       ],
     });
 
-    // Process rooms to include availability info
+    console.log(`📊 Found ${rooms.length} rooms`);
+
     const roomsWithAvailability = rooms.map((room) => {
-      // Filter active bookings (not cancelled)
-      const activeBookings = room.Bookings.filter(
+      const activeBookings = (room.Bookings || []).filter(
         (booking) => booking.status !== "cancelled"
       );
 
-      // Check if room is available for requested dates
-      const isAvailable = !activeBookings.some((booking) => {
-        const bookingStart = new Date(booking.checkIn);
-        const bookingEnd = new Date(booking.checkOut);
-        const requestStart = new Date(checkIn);
-        const requestEnd = new Date(checkOut);
+      // ⭐ NUEVA LÓGICA DE DISPONIBILIDAD
+      let isAvailable = true;
+      
+      // 1. Verificar conflictos de fechas primero
+      if (checkIn && checkOut) {
+        isAvailable = !activeBookings.some((booking) => {
+          const bookingStart = new Date(booking.checkIn);
+          const bookingEnd = new Date(booking.checkOut);
+          const requestStart = new Date(checkIn);
+          const requestEnd = new Date(checkOut);
 
-        return (
-          (bookingStart <= requestEnd && bookingEnd >= requestStart) ||
-          (requestStart <= bookingEnd && requestEnd >= bookingStart)
-        );
-      });
+          return (
+            (bookingStart <= requestEnd && bookingEnd >= requestStart) ||
+            (requestStart <= bookingEnd && requestEnd >= bookingStart)
+          );
+        });
+      }
 
-      // Get all booked dates
+      // 2. ⭐ LÓGICA DE ESTADO DE HABITACIÓN MEJORADA
+      // Solo marcar como NO disponible si está realmente fuera de servicio
+      if (!room.isActive) {
+        isAvailable = false;
+        console.log(`🚫 Room ${room.roomNumber}: Not active`);
+      }
+      
+      // ⭐ ESTADOS QUE IMPIDEN RESERVAS
+      if (room.status === 'out_of_order' || room.status === 'maintenance' || room.status === 'blocked') {
+        isAvailable = false;
+        console.log(`🚫 Room ${room.roomNumber}: Status ${room.status} prevents booking`);
+      }
+      
+      // ⭐ ESTADOS QUE PERMITEN RESERVAS (aunque necesiten preparación)
+      const bookableStatuses = ['Para Limpiar', 'available', 'clean', 'ready', null, undefined];
+      if (bookableStatuses.includes(room.status)) {
+        // Mantener la disponibilidad basada solo en conflictos de fechas
+        console.log(`✅ Room ${room.roomNumber}: Status ${room.status} allows booking`);
+      }
+      
+      console.log(`🏨 Room ${room.roomNumber}: available=${room.available}, status=${room.status}, isAvailable=${isAvailable}`);
+
       const bookedDates = activeBookings.map((booking) => ({
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
@@ -71,14 +108,37 @@ const checkAvailability = async (req, res) => {
         roomNumber: room.roomNumber,
         type: room.type,
         price: room.price,
+        priceSingle: room.priceSingle,
+        priceDouble: room.priceDouble,
+        priceMultiple: room.priceMultiple,
+        pricePerExtraGuest: room.pricePerExtraGuest,
+        isPromo: room.isPromo,
+        promotionPrice: room.promotionPrice,
         maxGuests: room.maxGuests,
         description: room.description,
         image_url: room.image_url,
+        available: room.available, // Mantener el campo original
+        isActive: room.isActive,
+        status: room.status,
         Services: room.Services,
-        isAvailable,
+        BasicInventories: room.BasicInventories,
+        isAvailable, // ⭐ NUEVA LÓGICA APLICADA
         bookedDates,
         currentBookings: activeBookings.length,
+        // ⭐ INFORMACIÓN ADICIONAL PARA DEBUG
+        availabilityReason: isAvailable ? 'Available for booking' : 
+          !room.isActive ? 'Room not active' : 
+          ['out_of_order', 'maintenance', 'blocked'].includes(room.status) ? `Room status: ${room.status}` :
+          'Date conflict with existing booking'
       };
+    });
+
+    console.log(`✅ Processed ${roomsWithAvailability.length} rooms with availability`);
+    console.log(`🏠 Available rooms: ${roomsWithAvailability.filter(r => r.isAvailable).length}`);
+    
+    // ⭐ LOG DETALLADO DE DISPONIBILIDAD
+    roomsWithAvailability.forEach(room => {
+      console.log(`🏨 Room ${room.roomNumber}: ${room.isAvailable ? '✅ AVAILABLE' : '❌ NOT AVAILABLE'} - ${room.availabilityReason}`);
     });
 
     res.json({
@@ -87,6 +147,7 @@ const checkAvailability = async (req, res) => {
       data: roomsWithAvailability,
     });
   } catch (error) {
+    console.error('❌ Error in checkAvailability:', error);
     res.status(500).json({
       error: true,
       message: "Error al consultar disponibilidad",

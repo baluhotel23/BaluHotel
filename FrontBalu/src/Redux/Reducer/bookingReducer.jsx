@@ -93,23 +93,45 @@ const initialState = {
 };
 
 const bookingReducer = (state = initialState, action) => {
+  console.log('📮 [REDUCER] Action received:', {
+    type: action.type,
+    payloadType: typeof action.payload,
+    payloadLength: Array.isArray(action.payload) ? action.payload.length : 'not array',
+    timestamp: new Date().toISOString()
+  });
+  
   switch (action.type) {
-    
-    // ⭐ CHECK AVAILABILITY - YA OPTIMIZADO
     case "CHECK_AVAILABILITY_REQUEST":
+      console.log('🔄 [REDUCER] Setting loading to true');
       return { 
         ...state, 
         loading: { ...state.loading, availability: true }, 
         errors: { ...state.errors, availability: null } 
       };
+      
     case "CHECK_AVAILABILITY_SUCCESS":
-      return { 
+      console.log('✅ [REDUCER] Processing SUCCESS:', {
+        payloadLength: action.payload?.length,
+        payload: action.payload
+      });
+      
+      const newState = { 
         ...state, 
         loading: { ...state.loading, availability: false },
         availability: action.payload,
         cache: { ...state.cache, lastUpdated: Date.now() }
       };
+      
+      console.log('📊 [REDUCER] New state created:', {
+        availabilityLength: newState.availability?.length,
+        loading: newState.loading.availability,
+        cacheUpdated: newState.cache.lastUpdated
+      });
+      
+      return newState;
+      
     case "CHECK_AVAILABILITY_FAILURE":
+      console.log('❌ [REDUCER] Processing FAILURE:', action.payload);
       return { 
         ...state, 
         loading: { ...state.loading, availability: false },

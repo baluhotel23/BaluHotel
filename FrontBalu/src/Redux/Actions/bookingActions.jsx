@@ -5,14 +5,104 @@ import { toast } from 'react-toastify';
 
 // CHECK AVAILABILITY
 export const checkAvailability = (params) => async (dispatch) => {
+  console.log('🚀 [ACTION] checkAvailability started with params:', params);
+  
+  // ⭐ VALIDAR PARÁMETROS ANTES DE ENVIAR
+  if (!params || !params.checkIn || !params.checkOut || !params.roomType) {
+    console.error('❌ [ACTION] Invalid parameters:', params);
+    dispatch({ 
+      type: 'CHECK_AVAILABILITY_FAILURE', 
+      payload: 'Parámetros inválidos para búsqueda de disponibilidad' 
+    });
+    return;
+  }
+  
   dispatch({ type: 'CHECK_AVAILABILITY_REQUEST' });
+  console.log('✅ [ACTION] REQUEST dispatched');
+  
   try {
-    const { data } = await api.get('/bookings/availability', { params });
-    dispatch({ type: 'CHECK_AVAILABILITY_SUCCESS', payload: data.data });
+    console.log('📡 [ACTION] Making API call to /bookings/availability');
+    console.log('📋 [ACTION] Request details:', {
+      url: '/bookings/availability',
+      method: 'GET',
+      params: params,
+      timestamp: new Date().toISOString()
+    });
+    
+    const response = await api.get('/bookings/availability', { params });
+    
+    console.log('📥 [ACTION] Response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+      data: response.data
+    });
+    
+    const { data } = response;
+    
+    // ⭐ VALIDACIÓN EXHAUSTIVA DE LA RESPUESTA
+    console.log('🔍 [ACTION] Response validation:');
+    console.log('  - data exists:', !!data);
+    console.log('  - data.error:', data?.error);
+    console.log('  - data.message:', data?.message);
+    console.log('  - data.data exists:', !!data?.data);
+    console.log('  - data.data is array:', Array.isArray(data?.data));
+    console.log('  - data.data length:', data?.data?.length || 0);
+    
+    if (data?.data && Array.isArray(data.data)) {
+      console.log('🏨 [ACTION] Rooms details:');
+      data.data.forEach((room, index) => {
+        console.log(`  ${index + 1}. Room ${room.roomNumber}:`, {
+          type: room.type,
+          available: room.available,
+          isActive: room.isActive,
+          status: room.status,
+          isAvailable: room.isAvailable
+        });
+      });
+      
+      const availableCount = data.data.filter(r => r.isAvailable).length;
+      console.log(`📊 [ACTION] Availability summary: ${availableCount}/${data.data.length} rooms available`);
+    }
+    
+    // ⭐ DISPATCH SUCCESS
+    if (data && !data.error && data.data && Array.isArray(data.data)) {
+      console.log('✅ [ACTION] Dispatching SUCCESS with payload:', data.data);
+      dispatch({ 
+        type: 'CHECK_AVAILABILITY_SUCCESS', 
+        payload: data.data 
+      });
+      console.log('🎯 [ACTION] SUCCESS dispatched successfully');
+      
+      // ⭐ VERIFICAR QUE SE HAYA ENVIADO CORRECTAMENTE
+      setTimeout(() => {
+        console.log('⏰ [ACTION] Delayed check - action should be in Redux now');
+      }, 100);
+      
+    } else {
+      console.warn('⚠️ [ACTION] Unexpected response structure, dispatching empty array');
+      dispatch({ 
+        type: 'CHECK_AVAILABILITY_SUCCESS', 
+        payload: [] 
+      });
+    }
+    
   } catch (error) {
-    const errorMessage =
-      error.response?.data?.message || 'Error al consultar disponibilidad';
-    dispatch({ type: 'CHECK_AVAILABILITY_FAILURE', payload: errorMessage });
+    console.error('❌ [ACTION] Error caught:', error);
+    console.error('❌ [ACTION] Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      config: error.config
+    });
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Error al consultar disponibilidad';
+    dispatch({ 
+      type: 'CHECK_AVAILABILITY_FAILURE', 
+      payload: errorMessage 
+    });
+    console.log('💥 [ACTION] FAILURE dispatched with error:', errorMessage);
   }
 };
 

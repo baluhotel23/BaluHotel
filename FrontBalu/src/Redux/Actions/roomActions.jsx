@@ -64,14 +64,57 @@ export const searchRoomByInput = (roomNumber) => async (dispatch) => {
 };
 
 // Verificar disponibilidad (se espera que "dates" tenga el formato requerido)
-export const checkAvailability = (dates) => async (dispatch) => {
+export const checkAvailability = (params) => async (dispatch) => {
+  console.log('🚀 Redux checkAvailability called with params:', params);
   dispatch({ type: 'CHECK_AVAILABILITY_REQUEST' });
+  
   try {
-    const { data } = await api.get(`/rooms/availability/${dates}`);
-    dispatch({ type: 'CHECK_AVAILABILITY_SUCCESS', payload: data });
+    console.log('📡 Making request to /bookings/availability with params:', params);
+    
+    // ⭐ DEBUGGING: Verificar estructura de params
+    console.log('🔍 Params structure:');
+    console.log('  - checkIn:', params.checkIn);
+    console.log('  - checkOut:', params.checkOut);
+    console.log('  - roomType:', params.roomType);
+    
+    const { data } = await api.get('/bookings/availability', { params });
+    console.log('📥 Full response received from backend:', data);
+    
+    // ⭐ LOG DETALLADO DE CADA HABITACIÓN
+    if (data.data && Array.isArray(data.data)) {
+      console.log('🏨 Rooms received:');
+      data.data.forEach((room, index) => {
+        console.log(`  ${index + 1}. Room ${room.roomNumber} - Available: ${room.isAvailable} - Status: ${room.status} - Active: ${room.isActive}`);
+      });
+      
+      const availableCount = data.data.filter(r => r.isAvailable).length;
+      const totalCount = data.data.length;
+      console.log(`📊 Summary: ${availableCount}/${totalCount} rooms available`);
+    }
+    
+    if (data && !data.error && data.data && Array.isArray(data.data)) {
+      console.log('✅ Dispatching SUCCESS with', data.data.length, 'rooms');
+      dispatch({ 
+        type: 'CHECK_AVAILABILITY_SUCCESS', 
+        payload: data.data 
+      });
+      console.log('🎯 Action dispatched successfully');
+    } else {
+      console.warn('⚠️ Backend response structure unexpected:', data);
+      dispatch({ 
+        type: 'CHECK_AVAILABILITY_SUCCESS', 
+        payload: [] 
+      });
+    }
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Error al verificar disponibilidad';
-    dispatch({ type: 'CHECK_AVAILABILITY_FAILURE', payload: errorMessage });
+    console.error('❌ Error in checkAvailability action:', error);
+    console.error('❌ Error response:', error.response?.data);
+    console.error('❌ Error status:', error.response?.status);
+    const errorMessage = error.response?.data?.message || 'Error al consultar disponibilidad';
+    dispatch({ 
+      type: 'CHECK_AVAILABILITY_FAILURE', 
+      payload: errorMessage 
+    });
   }
 };
 
