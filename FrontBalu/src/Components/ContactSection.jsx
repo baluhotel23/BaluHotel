@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMapMarkerAlt, faEnvelope, faPhone, faClock, faDirections } from '@fortawesome/free-solid-svg-icons';
 import { faInstagram, faFacebook, faWhatsapp } from '@fortawesome/free-brands-svg-icons';
+import image from '../../public/hotel.jpg'; // Import your main image
+
 
 const ContactSection = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -75,7 +77,7 @@ const ContactSection = () => {
               <div className="bg-white p-6 rounded-2xl shadow-lg border-l-4 border-yellow-600 hover:shadow-xl transition-all duration-300 relative overflow-hidden"
                    style={{ 
                      boxShadow: '0 0 0 3px rgba(255, 255, 255, 0.2), 0 15px 35px -10px rgba(0, 0, 0, 0.15)',
-                     backgroundImage: `url('/src/assets/hotel.jpg')`,
+                     backgroundImage: `url(${image})`,
                      backgroundSize: 'cover',
                      backgroundPosition: 'right center'
                    }}>
@@ -96,7 +98,7 @@ const ContactSection = () => {
               <div className="bg-white p-6 rounded-2xl shadow-lg border-l-4 border-yellow-600 hover:shadow-xl transition-all duration-300 relative overflow-hidden"
                    style={{ 
                      boxShadow: '0 0 0 3px rgba(255, 255, 255, 0.6), 0 15px 35px -10px rgba(0, 0, 0, 0.15)',
-                     backgroundImage: `url('/src/assets/recepcion.jpg')`,
+                     backgroundImage: `url('/recepcion.jpg')`,
                      backgroundSize: 'cover',
                      backgroundPosition: 'right center'
                    }}>
@@ -134,7 +136,7 @@ const ContactSection = () => {
               <div className="bg-white p-6 rounded-2xl shadow-lg border-l-4 border-yellow-600 hover:shadow-xl transition-all duration-300 relative overflow-hidden"
                    style={{ 
                      boxShadow: '0 0 0 3px rgba(255, 255, 255, 0.2), 0 15px 35px -10px rgba(0, 0, 0, 0.15)',
-                     backgroundImage: `url('/src/assets/hotel2.jpg')`,
+                     backgroundImage: `url('/hotel2.jpg')`,
                      backgroundSize: 'cover',
                      backgroundPosition: 'right center'
                    }}>
@@ -197,7 +199,7 @@ const ContactSection = () => {
               <div 
                 className="h-96 md:h-[500px] rounded-2xl bg-cover bg-center shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden relative"
                 style={{ 
-                  backgroundImage: `url('/src/assets/hotel.jpg')`, // Imagen del exterior del hotel
+                  backgroundImage: `url('/hotel.jpg')`, // Imagen del exterior del hotel
                   boxShadow: '0 0 0 4px rgba(255, 255, 255, 0.2), 0 20px 40px -15px rgba(0, 0, 0, 0.3)'
                 }}
               >
@@ -245,7 +247,7 @@ const ContactSection = () => {
                 <div 
                   className="h-32 rounded-xl bg-cover bg-center shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden"
                   style={{ 
-                    backgroundImage: `url('/src/assets/religioso.jpeg')`, // Imagen del centro de Restrepo
+                    backgroundImage: `url('/religioso.jpeg')`, // Imagen del centro de Restrepo
                     boxShadow: '0 0 0 3px rgba(255, 255, 255, 0.2), 0 10px 25px -8px rgba(0, 0, 0, 0.2)'
                   }}
                 >
@@ -257,7 +259,7 @@ const ContactSection = () => {
                 <div 
                   className="h-32 rounded-xl bg-cover bg-center shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden"
                   style={{ 
-                    backgroundImage: `url('/src/assets/actividad.jpeg')`, // Imagen de los llanos
+                    backgroundImage: `url('/actividad.jpeg')`, // Imagen de los llanos
                     boxShadow: '0 0 0 3px rgba(255, 255, 255, 0.2), 0 10px 25px -8px rgba(0, 0, 0, 0.2)'
                   }}
                 >

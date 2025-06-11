@@ -33,7 +33,7 @@ const ActivitiesShowcase = () => {
       icon: "🦅",
       title: "Avistamiento de Aves",
       description: "Un paraíso para los amantes de la ornitología y la fotografía. Observa especies únicas en su hábitat natural, entre humedales y reservas llenas de vida.",
-      image: "/src/assets/avistamiento.jpg", // Asegúrate que esta imagen exista
+      image: "/avistamiento.jpg", // Asegúrate que esta imagen exista
       colorTheme: "yellow",
       features: ["Observa especies únicas en humedales y reservas naturales", "Ideal para amantes de la fotografía y la naturaleza"]
     },
@@ -42,7 +42,7 @@ const ActivitiesShowcase = () => {
       icon: "🌿",
       title: "Aventura y Naturaleza",
       description: "Explora la belleza indómita del llano. Siente la adrenalina en emocionantes cabalgatas, descubre senderos ecológicos y refréscate en cascadas escondidas y ríos cristalinos.",
-      image: "/src/assets/actividad.jpeg", // Asegúrate que esta imagen exista
+      image: "/actividad.jpeg", // Asegúrate que esta imagen exista
       colorTheme: "yellow",
       features: ["Cabalgatas y caminatas por ríos y caños", "Senderismo", "Cascadas escondidas", "Rutas ecológicas"]
     },
@@ -51,7 +51,7 @@ const ActivitiesShowcase = () => {
       icon: "⛪",
       title: "Turismo Religioso",
       description: "Conéctate con la profunda fe y las tradiciones ancestrales de nuestra región. Visita el emblemático Santuario y participa en celebraciones llenas de devoción.",
-      image: "/src/assets/religioso.jpeg", // Asegúrate que esta imagen exista
+      image: "/religioso.jpeg", // Asegúrate que esta imagen exista
       colorTheme: "yellow",
       features: ["Visita al emblematico Santuario La Inmaculada Concepción", "Peregrinaciones y celebraciones tradicionales, semana santa, viacrusis a Miralindo"]
     },
@@ -61,7 +61,7 @@ const ActivitiesShowcase = () => {
       icon: "🍖",
       title: "Gastronomía Llanera",
       description: "Deléitate con los sabores auténticos de la cocina llanera. Prueba la tradicional mamona, hayacas caseras y tungos, en un ambiente festivo con música en vivo.",
-      image: "/src/assets/resto.jpg", // Asegúrate que esta imagen exista
+      image: "/resto.jpg", // Asegúrate que esta imagen exista
       colorTheme: "yellow",
       features: ["Mamona hayacas, tungos y más", "Restaurantes con música  en vivo", "Ambiente 100% llanero"]
     }
