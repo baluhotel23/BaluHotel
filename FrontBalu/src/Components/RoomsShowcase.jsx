@@ -33,7 +33,7 @@ const RoomsShowcase = () => {
       title: "Habitación Doble",
       description: "Ambiente íntimo, ideal para estar cómodo, de visita o viajes de trabajo.",
       features: ["Aire acondicionado/ventilador", "Televisión", "WiFi", "Baño privado", "Parqueadero privado"],
-      image: "/src/assets/hab5.jpg",
+      image: "/hab5.jpg",
       maxGuests: 2
     },
     {
@@ -41,7 +41,7 @@ const RoomsShowcase = () => {
       title: "Habitación para Parejas",
       description: "Ambiente íntimo, ideal para parejas o viajes de trabajo.",
       features: ["Aire acondicionado/ventilador", "Televisión", "WiFi", "Baño privado", "Parqueadero privado"],
-      image: "/src/assets/hab4.jpg",
+      image: "/hab4.jpg",
       maxGuests: 3
     },
     {
@@ -49,7 +49,7 @@ const RoomsShowcase = () => {
       title: "Habitación Familiar",
       description: "Perfecta para compartir en familia o con amigos, sin perder el confort.",
       features: ["Aire acondicionado/ventilador", "Televisión", "WiFi", "Baño privado", "Parqueadero privado"],
-      image: "/src/assets/hab3.jpg",
+      image: "/hab3.jpg",
       maxGuests: 8,
       
     }
