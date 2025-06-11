@@ -895,7 +895,9 @@ const getAllBookings = async (req, res, next) => {
       status, 
       roomNumber, 
       guestId,
-      includeInventory = false 
+      includeInventory = false,
+      fromDate,
+      toDate
     } = req.query;
 
     const where = {};
@@ -903,17 +905,55 @@ const getAllBookings = async (req, res, next) => {
     if (roomNumber) where.roomNumber = roomNumber;
     if (guestId) where.guestId = guestId;
 
+    // ⭐ FILTRO POR FECHAS DE CHECK-IN
+    if (fromDate || toDate) {
+      where.checkIn = {};
+      if (fromDate) where.checkIn[Op.gte] = new Date(fromDate);
+      if (toDate) where.checkIn[Op.lte] = new Date(toDate + 'T23:59:59.999Z');
+    }
+
     const includeOptions = [
       { 
         model: Room,
-        // ⭐ AGREGAR EL ALIAS CORRECTO (probablemente 'room' o similar)
-        as: 'room', // ⭐ PRUEBA PRIMERO CON 'room'
-        attributes: ['roomNumber', 'type', 'status']
+        as: 'room',
+        attributes: ['roomNumber', 'type', 'status'],
+        // ⭐ INCLUIR INVENTARIO BÁSICO DE LA HABITACIÓN
+        include: [
+          {
+            model: BasicInventory,
+            as: 'BasicInventories',
+            attributes: ['id', 'name', 'description', 'currentStock'],
+            through: {
+              attributes: ['quantity'], // ⭐ CANTIDAD ASIGNADA A LA HABITACIÓN
+              as: 'RoomBasics'
+            }
+          }
+        ]
       },
       { 
         model: Buyer, 
         as: "guest", 
         attributes: ["sdocno", "scostumername"] 
+      },
+      // ⭐ INCLUIR PAGOS - INFORMACIÓN CRUCIAL PARA CHECK-IN
+      {
+        model: Payment,
+        as: 'payments',
+        attributes: [
+          'paymentId', 
+          'amount', 
+          'paymentMethod', 
+          'paymentStatus', 
+          'paymentDate', 
+          'paymentType', 
+          'transactionId',
+          'paymentReference'
+        ],
+        // ⭐ SOLO PAGOS COMPLETADOS
+        where: {
+          paymentStatus: ['completed', 'pending'] // ⭐ INCLUIR PENDING TAMBIÉN
+        },
+        required: false // ⭐ LEFT JOIN - incluir reservas sin pagos
       }
     ];
 
@@ -929,22 +969,57 @@ const getAllBookings = async (req, res, next) => {
             as: 'inventory',
             attributes: ['name', 'inventoryType']
           }
-        ]
+        ],
+        required: false
       });
     }
 
     const { count, rows } = await Booking.findAndCountAll({
       where,
       include: includeOptions,
-      order: [['createdAt', 'DESC']],
+      order: [
+        ['createdAt', 'DESC'],
+        // ⭐ ORDENAR PAGOS POR FECHA (MÁS RECIENTE PRIMERO)
+        [{ model: Payment, as: 'payments' }, 'paymentDate', 'DESC']
+      ],
       limit: parseInt(limit),
-      offset: (parseInt(page) - 1) * parseInt(limit)
+      offset: (parseInt(page) - 1) * parseInt(limit),
+      distinct: true // ⭐ EVITAR DUPLICADOS POR MÚLTIPLES PAGOS
     });
 
-    // ⭐ PROCESAR DATOS CON ESTADO DE INVENTARIO
-    const bookingsWithInventoryStatus = rows.map(booking => {
+    // ⭐ PROCESAR DATOS CON ESTADO DE INVENTARIO Y PAGOS
+    const bookingsWithAllInfo = rows.map(booking => {
       const bookingData = booking.toJSON();
       
+      // ⭐ CALCULAR INFORMACIÓN DE PAGOS
+      if (bookingData.payments && bookingData.payments.length > 0) {
+        const totalPaid = bookingData.payments
+          .filter(p => p.paymentStatus === 'completed')
+          .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
+        
+        const totalAmount = parseFloat(bookingData.totalAmount || 0);
+        
+        bookingData.paymentInfo = {
+          totalPaid,
+          totalAmount,
+          balance: totalAmount - totalPaid,
+          paymentStatus: totalPaid >= totalAmount ? 'fully_paid' : 
+                        totalPaid > 0 ? 'partially_paid' : 'unpaid',
+          paymentCount: bookingData.payments.length,
+          lastPayment: bookingData.payments[0] // ⭐ MÁS RECIENTE POR EL ORDER BY
+        };
+      } else {
+        bookingData.paymentInfo = {
+          totalPaid: 0,
+          totalAmount: parseFloat(bookingData.totalAmount || 0),
+          balance: parseFloat(bookingData.totalAmount || 0),
+          paymentStatus: 'unpaid',
+          paymentCount: 0,
+          lastPayment: null
+        };
+      }
+      
+      // ⭐ INFORMACIÓN DE INVENTARIO SI SE SOLICITA
       if (includeInventory === 'true' && bookingData.inventoryUsages) {
         bookingData.inventoryStatus = {
           hasInventoryAssigned: bookingData.inventoryUsages.length > 0,
@@ -961,7 +1036,7 @@ const getAllBookings = async (req, res, next) => {
     res.json({
       error: false,
       data: {
-        bookings: bookingsWithInventoryStatus,
+        bookings: bookingsWithAllInfo,
         pagination: {
           total: count,
           page: parseInt(page),
