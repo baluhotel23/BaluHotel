@@ -84,24 +84,59 @@ const initialState = {
   }
 };
 
-const roomReducer = (state = initialState, action) => {
-  switch (action.type) {
+
     
     // ⭐ HABITACIONES PRINCIPALES - OPTIMIZADO
+   const roomReducer = (state = initialState, action) => {
+  console.log('📮 [REDUCER] Action recibida:', {
+    type: action.type,
+    payloadType: typeof action.payload,
+    payloadLength: Array.isArray(action.payload) ? action.payload.length : 'not array',
+    timestamp: new Date().toISOString()
+  });
+  
+  switch (action.type) {
     case "GET_ROOMS_REQUEST":
+      console.log('🔄 [REDUCER] GET_ROOMS_REQUEST - Setting loading');
       return { 
         ...state, 
         loading: { ...state.loading, rooms: true }, 
         errors: { ...state.errors, rooms: null } 
       };
+      
     case "GET_ROOMS_SUCCESS":
-      return { 
-        ...state, 
-        loading: { ...state.loading, rooms: false }, 
-        rooms: action.payload,
-        cache: { ...state.cache, roomsLastFetch: Date.now() }
-      };
+      console.log('✅ [REDUCER] GET_ROOMS_SUCCESS recibido');
+      console.log('📊 [REDUCER] Payload:', action.payload);
+      console.log('🔢 [REDUCER] Cantidad:', action.payload?.length);
+      
+      // ⭐ VALIDAR PAYLOAD ANTES DE ACTUALIZAR ESTADO
+      if (Array.isArray(action.payload)) {
+        console.log('🎯 [REDUCER] Payload válido, actualizando estado');
+        const newState = { 
+          ...state, 
+          loading: { ...state.loading, rooms: false }, 
+          rooms: action.payload,
+          cache: { ...state.cache, roomsLastFetch: Date.now() }
+        };
+        
+        console.log('📋 [REDUCER] Nuevo estado creado:', {
+          roomsLength: newState.rooms.length,
+          loading: newState.loading.rooms,
+          cacheUpdated: newState.cache.roomsLastFetch
+        });
+        
+        return newState;
+      } else {
+        console.error('❌ [REDUCER] Payload no es un array:', action.payload);
+        return { 
+          ...state, 
+          loading: { ...state.loading, rooms: false }, 
+          errors: { ...state.errors, rooms: 'Payload inválido' }
+        };
+      }
+      
     case "GET_ROOMS_FAILURE":
+      console.log('❌ [REDUCER] GET_ROOMS_FAILURE:', action.payload);
       return { 
         ...state, 
         loading: { ...state.loading, rooms: false }, 

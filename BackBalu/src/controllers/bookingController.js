@@ -16,6 +16,17 @@ const { CustomError } = require('../middleware/error');
 const jwt = require("jsonwebtoken");
 const PDFDocument = require("pdfkit");
 
+const { 
+  getColombiaTime, 
+  getColombiaDate, 
+  formatColombiaDate, 
+  formatForLogs,
+  formatForDetailedLogs,
+  isBeforeToday,
+  getDaysDifference 
+} = require('../utils/dateUtils');
+
+
 // Public endpoints
 const checkAvailability = async (req, res) => {
   try {
@@ -31,11 +42,13 @@ const checkAvailability = async (req, res) => {
       include: [
         {
           model: Booking,
+          as: 'bookings', // ⭐ AGREGAR EL ALIAS CORRECTO
           attributes: ["bookingId", "checkIn", "checkOut", "status"],
           required: false,
         },
         {
           model: Service,
+          as: 'Services', // ⭐ AGREGAR EL ALIAS CORRECTO
           through: { attributes: [] },
         },
         {
@@ -54,16 +67,32 @@ const checkAvailability = async (req, res) => {
     console.log(`📊 Found ${rooms.length} rooms`);
 
     const roomsWithAvailability = rooms.map((room) => {
-      const activeBookings = (room.Bookings || []).filter(
+      // ⭐ USAR EL ALIAS CORRECTO
+      const activeBookings = (room.bookings || []).filter(
         (booking) => booking.status !== "cancelled"
       );
 
-      // ⭐ NUEVA LÓGICA DE DISPONIBILIDAD
+      // ⭐ NUEVA LÓGICA DE DISPONIBILIDAD MEJORADA
       let isAvailable = true;
+      let unavailabilityReason = null;
+
+      // 1. ⭐ VERIFICAR ESTADO DE LA HABITACIÓN PRIMERO
+      if (!room.isActive) {
+        isAvailable = false;
+        unavailabilityReason = 'Room not active';
+        console.log(`🚫 Room ${room.roomNumber}: Not active`);
+      }
       
-      // 1. Verificar conflictos de fechas primero
-      if (checkIn && checkOut) {
-        isAvailable = !activeBookings.some((booking) => {
+      // 2. ⭐ ESTADOS QUE IMPIDEN RESERVAS - USAR LOS ESTADOS CORRECTOS DE TU MODELO
+      else if (['Mantenimiento'].includes(room.status)) {
+        isAvailable = false;
+        unavailabilityReason = `Room status: ${room.status}`;
+        console.log(`🚫 Room ${room.roomNumber}: Status ${room.status} prevents booking`);
+      }
+      
+      // 3. ⭐ VERIFICAR CONFLICTOS DE FECHAS SOLO SI LA HABITACIÓN ESTÁ OPERATIVA
+      else if (checkIn && checkOut) {
+        const hasDateConflict = activeBookings.some((booking) => {
           const bookingStart = new Date(booking.checkIn);
           const bookingEnd = new Date(booking.checkOut);
           const requestStart = new Date(checkIn);
@@ -74,26 +103,25 @@ const checkAvailability = async (req, res) => {
             (requestStart <= bookingEnd && requestEnd >= bookingStart)
           );
         });
-      }
 
-      // 2. ⭐ LÓGICA DE ESTADO DE HABITACIÓN MEJORADA
-      // Solo marcar como NO disponible si está realmente fuera de servicio
-      if (!room.isActive) {
-        isAvailable = false;
-        console.log(`🚫 Room ${room.roomNumber}: Not active`);
+        if (hasDateConflict) {
+          isAvailable = false;
+          unavailabilityReason = 'Date conflict with existing booking';
+          console.log(`🚫 Room ${room.roomNumber}: Date conflict`);
+        }
       }
       
-      // ⭐ ESTADOS QUE IMPIDEN RESERVAS
-      if (room.status === 'out_of_order' || room.status === 'maintenance' || room.status === 'blocked') {
-        isAvailable = false;
-        console.log(`🚫 Room ${room.roomNumber}: Status ${room.status} prevents booking`);
-      }
-      
-      // ⭐ ESTADOS QUE PERMITEN RESERVAS (aunque necesiten preparación)
-      const bookableStatuses = ['Para Limpiar', 'available', 'clean', 'ready', null, undefined];
-      if (bookableStatuses.includes(room.status)) {
-        // Mantener la disponibilidad basada solo en conflictos de fechas
+      // ⭐ ESTADOS QUE PERMITEN RESERVAS (SEGÚN TU MODELO)
+      const bookableStatuses = ['Limpia', 'Para Limpiar'];
+      if (bookableStatuses.includes(room.status) && room.isActive) {
         console.log(`✅ Room ${room.roomNumber}: Status ${room.status} allows booking`);
+      }
+      
+      // ⭐ NO PERMITIR RESERVAS EN HABITACIONES OCUPADAS
+      if (room.status === 'Ocupada') {
+        isAvailable = false;
+        unavailabilityReason = 'Room is currently occupied';
+        console.log(`🚫 Room ${room.roomNumber}: Currently occupied`);
       }
       
       console.log(`🏨 Room ${room.roomNumber}: available=${room.available}, status=${room.status}, isAvailable=${isAvailable}`);
@@ -117,19 +145,15 @@ const checkAvailability = async (req, res) => {
         maxGuests: room.maxGuests,
         description: room.description,
         image_url: room.image_url,
-        available: room.available, // Mantener el campo original
+        available: room.available, // ⭐ CAMPO DE BD
         isActive: room.isActive,
         status: room.status,
         Services: room.Services,
         BasicInventories: room.BasicInventories,
-        isAvailable, // ⭐ NUEVA LÓGICA APLICADA
+        isAvailable, // ⭐ DISPONIBILIDAD CALCULADA
         bookedDates,
         currentBookings: activeBookings.length,
-        // ⭐ INFORMACIÓN ADICIONAL PARA DEBUG
-        availabilityReason: isAvailable ? 'Available for booking' : 
-          !room.isActive ? 'Room not active' : 
-          ['out_of_order', 'maintenance', 'blocked'].includes(room.status) ? `Room status: ${room.status}` :
-          'Date conflict with existing booking'
+        availabilityReason: isAvailable ? 'Available for booking' : unavailabilityReason
       };
     });
 
@@ -171,6 +195,15 @@ const getRoomTypes = async (req, res) => {
 // Client and staff endpoints
 const createBooking = async (req, res, next) => {
   try {
+    console.log('🚀 [CREATE-BOOKING] Starting createBooking process...');
+    console.log('🇨🇴 [CREATE-BOOKING] Server time Colombia:', formatForLogs(new Date())); // ⭐ SIN SEGUNDOS
+    console.log('📥 [CREATE-BOOKING] Request body:', JSON.stringify(req.body, null, 2));
+    console.log('👤 [CREATE-BOOKING] Request user:', req.user ? req.user.sdocno : 'No user');
+    console.log('👤 [CREATE-BOOKING] Request user:', req.user ? {
+      n_document: req.user.n_document, // ⭐ CAMBIAR DE sdocno A n_document
+      role: req.user.role,
+      email: req.user.email
+    } : 'No user');
     const {
       guestId,
       roomNumber,
@@ -178,100 +211,431 @@ const createBooking = async (req, res, next) => {
       checkOut,
       guestCount,
       totalPrice,
+      totalAmount,
       status = 'confirmed',
       notes,
-      verifyInventory = true // ⭐ OPCIÓN PARA VERIFICAR INVENTARIO
+      verifyInventory = true,
+      forceCreate = false,
+      pointOfSale = 'Online'
     } = req.body;
 
-    // Validaciones básicas
-    if (!guestId || !roomNumber || !checkIn || !checkOut || !guestCount) {
+    console.log('📋 [CREATE-BOOKING] Extracted fields:', {
+      guestId,
+      roomNumber,
+      checkIn,
+      checkOut,
+      guestCount,
+      totalPrice,
+      totalAmount,
+      status,
+      pointOfSale,
+      verifyInventory,
+      forceCreate
+    });
+
+    // ⭐ VALIDACIONES BÁSICAS MEJORADAS CON LOGS
+    console.log('🔍 [CREATE-BOOKING] Starting validations...');
+    
+    if (!guestId) {
+      console.log('❌ [CREATE-BOOKING] Missing guestId');
       return res.status(400).json({
         error: true,
-        message: 'Faltan campos requeridos'
+        message: 'Campo requerido faltante: guestId'
+      });
+    }
+    
+    if (!roomNumber) {
+      console.log('❌ [CREATE-BOOKING] Missing roomNumber');
+      return res.status(400).json({
+        error: true,
+        message: 'Campo requerido faltante: roomNumber'
+      });
+    }
+    
+    if (!checkIn) {
+      console.log('❌ [CREATE-BOOKING] Missing checkIn');
+      return res.status(400).json({
+        error: true,
+        message: 'Campo requerido faltante: checkIn'
+      });
+    }
+    
+    if (!checkOut) {
+      console.log('❌ [CREATE-BOOKING] Missing checkOut');
+      return res.status(400).json({
+        error: true,
+        message: 'Campo requerido faltante: checkOut'
+      });
+    }
+    
+    if (!guestCount) {
+      console.log('❌ [CREATE-BOOKING] Missing guestCount');
+      return res.status(400).json({
+        error: true,
+        message: 'Campo requerido faltante: guestCount'
       });
     }
 
-    // Verificar que la habitación existe
+    console.log('✅ [CREATE-BOOKING] Basic validations passed');
+
+    // ⭐ VALIDAR FECHAS CON UTILIDADES DE COLOMBIA
+    console.log('📅 [CREATE-BOOKING] Validating dates...');
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    const today = getColombiaDate(); // ⭐ USAR UTILIDAD
+
+    console.log('📅 [CREATE-BOOKING] Date objects:', {
+      checkInDate: checkInDate.toISOString(),
+      checkOutDate: checkOutDate.toISOString(),
+      today: today.toISOString(),
+      todayFormatted: formatForLogs(today), // ⭐ SIN SEGUNDOS
+      checkInFormatted: formatColombiaDate(checkInDate), // ⭐ SOLO FECHA
+      checkOutFormatted: formatColombiaDate(checkOutDate) // ⭐ SOLO FECHA
+    });
+
+    if (checkInDate >= checkOutDate) {
+      console.log('❌ [CREATE-BOOKING] Invalid date range - checkIn >= checkOut');
+      return res.status(400).json({
+        error: true,
+        message: 'La fecha de check-out debe ser posterior al check-in'
+      });
+    }
+
+    // ⭐ USAR UTILIDAD PARA COMPARAR FECHAS
+    if (isBeforeToday(checkInDate)) {
+      console.log('❌ [CREATE-BOOKING] Invalid checkIn date - in the past');
+      console.log('📅 [CREATE-BOOKING] Date comparison Colombia:', {
+        checkInFormatted: formatColombiaDate(checkInDate),
+        todayFormatted: formatColombiaDate(today),
+        isPast: isBeforeToday(checkInDate)
+      });
+      return res.status(400).json({
+        error: true,
+        message: 'La fecha de check-in no puede ser anterior a hoy'
+      });
+    }
+
+    console.log('✅ [CREATE-BOOKING] Date validations passed');
+
+    // ⭐ VERIFICAR QUE EL HUÉSPED EXISTE CON LOGS
+    console.log('👤 [CREATE-BOOKING] Looking for guest with ID:', guestId);
+    const guest = await Buyer.findByPk(guestId);
+    
+    if (!guest) {
+      console.log('❌ [CREATE-BOOKING] Guest not found with ID:', guestId);
+      return res.status(404).json({
+        error: true,
+        message: `Huésped no encontrado con ID: ${guestId}`
+      });
+    }
+    
+    console.log('✅ [CREATE-BOOKING] Guest found:', {
+      sdocno: guest.sdocno,
+      name: guest.scostumername
+    });
+
+    // ⭐ VERIFICAR QUE LA HABITACIÓN EXISTE CON LOGS DETALLADOS
+    console.log('🏨 [CREATE-BOOKING] Looking for room:', roomNumber);
+    
     const room = await Room.findByPk(roomNumber, {
       include: [
         {
           model: BasicInventory,
           as: 'BasicInventories',
-          attributes: ['id', 'name', 'inventoryType', 'currentStock', 'cleanStock'],
+          attributes: ['id', 'name', 'inventoryType', 'currentStock', 'cleanStock', 'minStock'],
           through: { 
             attributes: ['quantity', 'isRequired'],
             as: 'RoomBasics'
           }
+        },
+        {
+          model: Booking,
+          as: 'bookings',
+          attributes: ['bookingId', 'checkIn', 'checkOut', 'status'],
+          required: false
         }
       ]
     });
 
     if (!room) {
+      console.log('❌ [CREATE-BOOKING] Room not found:', roomNumber);
       return res.status(404).json({
         error: true,
-        message: 'Habitación no encontrada'
+        message: `Habitación no encontrada: ${roomNumber}`
       });
     }
 
-    // ⭐ VERIFICAR DISPONIBILIDAD DE INVENTARIO SI SE SOLICITA
-    const inventoryIssues = [];
-    if (verifyInventory && room.BasicInventories) {
-      for (const item of room.BasicInventories) {
-        const requiredQty = item.RoomBasics.quantity;
-        const availableQty = item.inventoryType === 'reusable' ? item.cleanStock : item.currentStock;
-        
-        if (availableQty < requiredQty && item.RoomBasics.isRequired) {
-          inventoryIssues.push({
-            item: item.name,
-            required: requiredQty,
-            available: availableQty,
-            type: item.inventoryType
-          });
-        }
-      }
-    }
+    console.log('✅ [CREATE-BOOKING] Room found:', {
+      roomNumber: room.roomNumber,
+      type: room.type,
+      status: room.status,
+      isActive: room.isActive,
+      available: room.available,
+      maxGuests: room.maxGuests,
+      existingBookings: room.bookings ? room.bookings.length : 0
+    });
 
-    // Si hay problemas de inventario y la verificación está activada, alertar
-    if (inventoryIssues.length > 0 && verifyInventory) {
+    // ⭐ VERIFICAR QUE LA HABITACIÓN ESTÉ ACTIVA
+    if (!room.isActive) {
+      console.log('❌ [CREATE-BOOKING] Room is not active:', roomNumber);
       return res.status(400).json({
         error: true,
-        message: 'Inventario insuficiente para la reserva',
+        message: `La habitación ${roomNumber} no está activa`
+      });
+    }
+
+    console.log('✅ [CREATE-BOOKING] Room is active');
+
+    // ⭐ VERIFICAR DISPONIBILIDAD DE FECHAS CON LOGS DETALLADOS
+    console.log('📅 [CREATE-BOOKING] Checking date conflicts...');
+    
+    const activeBookings = (room.bookings || []).filter(
+      booking => booking.status !== 'cancelled'
+    );
+
+    console.log('📅 [CREATE-BOOKING] Active bookings for room:', activeBookings.map(b => ({
+      bookingId: b.bookingId,
+      checkIn: formatColombiaDate(b.checkIn), // ⭐ FORMATO COLOMBIA
+      checkOut: formatColombiaDate(b.checkOut), // ⭐ FORMATO COLOMBIA
+      status: b.status
+    })));
+
+    const hasDateConflict = activeBookings.some(booking => {
+      const bookingStart = new Date(booking.checkIn);
+      const bookingEnd = new Date(booking.checkOut);
+      
+      const conflict = (
+        (bookingStart <= checkOutDate && bookingEnd >= checkInDate) ||
+        (checkInDate <= bookingEnd && checkOutDate >= bookingStart)
+      );
+      
+      if (conflict) {
+        console.log('⚠️ [CREATE-BOOKING] Date conflict detected with booking:', {
+          conflictingBookingId: booking.bookingId,
+          existingCheckIn: formatColombiaDate(bookingStart), // ⭐ FORMATO COLOMBIA
+          existingCheckOut: formatColombiaDate(bookingEnd), // ⭐ FORMATO COLOMBIA
+          requestedCheckIn: formatColombiaDate(checkInDate), // ⭐ FORMATO COLOMBIA
+          requestedCheckOut: formatColombiaDate(checkOutDate) // ⭐ FORMATO COLOMBIA
+        });
+      }
+      
+      return conflict;
+    });
+
+    if (hasDateConflict) {
+      console.log('❌ [CREATE-BOOKING] Date conflict found');
+      return res.status(400).json({
+        error: true,
+        message: 'La habitación no está disponible en las fechas seleccionadas',
         data: {
-          inventoryIssues,
-          canCreateAnyway: true // Permitir crear la reserva de todas formas
+          conflictingBookings: activeBookings.map(b => ({
+            bookingId: b.bookingId,
+            checkIn: b.checkIn,
+            checkOut: b.checkOut,
+            status: b.status
+          }))
         }
       });
     }
 
-    // Crear la reserva
-    const newBooking = await Booking.create({
+    console.log('✅ [CREATE-BOOKING] No date conflicts found');
+
+    // ⭐ VERIFICAR CAPACIDAD DE LA HABITACIÓN
+    console.log('👥 [CREATE-BOOKING] Checking room capacity...');
+    console.log('👥 [CREATE-BOOKING] Guest count:', guestCount, 'Max guests:', room.maxGuests);
+    
+    if (guestCount > room.maxGuests) {
+      console.log('❌ [CREATE-BOOKING] Exceeds room capacity');
+      return res.status(400).json({
+        error: true,
+        message: `La habitación tiene capacidad máxima de ${room.maxGuests} huéspedes, solicitados: ${guestCount}`
+      });
+    }
+
+    console.log('✅ [CREATE-BOOKING] Room capacity validation passed');
+
+    // ⭐ CALCULAR PRECIO TOTAL CON LOGS DETALLADOS
+    console.log('💰 [CREATE-BOOKING] Calculating price...');
+    
+    let finalTotalPrice = totalAmount || totalPrice;
+    
+    if (!finalTotalPrice) {
+      console.log('💰 [CREATE-BOOKING] No price provided, calculating...');
+      
+      // ⭐ USAR UTILIDAD PARA CALCULAR NOCHES
+      const nights = getDaysDifference(checkInDate, checkOutDate);
+      console.log('💰 [CREATE-BOOKING] Nights calculated:', nights);
+      
+      // Usar precio según cantidad de huéspedes
+      let pricePerNight;
+      
+      if (guestCount === 1) {
+        pricePerNight = room.priceSingle || room.priceDouble;
+        console.log('💰 [CREATE-BOOKING] Using single price:', pricePerNight);
+      } else if (guestCount === 2) {
+        pricePerNight = room.priceDouble;
+        console.log('💰 [CREATE-BOOKING] Using double price:', pricePerNight);
+      } else {
+        pricePerNight = room.priceMultiple;
+        console.log('💰 [CREATE-BOOKING] Using multiple price:', pricePerNight);
+        
+        // Agregar costo por huéspedes extra
+        if (guestCount > 3 && room.pricePerExtraGuest) {
+          const extraCost = (guestCount - 3) * room.pricePerExtraGuest;
+          pricePerNight += extraCost;
+          console.log('💰 [CREATE-BOOKING] Added extra guest cost:', extraCost, 'New price per night:', pricePerNight);
+        }
+      }
+
+      // Aplicar precio promocional si existe
+      if (room.isPromo && room.promotionPrice) {
+        pricePerNight = room.promotionPrice;
+        console.log('💰 [CREATE-BOOKING] Applied promotional price:', pricePerNight);
+      }
+
+      finalTotalPrice = pricePerNight * nights;
+      console.log('💰 [CREATE-BOOKING] Final calculated price:', finalTotalPrice);
+    } else {
+      console.log('💰 [CREATE-BOOKING] Using provided price:', finalTotalPrice);
+    }
+
+    // ⭐ PREPARAR DATOS PARA CREAR LA RESERVA CON LOGS
+    console.log('📝 [CREATE-BOOKING] Preparing booking data...');
+    
+    const bookingData = {
       guestId,
       roomNumber,
-      checkIn: new Date(checkIn),
-      checkOut: new Date(checkOut),
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
       guestCount,
-      totalPrice,
+      totalAmount: finalTotalPrice,
       status,
-      notes
-    });
+      notes: notes || '',
+      pointOfSale: pointOfSale, // ⭐ USAR EL POINT OF SALE ENVIADO
+      
+      createdBy: req.user?.n_document || null
+    };
 
-    // Incluir información completa en la respuesta
-    const bookingWithDetails = await Booking.findByPk(newBooking.bookingId, {
-      include: [
-        { model: Room },
-        { model: Buyer, as: "guest" }
-      ]
-    });
+    console.log('📝 [CREATE-BOOKING] Booking data to create:', JSON.stringify(bookingData, null, 2));
 
-    res.status(201).json({
+    // ⭐ CREAR LA RESERVA CON TRY-CATCH ESPECÍFICO
+    console.log('💾 [CREATE-BOOKING] Creating booking in database...');
+    if (pointOfSale === 'Local') {
+      if (req.user?.n_document) {
+        console.log('✅ [CREATE-BOOKING] Reserva LOCAL creada por empleado:', req.user.n_document, req.user.role);
+      } else {
+        console.log('⚠️ [CREATE-BOOKING] Reserva LOCAL pero SIN empleado logueado - esto podría ser un problema');
+      }
+    } else {
+      console.log('🌐 [CREATE-BOOKING] Reserva ONLINE - puede no tener empleado asociado');
+    }
+
+    let newBooking;
+    try {
+      newBooking = await Booking.create(bookingData);
+      console.log('✅ [CREATE-BOOKING] Booking created successfully:', {
+        bookingId: newBooking.bookingId,
+        id: newBooking.id,
+        createdAt: formatForLogs(newBooking.createdAt) // ⭐ FORMATO COLOMBIA
+      });
+    } catch (createError) {
+      console.error('❌ [CREATE-BOOKING] Error creating booking at:', formatForDetailedLogs(new Date())); // ⭐ CON SEGUNDOS PARA DEBUG
+      console.error('❌ [CREATE-BOOKING] Error details:', {
+        name: createError.name,
+        message: createError.message,
+        sql: createError.sql,
+        parameters: createError.parameters
+      });
+      
+      return res.status(500).json({
+        error: true,
+        message: 'Error al crear la reserva en la base de datos',
+        details: createError.message
+      });
+    }
+
+    // ⭐ ACTUALIZAR ESTADO DE LA HABITACIÓN CON LOGS
+    console.log('🏨 [CREATE-BOOKING] Updating room status...');
+    
+    const roomUpdateData = {
+      status: status === 'confirmed' ? 'Reservada' : 'Ocupada',
+      available: false
+    };
+
+    console.log('🏨 [CREATE-BOOKING] Room update data:', roomUpdateData);
+
+    try {
+      await room.update(roomUpdateData);
+      console.log('✅ [CREATE-BOOKING] Room status updated successfully');
+    } catch (updateError) {
+      console.error('❌ [CREATE-BOOKING] Error updating room status:', updateError);
+      // No fallar la reserva por esto, solo log
+    }
+
+    // ⭐ OBTENER INFORMACIÓN COMPLETA DE LA RESERVA CREADA CON LOGS
+    console.log('🔍 [CREATE-BOOKING] Fetching complete booking data...');
+    
+    let bookingWithDetails;
+    try {
+      bookingWithDetails = await Booking.findByPk(newBooking.bookingId, {
+        include: [
+          {
+            model: Room,
+            attributes: ['roomNumber', 'type', 'status', 'maxGuests']
+          },
+          {
+            model: Buyer,
+            as: "guest",
+            attributes: ['sdocno', 'scostumername', 'selectronicmail']
+          }
+        ]
+      });
+      
+      console.log('✅ [CREATE-BOOKING] Complete booking data fetched:', {
+        bookingId: bookingWithDetails?.bookingId,
+        hasRoom: !!bookingWithDetails?.Room,
+        hasGuest: !!bookingWithDetails?.guest
+      });
+      
+    } catch (fetchError) {
+      console.error('❌ [CREATE-BOOKING] Error fetching complete booking:', fetchError);
+      // Usar la reserva básica si falla
+      bookingWithDetails = newBooking;
+    }
+
+    // ⭐ PREPARAR RESPUESTA FINAL CON LOGS
+    console.log('📤 [CREATE-BOOKING] Preparing final response...');
+    
+    const response = {
       error: false,
       message: 'Reserva creada exitosamente',
+      success: true,
       data: {
         booking: bookingWithDetails,
-        inventoryWarnings: inventoryIssues.length > 0 ? inventoryIssues : null
+        calculatedPrice: finalTotalPrice,
+        nights: getDaysDifference(checkInDate, checkOutDate),
+        roomStatusUpdated: true,
+        // ⭐ INFO ADICIONAL
+        pointOfSale: pointOfSale,
+        createdBy: bookingData.createdBy,
+        isLocalBooking: pointOfSale === 'Local'
       }
+    };
+
+    console.log('✅ [CREATE-BOOKING] Final response prepared:', {
+      success: response.success,
+      bookingId: response.data.booking?.bookingId,
+      calculatedPrice: response.data.calculatedPrice,
+      pointOfSale: response.data.pointOfSale,
+      createdBy: response.data.createdBy,
+      completedAt: formatForLogs(new Date())
     });
+
+    res.status(201).json(response);
+
   } catch (error) {
+    console.error('❌ [CREATE-BOOKING] Unexpected error at:', formatForDetailedLogs(new Date()));
+    console.error('❌ [CREATE-BOOKING] Error details:', error);
     next(error);
   }
 };
@@ -542,6 +906,8 @@ const getAllBookings = async (req, res, next) => {
     const includeOptions = [
       { 
         model: Room,
+        // ⭐ AGREGAR EL ALIAS CORRECTO (probablemente 'room' o similar)
+        as: 'room', // ⭐ PRUEBA PRIMERO CON 'room'
         attributes: ['roomNumber', 'type', 'status']
       },
       { 
@@ -605,11 +971,12 @@ const getAllBookings = async (req, res, next) => {
       }
     });
   } catch (error) {
+    console.error('❌ [GET-ALL-BOOKINGS] Error:', error);
     next(error);
   }
 };
 
-const checkIn = async (req, res, next) => {
+const checkInGuest = async (req, res, next) => {
   try {
     const { bookingId } = req.params;
     const { assignInventory = true, customItems = [] } = req.body;
@@ -1413,7 +1780,7 @@ module.exports = {
   getUserBookings,
   getBookingById,
   getAllBookings,
-  checkIn,
+  checkInGuest, // ⭐ CAMBIAR DE checkIn A checkInGuest
   checkOut,
   calculateTotalAmount,
   addExtraCharges,
@@ -1425,6 +1792,6 @@ module.exports = {
   getRevenueReport,
   getBookingByToken,
   updateOnlinePayment,
-  getBookingInventoryStatus, // ⭐ NUEVOn
-  getInventoryUsageReport, // ⭐ NUEVO
+  getBookingInventoryStatus,
+  getInventoryUsageReport,
 };

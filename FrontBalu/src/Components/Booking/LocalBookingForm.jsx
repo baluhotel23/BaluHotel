@@ -100,7 +100,7 @@ const BuyerRegistrationFormPopup = ({ isOpen, onClose, onBuyerRegistered, initia
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Documento (sdocno) *
+                Cédula (sdocno) *
               </label>
               <input 
                 type="text" 
@@ -109,7 +109,7 @@ const BuyerRegistrationFormPopup = ({ isOpen, onClose, onBuyerRegistered, initia
                 onChange={handleChange} 
                 required 
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Número de documento"
+                placeholder="Número de Cédula"
               />
             </div>
             
@@ -205,7 +205,7 @@ const BuyerRegistrationFormPopup = ({ isOpen, onClose, onBuyerRegistered, initia
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Registro Corporativo *
+                Nombre comercial *
               </label>
               <input 
                 type="text" 
@@ -260,8 +260,9 @@ const BuyerRegistrationFormPopup = ({ isOpen, onClose, onBuyerRegistered, initia
                   onChange={handleChange} 
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  <option value="48">48 - IVA</option>
+                  
                   <option value="49">49 - No IVA</option>
+                  <option value="48">48 - IVA</option>
                 </select>
               </div>
             </div>
@@ -288,17 +289,39 @@ const LocalBookingForm = () => {
   const navigate = useNavigate();
   
   // ⭐ CORREGIR SELECTORES PARA OBTENER LAS HABITACIONES
-  const { availability, loading: availabilityLoading, error: availabilityError } = useSelector(state => state.booking);
-  const { buyer: verifiedBuyer, loading: buyerLoading, error: buyerError } = useSelector(state => state.taxxa);
+  const { 
+    availability, 
+    availabilitySummary,
+    loading, 
+    errors 
+  } = useSelector((state) => ({
+    availability: state.booking.availability || [],
+    availabilitySummary: state.booking.availabilitySummary || { total: 0, available: 0 },
+    loading: state.booking.loading || {},
+    errors: state.booking.errors || {}
+  }));
+  
+  const { 
+    buyer: verifiedBuyer, 
+    loading: buyerLoading, 
+    error: buyerError 
+  } = useSelector((state) => state.taxxa);
+
+  const isLoadingAvailability = loading.availability;
+  const availabilityError = errors.availability;
   
   // ⭐ DEBUGEAR AVAILABILITY
-  console.log('🏨 Availability from Redux:', availability);
-  console.log('📊 Type of availability:', typeof availability);
-  console.log('🔍 Is availability array?', Array.isArray(availability));
+   console.log('🏨 [LOCAL] Availability from Redux:', {
+    availability: availability?.length,
+    isLoadingAvailability,
+    availabilityError,
+    availabilitySummary
+  });
 
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
+
 
   const [checkIn, setCheckIn] = useState(today);
   const [checkOut, setCheckOut] = useState(tomorrow);
@@ -322,37 +345,94 @@ const LocalBookingForm = () => {
   const [showBuyerPopup, setShowBuyerPopup] = useState(false);
   const [confirmationOption, setConfirmationOption] = useState('payNow');
 
+
+   useEffect(() => {
+    console.log('🚀 [LOCAL] Component mounted, loading all rooms...');
+    // Cargar todas las habitaciones por defecto
+    setTimeout(() => {
+      handleSearchAvailability();
+    }, 500);
+  }, [dispatch]);
+
+   const getStaffFriendlyStatus = (room) => {
+    if (!room.isActive) {
+      return { text: 'Inactiva', color: 'bg-gray-100 text-gray-800', icon: '🚫' };
+    }
+    
+    if (room.status === 'Limpia' && room.isAvailable) {
+      return { text: 'Disponible', color: 'bg-green-100 text-green-800', icon: '✅' };
+    }
+    
+    if (room.status === 'Para Limpiar' && room.isAvailable) {
+      return { text: 'Para Limpiar', color: 'bg-yellow-100 text-yellow-800', icon: '🧹' };
+    }
+    
+    if (room.status === 'Ocupada') {
+      return { text: 'Ocupada', color: 'bg-red-100 text-red-800', icon: '👥' };
+    }
+    
+    if (room.status === 'Reservada') {
+      return { text: 'Reservada', color: 'bg-blue-100 text-blue-800', icon: '📝' };
+    }
+    
+    if (room.status === 'Mantenimiento') {
+      return { text: 'Mantenimiento', color: 'bg-orange-100 text-orange-800', icon: '🔧' };
+    }
+    
+    return { text: 'Desconocido', color: 'bg-gray-100 text-gray-800', icon: '❓' };
+  };
   // Función para manejar selección de habitación mejorada
   const handleSelectRoom = (room) => {
-    console.log('🏨 Habitación seleccionada:', room);
+    console.log('🏨 [LOCAL] Habitación seleccionada:', room);
+    
+    // ⭐ VALIDAR SI LA HABITACIÓN ES RESERVABLE
+    if (!room.isActive) {
+      toast.error(`Habitación ${room.roomNumber} está inactiva y no se puede reservar.`);
+      return;
+    }
+    
+    if (!room.isAvailable) {
+      toast.warning(`Habitación ${room.roomNumber} no está disponible para reserva.`);
+      return;
+    }
+    
+    // ⭐ MOSTRAR INFORMACIÓN ADICIONAL DEL ESTADO
+    const statusInfo = getStaffFriendlyStatus(room);
+    
+    if (room.status === 'Para Limpiar') {
+      toast.info(`Habitación ${room.roomNumber} seleccionada. Estado: ${statusInfo.text} - Se limpiará antes del check-in.`);
+    } else {
+      toast.success(`Habitación ${room.roomNumber} seleccionada. Estado: ${statusInfo.text}`);
+    }
+    
     setSelectedRoom(room);
-    toast.success(`Habitación ${room.roomNumber} seleccionada`);
   };
 
   // ⭐ MEJORAR availableRooms CON VERIFICACIÓN
   const availableRooms = React.useMemo(() => {
-  console.log('🔄 Calculando habitaciones disponibles...');
-  console.log('📊 Availability:', availability);
-  console.log('🔍 availabilityLoading:', availabilityLoading);
-  console.log('❌ availabilityError:', availabilityError);
-  
-  if (availability && Array.isArray(availability) && !availabilityLoading && !availabilityError) {
-    // ⭐ OPCIÓN 1: Mostrar solo disponibles (actual)
-    // const filtered = availability.filter(room => room.isAvailable);
+    console.log('🔄 [LOCAL] Calculando habitaciones disponibles...');
+    console.log('📊 Availability:', availability?.length);
+    console.log('🔍 isLoadingAvailability:', isLoadingAvailability);
+    console.log('❌ availabilityError:', availabilityError);
     
-    // ⭐ OPCIÓN 2: Mostrar TODAS las habitaciones (recomendado para debug)
-    const filtered = availability; // Mostrar todas
+    if (availability && Array.isArray(availability) && !isLoadingAvailability && !availabilityError) {
+      // ⭐ PARA STAFF LOCAL: MOSTRAR TODAS LAS HABITACIONES (DISPONIBLES Y NO DISPONIBLES)
+      const allRooms = availability;
+      
+      console.log('✅ [LOCAL] Habitaciones procesadas:', {
+        total: allRooms.length,
+        disponibles: allRooms.filter(r => r.isAvailable).length,
+        ocupadas: allRooms.filter(r => r.status === 'Ocupada').length,
+        paraLimpiar: allRooms.filter(r => r.status === 'Para Limpiar').length,
+        mantenimiento: allRooms.filter(r => r.status === 'Mantenimiento').length
+      });
+      
+      return allRooms;
+    }
     
-    console.log('✅ Habitaciones filtradas:', filtered);
-    console.log('🏠 Habitaciones disponibles:', filtered.filter(r => r.isAvailable).length);
-    console.log('🚫 Habitaciones no disponibles:', filtered.filter(r => !r.isAvailable).length);
-    
-    return filtered;
-  }
-  
-  console.log('❌ No hay habitaciones disponibles');
-  return [];
-}, [availability, availabilityLoading, availabilityError]);
+    console.log('❌ [LOCAL] No hay habitaciones disponibles');
+    return [];
+  }, [availability, isLoadingAvailability, availabilityError]);
 
   // Resto de funciones sin cambios (handleVerifyOrRegisterBuyer, etc.)
   const handleVerifyOrRegisterBuyer = async () => {
@@ -382,49 +462,54 @@ const LocalBookingForm = () => {
     }
   }, [verifiedBuyer, buyerLoading, buyerError, buyerSdocnoInput, dispatch]);
 
-  const handleBuyerRegistered = (registeredBuyer) => {
+ const handleBuyerRegistered = (registeredBuyer) => {
     setBuyerSdocno(registeredBuyer.sdocno);
     setBuyerName(registeredBuyer.scostumername || '');
     setShowBuyerPopup(false);
   };
 
-  const handleSearchAvailability = async () => {
-  if (!checkIn || !checkOut || !roomType) {
-    toast.error("Por favor, seleccione fechas y tipo de habitación.");
-    return;
-  }
-  if (checkOut <= checkIn) {
-    toast.error("La fecha de salida debe ser posterior a la fecha de entrada.");
-    return;
-  }
-  
-  console.log('🔍 Buscando disponibilidad...');
-  
-  // ⭐ CREAR OBJETO DE PARÁMETROS CON VALIDACIÓN
-  const searchParams = {
-    checkIn: format(checkIn, 'yyyy-MM-dd'), 
-    checkOut: format(checkOut, 'yyyy-MM-dd'), 
-    roomType 
+const handleSearchAvailability = async () => {
+    if (!checkIn || !checkOut || !roomType) {
+      toast.error("Por favor, seleccione fechas y tipo de habitación.");
+      return;
+    }
+    if (checkOut <= checkIn) {
+      toast.error("La fecha de salida debe ser posterior a la fecha de entrada.");
+      return;
+    }
+    
+    console.log('🔍 [LOCAL] Buscando disponibilidad...');
+    
+    // ⭐ CREAR OBJETO DE PARÁMETROS FORMATEADO
+    const searchParams = {
+      checkIn: format(checkIn, 'yyyy-MM-dd'), 
+      checkOut: format(checkOut, 'yyyy-MM-dd'), 
+      roomType 
+    };
+    
+    console.log('📅 [LOCAL] Search Params:', searchParams);
+    
+    try {
+      const result = await dispatch(checkAvailability(searchParams));
+      console.log('🎯 [LOCAL] Dispatch result:', result);
+    } catch (error) {
+      console.error('❌ [LOCAL] Error in dispatch:', error);
+    }
+    
+    setSelectedRoom(null); 
+    setCreatedBookingId(null);
+    setShowPaymentForm(false);
   };
-  
-  console.log('📅 Search Params:', searchParams);
-  console.log('🔍 Params validation:');
-  console.log('  - checkIn valid:', !!searchParams.checkIn);
-  console.log('  - checkOut valid:', !!searchParams.checkOut);
-  console.log('  - roomType valid:', !!searchParams.roomType);
-  
-  // ⭐ ESPERAR LA RESPUESTA Y VERIFICAR
-  try {
-    const result = await dispatch(checkAvailability(searchParams));
-    console.log('🎯 Dispatch result:', result);
-  } catch (error) {
-    console.error('❌ Error in dispatch:', error);
-  }
-  
-  setSelectedRoom(null); 
-  setCreatedBookingId(null);
-  setShowPaymentForm(false);
-};
+
+useEffect(() => {
+    console.log('🔍 [LOCAL] Current state:', {
+      availability: availability?.length,
+      isLoadingAvailability,
+      availabilityError,
+      availabilitySummary,
+      selectedRoom: selectedRoom?.roomNumber
+    });
+  }, [availability, isLoadingAvailability, availabilityError, availabilitySummary, selectedRoom]);
 
   // Cálculo de precio con nuevos campos
   const calculateLocalBookingTotal = () => {
@@ -671,10 +756,10 @@ const LocalBookingForm = () => {
               <div className="flex items-end">
                 <button 
                   onClick={handleSearchAvailability} 
-                  disabled={availabilityLoading}
+                  disabled={isLoadingAvailability}
                   className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 transform hover:-translate-y-0.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {availabilityLoading ? '🔍 Buscando...' : '🔍 Buscar'}
+                  {isLoadingAvailability ? '🔍 Buscando...' : '🔍 Buscar'}
                 </button>
               </div>
             </div>
@@ -707,7 +792,7 @@ const LocalBookingForm = () => {
           )}
 
           {/* No Rooms Available Message */}
-          {availability && availableRooms.length === 0 && !availabilityLoading && (
+          {availability && availableRooms.length === 0 && !isLoadingAvailability && (
             <div className="bg-orange-50 border border-orange-200 rounded-2xl p-8 mb-8 text-center">
               <div className="text-6xl mb-4">😔</div>
               <h3 className="text-2xl font-bold text-orange-800 mb-2">No hay habitaciones disponibles</h3>

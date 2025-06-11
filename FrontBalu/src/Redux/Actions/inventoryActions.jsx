@@ -37,24 +37,36 @@ export const getLowStockItems = () => async (dispatch) => {
 
 export const getAllItems = () => async (dispatch) => {
   try {
+    console.log('🚀 [ACTION] getAllItems iniciado');
     const response = await api.get('/inventory');
+    console.log('📥 [ACTION] Respuesta inventario:', response.data);
     
-    // Mapear los datos al formato esperado por tu componente
+    // ⭐ MAPEAR CORRECTAMENTE - usar 'name' del backend
     const mappedItems = response.data.data.map(item => ({
-      itemId: item.id,
-      itemName: item.name,
+      itemId: item.id,        // Mapear id a itemId para compatibilidad
+      id: item.id,            // ⭐ MANTENER id original
+      itemName: item.name,    // ⭐ MAPEAR name a itemName
+      name: item.name,        // ⭐ MANTENER name original
       description: item.description,
       category: item.category,
+      inventoryType: item.inventoryType,
       currentStock: item.currentStock,
+      cleanStock: item.cleanStock || 0,
+      dirtyStock: item.dirtyStock || 0,
       minStock: item.minStock,
       unitPrice: parseFloat(item.unitPrice),
-      isSellable: item.isSellable || false,
-      salePrice: item.isSellable ? parseFloat(item.salePrice) : null
+      isSellable: item.salePrice !== null,
+      salePrice: item.salePrice ? parseFloat(item.salePrice) : null,
+      washingTime: item.washingTime,
+      stockStatus: item.stockStatus,
+      alerts: item.alerts || []
     }));
     
+    console.log('🔄 [ACTION] Items mapeados:', mappedItems);
     dispatch({ type: 'GET_ALL_ITEMS', payload: mappedItems });
     return { success: true, data: mappedItems };
   } catch (error) {
+    console.error('❌ [ACTION] Error en getAllItems:', error);
     toast.error(error.response?.data?.message || 'Error al obtener los items');
     return { success: false, error };
   }

@@ -2,20 +2,49 @@ import api from '../../utils/axios';
 
 // Obtener todas las habitaciones
 export const getAllRooms = () => async (dispatch) => {
-  console.log('🚀 Iniciando getAllRooms...');
+  console.log('🚀 [ACTION] getAllRooms iniciado');
   dispatch({ type: 'GET_ROOMS_REQUEST' });
+  
   try {
-    console.log('📡 Haciendo petición a /rooms...');
-    const { data } = await api.get('/rooms');
-    console.log('📥 Respuesta recibida:', data);
-    console.log('🏨 Habitaciones:', data.data);
+    console.log('📡 [ACTION] Llamando a api.get("/rooms")');
+    console.log('🔗 [ACTION] Base URL:', api.defaults.baseURL);
     
-    dispatch({ type: 'GET_ROOMS_SUCCESS', payload: data.data });
-    console.log('✅ Dispatch exitoso');
+    const response = await api.get('/rooms');
+    
+    console.log('📥 [ACTION] Respuesta completa:', response);
+    console.log('📊 [ACTION] Status:', response.status);
+    console.log('📋 [ACTION] Data completa:', response.data);
+    console.log('🏨 [ACTION] Habitaciones array:', response.data.data);
+    console.log('🔢 [ACTION] Cantidad de habitaciones:', response.data.data?.length);
+    
+    // ⭐ VALIDAR ESTRUCTURA DE RESPUESTA
+    if (response.data && response.data.data && Array.isArray(response.data.data)) {
+      console.log('✅ [ACTION] Estructura válida, dispatching SUCCESS');
+      dispatch({ 
+        type: 'GET_ROOMS_SUCCESS', 
+        payload: response.data.data 
+      });
+      console.log('🎯 [ACTION] SUCCESS dispatched con', response.data.data.length, 'habitaciones');
+    } else {
+      console.warn('⚠️ [ACTION] Estructura de respuesta inesperada');
+      dispatch({ 
+        type: 'GET_ROOMS_FAILURE', 
+        payload: 'Estructura de respuesta inválida' 
+      });
+    }
+    
   } catch (error) {
-    console.error('❌ Error en getAllRooms:', error);
-    const errorMessage = error.response?.data?.message || 'Error al obtener habitaciones';
-    dispatch({ type: 'GET_ROOMS_FAILURE', payload: errorMessage });
+    console.error('❌ [ACTION] Error completo:', error);
+    console.error('❌ [ACTION] Error message:', error.message);
+    console.error('❌ [ACTION] Error response:', error.response);
+    console.error('❌ [ACTION] Error status:', error.response?.status);
+    console.error('❌ [ACTION] Error data:', error.response?.data);
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Error al obtener habitaciones';
+    dispatch({ 
+      type: 'GET_ROOMS_FAILURE', 
+      payload: errorMessage 
+    });
   }
 };
 

@@ -7,14 +7,20 @@ import { toast } from 'react-toastify';
 export const checkAvailability = (params) => async (dispatch) => {
   console.log('🚀 [ACTION] checkAvailability started with params:', params);
   
-  // ⭐ VALIDAR PARÁMETROS ANTES DE ENVIAR
-  if (!params || !params.checkIn || !params.checkOut || !params.roomType) {
-    console.error('❌ [ACTION] Invalid parameters:', params);
+  // ⭐ MEJORAR VALIDACIÓN - HACER MÁS FLEXIBLE
+  if (!params) {
+    console.error('❌ [ACTION] No parameters provided');
     dispatch({ 
       type: 'CHECK_AVAILABILITY_FAILURE', 
-      payload: 'Parámetros inválidos para búsqueda de disponibilidad' 
+      payload: 'Parámetros requeridos para búsqueda de disponibilidad' 
     });
-    return;
+    return { success: false, error: 'No parameters provided' };
+  }
+
+  // ⭐ PERMITIR BÚSQUEDA SIN FILTROS ESPECÍFICOS
+  const hasFilters = params.checkIn || params.checkOut || params.roomType;
+  if (!hasFilters) {
+    console.log('ℹ️ [ACTION] No filters provided, fetching all rooms');
   }
   
   dispatch({ type: 'CHECK_AVAILABILITY_REQUEST' });
@@ -34,88 +40,117 @@ export const checkAvailability = (params) => async (dispatch) => {
     console.log('📥 [ACTION] Response received:', {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers,
-      data: response.data
+      dataType: typeof response.data,
+      dataKeys: response.data ? Object.keys(response.data) : []
     });
     
     const { data } = response;
     
-    // ⭐ VALIDACIÓN EXHAUSTIVA DE LA RESPUESTA
+    // ⭐ VALIDACIÓN MEJORADA DE LA RESPUESTA
     console.log('🔍 [ACTION] Response validation:');
-    console.log('  - data exists:', !!data);
-    console.log('  - data.error:', data?.error);
-    console.log('  - data.message:', data?.message);
-    console.log('  - data.data exists:', !!data?.data);
-    console.log('  - data.data is array:', Array.isArray(data?.data));
-    console.log('  - data.data length:', data?.data?.length || 0);
+    console.log('  - API Response Structure:', {
+      hasData: !!data,
+      isError: data?.error,
+      message: data?.message,
+      hasRoomsArray: !!data?.data && Array.isArray(data.data),
+      roomsCount: data?.data?.length || 0
+    });
     
+    // ⭐ PROCESAR DATOS DE HABITACIONES
     if (data?.data && Array.isArray(data.data)) {
-      console.log('🏨 [ACTION] Rooms details:');
-      data.data.forEach((room, index) => {
+      console.log('🏨 [ACTION] Processing room data:');
+      
+      const processedRooms = data.data.map((room, index) => {
         console.log(`  ${index + 1}. Room ${room.roomNumber}:`, {
           type: room.type,
           available: room.available,
           isActive: room.isActive,
           status: room.status,
-          isAvailable: room.isAvailable
+          isAvailable: room.isAvailable,
+          services: room.Services?.length || 0,
+          inventory: room.BasicInventories?.length || 0
         });
+        
+        // ⭐ ASEGURAR CONSISTENCIA DE DATOS
+        return {
+          ...room,
+          // Garantizar que los campos críticos estén presentes
+          isAvailable: room.isAvailable !== undefined ? room.isAvailable : room.available,
+          Services: room.Services || [],
+          BasicInventories: room.BasicInventories || [],
+          bookedDates: room.bookedDates || [],
+          currentBookings: room.currentBookings || 0,
+          availabilityReason: room.availabilityReason || 'Status unknown'
+        };
       });
       
-      const availableCount = data.data.filter(r => r.isAvailable).length;
-      console.log(`📊 [ACTION] Availability summary: ${availableCount}/${data.data.length} rooms available`);
-    }
-    
-    // ⭐ DISPATCH SUCCESS
-    if (data && !data.error && data.data && Array.isArray(data.data)) {
-      console.log('✅ [ACTION] Dispatching SUCCESS with payload:', data.data);
+      const availableCount = processedRooms.filter(r => r.isAvailable).length;
+      console.log(`📊 [ACTION] Availability summary: ${availableCount}/${processedRooms.length} rooms available`);
+      
+      // ⭐ DISPATCH SUCCESS CON DATOS PROCESADOS
+      console.log('✅ [ACTION] Dispatching SUCCESS with processed rooms');
       dispatch({ 
         type: 'CHECK_AVAILABILITY_SUCCESS', 
-        payload: data.data 
+        payload: {
+          rooms: processedRooms,
+          summary: {
+            total: processedRooms.length,
+            available: availableCount,
+            occupied: processedRooms.filter(r => r.status === 'Ocupada').length,
+            cleaning: processedRooms.filter(r => r.status === 'Para Limpiar').length,
+            maintenance: processedRooms.filter(r => r.status === 'Mantenimiento').length
+          },
+          filters: params,
+          timestamp: new Date().toISOString()
+        }
       });
-      console.log('🎯 [ACTION] SUCCESS dispatched successfully');
       
-      // ⭐ VERIFICAR QUE SE HAYA ENVIADO CORRECTAMENTE
-      setTimeout(() => {
-        console.log('⏰ [ACTION] Delayed check - action should be in Redux now');
-      }, 100);
+      return { 
+        success: true, 
+        data: processedRooms, 
+        summary: {
+          total: processedRooms.length,
+          available: availableCount
+        }
+      };
       
     } else {
-      console.warn('⚠️ [ACTION] Unexpected response structure, dispatching empty array');
+      console.warn('⚠️ [ACTION] No room data in response or invalid format');
       dispatch({ 
         type: 'CHECK_AVAILABILITY_SUCCESS', 
-        payload: [] 
+        payload: {
+          rooms: [],
+          summary: { total: 0, available: 0 },
+          filters: params,
+          timestamp: new Date().toISOString()
+        }
       });
+      
+      return { success: true, data: [], summary: { total: 0, available: 0 } };
     }
     
   } catch (error) {
-    console.error('❌ [ACTION] Error caught:', error);
+    console.error('❌ [ACTION] Error in checkAvailability:', error);
     console.error('❌ [ACTION] Error details:', {
       message: error.message,
       response: error.response?.data,
       status: error.response?.status,
       statusText: error.response?.statusText,
-      config: error.config
+      url: error.config?.url
     });
     
-    const errorMessage = error.response?.data?.message || error.message || 'Error al consultar disponibilidad';
+    const errorMessage = error.response?.data?.message || error.message || 'Error al consultar disponibilidad de habitaciones';
+    
     dispatch({ 
       type: 'CHECK_AVAILABILITY_FAILURE', 
-      payload: errorMessage 
+      payload: {
+        message: errorMessage,
+        status: error.response?.status,
+        timestamp: new Date().toISOString()
+      }
     });
-    console.log('💥 [ACTION] FAILURE dispatched with error:', errorMessage);
-  }
-};
-
-// GET ROOM TYPES
-export const getRoomTypes = () => async (dispatch) => {
-  dispatch({ type: 'GET_ROOM_TYPES_REQUEST' });
-  try {
-    const { data } = await api.get('/bookings/room-types');
-    dispatch({ type: 'GET_ROOM_TYPES_SUCCESS', payload: data });
-  } catch (error) {
-    const errorMessage =
-      error.response?.data?.message || 'Error al obtener tipos de habitación';
-    dispatch({ type: 'GET_ROOM_TYPES_FAILURE', payload: errorMessage });
+    
+    return { success: false, error: errorMessage };
   }
 };
 
