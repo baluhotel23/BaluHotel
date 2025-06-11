@@ -7,25 +7,52 @@ import 'react-toastify/dist/ReactToastify.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch, faSortAmountDown, faSortAmountUp, faFilter, faBed, faUsers } from '@fortawesome/free-solid-svg-icons';
 
-
-
 function RoomsSection() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { rooms, loading, error } = useSelector(state => state.room);
+  
+  // ⭐ SELECTORES CORREGIDOS PARA TU REDUCER
+  const { 
+    rooms = [], 
+    loading = {}, 
+    errors = {} 
+  } = useSelector((state) => state.room || {});
+  
+  // ⭐ LOADING ESPECÍFICO PARA ROOMS
+  const isLoadingRooms = loading.rooms || loading.general || false;
+  const roomsError = errors.rooms || errors.general || null;
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredRooms, setFilteredRooms] = useState([]);
   const [sortOrder, setSortOrder] = useState("asc"); // "asc" or "desc"
-  // Removed sortType state, will always sort by capacity
   const [filterRoomType, setFilterRoomType] = useState(""); // For room type (e.g., "Sencilla")
   const [filterCapacity, setFilterCapacity] = useState(""); // For minimum guest capacity
 
+  // ⭐ DEBUG TEMPORAL - REMOVER DESPUÉS DE CONFIRMAR QUE FUNCIONA
   useEffect(() => {
+    console.log('🔍 [ROOMS] Estado actual:', {
+      isLoadingRooms,
+      roomsError,
+      roomsLength: rooms?.length,
+      rooms: rooms,
+      loading: loading,
+      errors: errors
+    });
+  }, [isLoadingRooms, roomsError, rooms?.length, loading, errors]);
+
+  useEffect(() => {
+    console.log('🔍 [ROOMS] Disparando getAllRooms action');
     dispatch(getAllRooms());
   }, [dispatch]);
 
   useEffect(() => {
+    // ⭐ VERIFICAR QUE ROOMS SEA UN ARRAY ANTES DE PROCESAR
+    if (!Array.isArray(rooms)) {
+      console.warn('⚠️ [ROOMS] rooms no es un array:', rooms);
+      setFilteredRooms([]);
+      return;
+    }
+
     let processedRooms = [...rooms];
 
     // Filtering
@@ -38,15 +65,14 @@ function RoomsSection() {
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       processedRooms = processedRooms.filter(room => 
-        room.description.toLowerCase().includes(lowerSearchTerm) ||
-        // room.roomNumber.toString().toLowerCase().includes(lowerSearchTerm) || // Room number search can be kept or removed based on preference
+        room.description?.toLowerCase().includes(lowerSearchTerm) ||
         (room.type && room.type.toLowerCase().includes(lowerSearchTerm))
       );
     }
 
     // Sorting - Simplified to sort by capacity only
     processedRooms.sort((a, b) => {
-      const comparison = a.maxGuests - b.maxGuests;
+      const comparison = (a.maxGuests || 0) - (b.maxGuests || 0);
       return sortOrder === "asc" ? comparison : comparison * -1;
     });
     
@@ -55,28 +81,34 @@ function RoomsSection() {
     }
 
     setFilteredRooms(processedRooms);
-  }, [rooms, searchTerm, filterRoomType, filterCapacity, sortOrder]); // Removed sortType from dependencies
+  }, [rooms, searchTerm, filterRoomType, filterCapacity, sortOrder]);
 
-  if (loading) return (
-    <div className="flex justify-center items-center min-h-[calc(100vh-200px)]"> {/* Adjust min-height as needed */}
-      <div className="text-center">
-        <div className="w-16 h-16 border-4 border-yellow-500 border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
-        <p className="text-xl text-gray-700">Cargando habitaciones...</p>
+  // ⭐ CONDICIONES DE LOADING Y ERROR CORREGIDAS
+  if (isLoadingRooms) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-yellow-500 border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
+          <p className="text-xl text-gray-700">Cargando habitaciones...</p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
-  if (error) return (
-    <div className="flex justify-center items-center min-h-[calc(100vh-200px)] px-4">
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-center" role="alert">
-        <strong className="font-bold">Error!</strong>
-        <span className="block sm:inline"> No se pudieron cargar las habitaciones: {error}. Por favor, intente más tarde.</span>
+  if (roomsError) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)] px-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-center" role="alert">
+          <strong className="font-bold">Error!</strong>
+          <span className="block sm:inline"> No se pudieron cargar las habitaciones: {roomsError}. Por favor, intente más tarde.</span>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
   
+  // ⭐ VERIFICACIONES SEGURAS PARA EVITAR CRASHES
   const uniqueRoomTypes = [...new Set(rooms.map(room => room.type).filter(Boolean))].sort();
-  const maxGuestCapacity = Math.max(...rooms.map(room => room.maxGuests), 0);
+  const maxGuestCapacity = rooms.length > 0 ? Math.max(...rooms.map(room => room.maxGuests || 0), 0) : 0;
 
   return (
     <div className="bg-gray-100 min-h-screen px-2 sm:px-4 lg:px-6 py-8">
@@ -168,11 +200,16 @@ function RoomsSection() {
         </div>
       </div>
 
+      {/* ⭐ INFORMACIÓN DE DEBUG TEMPORAL */}
+      {/* <div className="mb-4 p-2 bg-blue-50 rounded text-sm text-blue-700">
+        📊 Total habitaciones: {rooms.length} | Filtradas: {filteredRooms.length} | Loading: {isLoadingRooms ? 'Sí' : 'No'}
+      </div> */}
+
       {filteredRooms.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6 lg:gap-8">
           {filteredRooms.map((room, index) => (
             <div 
-              key={room.roomNumber} // Keep key as roomNumber for unique identification
+              key={room.roomNumber || index} // Fallback key
               className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1.5 cursor-pointer flex flex-col group animate-fadeInUp"
               style={{ animationDelay: `${index * 75}ms` }}
               onClick={() => navigate(`/room/${room.roomNumber}`)}
@@ -183,7 +220,6 @@ function RoomsSection() {
                   alt={`Habitación ${room.type || ''}`}
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
-                {/* Price display removed */}
                  {room.type && (
                   <div className="absolute top-3 left-3 bg-secondary bg-opacity-90 text-white text-xs font-semibold px-3 py-1.5 rounded-md shadow-md">
                     {room.type}
@@ -193,12 +229,11 @@ function RoomsSection() {
               
               <div className="p-4 sm:p-5 flex flex-col flex-grow">
                 <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-1.5 truncate" title={room.type ? `Habitación ${room.type} - ${room.description}` : room.description}>
-                  {/* Room number removed from title, using type instead */}
                   Habitación {room.type || 'Confortable'}
                 </h3>
                 <p className="text-gray-600 text-xs sm:text-sm mb-1">
                   <FontAwesomeIcon icon={faUsers} className="mr-1.5 text-yellow-600" />
-                  Capacidad: {room.maxGuests} huésped{room.maxGuests > 1 ? 'es' : ''}
+                  Capacidad: {room.maxGuests || 1} huésped{(room.maxGuests || 1) > 1 ? 'es' : ''}
                 </p>
                 <p className="text-gray-500 text-xs sm:text-sm mb-3 line-clamp-2 flex-grow min-h-[2.5em]" title={room.description}>
                   {room.description || "Descripción no disponible."}
@@ -218,7 +253,7 @@ function RoomsSection() {
           ))}
         </div>
       ) : (
-        !loading && ( // Only show if not loading and no rooms
+        !isLoadingRooms && ( // Only show if not loading and no rooms
           <div className="text-center py-10 sm:py-16">
             <FontAwesomeIcon icon={faSearch} size="3x" className="text-gray-400 mb-4" />
             <p className="text-xl text-gray-600 mb-2">No se encontraron habitaciones que coincidan.</p>

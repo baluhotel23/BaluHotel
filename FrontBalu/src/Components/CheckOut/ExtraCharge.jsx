@@ -4,7 +4,7 @@ import { addExtraCharge, getAllBookings } from '../../Redux/Actions/bookingActio
 import { getAllItems, removeStock } from '../../Redux/Actions/inventoryActions';
 import { toast } from 'react-toastify';
 
-const ExtraCharges = ({ bookingId }) => {
+const ExtraCharges = ({ bookingId, isLoading: externalLoading }) => {
   const dispatch = useDispatch();
   const [showForm, setShowForm] = useState(false);
   const [selectedItem, setSelectedItem] = useState('');
@@ -14,7 +14,10 @@ const ExtraCharges = ({ bookingId }) => {
   const [customPrice, setCustomPrice] = useState(false);
 
   const sellableItems = useSelector(state => state.inventory.inventory || []);
-  const { loading } = useSelector(state => state.booking);
+  
+  // ⭐ USAR EL LOADING EXTERNO EN LUGAR DEL INTERNO
+  const { loading: internalLoading } = useSelector(state => state.booking);
+  const isLoading = externalLoading || internalLoading?.booking || false;
   
   // ⭐ OBTENER BOOKING ACTUAL PARA MOSTRAR EXTRAS EXISTENTES
   const currentBooking = useSelector(state => 
@@ -25,15 +28,17 @@ const ExtraCharges = ({ bookingId }) => {
     dispatch(getAllItems());
   }, [dispatch]);
 
-  // ⭐ MANEJAR SELECCIÓN DE PRODUCTO
+  // ⭐ MANEJAR SELECCIÓN DE PRODUCTO - CORREGIDO
   const handleItemSelect = (e) => {
     const itemId = e.target.value;
     setSelectedItem(itemId);
 
     if (itemId) {
-      const item = sellableItems.find(item => item.itemId.toString() === itemId);
+      const item = sellableItems.find(item => 
+        item && item.itemId && item.itemId.toString() === itemId
+      );
       if (item) {
-        setDescription(item.itemName);
+        setDescription(item.itemName || '');
         if (!customPrice) {
           setAmount((parseFloat(item.salePrice || 0) * quantity).toFixed(2));
         }
@@ -45,12 +50,14 @@ const ExtraCharges = ({ bookingId }) => {
     }
   };
 
-  // ⭐ RECALCULAR PRECIO CUANDO CAMBIA LA CANTIDAD
+  // ⭐ RECALCULAR PRECIO CUANDO CAMBIA LA CANTIDAD - CORREGIDO
   useEffect(() => {
-    if (selectedItem && !customPrice) {
-      const item = sellableItems.find(item => item.itemId.toString() === selectedItem);
-      if (item) {
-        setAmount((parseFloat(item.salePrice || 0) * quantity).toFixed(2));
+    if (selectedItem && !customPrice && sellableItems.length > 0) {
+      const item = sellableItems.find(item => 
+        item && item.itemId && item.itemId.toString() === selectedItem
+      );
+      if (item && item.salePrice) {
+        setAmount((parseFloat(item.salePrice) * quantity).toFixed(2));
       }
     }
   }, [quantity, selectedItem, sellableItems, customPrice]);
@@ -74,7 +81,9 @@ const ExtraCharges = ({ bookingId }) => {
 
     // ⭐ VALIDAR STOCK SOLO SI SE SELECCIONÓ UN PRODUCTO
     if (selectedItem) {
-      const selectedItemObject = sellableItems.find(item => item.itemId.toString() === selectedItem);
+      const selectedItemObject = sellableItems.find(item => 
+        item && item.itemId && item.itemId.toString() === selectedItem
+      );
 
       if (!selectedItemObject) {
         toast.error("Producto no encontrado en el inventario");
@@ -100,7 +109,7 @@ const ExtraCharges = ({ bookingId }) => {
     setShowForm(false);
   };
 
-  // ⭐ MANEJAR ENVÍO DEL FORMULARIO
+  // ⭐ MANEJAR ENVÍO DEL FORMULARIO - CORREGIDO PARA EVITAR RECARGA PROBLEMÁTICA
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -109,55 +118,106 @@ const ExtraCharges = ({ bookingId }) => {
     }
 
     try {
-      console.log("📤 Procesando cargo extra...");
+      console.log("🔍 [FRONTEND-DEBUG] Estado del formulario antes de enviar:");
+      console.log("📝 description:", description);
+      console.log("💰 amount:", amount);
+      console.log("🔢 quantity:", quantity);
+      console.log("📦 selectedItem:", selectedItem);
       
       const extraChargeData = {
-        bookingId,
+        bookingId: parseInt(bookingId),
         extraCharge: {
           description: description.trim(),
           price: parseFloat(amount),
           quantity: parseInt(quantity, 10),
-          // ⭐ INCLUIR itemId SOLO SI SE SELECCIONÓ UN PRODUCTO
+          chargeType: 'service',
+          notes: selectedItem ? `Producto del inventario: ${selectedItem}` : null,
           ...(selectedItem && { itemId: selectedItem })
         },
       };
 
-      console.log("📦 Datos del cargo extra:", extraChargeData);
+      console.log("📤 [FRONTEND-DEBUG] Datos completos a enviar:");
+      console.log(JSON.stringify(extraChargeData, null, 2));
+
+      // ⭐ VERIFICAR QUE DESCRIPTION NO ESTÉ VACÍA
+      if (!extraChargeData.extraCharge.description || extraChargeData.extraCharge.description.trim() === '') {
+        console.error("❌ [FRONTEND-DEBUG] Description está vacía!");
+        toast.error("La descripción no puede estar vacía");
+        return;
+      }
+
+      // ⭐ VERIFICAR QUE PRICE SEA VÁLIDO
+      if (isNaN(extraChargeData.extraCharge.price) || extraChargeData.extraCharge.price <= 0) {
+        console.error("❌ [FRONTEND-DEBUG] Price inválido:", extraChargeData.extraCharge.price);
+        toast.error("El precio debe ser un número válido mayor a 0");
+        return;
+      }
+
+      console.log("✅ [FRONTEND-DEBUG] Validaciones frontales pasadas, enviando...");
 
       const result = await dispatch(addExtraCharge(extraChargeData));
-
-      if (!result.error) {
+      
+      // ⭐ VERIFICAR RESULTADO CORRECTAMENTE
+      if (result && !result.error) {
         // ⭐ DESCONTAR STOCK SOLO SI SE SELECCIONÓ UN PRODUCTO DEL INVENTARIO
         if (selectedItem) {
           console.log("📦 Descontando stock del producto:", selectedItem, "cantidad:", quantity);
-          await dispatch(removeStock(selectedItem, quantity));
+          try {
+            await dispatch(removeStock(selectedItem, quantity));
+          } catch (stockError) {
+            console.warn("⚠️ Error al descontar stock (cargo ya creado):", stockError);
+            toast.warn("Cargo creado pero no se pudo actualizar el stock automáticamente");
+          }
         }
 
-        // ⭐ RECARGAR BOOKINGS PARA ASEGURAR SINCRONIZACIÓN
-        dispatch(getAllBookings({ status: "checked-in" }));
+        // ⭐ EVITAR RECARGA COMPLETA - SOLO ACTUALIZAR EL BOOKING ESPECÍFICO
+        try {
+          // ⭐ RECARGAR SOLO LOS BOOKINGS CHECKED-IN SIN FORZAR UNA RECARGA COMPLETA
+          console.log("🔄 Actualizando estado local...");
+          
+          // ⭐ NO HACER RECARGA AUTOMÁTICA QUE PUEDE CAUSAR ERRORES
+          // await dispatch(getAllBookings({ status: "checked-in" }));
+          
+          // ⭐ EN SU LUGAR, ACTUALIZAR EL ESTADO LOCAL YA SE HACE EN EL REDUCER
+          console.log("✅ Estado actualizado mediante reducer");
+          
+        } catch (reloadError) {
+          console.warn("⚠️ Error al recargar datos (cargo ya creado):", reloadError);
+          // ⭐ NO MOSTRAR ERROR AL USUARIO PORQUE EL CARGO YA SE CREÓ
+        }
 
+        // ⭐ LIMPIAR FORMULARIO Y MOSTRAR ÉXITO
         resetForm();
-        toast.success("Cargo extra añadido exitosamente");
+        toast.success("✅ Cargo extra añadido exitosamente");
         console.log("✅ Cargo extra procesado exitosamente");
+        
       } else {
-        throw new Error(result.message);
+        throw new Error(result?.message || "Error desconocido al agregar cargo");
       }
     } catch (error) {
       console.error("❌ Error al procesar el cargo extra:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Error al procesar la solicitud";
-      toast.error(errorMessage);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.details || 
+                          error.message || 
+                          "Error al procesar la solicitud";
+      
+      toast.error(`❌ ${errorMessage}`);
     }
   };
 
-  // ⭐ CALCULAR TOTAL DE EXTRAS EXISTENTES
+  // ⭐ CALCULAR TOTAL DE EXTRAS EXISTENTES - CORREGIDO
   const totalExtras = currentBooking?.ExtraCharges?.reduce(
-    (sum, charge) => sum + (parseFloat(charge.price) || 0), 
+    (sum, charge) => {
+      const price = parseFloat(charge.price || charge.amount || 0);
+      return sum + price;
+    }, 
     0
   ) || 0;
 
   return (
     <div className="mt-2">
-      {/* ⭐ MOSTRAR EXTRAS EXISTENTES */}
+      {/* ⭐ MOSTRAR EXTRAS EXISTENTES - CORREGIDO CON KEYS */}
       {currentBooking?.ExtraCharges && currentBooking.ExtraCharges.length > 0 && (
         <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded">
           <div className="flex justify-between items-center mb-2">
@@ -170,13 +230,16 @@ const ExtraCharges = ({ bookingId }) => {
           </div>
           <ul className="space-y-1">
             {currentBooking.ExtraCharges.map((charge, idx) => (
-              <li key={idx} className="text-xs text-blue-700 flex justify-between items-center">
+              <li 
+                key={charge.id || charge.chargeId || `charge-${idx}`} 
+                className="text-xs text-blue-700 flex justify-between items-center"
+              >
                 <span>
-                  📦 {charge.description} 
-                  {charge.quantity && ` (x${charge.quantity})`}
+                  📦 {charge.description || 'Cargo extra'} 
+                  {charge.quantity && charge.quantity > 1 && ` (x${charge.quantity})`}
                 </span>
                 <span className="font-medium">
-                  ${parseFloat(charge.price || 0).toLocaleString()}
+                  ${parseFloat(charge.price || charge.amount || 0).toLocaleString()}
                 </span>
               </li>
             ))}
@@ -207,7 +270,7 @@ const ExtraCharges = ({ bookingId }) => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3">
-            {/* ⭐ SELECCIÓN DE PRODUCTO DEL INVENTARIO */}
+            {/* ⭐ SELECCIÓN DE PRODUCTO DEL INVENTARIO - CORREGIDO CON VALIDACIONES */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 📦 Producto del inventario (opcional):
@@ -215,19 +278,23 @@ const ExtraCharges = ({ bookingId }) => {
               <select
                 value={selectedItem}
                 onChange={handleItemSelect}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
               >
                 <option value="">-- Seleccionar producto o agregar manualmente --</option>
-                {sellableItems.map(item => (
-                  <option 
-                    key={item.itemId} 
-                    value={item.itemId}
-                    disabled={item.currentStock < 1}
-                  >
-                    {item.itemName} - ${item.salePrice} 
-                    {item.currentStock < 1 ? " (Agotado)" : ` (Stock: ${item.currentStock})`}
-                  </option>
-                ))}
+                {sellableItems
+                  .filter(item => item && item.itemId && item.itemName) // ⭐ FILTRAR ITEMS VÁLIDOS
+                  .map(item => (
+                    <option 
+                      key={item.itemId} 
+                      value={item.itemId}
+                      disabled={item.currentStock < 1}
+                    >
+                      {item.itemName} - ${item.salePrice || 0} 
+                      {item.currentStock < 1 ? " (Agotado)" : ` (Stock: ${item.currentStock || 0})`}
+                    </option>
+                  ))
+                }
               </select>
             </div>
 
@@ -240,7 +307,8 @@ const ExtraCharges = ({ bookingId }) => {
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                 placeholder="Describe el cargo extra..."
                 required
               />
@@ -256,7 +324,8 @@ const ExtraCharges = ({ bookingId }) => {
                 value={quantity}
                 onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
                 min="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                 required
               />
             </div>
@@ -269,6 +338,7 @@ const ExtraCharges = ({ bookingId }) => {
                   id="customPrice"
                   checked={customPrice}
                   onChange={(e) => setCustomPrice(e.target.checked)}
+                  disabled={isLoading}
                   className="rounded"
                 />
                 <label htmlFor="customPrice" className="text-sm text-gray-600">
@@ -288,9 +358,10 @@ const ExtraCharges = ({ bookingId }) => {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 readOnly={selectedItem && !customPrice}
+                disabled={isLoading}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   selectedItem && !customPrice ? 'bg-gray-100' : ''
-                }`}
+                } ${isLoading ? 'bg-gray-100' : ''}`}
                 placeholder="0.00"
                 required
               />
@@ -301,21 +372,22 @@ const ExtraCharges = ({ bookingId }) => {
               )}
             </div>
 
-            {/* ⭐ BOTONES DE ACCIÓN */}
+            {/* ⭐ BOTONES DE ACCIÓN CON LOADING CORRECTO */}
             <div className="flex justify-end space-x-2 pt-2">
               <button
                 type="button"
                 onClick={resetForm}
-                className="px-4 py-2 text-sm bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
+                disabled={isLoading}
+                className="px-4 py-2 text-sm bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 disabled:opacity-50 transition-colors"
               >
                 ❌ Cancelar
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={isLoading}
                 className="px-4 py-2 text-sm bg-green-500 text-white rounded-md hover:bg-green-600 disabled:bg-gray-400 transition-colors flex items-center gap-2"
               >
-                {loading ? (
+                {isLoading ? (
                   <>
                     <span className="animate-spin">⏳</span>
                     Guardando...

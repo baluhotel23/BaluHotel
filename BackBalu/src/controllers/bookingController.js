@@ -1375,65 +1375,156 @@ const calculateTotalAmount = (booking) => {
   return roomCharge + extraCharges;
 };
 
-const addExtraCharges = async (req, res, next) => {
+
+
+const addExtraCharge = async (req, res) => {
   try {
+    console.log("📤 [ADD-EXTRA-CHARGE] Recibiendo datos completos:");
+    console.log("🔍 [ADD-EXTRA-CHARGE] req.params:", req.params);
+    console.log("🔍 [ADD-EXTRA-CHARGE] req.body:", JSON.stringify(req.body, null, 2));
+    console.log("🕐 [ADD-EXTRA-CHARGE] Hora de procesamiento:", formatForLogs(getColombiaTime()));
+
+    // ⭐ OBTENER bookingId DEL PARÁMETRO DE LA URL
     const { bookingId } = req.params;
-    const { price, quantity, description, itemId } = req.body;
+    const { extraCharge } = req.body;
 
-    // Validar que req.user exista
-    
+    console.log("📋 [ADD-EXTRA-CHARGE] Datos extraídos:", {
+      bookingId: bookingId,
+      extraCharge: extraCharge
+    });
 
-    // Buscar la reserva usando el bookingId de los parámetros
-    const booking = await Booking.findByPk(bookingId);
-    if (!booking) {
-      throw new CustomError("Reserva no encontrada", 404);
-    }
-
-    // Solo se permiten cargos si el estado de la reserva es "checked-in"
-    if (booking.status.toLowerCase() !== "checked-in") {
-      throw new CustomError(
-        "Solo se pueden agregar cargos a reservas con check-in",
-        400
-      );
-    }
-
-    // Validar stock si se proporciona itemId
-    if (itemId) {
-      const inventoryItem = await BasicInventory.findByPk(itemId);
-      if (!inventoryItem) {
-        throw new CustomError("El ítem del inventario no existe", 404);
-      }
-
-      if (inventoryItem.currentStock < quantity) {
-        throw new CustomError(`Stock insuficiente para el ítem ${inventoryItem.name}. Disponible: ${inventoryItem.currentStock}`, 400);
-      }
-
-      // Reducir el stock después de crear el cargo extra
-      await inventoryItem.update({
-        currentStock: inventoryItem.currentStock - quantity,
+    // ⭐ VALIDACIONES MEJORADAS CON LOGS ESPECÍFICOS
+    if (!bookingId) {
+      console.error("❌ [ADD-EXTRA-CHARGE] bookingId faltante en params");
+      return res.status(400).json({ 
+        error: true, 
+        message: "bookingId es requerido en la URL" 
       });
     }
 
-    // Crear el cargo extra
-    const extraCharge = await ExtraCharge.create({
-      bookingId, // bookingId proveniente de req.params
-      description,
-      price,
-      quantity,
-      amount: price * quantity,
-      createdBy: req.user.sdocno, // Usar req.user en lugar de req.buyer
+    if (!extraCharge) {
+      console.error("❌ [ADD-EXTRA-CHARGE] extraCharge faltante en body");
+      return res.status(400).json({ 
+        error: true, 
+        message: "extraCharge es requerido en el body" 
+      });
+    }
+
+    if (!extraCharge.description || extraCharge.description.trim() === '') {
+      console.error("❌ [ADD-EXTRA-CHARGE] description faltante o vacía:", extraCharge.description);
+      return res.status(400).json({ 
+        error: true, 
+        message: "description es requerida y no puede estar vacía" 
+      });
+    }
+
+    if (!extraCharge.price || isNaN(parseFloat(extraCharge.price))) {
+      console.error("❌ [ADD-EXTRA-CHARGE] price inválido:", extraCharge.price);
+      return res.status(400).json({ 
+        error: true, 
+        message: "price es requerido y debe ser un número válido" 
+      });
+    }
+
+    console.log("✅ [ADD-EXTRA-CHARGE] Validaciones básicas pasadas");
+
+    // ⭐ VERIFICAR QUE LA RESERVA EXISTE
+    const booking = await Booking.findByPk(bookingId);
+    if (!booking) {
+      console.error("❌ [ADD-EXTRA-CHARGE] Reserva no encontrada:", bookingId);
+      return res.status(404).json({ 
+        error: true, 
+        message: "Reserva no encontrada" 
+      });
+    }
+
+    console.log("✅ [ADD-EXTRA-CHARGE] Reserva encontrada:", {
+      bookingId: booking.bookingId,
+      status: booking.status,
+      roomNumber: booking.roomNumber
+    });
+
+    // ⭐ CREAR EL CARGO EXTRA CON LOGGING DETALLADO
+    const chargeData = {
+      bookingId: parseInt(bookingId),
+      description: extraCharge.description.trim(),
+      // ⭐ USAR 'amount' SEGÚN TU MODELO
+      amount: parseFloat(extraCharge.price),
+      quantity: parseInt(extraCharge.quantity) || 1,
+      chargeType: extraCharge.chargeType || 'service',
+      chargeDate: getColombiaTime(),
+      chargedBy: req.user?.n_document || 'system',
+      notes: extraCharge.notes || null,
+      isApproved: true,
+      approvedAt: getColombiaTime(),
+      approvedBy: req.user?.n_document || 'system'
+    };
+
+    console.log("📝 [ADD-EXTRA-CHARGE] Datos para crear cargo:", JSON.stringify(chargeData, null, 2));
+
+    // ⭐ CREAR CON TRY-CATCH ESPECÍFICO
+    let newExtraCharge;
+    try {
+      newExtraCharge = await ExtraCharge.create(chargeData);
+      console.log("✅ [ADD-EXTRA-CHARGE] Cargo creado exitosamente:", {
+        id: newExtraCharge.id,
+        description: newExtraCharge.description,
+        amount: newExtraCharge.amount
+      });
+    } catch (createError) {
+      console.error("❌ [ADD-EXTRA-CHARGE] Error específico al crear:", createError);
+      console.error("❌ [ADD-EXTRA-CHARGE] Error details:", {
+        name: createError.name,
+        message: createError.message,
+        errors: createError.errors
+      });
+      
+      return res.status(500).json({
+        error: true,
+        message: "Error al crear el cargo extra en la base de datos",
+        details: createError.message,
+        validationErrors: createError.errors
+      });
+    }
+
+    // ⭐ FORMATEAR RESPUESTA PARA COMPATIBILIDAD CON FRONTEND
+    const responseData = {
+      ...newExtraCharge.toJSON(),
+      // ⭐ AGREGAR 'price' PARA COMPATIBILIDAD
+      price: newExtraCharge.amount,
+      // ⭐ FORMATEAR FECHAS
+      chargeDate: formatForLogs(newExtraCharge.chargeDate),
+      createdAt: formatForLogs(newExtraCharge.createdAt)
+    };
+
+    console.log("📤 [ADD-EXTRA-CHARGE] Respuesta preparada:", {
+      id: responseData.id,
+      description: responseData.description,
+      price: responseData.price,
+      amount: responseData.amount
     });
 
     res.status(201).json({
       error: false,
       message: "Cargo extra agregado exitosamente",
-      data: extraCharge,
+      data: responseData,
+      timestamp: formatForLogs(getColombiaTime())
     });
+
   } catch (error) {
-    console.error("Error al agregar cargo extra:", error);
-    next(error);
+    console.error("❌ [ADD-EXTRA-CHARGE] Error general:", error);
+    console.error("🕐 [ADD-EXTRA-CHARGE] Hora del error:", formatForLogs(getColombiaTime()));
+    
+    res.status(500).json({
+      error: true,
+      message: "Error interno del servidor",
+      details: error.message,
+      timestamp: formatForLogs(getColombiaTime())
+    });
   }
 };
+
+
 
 const getBookingInventoryStatus = async (req, res, next) => {
   try {
@@ -1611,82 +1702,382 @@ const getInventoryUsageReport = async (req, res, next) => {
 };
 
 
-const generateBill = async (req, res) => {
-  const { bookingId } = req.params;
 
+
+// ...existing code...
+
+const generateBill = async (req, res, next) => {
   try {
-    // Buscar la reserva
+    console.log("🧾 Iniciando generación de factura");
+    console.log("🕐 Hora de procesamiento:", formatForLogs(getColombiaTime()));
+    
+    const { bookingId } = req.params;
+
+    if (!bookingId) {
+      return res.status(400).json({ error: true, message: "bookingId es requerido" });
+    }
+
+    // ⭐ VERIFICAR SI YA EXISTE UNA FACTURA PARA ESTA RESERVA
+    const existingBill = await Bill.findOne({
+      where: { bookingId: bookingId }
+    });
+
+    if (existingBill) {
+      console.log("⚠️ Ya existe una factura para esta reserva:", existingBill.idBill);
+      return res.status(200).json({
+        error: false,
+        message: "Factura ya existe para esta reserva",
+        data: existingBill,
+        timestamp: formatForLogs(getColombiaTime())
+      });
+    }
+
+    // ⭐ OBTENER DATOS DE LA RESERVA
     const booking = await Booking.findByPk(bookingId, {
       include: [
-        { model: Room },
-        { model: ExtraCharge },
-        { model: Buyer, as: "guest", attributes: ["scostumername", "selectronicmail", "sdocno"] },
+        { 
+          model: Room, 
+          as: 'room'
+        },
+        {
+          model: Buyer,
+          as: 'guest',
+          attributes: ["scostumername", "selectronicmail", "sdocno"]
+        },
+        {
+          model: Payment,
+          as: 'payments',
+          where: { paymentStatus: 'completed' },
+          required: false
+        },
+        {
+          model: ExtraCharge,
+          as: 'extraCharges',
+          required: false
+        }
       ],
     });
 
     if (!booking) {
-      throw new CustomError("Reserva no encontrada", 404);
+      return res.status(404).json({ 
+        error: true, 
+        message: "Reserva no encontrada" 
+      });
     }
 
-    // Calcular los montos
-    const reservationAmount = parseFloat(booking.totalAmount) || 0; // Monto base de la reserva
-    const extraChargesAmount = booking.ExtraCharges.reduce(
-      (sum, charge) => sum + (parseFloat(charge.price) || 0),
-      0
-    ); // Total de cargos extra
-    const totalAmount = reservationAmount + extraChargesAmount; // Total final
-
-    // Crear la factura
-    const bill = await Bill.create({
+    console.log("📋 Reserva encontrada:", {
       bookingId: booking.bookingId,
-      reservationAmount,
-      extraChargesAmount,
-      totalAmount,
-      generatedBy: req.user?.n_document || "system",
-      details: {
-        roomCharge: reservationAmount,
-        extraCharges: booking.ExtraCharges,
-        nights: calculateNights(booking.checkIn, booking.checkOut),
-        roomDetails: booking.Room,
-        guestDetails: booking.guest,
-      },
+      roomNumber: booking.room?.roomNumber || booking.roomNumber,
+      guestName: booking.guest?.scostumername,
+      status: booking.status
     });
 
-    res.json({
+    // ⭐ VERIFICAR QUE LA RESERVA ESTÉ EN ESTADO ADECUADO
+    if (!['checked-in', 'completed'].includes(booking.status)) {
+      return res.status(400).json({ 
+        error: true, 
+        message: "La reserva debe estar en estado 'checked-in' o 'completed' para generar factura" 
+      });
+    }
+
+    // ⭐ CALCULAR TOTALES CORRECTAMENTE
+    const baseAmount = parseFloat(booking.totalAmount) || 0;
+    const extraCharges = booking.extraCharges || [];
+    
+    // ⭐ USAR 'amount' EN LUGAR DE 'price' SEGÚN TU MODELO ExtraCharge
+    const totalExtras = extraCharges.reduce((sum, charge) => {
+      const chargeAmount = parseFloat(charge.amount || charge.price || 0);
+      console.log(`💰 Cargo extra: ${charge.description} = ${chargeAmount}`);
+      return sum + chargeAmount;
+    }, 0);
+    
+    const totalAmount = baseAmount + totalExtras;
+
+    console.log("💰 Cálculo de totales:", {
+      baseAmount,
+      totalExtras,
+      totalAmount,
+      extraChargesCount: extraCharges.length
+    });
+
+    // ⭐ CREAR LA FACTURA SOLO CON CAMPOS QUE EXISTEN EN TU MODELO
+    const billData = {
+      bookingId: booking.bookingId,
+      reservationAmount: baseAmount,
+      extraChargesAmount: totalExtras,
+      taxAmount: 0, // ⭐ PUEDES CALCULAR IMPUESTOS SI ES NECESARIO
+      totalAmount: totalAmount,
+      taxInvoiceId: null, // ⭐ GENERAR SI TIENES INTEGRACIÓN FISCAL
+      status: 'pending', // ⭐ USAR VALOR VÁLIDO DEL ENUM
+      paymentMethod: null, // ⭐ SE LLENARÁ CUANDO SE PAGUE
+    };
+
+    console.log("📝 [GENERATE-BILL] Datos de factura a crear:");
+    console.log(JSON.stringify(billData, null, 2));
+
+    // ⭐ VALIDAR DATOS ANTES DE CREAR
+    if (totalAmount < 0) {
+      return res.status(400).json({
+        error: true,
+        message: "El monto total de la factura no puede ser negativo",
+        data: { totalAmount }
+      });
+    }
+
+    // ⭐ CREAR REGISTRO EN LA BASE DE DATOS
+    let savedBill = null;
+    try {
+      savedBill = await Bill.create(billData);
+      console.log("💾 Factura guardada en BD:", savedBill.idBill);
+    } catch (billError) {
+      console.error("❌ Error al guardar factura:", billError.message);
+      console.error("❌ Detalles del error:", {
+        name: billError.name,
+        message: billError.message,
+        errors: billError.errors,
+        sql: billError.sql
+      });
+      
+      return res.status(500).json({
+        error: true,
+        message: "Error al crear la factura en la base de datos",
+        details: billError.message,
+        validationErrors: billError.errors
+      });
+    }
+
+    // ⭐ ACTUALIZAR ESTADO DE LA RESERVA A 'COMPLETED' SI ESTABA EN CHECK-IN
+    if (booking.status === 'checked-in') {
+      try {
+        await booking.update({ 
+          status: 'completed',
+          completedAt: getColombiaTime()
+        });
+        console.log("✅ Estado de reserva actualizado a 'completed'");
+      } catch (updateError) {
+        console.warn("⚠️ Error al actualizar estado de reserva:", updateError.message);
+        // No fallar la factura por esto
+      }
+    }
+
+    // ⭐ CREAR RESPUESTA CON INFORMACIÓN ADICIONAL PARA EL FRONTEND
+    const responseData = {
+      ...savedBill.toJSON(),
+      // ⭐ INFORMACIÓN ADICIONAL PARA EL FRONTEND (NO GUARDADA EN BD)
+      guestInfo: {
+        name: booking.guest?.scostumername || 'Huésped',
+        document: booking.guest?.sdocno || booking.guestId,
+        email: booking.guest?.selectronicmail || null
+      },
+      roomInfo: {
+        number: booking.room?.roomNumber || booking.roomNumber,
+        type: booking.room?.type || 'Standard',
+        checkIn: formatForLogs(booking.checkIn),
+        checkOut: formatForLogs(booking.checkOut),
+      },
+      bookingDetails: {
+        roomCharge: baseAmount,
+        extraCharges: extraCharges.map(charge => ({
+          description: charge.description,
+          amount: parseFloat(charge.amount || charge.price || 0),
+          quantity: charge.quantity || 1
+        })),
+        nights: calculateNights(booking.checkIn, booking.checkOut),
+        guestCount: booking.guestCount
+      },
+      // ⭐ FECHAS FORMATEADAS
+      createdAtFormatted: formatForLogs(savedBill.createdAt),
+      totalAmountFormatted: `$${totalAmount.toLocaleString()}`
+    };
+
+    console.log("✅ Factura generada exitosamente:", {
+      idBill: savedBill.idBill,
+      totalAmount: savedBill.totalAmount,
+      generatedAt: formatForLogs(getColombiaTime())
+    });
+
+    res.status(201).json({
       error: false,
       message: "Factura generada exitosamente",
-      data: bill,
+      data: responseData,
+      timestamp: formatForLogs(getColombiaTime())
     });
+
   } catch (error) {
-    console.error("Error al generar la factura:", error);
-    res.status(500).json({
-      error: true,
-      message: "Error al generar la factura",
+    console.error("❌ Error al generar la factura:", error);
+    console.error("🕐 Hora del error:", formatForLogs(getColombiaTime()));
+    
+    res.status(500).json({ 
+      error: true, 
+      message: "Error al generar la factura", 
       details: error.message,
+      timestamp: formatForLogs(getColombiaTime())
     });
   }
 };
+
+// ...existing code...
+
+
+
+
+
+// ...existing code...
 
 const getAllBills = async (req, res) => {
   try {
+    console.log("🧾 Consultando todas las facturas");
+    console.log("🕐 Hora de consulta:", formatForLogs(getColombiaTime()));
+
     const bills = await Bill.findAll({
       include: [
-        { model: Booking, include: [{ model: Buyer, as: "guest" }] },
+        { 
+          model: Booking, 
+          as: 'booking', // ⭐ USAR EL ALIAS CORRECTO
+          include: [
+            { 
+              model: Buyer, 
+              as: "guest",
+              attributes: ["sdocno", "scostumername", "selectronicmail"]
+            },
+            {
+              model: Room,
+              as: 'room', // ⭐ ALIAS CORRECTO PARA ROOM
+              attributes: ['roomNumber', 'type']
+            }
+          ]
+        },
       ],
+      order: [['createdAt', 'DESC']] // ⭐ ORDENAR POR MÁS RECIENTES PRIMERO
+    });
+
+    console.log(`✅ Encontradas ${bills.length} facturas`);
+
+    // ⭐ PROCESAR DATOS CON INFORMACIÓN ADICIONAL - CORREGIDO
+    const billsWithDetails = bills.map(bill => {
+      const billData = bill.toJSON();
+      
+      // ⭐ AGREGAR INFORMACIÓN CALCULADA SOLO CON CAMPOS EXISTENTES
+      return {
+        ...billData,
+        // ⭐ INFORMACIÓN FORMATEADA DE FECHAS - SOLO LAS QUE EXISTEN EN TU MODELO
+        createdAtFormatted: formatForLogs(billData.createdAt),
+        updatedAtFormatted: formatForLogs(billData.updatedAt),
+        
+        // ⭐ INFORMACIÓN DEL HUÉSPED
+        guestName: billData.booking?.guest?.scostumername || 'N/A',
+        guestDocument: billData.booking?.guest?.sdocno || 'N/A',
+        guestEmail: billData.booking?.guest?.selectronicmail || 'N/A',
+        
+        // ⭐ INFORMACIÓN DE LA HABITACIÓN
+        roomNumber: billData.booking?.room?.roomNumber || 'N/A',
+        roomType: billData.booking?.room?.type || 'N/A',
+        
+        // ⭐ ESTADO DE PAGO - USAR SOLO EL CAMPO 'status' QUE SÍ EXISTE
+        isPaid: billData.status === 'paid',
+        isPending: billData.status === 'pending',
+        isCancelled: billData.status === 'cancelled',
+        statusLabel: billData.status === 'paid' ? 'Pagada' : 
+                    billData.status === 'pending' ? 'Pendiente' : 'Cancelada',
+        
+        // ⭐ TOTALES FORMATEADOS - SOLO CAMPOS QUE EXISTEN
+        totalAmountFormatted: billData.totalAmount ? 
+          `$${parseFloat(billData.totalAmount).toLocaleString()}` : '$0',
+        reservationAmountFormatted: billData.reservationAmount ? 
+          `$${parseFloat(billData.reservationAmount).toLocaleString()}` : '$0',
+        extraChargesAmountFormatted: billData.extraChargesAmount ? 
+          `$${parseFloat(billData.extraChargesAmount).toLocaleString()}` : '$0',
+        taxAmountFormatted: billData.taxAmount ? 
+          `$${parseFloat(billData.taxAmount).toLocaleString()}` : '$0',
+        
+        // ⭐ INFORMACIÓN DE PAGO - SOLO SI EXISTE
+        paymentMethodLabel: billData.paymentMethod ? 
+          getPaymentMethodLabel(billData.paymentMethod) : 'No especificado',
+        
+        // ⭐ INFORMACIÓN DE LA RESERVA
+        bookingId: billData.booking?.bookingId || billData.bookingId,
+        checkIn: billData.booking?.checkIn ? formatForLogs(billData.booking.checkIn) : null,
+        checkOut: billData.booking?.checkOut ? formatForLogs(billData.booking.checkOut) : null,
+        
+        // ⭐ CÁLCULOS ADICIONALES
+        hasExtraCharges: parseFloat(billData.extraChargesAmount || 0) > 0,
+        hasTaxes: parseFloat(billData.taxAmount || 0) > 0,
+        
+        // ⭐ IDENTIFICADOR DE FACTURA FISCAL
+        hasTaxInvoice: !!billData.taxInvoiceId,
+        taxInvoiceDisplay: billData.taxInvoiceId || 'No generada'
+      };
+    });
+
+    // ⭐ CREAR RESUMEN CON CAMPOS CORRECTOS
+    const summary = {
+      totalBills: bills.length,
+      paidBills: billsWithDetails.filter(b => b.isPaid).length,
+      pendingBills: billsWithDetails.filter(b => b.isPending).length,
+      cancelledBills: billsWithDetails.filter(b => b.isCancelled).length,
+      totalRevenue: billsWithDetails
+        .filter(b => b.isPaid)
+        .reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0),
+      totalPendingAmount: billsWithDetails
+        .filter(b => b.isPending)
+        .reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0),
+      totalExtraCharges: billsWithDetails
+        .reduce((sum, bill) => sum + parseFloat(bill.extraChargesAmount || 0), 0),
+      totalTaxes: billsWithDetails
+        .reduce((sum, bill) => sum + parseFloat(bill.taxAmount || 0), 0),
+      // ⭐ FORMATEOS
+      totalRevenueFormatted: `$${billsWithDetails
+        .filter(b => b.isPaid)
+        .reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0)
+        .toLocaleString()}`,
+      totalPendingFormatted: `$${billsWithDetails
+        .filter(b => b.isPending)
+        .reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0)
+        .toLocaleString()}`
+    };
+
+    console.log("📊 Resumen de facturas:", {
+      total: summary.totalBills,
+      paid: summary.paidBills,
+      pending: summary.pendingBills,
+      revenue: summary.totalRevenueFormatted
     });
 
     res.json({
       error: false,
-      data: bills,
+      message: "Facturas obtenidas exitosamente",
+      data: billsWithDetails,
+      summary: summary,
+      timestamp: formatForLogs(getColombiaTime())
     });
+
   } catch (error) {
-    console.error("Error al obtener las facturas:", error);
+    console.error("❌ Error al obtener las facturas:", error);
+    console.error("🕐 Hora del error:", formatForLogs(getColombiaTime()));
+    
     res.status(500).json({
       error: true,
       message: "Error al obtener las facturas",
+      details: error.message,
+      timestamp: formatForLogs(getColombiaTime())
     });
   }
 };
+
+// ⭐ FUNCIÓN HELPER PARA ETIQUETAS DE MÉTODOS DE PAGO
+const getPaymentMethodLabel = (method) => {
+  const labels = {
+    'cash': 'Efectivo',
+    'credit_card': 'Tarjeta de Crédito',
+    'debit_card': 'Tarjeta de Débito',
+    'transfer': 'Transferencia'
+  };
+  return labels[method] || method;
+};
+
+// ...existing code...
+
+
 
 
 const updateBookingStatus = async (req, res) => {
@@ -1858,7 +2249,7 @@ module.exports = {
   checkInGuest, // ⭐ CAMBIAR DE checkIn A checkInGuest
   checkOut,
   calculateTotalAmount,
-  addExtraCharges,
+  addExtraCharge,
   downloadBookingPdf,
   generateBill,
   updateBookingStatus,

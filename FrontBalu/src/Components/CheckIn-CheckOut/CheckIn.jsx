@@ -360,37 +360,87 @@ const CheckIn = () => {
   }, [dispatch]);
 
   // ⭐ MANEJAR ÉXITO EN REGISTRO DE PASAJEROS
-  const handlePassengerRegistrationSuccess = useCallback((bookingId, passengers) => {
-    console.log("✅ Pasajeros registrados exitosamente:", passengers);
+const handlePassengerRegistrationSuccess = useCallback(async (bookingId, passengers) => {
+    console.log("✅ Iniciando proceso post-registro de pasajeros:", {
+      bookingId,
+      passengersCount: passengers?.length
+    });
     
-    setRegisteredPassengers((prev) => ({
-      ...prev,
-      [bookingId]: passengers,
-    }));
+    try {
+      // ⭐ 1. ACTUALIZAR ESTADO LOCAL INMEDIATAMENTE
+      setRegisteredPassengers((prev) => ({
+        ...prev,
+        [bookingId]: passengers,
+      }));
 
-    // ⭐ FORZAR RECARGA PARA SINCRONIZAR CON REDUX
-    setTimeout(() => {
-      reloadPassengersForBooking(bookingId);
-    }, 500);
+      // ⭐ 2. ACTUALIZAR ESTADO DE TRACKING LOCAL
+      setPassengersLoaded(prev => ({ 
+        ...prev, 
+        [bookingId]: true 
+      }));
 
-    dispatch(updateBookingStatus(bookingId, { status: "checked-in" }))
-      .then(() => {
-        toast.success(`✅ Reserva ${bookingId} completada y movida a check-out`);
-        setSelectedBooking(null);
-        
-        setTimeout(() => {
-          dispatch(
+      setPassengersLoadingErrors(prev => ({ 
+        ...prev, 
+        [bookingId]: false 
+      }));
+
+      console.log("✅ Estados locales actualizados exitosamente");
+
+      // ⭐ 3. ACTUALIZAR ESTADO DE RESERVA CON MANEJO DE ERRORES
+      console.log("🔄 Actualizando estado de reserva a checked-in...");
+      
+      const updateResult = await dispatch(updateBookingStatus(bookingId, { status: "checked-in" }));
+      
+      if (updateResult && !updateResult.error) {
+        console.log("✅ Estado de reserva actualizado exitosamente");
+        toast.success(`✅ Check-in completado para reserva ${bookingId}`);
+      } else {
+        console.warn("⚠️ Error al actualizar estado de reserva:", updateResult);
+        toast.warning("Pasajeros registrados, pero error al actualizar estado de reserva");
+      }
+
+      // ⭐ 4. LIMPIAR SELECCIÓN ACTUAL
+      setSelectedBooking(null);
+
+      // ⭐ 5. RECARGAR DATOS CON DELAY PARA EVITAR CONFLICTOS
+      console.log("🔄 Programando recarga de datos...");
+      
+      setTimeout(async () => {
+        try {
+          // ⭐ RECARGAR DATOS SIN SOBREESCRIBIR ESTADOS LOCALES
+          console.log("🔄 Recargando bookings...");
+          
+          await dispatch(
             getAllBookings({ 
               fromDate: dateRange.from, 
               toDate: dateRange.to
             })
           );
-        }, 1000);
-      })
-      .catch((error) => {
-        console.error("❌ Error actualizando estado de reserva:", error);
-        toast.error("Error al actualizar el estado de la reserva");
-      });
+          
+          // ⭐ RECARGAR PASAJEROS PARA SINCRONIZAR REDUX
+          console.log("🔄 Sincronizando pasajeros con Redux...");
+          await reloadPassengersForBooking(bookingId);
+          
+          console.log("✅ Recarga de datos completada");
+          
+        } catch (reloadError) {
+          console.error("❌ Error en recarga de datos:", reloadError);
+          // ⭐ NO MOSTRAR ERROR AL USUARIO PORQUE EL REGISTRO YA SE COMPLETÓ
+        }
+      }, 1000); // ⭐ DELAY DE 1 SEGUNDO PARA EVITAR RACE CONDITIONS
+
+    } catch (error) {
+      console.error("❌ Error en handlePassengerRegistrationSuccess:", error);
+      
+      // ⭐ MANTENER LOS DATOS LOCALES Y SOLO MOSTRAR WARNING
+      toast.warning(
+        "Pasajeros registrados exitosamente, pero hubo un problema al actualizar la vista. " +
+        "La reserva puede requerir recarga manual."
+      );
+      
+      // ⭐ STILL CLOSE THE REGISTRATION FORM
+      setSelectedBooking(null);
+    }
   }, [dispatch, dateRange.from, dateRange.to, reloadPassengersForBooking]);
 
   // ⭐ MANEJAR CIERRE DE REGISTRO

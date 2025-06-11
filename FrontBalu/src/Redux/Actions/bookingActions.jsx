@@ -259,16 +259,29 @@ export const addExtraCharge = (chargeData) => async (dispatch) => {
   try {
     console.log("📤 Enviando cargo extra:", chargeData);
     
-    const { data } = await api.post("/bookings/extra-charges", chargeData);
+    // ⭐ VERIFICAR QUE bookingId EXISTE EN chargeData
+    if (!chargeData.bookingId) {
+      throw new Error("bookingId es requerido en chargeData");
+    }
+    
+    // ⭐ USAR LA RUTA CORRECTA CON chargeData.bookingId
+    const { data } = await api.post(`/bookings/${chargeData.bookingId}/extra-charges`, chargeData);
     
     console.log("✅ Respuesta del servidor:", data);
+    
+    // ⭐ VERIFICAR QUE LA RESPUESTA SEA EXITOSA
+    if (data.error) {
+      throw new Error(data.message || "Error en la respuesta del servidor");
+    }
     
     // ⭐ ASEGURAR QUE EL PAYLOAD INCLUYA TODA LA INFORMACIÓN NECESARIA
     const payload = {
       bookingId: chargeData.bookingId,
       extraCharge: data.data, // El cargo extra creado
-      message: data.message
+      message: data.message || "Cargo extra agregado exitosamente"
     };
+    
+    console.log("📦 Payload para dispatch:", payload);
     
     dispatch({ 
       type: "ADD_EXTRA_CHARGE_SUCCESS", 
@@ -277,8 +290,21 @@ export const addExtraCharge = (chargeData) => async (dispatch) => {
     
     return { error: false, data: payload };
   } catch (error) {
-    const errorMessage = error.response?.data?.message || "Error al agregar cargo extra";
-    console.error("❌ Error en addExtraCharge:", errorMessage);
+    console.error("❌ Error en addExtraCharge:", error);
+    
+    // ⭐ MANEJO MEJORADO DE ERRORES
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.details || 
+                        error.message || 
+                        "Error al agregar cargo extra";
+    
+    console.error("❌ Error message:", errorMessage);
+    console.error("❌ Error details:", {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+      method: error.config?.method
+    });
     
     dispatch({ 
       type: "ADD_EXTRA_CHARGE_FAILURE", 

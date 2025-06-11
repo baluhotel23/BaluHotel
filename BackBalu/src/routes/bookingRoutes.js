@@ -14,7 +14,7 @@ const {
     getAllBookings,
     checkInGuest, // ⭐ CAMBIAR DE checkIn A checkInGuest
     checkOut,
-    addExtraCharges,
+    addExtraCharge,
     generateBill,
     updateBookingStatus,
     cancelBooking,
@@ -61,7 +61,8 @@ router.put('/:bookingId/check-out', checkOut);
 // ⭐ NUEVAS RUTAS DE INVENTARIO
 router.get('/:bookingId/inventory/status', getBookingInventoryStatus);
 
-router.post('/:bookingId/extra-charges', addExtraCharges);
+router.post('/:bookingId/extra-charges', addExtraCharge
+);
 router.get('/:bookingId/bill', generateBill);
 router.put('/:bookingId/status', updateBookingStatus);
 

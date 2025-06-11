@@ -418,27 +418,34 @@ const bookingReducer = (state = initialState, action) => {
       };
 
     // ⭐ ADD EXTRA CHARGES - OPTIMIZADO
-    case "ADD_EXTRA_CHARGE_REQUEST":
+   case "ADD_EXTRA_CHARGE_REQUEST":
       return { 
         ...state, 
         loading: { ...state.loading, booking: true }, 
-        errors: { ...state.errors, booking: null } 
+        errors: { ...state.errors, booking: null },
+        success: { ...state.success, message: null }
       };
     case "ADD_EXTRA_CHARGE_SUCCESS": {
+      console.log('✅ [REDUCER] Procesando cargo extra exitoso:', action.payload);
+      
       const updatedBookings = state.bookings.map(booking => {
         if (booking.bookingId === action.payload.bookingId) {
+          const newExtraCharges = [
+            ...(booking.ExtraCharges || []),
+            action.payload.extraCharge
+          ];
+          
+          console.log('📦 [REDUCER] Actualizando ExtraCharges para reserva:', booking.bookingId, newExtraCharges);
+          
           return {
             ...booking,
-            ExtraCharges: [
-              ...(booking.ExtraCharges || []),
-              action.payload.extraCharge
-            ]
+            ExtraCharges: newExtraCharges
           };
         }
         return booking;
       });
 
-      return { 
+      const newState = { 
         ...state, 
         loading: { ...state.loading, booking: false }, 
         extraCharges: [...state.extraCharges, action.payload.extraCharge],
@@ -452,14 +459,20 @@ const bookingReducer = (state = initialState, action) => {
               ]
             }
           : state.bookingDetails,
-        success: { message: 'Cargo adicional agregado exitosamente', type: 'update' }
+        success: { message: 'Cargo adicional agregado exitosamente', type: 'update' },
+        errors: { ...state.errors, booking: null }
       };
+      
+      console.log('📊 [REDUCER] Estado actualizado con cargo extra');
+      return newState;
     }
     case "ADD_EXTRA_CHARGE_FAILURE":
+      console.error('❌ [REDUCER] Error al agregar cargo extra:', action.payload);
       return { 
         ...state, 
         loading: { ...state.loading, booking: false }, 
-        errors: { ...state.errors, booking: action.payload }
+        errors: { ...state.errors, booking: action.payload },
+        success: { ...state.success, message: null }
       };
 
     // ⭐ GENERATE BILL - OPTIMIZADO
