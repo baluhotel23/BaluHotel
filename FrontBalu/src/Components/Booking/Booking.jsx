@@ -15,7 +15,9 @@ import { toast } from "react-toastify";
 import WompiPayment from "../WompiPayment";
 import { useNavigate } from "react-router-dom";
 
+
 const ROOM_TYPES = [ "Doble", "Triple", "Cuadruple", "Pareja"];
+
 
 // Definición del Modal
 const Modal = ({ children, isOpen, onClose }) => {
@@ -218,16 +220,27 @@ const BuyerRegistrationFormPopup = ({ isOpen, onClose, onBuyerRegistered, initia
 const Booking = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  
+  // ⭐ CORREGIR SELECTORES REDUX
   const { 
     availability, 
-    loading: availabilityLoading,
-    error: availabilityError 
-  } = useSelector((state) => state.booking);
+    availabilitySummary,
+    loading, 
+    errors 
+  } = useSelector((state) => ({
+    availability: state.booking.availability || [],
+    availabilitySummary: state.booking.availabilitySummary || { total: 0, available: 0 },
+    loading: state.booking.loading || {},
+    errors: state.booking.errors || {}
+  }));
   const { 
     buyer: buyerFromRedux, 
     loading: buyerLoading, 
     error: buyerError 
   } = useSelector((state) => state.taxxa);
+
+  const isLoadingAvailability = loading.availability;
+  const availabilityError = errors.availability;
 
   const [step, setStep] = useState(1);
   const [checkIn, setCheckIn] = useState(new Date());
@@ -251,37 +264,72 @@ const Booking = () => {
 
   // Load search parameters from localStorage if available
   useEffect(() => {
+    console.log('🚀 [BOOKING] Component mounted, loading rooms...');
+    
     const storedParams = localStorage.getItem('bookingSearchParams');
     if (storedParams) {
-      const params = JSON.parse(storedParams);
-      setCheckIn(new Date(params.checkIn));
-      setCheckOut(new Date(params.checkOut));
-      setRoomType(params.roomType || "");
-      setAdults(params.guests || 1);
-      
-      // Auto-trigger search with stored parameters
-      setTimeout(() => {
-        dispatch(checkAvailability({ 
-          checkIn: new Date(params.checkIn), 
-          checkOut: new Date(params.checkOut), 
-          roomType: params.roomType 
-        }));
-      }, 100);
-      
-      // Clear stored parameters
-      localStorage.removeItem('bookingSearchParams');
+      try {
+        const params = JSON.parse(storedParams);
+        console.log('📦 [BOOKING] Found stored params:', params);
+        
+        setCheckIn(new Date(params.checkIn));
+        setCheckOut(new Date(params.checkOut));
+        setRoomType(params.roomType || "");
+        setAdults(params.guests || 1);
+        
+        setTimeout(() => handleSearch(params), 500);
+        localStorage.removeItem('bookingSearchParams');
+      } catch (error) {
+        console.error('❌ [BOOKING] Error parsing stored params:', error);
+        localStorage.removeItem('bookingSearchParams');
+      }
+    } else {
+      // ⭐ CARGAR TODAS LAS HABITACIONES POR DEFECTO
+      console.log('ℹ️ [BOOKING] No stored params, loading all rooms');
+      setTimeout(() => handleSearch(), 500);
     }
   }, [dispatch]);
 
   // ... (handleSearch, handleSelectRoom, handleContinuePassengers sin cambios) ...
- const handleSearch = () => {
-    dispatch(checkAvailability({ checkIn, checkOut, roomType }));
+ const handleSearch = (customParams = null) => {
+    console.log('🔍 [BOOKING] handleSearch called with params:', customParams);
+    
+    const searchParams = customParams || {
+      checkIn: checkIn,
+      checkOut: checkOut,
+      roomType: roomType
+    };
+
+    // ⭐ FORMATEAR FECHAS CORRECTAMENTE
+    const formattedParams = {
+      checkIn: searchParams.checkIn ? format(new Date(searchParams.checkIn), 'yyyy-MM-dd') : undefined,
+      checkOut: searchParams.checkOut ? format(new Date(searchParams.checkOut), 'yyyy-MM-dd') : undefined,
+      roomType: searchParams.roomType || undefined
+    };
+
+    // ⭐ REMOVER PARÁMETROS UNDEFINED
+    const cleanParams = Object.fromEntries(
+      Object.entries(formattedParams).filter(([_, value]) => value !== undefined && value !== '')
+    );
+
+    console.log('📤 [BOOKING] Dispatching checkAvailability with params:', cleanParams);
+    dispatch(checkAvailability(cleanParams));
   };
 
+  useEffect(() => {
+    console.log('🔍 [BOOKING] Current state:', {
+      availability: availability?.length,
+      isLoadingAvailability,
+      availabilityError,
+      availabilitySummary
+    });
+  }, [availability, isLoadingAvailability, availabilityError, availabilitySummary]);
+
   const handleSelectRoom = (room) => {
+    console.log('🏨 [BOOKING] Room selected:', room.roomNumber);
     setSelectedRoom(room);
     setMaxCapacity(room.maxGuests || 2);
-    setAdults(1); 
+    setAdults(1);
     setChildren(0);
     setStep(2);
   };
@@ -289,6 +337,7 @@ const Booking = () => {
 
   const handleContinuePassengers = async () => {
     const totalGuests = adults + children;
+    
     if (totalGuests === 0) {
       toast.warning('Debe seleccionar al menos un huésped.');
       return;
@@ -304,33 +353,50 @@ const Booking = () => {
       return;
     }
 
+    console.log('💰 [BOOKING] Calculating price for:', {
+      room: selectedRoom.roomNumber,
+      guests: totalGuests,
+      nights: nights
+    });
+
     setPriceLoading(true);
     
     try {
-      // ⭐ LLAMAR AL BACKEND PARA CALCULAR PRECIO
-      const result = await dispatch(calculateRoomPrice({
-        roomNumber: selectedRoom.roomNumber,
-        guestCount: totalGuests,
-        checkIn: checkIn.toISOString(),
-        checkOut: checkOut.toISOString(),
-        promoCode: promoCode || null
-      }));
+      // ⭐ CALCULAR PRECIO LOCALMENTE MIENTRAS NO HAY ENDPOINT
+      const basePrice = totalGuests === 1 ? 
+        parseFloat(selectedRoom.priceSingle) : 
+        totalGuests === 2 ? 
+        parseFloat(selectedRoom.priceDouble) : 
+        parseFloat(selectedRoom.priceMultiple);
 
-      if (result.success) {
-        const priceData = result.data;
-        setBookingTotal(priceData.totalAmount);
-        setPriceBreakdown(priceData.breakdown);
-        
-        if (priceData.isPromotion) {
-          toast.success(`¡Precio promocional aplicado! $${priceData.pricePerNight.toLocaleString()} por noche`);
-        }
-        
-        setStep(3);
-      } else {
-        toast.error(result.error || 'Error al calcular el precio');
+      const extraCharges = totalGuests > 3 ? 
+        (totalGuests - 3) * parseFloat(selectedRoom.pricePerExtraGuest || 0) : 0;
+
+      const finalPrice = selectedRoom.isPromo && selectedRoom.promotionPrice ? 
+        parseFloat(selectedRoom.promotionPrice) : 
+        (basePrice + extraCharges);
+
+      const totalAmount = finalPrice * nights;
+
+      const breakdown = {
+        basePrice: finalPrice,
+        nights: nights,
+        guestCount: totalGuests,
+        extraGuestCharges: extraCharges,
+        isPromotion: selectedRoom.isPromo && selectedRoom.promotionPrice
+      };
+
+      setBookingTotal(totalAmount);
+      setPriceBreakdown(breakdown);
+      
+      if (breakdown.isPromotion) {
+        toast.success(`¡Precio promocional aplicado! $${finalPrice.toLocaleString()} por noche`);
       }
+      
+      setStep(3);
+      
     } catch (error) {
-      console.error('Error calculando precio:', error);
+      console.error('❌ [BOOKING] Error calculating price:', error);
       toast.error('Error al calcular el precio. Intente nuevamente.');
     } finally {
       setPriceLoading(false);
@@ -474,17 +540,14 @@ const Booking = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pt-32"> {/* Added top padding to account for navbar */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pt-32">
       <div className="container mx-auto p-4 max-w-4xl">
-        {/* Paso 1: Selección de habitación y fechas */}
+        {/* ⭐ PASO 1: CORREGIR ESTADOS DE LOADING */}
         {step === 1 && (
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200"
-               style={{ 
-                 boxShadow: '0 0 0 4px rgba(255, 255, 255, 0.1), 0 20px 40px -12px rgba(0, 0, 0, 0.15)' 
-               }}>
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
             <h1 className="text-3xl font-bold mb-6 text-gray-800 text-center">Reservar Habitación</h1>
             
-            {/* Show current search parameters if they exist */}
+            {/* Show current search parameters */}
             <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
               <h3 className="text-xl font-semibold mb-3 text-gray-700 flex items-center">
                 <span className="mr-2">🔍</span> Búsqueda Actual
@@ -494,14 +557,19 @@ const Booking = () => {
                 <p><span className="font-medium">Salida:</span> {format(checkOut, "dd-MM-yyyy", { locale: es })}</p>
                 {roomType && <p><span className="font-medium">Tipo:</span> {roomType}</p>}
               </div>
+              {availabilitySummary.total > 0 && (
+                <div className="mt-3 text-sm text-blue-600">
+                  📊 {availabilitySummary.available}/{availabilitySummary.total} habitaciones disponibles
+                </div>
+              )}
             </div>
 
-            {/* Existing form for modifying search */}
+            {/* Search form */}
             <div className="mb-6 p-6 bg-gray-50 rounded-xl">
-              <h3 className="text-lg font-semibold mb-4 text-gray-700">Modificar Búsqueda</h3>
+              <h3 className="text-lg font-semibold mb-4 text-gray-700">Buscar Habitaciones</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">Desde</label>
+                  <label className="block mb-2 text-sm font-medium text-gray-700">Fecha de Entrada</label>
                   <DatePicker
                     selected={checkIn}
                     onChange={(date) => setCheckIn(date)}
@@ -509,17 +577,19 @@ const Booking = () => {
                     className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     dateFormat="dd-MM-yyyy"
                     locale={es}
+                    placeholderText="Seleccione fecha de entrada"
                   />
                 </div>
                 <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">Hasta</label>
+                  <label className="block mb-2 text-sm font-medium text-gray-700">Fecha de Salida</label>
                   <DatePicker
                     selected={checkOut}
                     onChange={(date) => setCheckOut(date)}
-                    minDate={new Date(new Date(checkIn).getTime() + 86400000)} 
+                    minDate={new Date(new Date(checkIn).getTime() + 86400000)}
                     className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     dateFormat="dd-MM-yyyy"
                     locale={es}
+                    placeholderText="Seleccione fecha de salida"
                   />
                 </div>
               </div>
@@ -537,33 +607,46 @@ const Booking = () => {
                 </select>
               </div>
               <button
-                onClick={handleSearch}
-                className="mt-6 w-full p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-bold transition-all duration-200 transform hover:scale-105 shadow-lg"
+                onClick={() => handleSearch()}
+                disabled={isLoadingAvailability}
+                className="mt-6 w-full p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-bold transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                🔎 Buscar Disponibilidad
+                {isLoadingAvailability ? '⏳ Buscando...' : '🔎 Buscar Disponibilidad'}
               </button>
             </div>
 
-            {availabilityLoading && (
+            {/* ⭐ CORREGIR ESTADOS DE LOADING */}
+            {isLoadingAvailability && (
               <div className="text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p className="mt-2 text-gray-600">Cargando habitaciones...</p>
+                <p className="mt-2 text-gray-600">Buscando habitaciones disponibles...</p>
               </div>
             )}
 
-            {availabilityError && (
+            {availabilityError && !isLoadingAvailability && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
                 <p className="text-red-600 text-center">
                   ❌ Error: {typeof availabilityError === 'string' ? availabilityError : (availabilityError.message || 'Error al buscar habitaciones')}
                 </p>
+                <button 
+                  onClick={() => handleSearch()}
+                  className="mt-2 w-full p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  🔄 Reintentar
+                </button>
               </div>
             )}
 
-            {availability && availability.length > 0 && !availabilityLoading && (
+            {/* ⭐ MOSTRAR HABITACIONES DISPONIBLES */}
+            {availability && availability.length > 0 && !isLoadingAvailability && (
               <div>
-                <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">🏨 Habitaciones Disponibles</h2>
+                <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">
+                  🏨 Habitaciones Disponibles ({availability.filter(r => r.isAvailable).length})
+                </h2>
                 <div className="space-y-6">
-                  {availability.map((room) => (
+                  {availability
+                    .filter(room => room.isAvailable) // ⭐ SOLO MOSTRAR DISPONIBLES
+                    .map((room) => (
                     <div key={room.roomNumber} className="bg-white border border-gray-200 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
                       <div className="flex flex-col lg:flex-row items-center">
                         <img
@@ -577,12 +660,16 @@ const Booking = () => {
                           <p className="text-lg font-bold text-yellow-600 mb-3">
                             👥 Capacidad: {room.maxGuests} personas
                           </p>
+                          
+                          {/* Show room status */}
+                          
+
                           <div className="text-sm text-green-600 space-y-1">
-                            <p>💰 Desde: ${room.priceSingle?.toLocaleString() || 'N/A'} (1 huésped)</p>
-                            <p>💰 Hasta: ${room.priceMultiple?.toLocaleString() || 'N/A'} (3+ huéspedes)</p>
+                            <p>💰 Desde: ${parseFloat(room.priceSingle || 0).toLocaleString()} (1 huésped)</p>
+                            <p>💰 Hasta: ${parseFloat(room.priceMultiple || 0).toLocaleString()} (3+ huéspedes)</p>
                             {room.isPromo && room.promotionPrice && (
                               <p className="text-yellow-600 font-bold">
-                                🎉 ¡Oferta! ${room.promotionPrice.toLocaleString()}
+                                🎉 ¡Oferta! ${parseFloat(room.promotionPrice).toLocaleString()}
                               </p>
                             )}
                           </div>
@@ -602,10 +689,22 @@ const Booking = () => {
               </div>
             )}
 
-            {availability && availability.length === 0 && !availabilityLoading && (
+            {/* No rooms available message */}
+            {availability && availability.length > 0 && availability.filter(r => r.isAvailable).length === 0 && !isLoadingAvailability && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
                 <p className="text-yellow-700">
                   😔 No hay habitaciones disponibles para las fechas o tipo seleccionado.
+                </p>
+                <p className="text-sm text-yellow-600 mt-2">
+                  Intente con fechas diferentes o sin filtro de tipo de habitación.
+                </p>
+              </div>
+            )}
+
+            {availability && availability.length === 0 && !isLoadingAvailability && (
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
+                <p className="text-gray-600">
+                  ℹ️ No se encontraron habitaciones. Intente ajustar los filtros de búsqueda.
                 </p>
               </div>
             )}

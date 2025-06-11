@@ -20,87 +20,153 @@ import { toast } from "react-toastify";
 
 const CheckIn = () => {
   const dispatch = useDispatch();
-  const allBookings = useSelector((state) => state.booking.bookings);
-  const loading = useSelector((state) => state.booking.loading);
-  const error = useSelector((state) => state.booking.error);
   
-  // ⭐ SELECTORES CON FALLBACK
-  const { registrationsByBooking = {} } = useSelector((state) => state.registrationPass || {});
+  // ⭐ SELECTORES PRINCIPALES
+  const { 
+    bookings: allBookings = [], 
+    loading = {}, 
+    errors = {} 
+  } = useSelector((state) => state.booking || {});
   
-  // ⭐ ESTADOS LOCALES
+  // ⭐ LOADING ESPECÍFICO PARA GET_ALL_BOOKINGS
+  const isLoadingBookings = loading.general || false;
+  const bookingError = errors.general || null;
+  
+  // ⭐ SELECTORES DE REGISTRATIONPASS - OPTIMIZADOS
+  const { 
+    registrationsByBooking = {}
+    // ⭐ REMOVER VARIABLES NO USADAS
+    // loading: registrationLoading = {}, 
+    // errors: registrationErrors = {} 
+  } = useSelector((state) => state.registrationPass || {});
+  
+  // ⭐ ESTADOS LOCALES ORGANIZADOS POR FUNCIONALIDAD
+  
+  // Estados de UI
   const [selectedBooking, setSelectedBooking] = useState(null);
-  const [checkedBookings, setCheckedBookings] = useState({});
-  const [checkedBasics, setCheckedBasics] = useState({});
-  const [basicsByBooking, setBasicsByBooking] = useState({});
-  const [registeredPassengers, setRegisteredPassengers] = useState({});
-  const [passengersLoaded, setPassengersLoaded] = useState({}); // ⭐ NUEVO: Controlar carga de pasajeros
-
   const [dateRange, setDateRange] = useState({
     from: dayjs().format("YYYY-MM-DD"),
     to: dayjs().format("YYYY-MM-DD"),
   });
 
-  // ⭐ MEMOIZAR BOOKINGS FILTRADOS PARA EVITAR RE-RENDERS
+  // Estados de inventario básico
+  const [checkedBookings, setCheckedBookings] = useState({});
+  const [checkedBasics, setCheckedBasics] = useState({});
+  const [basicsByBooking, setBasicsByBooking] = useState({});
+
+  // Estados de pasajeros (locales para mejor control)
+  const [registeredPassengers, setRegisteredPassengers] = useState({});
+  const [passengersLoaded, setPassengersLoaded] = useState({}); 
+  const [passengersLoadingErrors, setPassengersLoadingErrors] = useState({});
+
+  // ⭐ DEBUG TEMPORAL - SOLO EN DESARROLLO
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [CHECKIN] Estado actual:', {
+        isLoadingBookings,
+        bookingError,
+        allBookingsLength: allBookings?.length,
+        filteredBookingsLength: bookings?.length,
+        selectedBooking,
+        passengersLoadedKeys: Object.keys(passengersLoaded)
+      });
+    }
+  }, [isLoadingBookings, bookingError, allBookings?.length, selectedBooking]);
+
+  // ⭐ MEMOIZAR BOOKINGS FILTRADOS
   const bookings = useMemo(() => {
-    return allBookings.filter(booking => 
-      booking.status === 'pending' || 
-      booking.status === 'confirmed' || 
-      booking.status === 'paid' ||
-      !booking.status
-    );
+    if (!Array.isArray(allBookings)) return [];
+    
+    const validStatuses = ['pending', 'confirmed', 'paid'];
+    
+    const filtered = allBookings.filter(booking => {
+      const hasValidStatus = validStatuses.includes(booking.status) || !booking.status;
+      
+      // ⭐ DEBUG SOLO EN DESARROLLO
+      if (process.env.NODE_ENV === 'development' && booking.bookingId) {
+        console.log(`🔍 Booking ${booking.bookingId}: status=${booking.status}, included=${hasValidStatus}`);
+      }
+      
+      return hasValidStatus;
+    });
+
+    return filtered;
   }, [allBookings]);
 
-  // ⭐ CARGAR RESERVAS SOLO CUANDO CAMBIAN LAS FECHAS
+  // ⭐ CARGAR RESERVAS CUANDO CAMBIAN LAS FECHAS
   useEffect(() => {
-    console.log("🔍 Cargando reservas para check-in con filtros:", {
+    console.log("🔍 Cargando reservas para check-in:", {
       fromDate: dateRange.from,
       toDate: dateRange.to
     });
     
-    dispatch(
-      getAllBookings({ 
-        fromDate: dateRange.from, 
-        toDate: dateRange.to
-      })
-    );
-  }, [dispatch, dateRange.from, dateRange.to]); // ⭐ DEPENDENCIAS ESPECÍFICAS
+    dispatch(getAllBookings({ 
+      fromDate: dateRange.from, 
+      toDate: dateRange.to
+    }));
+  }, [dispatch, dateRange.from, dateRange.to]);
 
-  // ⭐ LOG PARA DEBUG - SOLO CUANDO CAMBIAN LOS BOOKINGS
+  // ⭐ LOG DE ESTADO DE RESERVAS - SOLO EN DESARROLLO
   useEffect(() => {
-    if (allBookings.length > 0) {
+    if (process.env.NODE_ENV === 'development' && allBookings.length > 0) {
       console.log("📊 Estado de reservas en CheckIn:");
       console.log("- Total reservas cargadas:", allBookings.length);
       console.log("- Reservas para check-in:", bookings.length);
       console.log("- Estados encontrados:", [...new Set(allBookings.map(b => b.status))]);
-      
-      bookings.forEach(booking => {
-        console.log(`  📋 Reserva ${booking.bookingId}: ${booking.status} - Habitación ${booking.Room?.roomNumber}`);
-      });
     }
-  }, [allBookings.length, bookings.length]); // ⭐ SOLO CUANDO CAMBIAN LAS CANTIDADES
+  }, [allBookings.length, bookings.length]);
 
-  // ⭐ CARGAR PASAJEROS SOLO UNA VEZ POR RESERVA
+  // ⭐ CARGAR PASAJEROS AUTOMÁTICAMENTE - OPTIMIZADO
   useEffect(() => {
-    bookings.forEach((booking) => {
-      if (!passengersLoaded[booking.bookingId]) {
-        console.log(`🔍 Cargando pasajeros para reserva ${booking.bookingId}`);
-        dispatch(getRegistrationPassesByBooking(booking.bookingId));
-        setPassengersLoaded(prev => ({ ...prev, [booking.bookingId]: true }));
+    const loadPassengersForBookings = async () => {
+      const bookingsToLoad = bookings.filter(booking => 
+        !passengersLoaded[booking.bookingId] && 
+        !passengersLoadingErrors[booking.bookingId] &&
+        passengersLoaded[booking.bookingId] !== 'loading'
+      );
+
+      if (bookingsToLoad.length === 0) return;
+
+      console.log(`🔍 Verificando pasajeros para ${bookingsToLoad.length} reserva(s)`);
+
+      for (const booking of bookingsToLoad) {
+        try {
+          setPassengersLoaded(prev => ({ ...prev, [booking.bookingId]: 'loading' }));
+          
+          const result = await dispatch(getRegistrationPassesByBooking(booking.bookingId));
+          
+          if (result.isNotFound) {
+            setPassengersLoaded(prev => ({ ...prev, [booking.bookingId]: true }));
+          } else if (result.success) {
+            setPassengersLoaded(prev => ({ ...prev, [booking.bookingId]: true }));
+          } else {
+            setPassengersLoadingErrors(prev => ({ ...prev, [booking.bookingId]: true }));
+            setPassengersLoaded(prev => ({ ...prev, [booking.bookingId]: true }));
+          }
+        } catch (error) {
+          console.error(`❌ Error para reserva ${booking.bookingId}:`, error);
+          setPassengersLoadingErrors(prev => ({ ...prev, [booking.bookingId]: true }));
+          setPassengersLoaded(prev => ({ ...prev, [booking.bookingId]: true }));
+        }
+
+        // ⭐ PEQUEÑO DELAY PARA EVITAR SOBRECARGA
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-    });
-  }, [bookings, dispatch, passengersLoaded]);
+    };
 
-  // ⭐ SINCRONIZAR ESTADO LOCAL CON REDUX - OPTIMIZADO
+    loadPassengersForBookings();
+  }, [bookings, dispatch, passengersLoaded, passengersLoadingErrors]);
+
+  // ⭐ SINCRONIZAR REDUX CON ESTADO LOCAL
   useEffect(() => {
-    const updatedRegisteredPassengers = {};
     let hasChanges = false;
+    const updatedRegisteredPassengers = { ...registeredPassengers };
 
-    Object.keys(registrationsByBooking).forEach((bookingId) => {
-      const passengers = registrationsByBooking[bookingId];
+    Object.entries(registrationsByBooking).forEach(([bookingId, passengers]) => {
       if (passengers && passengers.length > 0) {
-        updatedRegisteredPassengers[bookingId] = passengers;
         if (!registeredPassengers[bookingId] || 
             registeredPassengers[bookingId].length !== passengers.length) {
+          updatedRegisteredPassengers[bookingId] = passengers;
           hasChanges = true;
         }
       }
@@ -109,36 +175,100 @@ const CheckIn = () => {
     if (hasChanges) {
       setRegisteredPassengers(updatedRegisteredPassengers);
     }
-  }, [registrationsByBooking]); // ⭐ SOLO DEPENDENCIA DE REDUX
+  }, [registrationsByBooking, registeredPassengers]);
 
-  // ⭐ FUNCIÓN PARA VERIFICAR SI HAY PASAJEROS REGISTRADOS
+  // ⭐ FUNCIONES HELPER MEMOIZADAS
+  
   const hasRegisteredPassengers = useCallback((bookingId) => {
-    return (
-      registeredPassengers[bookingId]?.length > 0 ||
-      registrationsByBooking[bookingId]?.length > 0
-    );
+    const fromLocal = registeredPassengers[bookingId]?.length > 0;
+    const fromRedux = registrationsByBooking[bookingId]?.length > 0;
+    return fromLocal || fromRedux;
   }, [registeredPassengers, registrationsByBooking]);
 
-  // ⭐ FUNCIÓN PARA PREPARAR HABITACIÓN
+  const getPassengersStatus = useCallback((bookingId) => {
+    const loadedState = passengersLoaded[bookingId];
+    const hasError = passengersLoadingErrors[bookingId];
+    const hasPassengers = hasRegisteredPassengers(bookingId);
+    
+    if (loadedState === 'loading') {
+      return { status: 'loading', message: 'Verificando...', icon: '🔄' };
+    }
+    
+    if (hasError) {
+      return { status: 'error', message: 'Error al cargar', icon: '❌' };
+    }
+    
+    if (hasPassengers) {
+      const count = registrationsByBooking[bookingId]?.length || 
+                   registeredPassengers[bookingId]?.length || 0;
+      return { 
+        status: 'completed', 
+        message: `Check-in completado (${count})`, 
+        icon: '✅',
+        count 
+      };
+    }
+    
+    if (loadedState === true) {
+      return { status: 'pending', message: 'Pendiente de check-in', icon: '⏳' };
+    }
+    
+    return { status: 'unknown', message: 'Verificando...', icon: '🔄' };
+  }, [passengersLoaded, passengersLoadingErrors, hasRegisteredPassengers, registrationsByBooking, registeredPassengers]);
+
+  const getRoomInfo = useCallback((booking) => {
+    const room = booking.Room || booking.room || null;
+    
+    if (!room) {
+      console.warn(`⚠️ No se encontró información de habitación para reserva ${booking.bookingId}`);
+      return {
+        roomNumber: booking.roomNumber || 'Sin asignar',
+        type: 'Desconocido',
+        status: 'Sin estado',
+        maxGuests: 1,
+        BasicInventories: []
+      };
+    }
+    
+    return room;
+  }, []);
+
+  const getRoomStatusColor = useCallback((status) => {
+    const colors = {
+      "Limpia": "bg-green-100 text-green-700 border-green-200",
+      "Ocupada": "bg-red-100 text-red-700 border-red-200",
+      "Mantenimiento": "bg-orange-100 text-orange-700 border-orange-200",
+      "Reservada": "bg-blue-100 text-blue-700 border-blue-200",
+      "Para Limpiar": "bg-yellow-100 text-yellow-700 border-yellow-200",
+      "Sin estado": "bg-gray-100 text-gray-600 border-gray-200"
+    };
+    return colors[status] || "bg-gray-100 text-gray-700 border-gray-200";
+  }, []);
+
+  // ⭐ HANDLERS DE ACCIONES
+
   const handlePreparation = useCallback((roomNumber, status) => {
+    if (!roomNumber || roomNumber === 'Sin asignar') {
+      toast.error('No se puede actualizar: habitación no asignada');
+      return;
+    }
+    
     dispatch(updateRoomStatus(roomNumber, { status }));
     toast.success(`Habitación ${roomNumber} marcada como ${status}`);
   }, [dispatch]);
 
-  // ⭐ FUNCIÓN PARA CARGAR INVENTARIO BÁSICO
   const handleLoadBasics = useCallback((booking) => {
-    const roomNumber = booking.Room?.roomNumber;
+    const room = getRoomInfo(booking);
     const bookingId = booking.bookingId;
     
     console.log('🔍 Cargando básicos para reserva:', bookingId);
     
-    const loadedBasics = booking.Room?.BasicInventories || [];
-    console.log('📦 Básicos obtenidos:', loadedBasics);
+    const loadedBasics = room.BasicInventories || [];
     
     if (loadedBasics && loadedBasics.length > 0) {
-      setCheckedBookings((prev) => ({ ...prev, [bookingId]: true }));
+      setCheckedBookings(prev => ({ ...prev, [bookingId]: true }));
 
-      setBasicsByBooking((prev) => ({
+      setBasicsByBooking(prev => ({
         ...prev,
         [bookingId]: loadedBasics.map(basic => ({
           id: basic.id,
@@ -149,7 +279,7 @@ const CheckIn = () => {
         }))
       }));
 
-      setCheckedBasics((prev) => ({
+      setCheckedBasics(prev => ({
         ...prev,
         [bookingId]: loadedBasics.reduce((acc, basic) => {
           acc[basic.id] = false;
@@ -157,16 +287,14 @@ const CheckIn = () => {
         }, {}),
       }));
       
-      console.log("✅ Básicos cargados para reserva", bookingId);
       toast.success(`Inventario básico cargado para reserva ${bookingId}`);
     } else {
-      toast.info(`No hay inventario básico configurado para la habitación ${roomNumber}`);
+      toast.info(`No hay inventario básico configurado para la habitación ${room.roomNumber}`);
     }
-  }, []);
+  }, [getRoomInfo]);
 
-  // ⭐ MANEJAR CHECKBOX DE BÁSICOS
   const handleCheckBasic = useCallback((bookingId, basicId) => {
-    setCheckedBasics((prev) => ({
+    setCheckedBasics(prev => ({
       ...prev,
       [bookingId]: {
         ...prev[bookingId],
@@ -175,16 +303,10 @@ const CheckIn = () => {
     }));
   }, []);
 
-  // ⭐ CONFIRMAR ENTREGA DE BÁSICOS
   const handleConfirmBasics = useCallback(async (bookingId) => {
     const checked = checkedBasics[bookingId];
-    if (!checked) {
-      toast.warning("No hay básicos seleccionados para esta reserva.");
-      return;
-    }
-
     const bookingBasics = basicsByBooking[bookingId] || [];
-    const basicsToRemove = bookingBasics.filter((item) => checked[item.id]);
+    const basicsToRemove = bookingBasics.filter(item => checked?.[item.id]);
 
     if (basicsToRemove.length === 0) {
       toast.warning("Seleccione al menos un básico para confirmar la entrega.");
@@ -192,10 +314,7 @@ const CheckIn = () => {
     }
 
     try {
-      console.log("✅ Confirmando básicos para reserva:", bookingId);
-
       for (const basic of basicsToRemove) {
-        console.log(`📤 Descontando stock: ${basic.name}, cantidad: ${basic.quantity}`);
         const result = await dispatch(removeStock(basic.id, basic.quantity));
         
         if (result && result.error) {
@@ -204,7 +323,7 @@ const CheckIn = () => {
         }
       }
 
-      setCheckedBasics((prev) => ({
+      setCheckedBasics(prev => ({
         ...prev,
         [bookingId]: Object.keys(prev[bookingId] || {}).reduce((acc, key) => {
           acc[key] = true;
@@ -219,70 +338,121 @@ const CheckIn = () => {
     }
   }, [checkedBasics, basicsByBooking, dispatch]);
 
-  // ⭐ MANEJAR ÉXITO EN REGISTRO DE PASAJEROS
-  const handlePassengerRegistrationSuccess = useCallback((bookingId, passengers) => {
-    console.log("✅ Pasajeros registrados exitosamente:", passengers);
+  const reloadPassengersForBooking = useCallback(async (bookingId) => {
+    console.log(`🔄 Forzando recarga de pasajeros para reserva ${bookingId}`);
     
-    setRegisteredPassengers((prev) => ({
-      ...prev,
-      [bookingId]: passengers,
-    }));
+    setPassengersLoaded(prev => ({ ...prev, [bookingId]: 'loading' }));
+    setPassengersLoadingErrors(prev => ({ ...prev, [bookingId]: false }));
+    
+    try {
+      const result = await dispatch(getRegistrationPassesByBooking(bookingId));
+      
+      if (result.success || result.isNotFound) {
+        setPassengersLoaded(prev => ({ ...prev, [bookingId]: true }));
+      } else {
+        setPassengersLoadingErrors(prev => ({ ...prev, [bookingId]: true }));
+        setPassengersLoaded(prev => ({ ...prev, [bookingId]: true }));
+      }
+    } catch (error) {
+      console.error(`❌ Error en recarga forzada:`, error);
+      setPassengersLoadingErrors(prev => ({ ...prev, [bookingId]: true }));
+      setPassengersLoaded(prev => ({ ...prev, [bookingId]: true }));
+    }
+  }, [dispatch]);
 
-    // ⭐ ACTUALIZAR ESTADO DE RESERVA A CHECKED-IN
-    dispatch(updateBookingStatus(bookingId, { status: "checked-in" }))
-      .then(() => {
-        toast.success(`✅ Reserva ${bookingId} completada y movida a check-out`);
-        setSelectedBooking(null);
-        
-        // ⭐ RECARGAR LISTA PARA REMOVER LA RESERVA COMPLETADA
-        setTimeout(() => {
-          dispatch(
-            getAllBookings({ 
-              fromDate: dateRange.from, 
-              toDate: dateRange.to
-            })
-          );
-        }, 1000);
-      });
-  }, [dispatch, dateRange.from, dateRange.to]);
+  const handlePassengerRegistrationSuccess = useCallback(async (bookingId, passengers) => {
+    console.log("✅ Iniciando proceso post-registro de pasajeros:", {
+      bookingId,
+      passengersCount: passengers?.length
+    });
+    
+    try {
+      // ⭐ 1. ACTUALIZAR ESTADO LOCAL INMEDIATAMENTE
+      setRegisteredPassengers(prev => ({
+        ...prev,
+        [bookingId]: passengers,
+      }));
 
-  // ⭐ MANEJAR CIERRE DE REGISTRO
+      setPassengersLoaded(prev => ({ 
+        ...prev, 
+        [bookingId]: true 
+      }));
+
+      setPassengersLoadingErrors(prev => ({ 
+        ...prev, 
+        [bookingId]: false 
+      }));
+
+      // ⭐ 2. CERRAR FORMULARIO INMEDIATAMENTE
+      setSelectedBooking(null);
+
+      // ⭐ 3. MOSTRAR MENSAJE DE ÉXITO CON INFORMACIÓN
+      toast.success(
+        `✅ Check-in completado para reserva ${bookingId}. ` +
+        `La reserva ahora aparece en la sección Check-Out.`,
+        { autoClose: 5000 }
+      );
+
+      // ⭐ 4. ACTUALIZAR ESTADO DE RESERVA
+      const updateResult = await dispatch(updateBookingStatus(bookingId, { status: "checked-in" }));
+      
+      if (updateResult && !updateResult.error) {
+        // ⭐ 5. MOSTRAR TOAST DE REDIRECCIÓN
+        toast.info(
+          `🔄 Reserva ${bookingId} movida a Check-Out. ¿Deseas ir a Check-Out?`,
+          {
+            autoClose: 8000,
+            onClick: () => {
+              window.location.href = '/dashboard/checkout';
+            }
+          }
+        );
+      } else {
+        toast.warning("Pasajeros registrados, pero error al actualizar estado de reserva");
+      }
+
+      // ⭐ 6. RECARGAR DATOS CON DELAY MÍNIMO
+      setTimeout(async () => {
+        try {
+          await dispatch(getAllBookings({ 
+            fromDate: dateRange.from, 
+            toDate: dateRange.to
+          }));
+          
+          await reloadPassengersForBooking(bookingId);
+          console.log("✅ Recarga de datos completada");
+          
+        } catch (reloadError) {
+          console.error("❌ Error en recarga de datos:", reloadError);
+        }
+      }, 1000);
+
+    } catch (error) {
+      console.error("❌ Error en handlePassengerRegistrationSuccess:", error);
+      toast.error(`❌ Error al completar check-in: ${error.message || 'Error desconocido'}`);
+    }
+  }, [dispatch, dateRange.from, dateRange.to, reloadPassengersForBooking]);
+
   const handleCloseRegistration = useCallback((bookingId) => {
     setSelectedBooking(null);
 
-    const booking = bookings.find((b) => b.bookingId === bookingId);
-    if (booking && booking.Room) {
-      dispatch(
-        updateRoomStatus(booking.Room.roomNumber, { status: "Ocupada" })
-      );
+    const booking = bookings.find(b => b.bookingId === bookingId);
+    if (booking) {
+      const room = getRoomInfo(booking);
+      if (room.roomNumber && room.roomNumber !== 'Sin asignar') {
+        dispatch(updateRoomStatus(room.roomNumber, { status: "Ocupada" }));
+      }
     }
-  }, [bookings, dispatch]);
+  }, [bookings, dispatch, getRoomInfo]);
 
-  // ⭐ MANEJAR CAMBIO DE FECHAS
   const handleDateChange = useCallback((e) => {
     const { name, value } = e.target;
-    setDateRange((prev) => ({ ...prev, [name]: value }));
+    setDateRange(prev => ({ ...prev, [name]: value }));
   }, []);
 
-  // ⭐ FUNCIÓN PARA OBTENER COLOR DEL ESTADO DE HABITACIÓN
-  const getRoomStatusColor = useCallback((status) => {
-    switch (status) {
-      case "Limpia":
-        return "bg-green-100 text-green-700 border-green-200";
-      case "Ocupada":
-        return "bg-red-100 text-red-700 border-red-200";
-      case "Mantenimiento":
-        return "bg-orange-100 text-orange-700 border-orange-200";
-      case "Reservada":
-        return "bg-blue-100 text-blue-700 border-blue-200";
-      case "Para Limpiar":
-        return "bg-yellow-100 text-yellow-700 border-yellow-200";
-      default:
-        return "bg-gray-100 text-gray-700 border-gray-200";
-    }
-  }, []);
+  // ⭐ RENDERS CONDICIONALES
 
-  if (loading) {
+  if (isLoadingBookings) {
     return (
       <DashboardLayout>
         <div className="flex justify-center items-center h-64">
@@ -292,17 +462,187 @@ const CheckIn = () => {
     );
   }
 
-  if (error) {
+  if (bookingError) {
     return (
       <DashboardLayout>
-        <div className="text-red-500 text-center p-4">❌ {error}</div>
+        <div className="text-red-500 text-center p-4">❌ {bookingError}</div>
       </DashboardLayout>
     );
   }
 
+  // ⭐ RENDER CUANDO NO HAY RESERVAS
+  if (bookings.length === 0 && !isLoadingBookings) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-7xl mx-auto p-6">
+          {/* ⭐ HEADER */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">
+              🏨 Check-In de Habitaciones
+            </h2>
+            <p className="text-gray-600">
+              Gestiona el proceso de entrada de huéspedes y preparación de habitaciones
+            </p>
+          </div>
+
+          {/* ⭐ SELECTOR DE FECHAS SIEMPRE VISIBLE */}
+          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              📅 Filtrar por fechas
+            </h3>
+            <div className="flex gap-4 items-end">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Desde
+                </label>
+                <input
+                  type="date"
+                  name="from"
+                  value={dateRange.from}
+                  onChange={handleDateChange}
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hasta
+                </label>
+                <input
+                  type="date"
+                  name="to"
+                  value={dateRange.to}
+                  min={dateRange.from}
+                  onChange={handleDateChange}
+                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <button
+                onClick={() => dispatch(getAllBookings({ 
+                  fromDate: dateRange.from, 
+                  toDate: dateRange.to
+                }))}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                🔄 Actualizar
+              </button>
+            </div>
+          </div>
+
+          {/* ⭐ MENSAJE INFORMATIVO */}
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">✅</div>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+              {allBookings.length === 0 
+                ? "No hay reservas para estas fechas"
+                : "No hay reservas pendientes de check-in"
+              }
+            </h3>
+            <p className="text-gray-500 mb-6">
+              {allBookings.length > 0 
+                ? `Hay ${allBookings.length} reserva(s) en otros estados. Las reservas con check-in completado aparecen en Check-Out.`
+                : "Intenta cambiar el rango de fechas para ver más reservas"
+              }
+            </p>
+            
+            {/* ⭐ ESTADÍSTICAS RÁPIDAS */}
+            {allBookings.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto mb-6">
+                {(() => {
+                  const statusCounts = allBookings.reduce((acc, booking) => {
+                    const status = booking.status || 'sin-estado';
+                    acc[status] = (acc[status] || 0) + 1;
+                    return acc;
+                  }, {});
+
+                  const statusConfigs = {
+                    'checked-in': { label: 'En Check-Out', icon: '🏨', color: 'bg-blue-100 text-blue-700' },
+                    'completed': { label: 'Completadas', icon: '✅', color: 'bg-green-100 text-green-700' },
+                    'cancelled': { label: 'Canceladas', icon: '❌', color: 'bg-red-100 text-red-700' },
+                    'pending': { label: 'Pendientes', icon: '⏳', color: 'bg-yellow-100 text-yellow-700' }
+                  };
+
+                  return Object.entries(statusCounts).map(([status, count]) => {
+                    const config = statusConfigs[status] || { 
+                      label: status, 
+                      icon: '📋', 
+                      color: 'bg-gray-100 text-gray-700' 
+                    };
+                    
+                    return (
+                      <div key={status} className={`p-4 rounded-lg ${config.color}`}>
+                        <div className="text-2xl mb-1">{config.icon}</div>
+                        <div className="font-semibold">{count}</div>
+                        <div className="text-sm">{config.label}</div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
+
+            {/* ⭐ ACCIONES RÁPIDAS */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => window.location.href = '/dashboard/checkout'}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                🏨 Ir a Check-Out
+              </button>
+              <button
+                onClick={() => {
+                  const newRange = {
+                    from: dayjs().subtract(7, 'day').format("YYYY-MM-DD"),
+                    to: dayjs().add(7, 'day').format("YYYY-MM-DD")
+                  };
+                  setDateRange(newRange);
+                }}
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                📅 Últimos 14 días
+              </button>
+              <button
+                onClick={() => {
+                  const today = dayjs().format("YYYY-MM-DD");
+                  setDateRange({ from: today, to: today });
+                }}
+                className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                🔄 Solo hoy
+              </button>
+            </div>
+
+            {/* ⭐ DEBUG INFO - SOLO EN DESARROLLO */}
+            {process.env.NODE_ENV === 'development' && (
+              <details className="mt-6 text-left max-w-2xl mx-auto">
+                <summary className="cursor-pointer text-gray-500 hover:text-gray-700 text-sm">
+                  🔧 Debug Info (Development)
+                </summary>
+                <div className="mt-2 p-4 bg-gray-100 rounded text-xs">
+                  <pre className="text-left overflow-x-auto">{JSON.stringify({
+                    allBookingsCount: allBookings.length,
+                    filteredBookingsCount: bookings.length,
+                    isLoading: isLoadingBookings,
+                    error: bookingError,
+                    dateRange,
+                    statusBreakdown: allBookings.reduce((acc, b) => {
+                      acc[b.status || 'null'] = (acc[b.status || 'null'] || 0) + 1;
+                      return acc;
+                    }, {})
+                  }, null, 2)}</pre>
+                </div>
+              </details>
+            )}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ⭐ RENDER PRINCIPAL CON RESERVAS
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto p-6">
+        {/* ⭐ HEADER */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-800 mb-2">
             🏨 Check-In de Habitaciones
@@ -351,58 +691,42 @@ const CheckIn = () => {
                 className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+            <button
+              onClick={() => dispatch(getAllBookings({ 
+                fromDate: dateRange.from, 
+                toDate: dateRange.to
+              }))}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              🔄 Actualizar
+            </button>
           </div>
         </div>
-
-        {/* ⭐ MENSAJE CUANDO NO HAY RESERVAS */}
-        {bookings.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">✅</div>
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
-              No hay reservas pendientes de check-in
-            </h3>
-            <p className="text-gray-500 mb-4">
-              {allBookings.length > 0 
-                ? `Hay ${allBookings.length} reserva(s) en otros estados (checked-in, completed, etc.)`
-                : "No hay reservas para estas fechas"
-              }
-            </p>
-            {allBookings.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg inline-block">
-                <p className="text-blue-700 text-sm">
-                  💡 Las reservas con check-in completado aparecen en la sección de <strong>Check-Out</strong>
-                </p>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* ⭐ GRID DE RESERVAS */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {bookings.map((booking) => {
-            // ⭐ LÓGICA DE PAGOS
-            const payments = booking.Payments || [];
-            const totalPagado = payments.reduce(
-              (sum, p) => sum + parseFloat(p.amount || 0),
-              0
-            );
-            const totalReserva = parseFloat(booking.totalAmount || 0);
-            let estadoPago = "Sin pago";
-            let pagoColor = "bg-red-100 text-red-700";
+            const room = getRoomInfo(booking);
+            const passengersStatus = getPassengersStatus(booking.bookingId);
             
+            // ⭐ LÓGICA DE PAGOS
+            const payments = booking.Payments || booking.payments || [];
+            const totalPagado = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+            const totalReserva = parseFloat(booking.totalAmount || 0);
+            
+            let estadoPago, pagoColor;
             if (totalPagado >= totalReserva) {
               estadoPago = "Pago completo";
               pagoColor = "bg-green-100 text-green-700";
             } else if (totalPagado > 0) {
               estadoPago = "Pago parcial";
               pagoColor = "bg-yellow-100 text-yellow-700";
+            } else {
+              estadoPago = "Sin pago";
+              pagoColor = "bg-red-100 text-red-700";
             }
 
-            // ⭐ VERIFICAR ESTADO DE PASAJEROS
-            const hasPassengers = hasRegisteredPassengers(booking.bookingId);
-            const passengersCount = registrationsByBooking[booking.bookingId]?.length || 0;
-
-            // ⭐ VERIFICAR ESTADO DE INVENTARIO
+            // ⭐ ESTADO DE INVENTARIO
             const inventoryLoaded = checkedBookings[booking.bookingId];
             const inventoryItems = basicsByBooking[booking.bookingId] || [];
             const checkedItems = checkedBasics[booking.bookingId] || {};
@@ -419,7 +743,7 @@ const CheckIn = () => {
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="text-xl font-bold text-gray-800">
-                        🏨 Habitación #{booking.Room?.roomNumber}
+                        🏨 Habitación #{room.roomNumber}
                       </h3>
                       <p className="text-sm text-gray-600">
                         Reserva #{booking.bookingId}
@@ -427,13 +751,14 @@ const CheckIn = () => {
                       <span className="inline-block mt-1 px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">
                         🔄 {booking.status || 'Pendiente'} → Check-in
                       </span>
+                      {room.roomNumber === 'Sin asignar' && (
+                        <span className="block mt-1 px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
+                          ⚠️ Habitación no asignada
+                        </span>
+                      )}
                     </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium border ${getRoomStatusColor(
-                        booking.Room?.status
-                      )}`}
-                    >
-                      {booking.Room?.status || "Sin estado"}
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getRoomStatusColor(room.status)}`}>
+                      {room.status}
                     </span>
                   </div>
 
@@ -442,7 +767,7 @@ const CheckIn = () => {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-gray-600">👤 Huésped:</span>
                       <span className="text-sm text-gray-800 font-medium">
-                        {booking.guest?.scostumername}
+                        {booking.guest?.scostumername || 'Sin información'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -457,6 +782,21 @@ const CheckIn = () => {
                         {booking.guestCount || 1}
                       </span>
                     </div>
+                  </div>
+
+                  {/* ⭐ ESTADO DE PASAJEROS */}
+                  <div className="mt-3">
+                    <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                      passengersStatus.status === 'completed' 
+                        ? 'bg-green-100 text-green-700'
+                        : passengersStatus.status === 'pending'
+                        ? 'bg-yellow-100 text-yellow-700' 
+                        : passengersStatus.status === 'loading'
+                        ? 'bg-blue-100 text-blue-700 animate-pulse'
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {passengersStatus.icon} {passengersStatus.message}
+                    </span>
                   </div>
                 </div>
 
@@ -482,12 +822,8 @@ const CheckIn = () => {
                         <ul className="mt-2 space-y-1 ml-4">
                           {payments.map((p) => (
                             <li key={p.paymentId} className="flex justify-between">
-                              <span>
-                                {p.paymentType === "full" ? "Completo" : "Parcial"}
-                              </span>
-                              <span>
-                                ${parseFloat(p.amount || 0).toLocaleString()} ({p.paymentMethod})
-                              </span>
+                              <span>{p.paymentType === "full" ? "Completo" : "Parcial"}</span>
+                              <span>${parseFloat(p.amount || 0).toLocaleString()} ({p.paymentMethod})</span>
                             </li>
                           ))}
                         </ul>
@@ -528,9 +864,9 @@ const CheckIn = () => {
                         </div>
                       )
                     ) : (
-                      (booking.Room?.BasicInventories || []).map((item) => (
+                      (room.BasicInventories || []).map((item) => (
                         <div key={item.id} className="flex items-center gap-3 p-2">
-                          <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                          <div className="w-4 h-4 bg-gray-200 rounded animate-pulse"></div>
                           <span className="text-sm text-gray-700">{item.name}</span>
                           <span className="text-xs text-gray-500 ml-auto">
                             Qty: {item.RoomBasics?.quantity || 0}
@@ -544,7 +880,7 @@ const CheckIn = () => {
                     <button
                       className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         inventoryLoaded
-                          ? "bg-green-500 text-white"
+                          ? "bg-green-500 text-white cursor-not-allowed"
                           : "bg-yellow-500 text-white hover:bg-yellow-600"
                       }`}
                       onClick={() => handleLoadBasics(booking)}
@@ -557,7 +893,7 @@ const CheckIn = () => {
                       <button
                         className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                           allInventoryDelivered
-                            ? "bg-green-500 text-white"
+                            ? "bg-green-500 text-white cursor-not-allowed"
                             : "bg-blue-600 text-white hover:bg-blue-700"
                         }`}
                         onClick={() => handleConfirmBasics(booking.bookingId)}
@@ -604,16 +940,16 @@ const CheckIn = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className={`w-3 h-3 rounded-full ${
-                        booking.Room?.status === "Limpia" ? "bg-green-500" : "bg-gray-300"
+                        room.status === "Limpia" ? "bg-green-500" : "bg-gray-300"
                       }`}></div>
                       <span className="text-xs text-gray-600">Habitación limpia</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className={`w-3 h-3 rounded-full ${
-                        hasPassengers ? "bg-green-500" : "bg-gray-300"
+                        passengersStatus.status === 'completed' ? "bg-green-500" : "bg-gray-300"
                       }`}></div>
                       <span className="text-xs text-gray-600">
-                        Ocupantes registrados {hasPassengers ? `(${passengersCount})` : ''}
+                        Ocupantes registrados {passengersStatus.status === 'completed' ? `(${passengersStatus.count})` : ''}
                       </span>
                     </div>
                   </div>
@@ -624,39 +960,61 @@ const CheckIn = () => {
                   <div className="grid grid-cols-1 gap-3">
                     <button
                       className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                        booking.Room?.status === "Limpia"
+                        room.status === "Limpia"
                           ? "bg-green-500 text-white cursor-not-allowed"
+                          : room.roomNumber === 'Sin asignar'
+                          ? "bg-gray-400 text-gray-700 cursor-not-allowed"
                           : "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md transform hover:-translate-y-0.5"
                       }`}
-                      disabled={booking.Room?.status === "Limpia"}
-                      onClick={() => handlePreparation(booking.Room?.roomNumber, "Limpia")}
+                      disabled={room.status === "Limpia" || room.roomNumber === 'Sin asignar'}
+                      onClick={() => handlePreparation(room.roomNumber, "Limpia")}
                     >
-                      {booking.Room?.status === "Limpia"
+                      {room.roomNumber === 'Sin asignar'
+                        ? "🚫 Habitación no asignada"
+                        : room.status === "Limpia"
                         ? "✅ Habitación limpia"
                         : "🧹 Marcar como limpia"}
                     </button>
 
                     <button
                       className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                        hasPassengers
+                        passengersStatus.status === 'completed'
                           ? "bg-green-500 text-white cursor-not-allowed"
-                          : booking.Room?.status === "Limpia"
+                          : passengersStatus.status === 'loading'
+                          ? "bg-blue-400 text-white cursor-not-allowed animate-pulse"
+                          : room.status === "Limpia"
                           ? "bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md transform hover:-translate-y-0.5"
                           : "bg-gray-400 text-gray-700 cursor-not-allowed"
                       }`}
-                      disabled={booking.Room?.status !== "Limpia" && !hasPassengers}
+                      disabled={
+                        passengersStatus.status === 'completed' || 
+                        passengersStatus.status === 'loading' ||
+                        room.status !== "Limpia"
+                      }
                       onClick={() =>
                         setSelectedBooking(
                           selectedBooking === booking.bookingId ? null : booking.bookingId
                         )
                       }
                     >
-                      {hasPassengers
-                        ? `✅ Check-in completado (${passengersCount})`
-                        : booking.Room?.status === "Limpia"
+                      {passengersStatus.status === 'completed'
+                        ? `✅ ${passengersStatus.message}`
+                        : passengersStatus.status === 'loading'
+                        ? "🔄 Verificando pasajeros..."
+                        : room.status === "Limpia"
                         ? "👥 Registrar ocupantes"
                         : "🔒 Limpiar habitación primero"}
                     </button>
+
+                    {/* ⭐ BOTÓN DE RECARGA MANUAL */}
+                    {passengersStatus.status === 'error' && (
+                      <button
+                        className="w-full px-3 py-2 rounded text-sm text-blue-600 hover:bg-blue-50 border border-blue-200"
+                        onClick={() => reloadPassengersForBooking(booking.bookingId)}
+                      >
+                        🔄 Reintentar carga de pasajeros
+                      </button>
+                    )}
                   </div>
                   
                   <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-700 text-center">
@@ -666,28 +1024,27 @@ const CheckIn = () => {
 
                 {/* ⭐ FORMULARIO DE REGISTRO DE OCUPANTES */}
                 {selectedBooking === booking.bookingId && (
-  <div className="border-t border-gray-200 bg-gray-50">
-    <div className="p-6">
-      <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-        👥 Registro de Ocupantes
-      </h4>
-      <Registration
-        bookingId={booking.bookingId}
-        // ⭐ AGREGAR ESTOS PROPS NUEVOS:
-        existingPassengers={registrationsByBooking[booking.bookingId] || []}
-        guestCount={booking.guestCount || 1}
-        booking={booking} // ⭐ PASAR TODA LA INFO DE LA RESERVA
-        onSuccess={(passengers) =>
-          handlePassengerRegistrationSuccess(
-            booking.bookingId,
-            passengers
-          )
-        }
-        onClose={() => handleCloseRegistration(booking.bookingId)}
-      />
-    </div>
-  </div>
-)}
+                  <div className="border-t border-gray-200 bg-gray-50">
+                    <div className="p-6">
+                      <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        👥 Registro de Ocupantes
+                      </h4>
+                      <Registration
+                        bookingId={booking.bookingId}
+                        existingPassengers={registrationsByBooking[booking.bookingId] || []}
+                        guestCount={booking.guestCount || 1}
+                        booking={booking}
+                        onSuccess={(passengers) =>
+                          handlePassengerRegistrationSuccess(
+                            booking.bookingId,
+                            passengers
+                          )
+                        }
+                        onClose={() => handleCloseRegistration(booking.bookingId)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

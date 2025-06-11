@@ -16,6 +16,17 @@ const { CustomError } = require('../middleware/error');
 const jwt = require("jsonwebtoken");
 const PDFDocument = require("pdfkit");
 
+const { 
+  getColombiaTime, 
+  getColombiaDate, 
+  formatColombiaDate, 
+  formatForLogs,
+  formatForDetailedLogs,
+  isBeforeToday,
+  getDaysDifference 
+} = require('../utils/dateUtils');
+
+
 // Public endpoints
 const checkAvailability = async (req, res) => {
   try {
@@ -31,11 +42,13 @@ const checkAvailability = async (req, res) => {
       include: [
         {
           model: Booking,
+          as: 'bookings', // ⭐ AGREGAR EL ALIAS CORRECTO
           attributes: ["bookingId", "checkIn", "checkOut", "status"],
           required: false,
         },
         {
           model: Service,
+          as: 'Services', // ⭐ AGREGAR EL ALIAS CORRECTO
           through: { attributes: [] },
         },
         {
@@ -54,16 +67,32 @@ const checkAvailability = async (req, res) => {
     console.log(`📊 Found ${rooms.length} rooms`);
 
     const roomsWithAvailability = rooms.map((room) => {
-      const activeBookings = (room.Bookings || []).filter(
+      // ⭐ USAR EL ALIAS CORRECTO
+      const activeBookings = (room.bookings || []).filter(
         (booking) => booking.status !== "cancelled"
       );
 
-      // ⭐ NUEVA LÓGICA DE DISPONIBILIDAD
+      // ⭐ NUEVA LÓGICA DE DISPONIBILIDAD MEJORADA
       let isAvailable = true;
+      let unavailabilityReason = null;
+
+      // 1. ⭐ VERIFICAR ESTADO DE LA HABITACIÓN PRIMERO
+      if (!room.isActive) {
+        isAvailable = false;
+        unavailabilityReason = 'Room not active';
+        console.log(`🚫 Room ${room.roomNumber}: Not active`);
+      }
       
-      // 1. Verificar conflictos de fechas primero
-      if (checkIn && checkOut) {
-        isAvailable = !activeBookings.some((booking) => {
+      // 2. ⭐ ESTADOS QUE IMPIDEN RESERVAS - USAR LOS ESTADOS CORRECTOS DE TU MODELO
+      else if (['Mantenimiento'].includes(room.status)) {
+        isAvailable = false;
+        unavailabilityReason = `Room status: ${room.status}`;
+        console.log(`🚫 Room ${room.roomNumber}: Status ${room.status} prevents booking`);
+      }
+      
+      // 3. ⭐ VERIFICAR CONFLICTOS DE FECHAS SOLO SI LA HABITACIÓN ESTÁ OPERATIVA
+      else if (checkIn && checkOut) {
+        const hasDateConflict = activeBookings.some((booking) => {
           const bookingStart = new Date(booking.checkIn);
           const bookingEnd = new Date(booking.checkOut);
           const requestStart = new Date(checkIn);
@@ -74,26 +103,25 @@ const checkAvailability = async (req, res) => {
             (requestStart <= bookingEnd && requestEnd >= bookingStart)
           );
         });
-      }
 
-      // 2. ⭐ LÓGICA DE ESTADO DE HABITACIÓN MEJORADA
-      // Solo marcar como NO disponible si está realmente fuera de servicio
-      if (!room.isActive) {
-        isAvailable = false;
-        console.log(`🚫 Room ${room.roomNumber}: Not active`);
+        if (hasDateConflict) {
+          isAvailable = false;
+          unavailabilityReason = 'Date conflict with existing booking';
+          console.log(`🚫 Room ${room.roomNumber}: Date conflict`);
+        }
       }
       
-      // ⭐ ESTADOS QUE IMPIDEN RESERVAS
-      if (room.status === 'out_of_order' || room.status === 'maintenance' || room.status === 'blocked') {
-        isAvailable = false;
-        console.log(`🚫 Room ${room.roomNumber}: Status ${room.status} prevents booking`);
-      }
-      
-      // ⭐ ESTADOS QUE PERMITEN RESERVAS (aunque necesiten preparación)
-      const bookableStatuses = ['Para Limpiar', 'available', 'clean', 'ready', null, undefined];
-      if (bookableStatuses.includes(room.status)) {
-        // Mantener la disponibilidad basada solo en conflictos de fechas
+      // ⭐ ESTADOS QUE PERMITEN RESERVAS (SEGÚN TU MODELO)
+      const bookableStatuses = ['Limpia', 'Para Limpiar'];
+      if (bookableStatuses.includes(room.status) && room.isActive) {
         console.log(`✅ Room ${room.roomNumber}: Status ${room.status} allows booking`);
+      }
+      
+      // ⭐ NO PERMITIR RESERVAS EN HABITACIONES OCUPADAS
+      if (room.status === 'Ocupada') {
+        isAvailable = false;
+        unavailabilityReason = 'Room is currently occupied';
+        console.log(`🚫 Room ${room.roomNumber}: Currently occupied`);
       }
       
       console.log(`🏨 Room ${room.roomNumber}: available=${room.available}, status=${room.status}, isAvailable=${isAvailable}`);
@@ -117,19 +145,15 @@ const checkAvailability = async (req, res) => {
         maxGuests: room.maxGuests,
         description: room.description,
         image_url: room.image_url,
-        available: room.available, // Mantener el campo original
+        available: room.available, // ⭐ CAMPO DE BD
         isActive: room.isActive,
         status: room.status,
         Services: room.Services,
         BasicInventories: room.BasicInventories,
-        isAvailable, // ⭐ NUEVA LÓGICA APLICADA
+        isAvailable, // ⭐ DISPONIBILIDAD CALCULADA
         bookedDates,
         currentBookings: activeBookings.length,
-        // ⭐ INFORMACIÓN ADICIONAL PARA DEBUG
-        availabilityReason: isAvailable ? 'Available for booking' : 
-          !room.isActive ? 'Room not active' : 
-          ['out_of_order', 'maintenance', 'blocked'].includes(room.status) ? `Room status: ${room.status}` :
-          'Date conflict with existing booking'
+        availabilityReason: isAvailable ? 'Available for booking' : unavailabilityReason
       };
     });
 
@@ -171,6 +195,15 @@ const getRoomTypes = async (req, res) => {
 // Client and staff endpoints
 const createBooking = async (req, res, next) => {
   try {
+    console.log('🚀 [CREATE-BOOKING] Starting createBooking process...');
+    console.log('🇨🇴 [CREATE-BOOKING] Server time Colombia:', formatForLogs(new Date())); // ⭐ SIN SEGUNDOS
+    console.log('📥 [CREATE-BOOKING] Request body:', JSON.stringify(req.body, null, 2));
+    console.log('👤 [CREATE-BOOKING] Request user:', req.user ? req.user.sdocno : 'No user');
+    console.log('👤 [CREATE-BOOKING] Request user:', req.user ? {
+      n_document: req.user.n_document, // ⭐ CAMBIAR DE sdocno A n_document
+      role: req.user.role,
+      email: req.user.email
+    } : 'No user');
     const {
       guestId,
       roomNumber,
@@ -178,100 +211,431 @@ const createBooking = async (req, res, next) => {
       checkOut,
       guestCount,
       totalPrice,
+      totalAmount,
       status = 'confirmed',
       notes,
-      verifyInventory = true // ⭐ OPCIÓN PARA VERIFICAR INVENTARIO
+      verifyInventory = true,
+      forceCreate = false,
+      pointOfSale = 'Online'
     } = req.body;
 
-    // Validaciones básicas
-    if (!guestId || !roomNumber || !checkIn || !checkOut || !guestCount) {
+    console.log('📋 [CREATE-BOOKING] Extracted fields:', {
+      guestId,
+      roomNumber,
+      checkIn,
+      checkOut,
+      guestCount,
+      totalPrice,
+      totalAmount,
+      status,
+      pointOfSale,
+      verifyInventory,
+      forceCreate
+    });
+
+    // ⭐ VALIDACIONES BÁSICAS MEJORADAS CON LOGS
+    console.log('🔍 [CREATE-BOOKING] Starting validations...');
+    
+    if (!guestId) {
+      console.log('❌ [CREATE-BOOKING] Missing guestId');
       return res.status(400).json({
         error: true,
-        message: 'Faltan campos requeridos'
+        message: 'Campo requerido faltante: guestId'
+      });
+    }
+    
+    if (!roomNumber) {
+      console.log('❌ [CREATE-BOOKING] Missing roomNumber');
+      return res.status(400).json({
+        error: true,
+        message: 'Campo requerido faltante: roomNumber'
+      });
+    }
+    
+    if (!checkIn) {
+      console.log('❌ [CREATE-BOOKING] Missing checkIn');
+      return res.status(400).json({
+        error: true,
+        message: 'Campo requerido faltante: checkIn'
+      });
+    }
+    
+    if (!checkOut) {
+      console.log('❌ [CREATE-BOOKING] Missing checkOut');
+      return res.status(400).json({
+        error: true,
+        message: 'Campo requerido faltante: checkOut'
+      });
+    }
+    
+    if (!guestCount) {
+      console.log('❌ [CREATE-BOOKING] Missing guestCount');
+      return res.status(400).json({
+        error: true,
+        message: 'Campo requerido faltante: guestCount'
       });
     }
 
-    // Verificar que la habitación existe
+    console.log('✅ [CREATE-BOOKING] Basic validations passed');
+
+    // ⭐ VALIDAR FECHAS CON UTILIDADES DE COLOMBIA
+    console.log('📅 [CREATE-BOOKING] Validating dates...');
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    const today = getColombiaDate(); // ⭐ USAR UTILIDAD
+
+    console.log('📅 [CREATE-BOOKING] Date objects:', {
+      checkInDate: checkInDate.toISOString(),
+      checkOutDate: checkOutDate.toISOString(),
+      today: today.toISOString(),
+      todayFormatted: formatForLogs(today), // ⭐ SIN SEGUNDOS
+      checkInFormatted: formatColombiaDate(checkInDate), // ⭐ SOLO FECHA
+      checkOutFormatted: formatColombiaDate(checkOutDate) // ⭐ SOLO FECHA
+    });
+
+    if (checkInDate >= checkOutDate) {
+      console.log('❌ [CREATE-BOOKING] Invalid date range - checkIn >= checkOut');
+      return res.status(400).json({
+        error: true,
+        message: 'La fecha de check-out debe ser posterior al check-in'
+      });
+    }
+
+    // ⭐ USAR UTILIDAD PARA COMPARAR FECHAS
+    if (isBeforeToday(checkInDate)) {
+      console.log('❌ [CREATE-BOOKING] Invalid checkIn date - in the past');
+      console.log('📅 [CREATE-BOOKING] Date comparison Colombia:', {
+        checkInFormatted: formatColombiaDate(checkInDate),
+        todayFormatted: formatColombiaDate(today),
+        isPast: isBeforeToday(checkInDate)
+      });
+      return res.status(400).json({
+        error: true,
+        message: 'La fecha de check-in no puede ser anterior a hoy'
+      });
+    }
+
+    console.log('✅ [CREATE-BOOKING] Date validations passed');
+
+    // ⭐ VERIFICAR QUE EL HUÉSPED EXISTE CON LOGS
+    console.log('👤 [CREATE-BOOKING] Looking for guest with ID:', guestId);
+    const guest = await Buyer.findByPk(guestId);
+    
+    if (!guest) {
+      console.log('❌ [CREATE-BOOKING] Guest not found with ID:', guestId);
+      return res.status(404).json({
+        error: true,
+        message: `Huésped no encontrado con ID: ${guestId}`
+      });
+    }
+    
+    console.log('✅ [CREATE-BOOKING] Guest found:', {
+      sdocno: guest.sdocno,
+      name: guest.scostumername
+    });
+
+    // ⭐ VERIFICAR QUE LA HABITACIÓN EXISTE CON LOGS DETALLADOS
+    console.log('🏨 [CREATE-BOOKING] Looking for room:', roomNumber);
+    
     const room = await Room.findByPk(roomNumber, {
       include: [
         {
           model: BasicInventory,
           as: 'BasicInventories',
-          attributes: ['id', 'name', 'inventoryType', 'currentStock', 'cleanStock'],
+          attributes: ['id', 'name', 'inventoryType', 'currentStock', 'cleanStock', 'minStock'],
           through: { 
             attributes: ['quantity', 'isRequired'],
             as: 'RoomBasics'
           }
+        },
+        {
+          model: Booking,
+          as: 'bookings',
+          attributes: ['bookingId', 'checkIn', 'checkOut', 'status'],
+          required: false
         }
       ]
     });
 
     if (!room) {
+      console.log('❌ [CREATE-BOOKING] Room not found:', roomNumber);
       return res.status(404).json({
         error: true,
-        message: 'Habitación no encontrada'
+        message: `Habitación no encontrada: ${roomNumber}`
       });
     }
 
-    // ⭐ VERIFICAR DISPONIBILIDAD DE INVENTARIO SI SE SOLICITA
-    const inventoryIssues = [];
-    if (verifyInventory && room.BasicInventories) {
-      for (const item of room.BasicInventories) {
-        const requiredQty = item.RoomBasics.quantity;
-        const availableQty = item.inventoryType === 'reusable' ? item.cleanStock : item.currentStock;
-        
-        if (availableQty < requiredQty && item.RoomBasics.isRequired) {
-          inventoryIssues.push({
-            item: item.name,
-            required: requiredQty,
-            available: availableQty,
-            type: item.inventoryType
-          });
-        }
-      }
-    }
+    console.log('✅ [CREATE-BOOKING] Room found:', {
+      roomNumber: room.roomNumber,
+      type: room.type,
+      status: room.status,
+      isActive: room.isActive,
+      available: room.available,
+      maxGuests: room.maxGuests,
+      existingBookings: room.bookings ? room.bookings.length : 0
+    });
 
-    // Si hay problemas de inventario y la verificación está activada, alertar
-    if (inventoryIssues.length > 0 && verifyInventory) {
+    // ⭐ VERIFICAR QUE LA HABITACIÓN ESTÉ ACTIVA
+    if (!room.isActive) {
+      console.log('❌ [CREATE-BOOKING] Room is not active:', roomNumber);
       return res.status(400).json({
         error: true,
-        message: 'Inventario insuficiente para la reserva',
+        message: `La habitación ${roomNumber} no está activa`
+      });
+    }
+
+    console.log('✅ [CREATE-BOOKING] Room is active');
+
+    // ⭐ VERIFICAR DISPONIBILIDAD DE FECHAS CON LOGS DETALLADOS
+    console.log('📅 [CREATE-BOOKING] Checking date conflicts...');
+    
+    const activeBookings = (room.bookings || []).filter(
+      booking => booking.status !== 'cancelled'
+    );
+
+    console.log('📅 [CREATE-BOOKING] Active bookings for room:', activeBookings.map(b => ({
+      bookingId: b.bookingId,
+      checkIn: formatColombiaDate(b.checkIn), // ⭐ FORMATO COLOMBIA
+      checkOut: formatColombiaDate(b.checkOut), // ⭐ FORMATO COLOMBIA
+      status: b.status
+    })));
+
+    const hasDateConflict = activeBookings.some(booking => {
+      const bookingStart = new Date(booking.checkIn);
+      const bookingEnd = new Date(booking.checkOut);
+      
+      const conflict = (
+        (bookingStart <= checkOutDate && bookingEnd >= checkInDate) ||
+        (checkInDate <= bookingEnd && checkOutDate >= bookingStart)
+      );
+      
+      if (conflict) {
+        console.log('⚠️ [CREATE-BOOKING] Date conflict detected with booking:', {
+          conflictingBookingId: booking.bookingId,
+          existingCheckIn: formatColombiaDate(bookingStart), // ⭐ FORMATO COLOMBIA
+          existingCheckOut: formatColombiaDate(bookingEnd), // ⭐ FORMATO COLOMBIA
+          requestedCheckIn: formatColombiaDate(checkInDate), // ⭐ FORMATO COLOMBIA
+          requestedCheckOut: formatColombiaDate(checkOutDate) // ⭐ FORMATO COLOMBIA
+        });
+      }
+      
+      return conflict;
+    });
+
+    if (hasDateConflict) {
+      console.log('❌ [CREATE-BOOKING] Date conflict found');
+      return res.status(400).json({
+        error: true,
+        message: 'La habitación no está disponible en las fechas seleccionadas',
         data: {
-          inventoryIssues,
-          canCreateAnyway: true // Permitir crear la reserva de todas formas
+          conflictingBookings: activeBookings.map(b => ({
+            bookingId: b.bookingId,
+            checkIn: b.checkIn,
+            checkOut: b.checkOut,
+            status: b.status
+          }))
         }
       });
     }
 
-    // Crear la reserva
-    const newBooking = await Booking.create({
+    console.log('✅ [CREATE-BOOKING] No date conflicts found');
+
+    // ⭐ VERIFICAR CAPACIDAD DE LA HABITACIÓN
+    console.log('👥 [CREATE-BOOKING] Checking room capacity...');
+    console.log('👥 [CREATE-BOOKING] Guest count:', guestCount, 'Max guests:', room.maxGuests);
+    
+    if (guestCount > room.maxGuests) {
+      console.log('❌ [CREATE-BOOKING] Exceeds room capacity');
+      return res.status(400).json({
+        error: true,
+        message: `La habitación tiene capacidad máxima de ${room.maxGuests} huéspedes, solicitados: ${guestCount}`
+      });
+    }
+
+    console.log('✅ [CREATE-BOOKING] Room capacity validation passed');
+
+    // ⭐ CALCULAR PRECIO TOTAL CON LOGS DETALLADOS
+    console.log('💰 [CREATE-BOOKING] Calculating price...');
+    
+    let finalTotalPrice = totalAmount || totalPrice;
+    
+    if (!finalTotalPrice) {
+      console.log('💰 [CREATE-BOOKING] No price provided, calculating...');
+      
+      // ⭐ USAR UTILIDAD PARA CALCULAR NOCHES
+      const nights = getDaysDifference(checkInDate, checkOutDate);
+      console.log('💰 [CREATE-BOOKING] Nights calculated:', nights);
+      
+      // Usar precio según cantidad de huéspedes
+      let pricePerNight;
+      
+      if (guestCount === 1) {
+        pricePerNight = room.priceSingle || room.priceDouble;
+        console.log('💰 [CREATE-BOOKING] Using single price:', pricePerNight);
+      } else if (guestCount === 2) {
+        pricePerNight = room.priceDouble;
+        console.log('💰 [CREATE-BOOKING] Using double price:', pricePerNight);
+      } else {
+        pricePerNight = room.priceMultiple;
+        console.log('💰 [CREATE-BOOKING] Using multiple price:', pricePerNight);
+        
+        // Agregar costo por huéspedes extra
+        if (guestCount > 3 && room.pricePerExtraGuest) {
+          const extraCost = (guestCount - 3) * room.pricePerExtraGuest;
+          pricePerNight += extraCost;
+          console.log('💰 [CREATE-BOOKING] Added extra guest cost:', extraCost, 'New price per night:', pricePerNight);
+        }
+      }
+
+      // Aplicar precio promocional si existe
+      if (room.isPromo && room.promotionPrice) {
+        pricePerNight = room.promotionPrice;
+        console.log('💰 [CREATE-BOOKING] Applied promotional price:', pricePerNight);
+      }
+
+      finalTotalPrice = pricePerNight * nights;
+      console.log('💰 [CREATE-BOOKING] Final calculated price:', finalTotalPrice);
+    } else {
+      console.log('💰 [CREATE-BOOKING] Using provided price:', finalTotalPrice);
+    }
+
+    // ⭐ PREPARAR DATOS PARA CREAR LA RESERVA CON LOGS
+    console.log('📝 [CREATE-BOOKING] Preparing booking data...');
+    
+    const bookingData = {
       guestId,
       roomNumber,
-      checkIn: new Date(checkIn),
-      checkOut: new Date(checkOut),
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
       guestCount,
-      totalPrice,
+      totalAmount: finalTotalPrice,
       status,
-      notes
-    });
+      notes: notes || '',
+      pointOfSale: pointOfSale, // ⭐ USAR EL POINT OF SALE ENVIADO
+      
+      createdBy: req.user?.n_document || null
+    };
 
-    // Incluir información completa en la respuesta
-    const bookingWithDetails = await Booking.findByPk(newBooking.bookingId, {
-      include: [
-        { model: Room },
-        { model: Buyer, as: "guest" }
-      ]
-    });
+    console.log('📝 [CREATE-BOOKING] Booking data to create:', JSON.stringify(bookingData, null, 2));
 
-    res.status(201).json({
+    // ⭐ CREAR LA RESERVA CON TRY-CATCH ESPECÍFICO
+    console.log('💾 [CREATE-BOOKING] Creating booking in database...');
+    if (pointOfSale === 'Local') {
+      if (req.user?.n_document) {
+        console.log('✅ [CREATE-BOOKING] Reserva LOCAL creada por empleado:', req.user.n_document, req.user.role);
+      } else {
+        console.log('⚠️ [CREATE-BOOKING] Reserva LOCAL pero SIN empleado logueado - esto podría ser un problema');
+      }
+    } else {
+      console.log('🌐 [CREATE-BOOKING] Reserva ONLINE - puede no tener empleado asociado');
+    }
+
+    let newBooking;
+    try {
+      newBooking = await Booking.create(bookingData);
+      console.log('✅ [CREATE-BOOKING] Booking created successfully:', {
+        bookingId: newBooking.bookingId,
+        id: newBooking.id,
+        createdAt: formatForLogs(newBooking.createdAt) // ⭐ FORMATO COLOMBIA
+      });
+    } catch (createError) {
+      console.error('❌ [CREATE-BOOKING] Error creating booking at:', formatForDetailedLogs(new Date())); // ⭐ CON SEGUNDOS PARA DEBUG
+      console.error('❌ [CREATE-BOOKING] Error details:', {
+        name: createError.name,
+        message: createError.message,
+        sql: createError.sql,
+        parameters: createError.parameters
+      });
+      
+      return res.status(500).json({
+        error: true,
+        message: 'Error al crear la reserva en la base de datos',
+        details: createError.message
+      });
+    }
+
+    // ⭐ ACTUALIZAR ESTADO DE LA HABITACIÓN CON LOGS
+    console.log('🏨 [CREATE-BOOKING] Updating room status...');
+    
+    const roomUpdateData = {
+      status: status === 'confirmed' ? 'Reservada' : 'Ocupada',
+      available: false
+    };
+
+    console.log('🏨 [CREATE-BOOKING] Room update data:', roomUpdateData);
+
+    try {
+      await room.update(roomUpdateData);
+      console.log('✅ [CREATE-BOOKING] Room status updated successfully');
+    } catch (updateError) {
+      console.error('❌ [CREATE-BOOKING] Error updating room status:', updateError);
+      // No fallar la reserva por esto, solo log
+    }
+
+    // ⭐ OBTENER INFORMACIÓN COMPLETA DE LA RESERVA CREADA CON LOGS
+    console.log('🔍 [CREATE-BOOKING] Fetching complete booking data...');
+    
+    let bookingWithDetails;
+    try {
+      bookingWithDetails = await Booking.findByPk(newBooking.bookingId, {
+        include: [
+          {
+            model: Room,
+            attributes: ['roomNumber', 'type', 'status', 'maxGuests']
+          },
+          {
+            model: Buyer,
+            as: "guest",
+            attributes: ['sdocno', 'scostumername', 'selectronicmail']
+          }
+        ]
+      });
+      
+      console.log('✅ [CREATE-BOOKING] Complete booking data fetched:', {
+        bookingId: bookingWithDetails?.bookingId,
+        hasRoom: !!bookingWithDetails?.Room,
+        hasGuest: !!bookingWithDetails?.guest
+      });
+      
+    } catch (fetchError) {
+      console.error('❌ [CREATE-BOOKING] Error fetching complete booking:', fetchError);
+      // Usar la reserva básica si falla
+      bookingWithDetails = newBooking;
+    }
+
+    // ⭐ PREPARAR RESPUESTA FINAL CON LOGS
+    console.log('📤 [CREATE-BOOKING] Preparing final response...');
+    
+    const response = {
       error: false,
       message: 'Reserva creada exitosamente',
+      success: true,
       data: {
         booking: bookingWithDetails,
-        inventoryWarnings: inventoryIssues.length > 0 ? inventoryIssues : null
+        calculatedPrice: finalTotalPrice,
+        nights: getDaysDifference(checkInDate, checkOutDate),
+        roomStatusUpdated: true,
+        // ⭐ INFO ADICIONAL
+        pointOfSale: pointOfSale,
+        createdBy: bookingData.createdBy,
+        isLocalBooking: pointOfSale === 'Local'
       }
+    };
+
+    console.log('✅ [CREATE-BOOKING] Final response prepared:', {
+      success: response.success,
+      bookingId: response.data.booking?.bookingId,
+      calculatedPrice: response.data.calculatedPrice,
+      pointOfSale: response.data.pointOfSale,
+      createdBy: response.data.createdBy,
+      completedAt: formatForLogs(new Date())
     });
+
+    res.status(201).json(response);
+
   } catch (error) {
+    console.error('❌ [CREATE-BOOKING] Unexpected error at:', formatForDetailedLogs(new Date()));
+    console.error('❌ [CREATE-BOOKING] Error details:', error);
     next(error);
   }
 };
@@ -454,73 +818,228 @@ const getUserBookings = async (req, res, next) => {
   }
 };
 
+// ...existing code...
+
 const getBookingById = async (req, res) => {
-  const { bookingId } = req.params;
+  try {
+    console.log("🔍 [GET-BOOKING-BY-ID] Iniciando búsqueda de reserva:", req.params.bookingId);
+    console.log("🕐 Hora de consulta:", formatForLogs(getColombiaTime()));
+    
+    const { bookingId } = req.params;
 
-  const booking = await Booking.findOne({
-    where: { bookingId },
-    include: [
-      { 
-        model: Room,
-        include: [
-          {
-            model: BasicInventory,
-            as: 'BasicInventories',
-            attributes: ['id', 'name', 'description', 'inventoryType', 'currentStock', 'cleanStock'],
-            through: { 
-              attributes: ['quantity', 'isRequired', 'priority'],
-              as: 'RoomBasics'
+    if (!bookingId) {
+      return res.status(400).json({
+        error: true,
+        message: 'bookingId es requerido'
+      });
+    }
+
+    const booking = await Booking.findOne({
+      where: { bookingId },
+      include: [
+        { 
+          model: Room,
+          as: 'room', // ⭐ AGREGAR EL ALIAS CORRECTO
+          include: [
+            {
+              model: BasicInventory,
+              as: 'BasicInventories',
+              attributes: ['id', 'name', 'description', 'inventoryType', 'currentStock', 'cleanStock'],
+              through: { 
+                attributes: ['quantity', 'isRequired', 'priority'],
+                as: 'RoomBasics'
+              }
             }
-          }
-        ]
-      },
-      { model: ExtraCharge },
-      { model: Bill },
-      { model: Buyer, as: "guest", attributes: ["sdocno", "scostumername"] },
-      { model: Payment },
-      { model: RegistrationPass, as: "registrationPasses" },
-      // ⭐ NUEVO: Incluir inventario asignado a esta reserva
-      {
-        model: BookingInventoryUsage,
-        as: 'inventoryUsages',
-        include: [
-          {
-            model: BasicInventory,
-            as: 'inventory',
-            attributes: ['id', 'name', 'inventoryType', 'category']
-          }
-        ]
-      }
-    ],
-  });
+          ]
+        },
+        { 
+          model: ExtraCharge,
+          as: 'extraCharges', // ⭐ AGREGAR ALIAS SI EXISTE
+          required: false
+        },
+        { 
+          model: Bill,
+          as: 'bill', // ⭐ AGREGAR ALIAS SI EXISTE
+          required: false
+        },
+        { 
+          model: Buyer, 
+          as: "guest", 
+          attributes: ["sdocno", "scostumername", "selectronicmail"]
+        },
+        { 
+          model: Payment,
+          as: 'payments', // ⭐ AGREGAR ALIAS SI EXISTE
+          attributes: [
+            'paymentId', 
+            'amount', 
+            'paymentMethod', 
+            'paymentStatus', 
+            'paymentDate', 
+            'paymentType', 
+            'transactionId',
+            'paymentReference'
+          ],
+          required: false
+        },
+        { 
+          model: RegistrationPass, 
+          as: "registrationPasses",
+          required: false
+        },
+        // ⭐ INCLUIR INVENTARIO ASIGNADO A ESTA RESERVA
+        {
+          model: BookingInventoryUsage,
+          as: 'inventoryUsages',
+          include: [
+            {
+              model: BasicInventory,
+              as: 'inventory',
+              attributes: ['id', 'name', 'inventoryType', 'category']
+            }
+          ],
+          required: false
+        }
+      ],
+    });
 
-  if (!booking) {
-    return res.status(404).json({
+    if (!booking) {
+      console.log("❌ [GET-BOOKING-BY-ID] Reserva no encontrada:", bookingId);
+      return res.status(404).json({
+        error: true,
+        message: 'Reserva no encontrada'
+      });
+    }
+
+    console.log("✅ [GET-BOOKING-BY-ID] Reserva encontrada:", {
+      bookingId: booking.bookingId,
+      status: booking.status,
+      roomNumber: booking.room?.roomNumber || booking.roomNumber,
+      hasRoom: !!booking.room,
+      hasGuest: !!booking.guest,
+      hasPayments: booking.payments?.length > 0,
+      hasExtraCharges: booking.extraCharges?.length > 0,
+      hasBill: !!booking.bill,
+      hasRegistrationPasses: booking.registrationPasses?.length > 0,
+      hasInventoryUsages: booking.inventoryUsages?.length > 0
+    });
+
+    // ⭐ PROCESAR INFORMACIÓN DE INVENTARIO
+    const bookingData = booking.toJSON();
+    
+    // ⭐ CALCULAR ESTADO DEL INVENTARIO
+    const inventoryStatus = {
+      hasInventoryAssigned: bookingData.inventoryUsages && bookingData.inventoryUsages.length > 0,
+      totalItemsAssigned: bookingData.inventoryUsages ? bookingData.inventoryUsages.length : 0,
+      itemsReturned: bookingData.inventoryUsages ? bookingData.inventoryUsages.filter(u => u.status === 'returned').length : 0,
+      itemsConsumed: bookingData.inventoryUsages ? bookingData.inventoryUsages.filter(u => u.status === 'consumed').length : 0,
+      itemsPending: bookingData.inventoryUsages ? bookingData.inventoryUsages.filter(u => u.status === 'assigned' || u.status === 'in_use').length : 0,
+      canProceedCheckOut: bookingData.status === 'checked-in' && 
+                         bookingData.inventoryUsages && 
+                         bookingData.inventoryUsages.length > 0 &&
+                         bookingData.inventoryUsages.every(u => u.status === 'returned' || u.status === 'consumed')
+    };
+
+    // ⭐ CALCULAR INFORMACIÓN DE PAGOS
+    let paymentInfo = {
+      totalPaid: 0,
+      totalAmount: parseFloat(bookingData.totalAmount || 0),
+      balance: parseFloat(bookingData.totalAmount || 0),
+      paymentStatus: 'unpaid',
+      paymentCount: 0,
+      lastPayment: null
+    };
+
+    if (bookingData.payments && bookingData.payments.length > 0) {
+      const totalPaid = bookingData.payments
+        .filter(p => p.paymentStatus === 'completed')
+        .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
+      
+      const totalAmount = parseFloat(bookingData.totalAmount || 0);
+      
+      paymentInfo = {
+        totalPaid,
+        totalAmount,
+        balance: totalAmount - totalPaid,
+        paymentStatus: totalPaid >= totalAmount ? 'fully_paid' : 
+                      totalPaid > 0 ? 'partially_paid' : 'unpaid',
+        paymentCount: bookingData.payments.length,
+        lastPayment: bookingData.payments.find(p => p.paymentStatus === 'completed'),
+        allPayments: bookingData.payments
+      };
+    }
+
+    // ⭐ CALCULAR INFORMACIÓN DE CARGOS EXTRAS
+    const extraChargesInfo = {
+      hasExtraCharges: bookingData.extraCharges && bookingData.extraCharges.length > 0,
+      totalExtraCharges: bookingData.extraCharges ? 
+        bookingData.extraCharges.reduce((sum, charge) => sum + parseFloat(charge.amount || charge.price || 0), 0) : 0,
+      extraChargesCount: bookingData.extraCharges ? bookingData.extraCharges.length : 0
+    };
+
+    // ⭐ INFORMACIÓN AGREGADA DE LA HABITACIÓN
+    const roomInfo = bookingData.room ? {
+      roomNumber: bookingData.room.roomNumber,
+      type: bookingData.room.type,
+      status: bookingData.room.status,
+      hasBasicInventory: bookingData.room.BasicInventories && bookingData.room.BasicInventories.length > 0,
+      basicInventoryCount: bookingData.room.BasicInventories ? bookingData.room.BasicInventories.length : 0
+    } : null;
+
+    // ⭐ RESPUESTA ENRIQUECIDA
+    const responseData = {
+      ...bookingData,
+      // ⭐ INFORMACIÓN CALCULADA
+      inventoryStatus,
+      paymentInfo,
+      extraChargesInfo,
+      roomInfo,
+      
+      // ⭐ FECHAS FORMATEADAS
+      checkInFormatted: formatForLogs(bookingData.checkIn),
+      checkOutFormatted: formatForLogs(bookingData.checkOut),
+      createdAtFormatted: formatForLogs(bookingData.createdAt),
+      
+      // ⭐ MONTOS FORMATEADOS
+      totalAmountFormatted: `$${parseFloat(bookingData.totalAmount || 0).toLocaleString()}`,
+      
+      // ⭐ ESTADO GENERAL
+      isReadyForCheckOut: bookingData.status === 'checked-in' && inventoryStatus.canProceedCheckOut,
+      canGenerateBill: ['checked-in', 'completed'].includes(bookingData.status),
+      
+      // ⭐ NOCHES CALCULADAS
+      nights: calculateNights(bookingData.checkIn, bookingData.checkOut)
+    };
+
+    console.log("📤 [GET-BOOKING-BY-ID] Respuesta preparada:", {
+      bookingId: responseData.bookingId,
+      hasInventoryStatus: !!responseData.inventoryStatus,
+      hasPaymentInfo: !!responseData.paymentInfo,
+      isReadyForCheckOut: responseData.isReadyForCheckOut,
+      canGenerateBill: responseData.canGenerateBill
+    });
+
+    res.json({
+      error: false,
+      message: 'Reserva obtenida exitosamente',
+      data: responseData,
+      timestamp: formatForLogs(getColombiaTime())
+    });
+
+  } catch (error) {
+    console.error("❌ [GET-BOOKING-BY-ID] Error:", error);
+    console.error("🕐 Hora del error:", formatForLogs(getColombiaTime()));
+    
+    res.status(500).json({
       error: true,
-      message: 'Reserva no encontrada'
+      message: 'Error al obtener la reserva',
+      details: error.message,
+      timestamp: formatForLogs(getColombiaTime())
     });
   }
-
-  // ⭐ PROCESAR INFORMACIÓN DE INVENTARIO
-  const bookingData = booking.toJSON();
-  
-  // Calcular estado del inventario
-  const inventoryStatus = {
-    hasInventoryAssigned: bookingData.inventoryUsages && bookingData.inventoryUsages.length > 0,
-    totalItemsAssigned: bookingData.inventoryUsages ? bookingData.inventoryUsages.length : 0,
-    itemsReturned: bookingData.inventoryUsages ? bookingData.inventoryUsages.filter(u => u.status === 'returned').length : 0,
-    itemsConsumed: bookingData.inventoryUsages ? bookingData.inventoryUsages.filter(u => u.status === 'consumed').length : 0,
-    canProceedCheckOut: bookingData.status === 'checked-in' && bookingData.inventoryUsages && bookingData.inventoryUsages.length > 0
-  };
-
-  res.json({
-    error: false,
-    data: {
-      ...bookingData,
-      inventoryStatus
-    }
-  });
 };
+
+// ...existing code...
 
 // Staff only endpoints
 const getAllBookings = async (req, res, next) => {
@@ -531,7 +1050,9 @@ const getAllBookings = async (req, res, next) => {
       status, 
       roomNumber, 
       guestId,
-      includeInventory = false 
+      includeInventory = false,
+      fromDate,
+      toDate
     } = req.query;
 
     const where = {};
@@ -539,15 +1060,55 @@ const getAllBookings = async (req, res, next) => {
     if (roomNumber) where.roomNumber = roomNumber;
     if (guestId) where.guestId = guestId;
 
+    // ⭐ FILTRO POR FECHAS DE CHECK-IN
+    if (fromDate || toDate) {
+      where.checkIn = {};
+      if (fromDate) where.checkIn[Op.gte] = new Date(fromDate);
+      if (toDate) where.checkIn[Op.lte] = new Date(toDate + 'T23:59:59.999Z');
+    }
+
     const includeOptions = [
       { 
         model: Room,
-        attributes: ['roomNumber', 'type', 'status']
+        as: 'room',
+        attributes: ['roomNumber', 'type', 'status'],
+        // ⭐ INCLUIR INVENTARIO BÁSICO DE LA HABITACIÓN
+        include: [
+          {
+            model: BasicInventory,
+            as: 'BasicInventories',
+            attributes: ['id', 'name', 'description', 'currentStock'],
+            through: {
+              attributes: ['quantity'], // ⭐ CANTIDAD ASIGNADA A LA HABITACIÓN
+              as: 'RoomBasics'
+            }
+          }
+        ]
       },
       { 
         model: Buyer, 
         as: "guest", 
         attributes: ["sdocno", "scostumername"] 
+      },
+      // ⭐ INCLUIR PAGOS - INFORMACIÓN CRUCIAL PARA CHECK-IN
+      {
+        model: Payment,
+        as: 'payments',
+        attributes: [
+          'paymentId', 
+          'amount', 
+          'paymentMethod', 
+          'paymentStatus', 
+          'paymentDate', 
+          'paymentType', 
+          'transactionId',
+          'paymentReference'
+        ],
+        // ⭐ SOLO PAGOS COMPLETADOS
+        where: {
+          paymentStatus: ['completed', 'pending'] // ⭐ INCLUIR PENDING TAMBIÉN
+        },
+        required: false // ⭐ LEFT JOIN - incluir reservas sin pagos
       }
     ];
 
@@ -563,22 +1124,57 @@ const getAllBookings = async (req, res, next) => {
             as: 'inventory',
             attributes: ['name', 'inventoryType']
           }
-        ]
+        ],
+        required: false
       });
     }
 
     const { count, rows } = await Booking.findAndCountAll({
       where,
       include: includeOptions,
-      order: [['createdAt', 'DESC']],
+      order: [
+        ['createdAt', 'DESC'],
+        // ⭐ ORDENAR PAGOS POR FECHA (MÁS RECIENTE PRIMERO)
+        [{ model: Payment, as: 'payments' }, 'paymentDate', 'DESC']
+      ],
       limit: parseInt(limit),
-      offset: (parseInt(page) - 1) * parseInt(limit)
+      offset: (parseInt(page) - 1) * parseInt(limit),
+      distinct: true // ⭐ EVITAR DUPLICADOS POR MÚLTIPLES PAGOS
     });
 
-    // ⭐ PROCESAR DATOS CON ESTADO DE INVENTARIO
-    const bookingsWithInventoryStatus = rows.map(booking => {
+    // ⭐ PROCESAR DATOS CON ESTADO DE INVENTARIO Y PAGOS
+    const bookingsWithAllInfo = rows.map(booking => {
       const bookingData = booking.toJSON();
       
+      // ⭐ CALCULAR INFORMACIÓN DE PAGOS
+      if (bookingData.payments && bookingData.payments.length > 0) {
+        const totalPaid = bookingData.payments
+          .filter(p => p.paymentStatus === 'completed')
+          .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
+        
+        const totalAmount = parseFloat(bookingData.totalAmount || 0);
+        
+        bookingData.paymentInfo = {
+          totalPaid,
+          totalAmount,
+          balance: totalAmount - totalPaid,
+          paymentStatus: totalPaid >= totalAmount ? 'fully_paid' : 
+                        totalPaid > 0 ? 'partially_paid' : 'unpaid',
+          paymentCount: bookingData.payments.length,
+          lastPayment: bookingData.payments[0] // ⭐ MÁS RECIENTE POR EL ORDER BY
+        };
+      } else {
+        bookingData.paymentInfo = {
+          totalPaid: 0,
+          totalAmount: parseFloat(bookingData.totalAmount || 0),
+          balance: parseFloat(bookingData.totalAmount || 0),
+          paymentStatus: 'unpaid',
+          paymentCount: 0,
+          lastPayment: null
+        };
+      }
+      
+      // ⭐ INFORMACIÓN DE INVENTARIO SI SE SOLICITA
       if (includeInventory === 'true' && bookingData.inventoryUsages) {
         bookingData.inventoryStatus = {
           hasInventoryAssigned: bookingData.inventoryUsages.length > 0,
@@ -595,7 +1191,7 @@ const getAllBookings = async (req, res, next) => {
     res.json({
       error: false,
       data: {
-        bookings: bookingsWithInventoryStatus,
+        bookings: bookingsWithAllInfo,
         pagination: {
           total: count,
           page: parseInt(page),
@@ -605,11 +1201,12 @@ const getAllBookings = async (req, res, next) => {
       }
     });
   } catch (error) {
+    console.error('❌ [GET-ALL-BOOKINGS] Error:', error);
     next(error);
   }
 };
 
-const checkIn = async (req, res, next) => {
+const checkInGuest = async (req, res, next) => {
   try {
     const { bookingId } = req.params;
     const { assignInventory = true, customItems = [] } = req.body;
@@ -933,65 +1530,156 @@ const calculateTotalAmount = (booking) => {
   return roomCharge + extraCharges;
 };
 
-const addExtraCharges = async (req, res, next) => {
+
+
+const addExtraCharge = async (req, res) => {
   try {
+    console.log("📤 [ADD-EXTRA-CHARGE] Recibiendo datos completos:");
+    console.log("🔍 [ADD-EXTRA-CHARGE] req.params:", req.params);
+    console.log("🔍 [ADD-EXTRA-CHARGE] req.body:", JSON.stringify(req.body, null, 2));
+    console.log("🕐 [ADD-EXTRA-CHARGE] Hora de procesamiento:", formatForLogs(getColombiaTime()));
+
+    // ⭐ OBTENER bookingId DEL PARÁMETRO DE LA URL
     const { bookingId } = req.params;
-    const { price, quantity, description, itemId } = req.body;
+    const { extraCharge } = req.body;
 
-    // Validar que req.user exista
-    
+    console.log("📋 [ADD-EXTRA-CHARGE] Datos extraídos:", {
+      bookingId: bookingId,
+      extraCharge: extraCharge
+    });
 
-    // Buscar la reserva usando el bookingId de los parámetros
-    const booking = await Booking.findByPk(bookingId);
-    if (!booking) {
-      throw new CustomError("Reserva no encontrada", 404);
-    }
-
-    // Solo se permiten cargos si el estado de la reserva es "checked-in"
-    if (booking.status.toLowerCase() !== "checked-in") {
-      throw new CustomError(
-        "Solo se pueden agregar cargos a reservas con check-in",
-        400
-      );
-    }
-
-    // Validar stock si se proporciona itemId
-    if (itemId) {
-      const inventoryItem = await BasicInventory.findByPk(itemId);
-      if (!inventoryItem) {
-        throw new CustomError("El ítem del inventario no existe", 404);
-      }
-
-      if (inventoryItem.currentStock < quantity) {
-        throw new CustomError(`Stock insuficiente para el ítem ${inventoryItem.name}. Disponible: ${inventoryItem.currentStock}`, 400);
-      }
-
-      // Reducir el stock después de crear el cargo extra
-      await inventoryItem.update({
-        currentStock: inventoryItem.currentStock - quantity,
+    // ⭐ VALIDACIONES MEJORADAS CON LOGS ESPECÍFICOS
+    if (!bookingId) {
+      console.error("❌ [ADD-EXTRA-CHARGE] bookingId faltante en params");
+      return res.status(400).json({ 
+        error: true, 
+        message: "bookingId es requerido en la URL" 
       });
     }
 
-    // Crear el cargo extra
-    const extraCharge = await ExtraCharge.create({
-      bookingId, // bookingId proveniente de req.params
-      description,
-      price,
-      quantity,
-      amount: price * quantity,
-      createdBy: req.user.sdocno, // Usar req.user en lugar de req.buyer
+    if (!extraCharge) {
+      console.error("❌ [ADD-EXTRA-CHARGE] extraCharge faltante en body");
+      return res.status(400).json({ 
+        error: true, 
+        message: "extraCharge es requerido en el body" 
+      });
+    }
+
+    if (!extraCharge.description || extraCharge.description.trim() === '') {
+      console.error("❌ [ADD-EXTRA-CHARGE] description faltante o vacía:", extraCharge.description);
+      return res.status(400).json({ 
+        error: true, 
+        message: "description es requerida y no puede estar vacía" 
+      });
+    }
+
+    if (!extraCharge.price || isNaN(parseFloat(extraCharge.price))) {
+      console.error("❌ [ADD-EXTRA-CHARGE] price inválido:", extraCharge.price);
+      return res.status(400).json({ 
+        error: true, 
+        message: "price es requerido y debe ser un número válido" 
+      });
+    }
+
+    console.log("✅ [ADD-EXTRA-CHARGE] Validaciones básicas pasadas");
+
+    // ⭐ VERIFICAR QUE LA RESERVA EXISTE
+    const booking = await Booking.findByPk(bookingId);
+    if (!booking) {
+      console.error("❌ [ADD-EXTRA-CHARGE] Reserva no encontrada:", bookingId);
+      return res.status(404).json({ 
+        error: true, 
+        message: "Reserva no encontrada" 
+      });
+    }
+
+    console.log("✅ [ADD-EXTRA-CHARGE] Reserva encontrada:", {
+      bookingId: booking.bookingId,
+      status: booking.status,
+      roomNumber: booking.roomNumber
+    });
+
+    // ⭐ CREAR EL CARGO EXTRA CON LOGGING DETALLADO
+    const chargeData = {
+      bookingId: parseInt(bookingId),
+      description: extraCharge.description.trim(),
+      // ⭐ USAR 'amount' SEGÚN TU MODELO
+      amount: parseFloat(extraCharge.price),
+      quantity: parseInt(extraCharge.quantity) || 1,
+      chargeType: extraCharge.chargeType || 'service',
+      chargeDate: getColombiaTime(),
+      chargedBy: req.user?.n_document || 'system',
+      notes: extraCharge.notes || null,
+      isApproved: true,
+      approvedAt: getColombiaTime(),
+      approvedBy: req.user?.n_document || 'system'
+    };
+
+    console.log("📝 [ADD-EXTRA-CHARGE] Datos para crear cargo:", JSON.stringify(chargeData, null, 2));
+
+    // ⭐ CREAR CON TRY-CATCH ESPECÍFICO
+    let newExtraCharge;
+    try {
+      newExtraCharge = await ExtraCharge.create(chargeData);
+      console.log("✅ [ADD-EXTRA-CHARGE] Cargo creado exitosamente:", {
+        id: newExtraCharge.id,
+        description: newExtraCharge.description,
+        amount: newExtraCharge.amount
+      });
+    } catch (createError) {
+      console.error("❌ [ADD-EXTRA-CHARGE] Error específico al crear:", createError);
+      console.error("❌ [ADD-EXTRA-CHARGE] Error details:", {
+        name: createError.name,
+        message: createError.message,
+        errors: createError.errors
+      });
+      
+      return res.status(500).json({
+        error: true,
+        message: "Error al crear el cargo extra en la base de datos",
+        details: createError.message,
+        validationErrors: createError.errors
+      });
+    }
+
+    // ⭐ FORMATEAR RESPUESTA PARA COMPATIBILIDAD CON FRONTEND
+    const responseData = {
+      ...newExtraCharge.toJSON(),
+      // ⭐ AGREGAR 'price' PARA COMPATIBILIDAD
+      price: newExtraCharge.amount,
+      // ⭐ FORMATEAR FECHAS
+      chargeDate: formatForLogs(newExtraCharge.chargeDate),
+      createdAt: formatForLogs(newExtraCharge.createdAt)
+    };
+
+    console.log("📤 [ADD-EXTRA-CHARGE] Respuesta preparada:", {
+      id: responseData.id,
+      description: responseData.description,
+      price: responseData.price,
+      amount: responseData.amount
     });
 
     res.status(201).json({
       error: false,
       message: "Cargo extra agregado exitosamente",
-      data: extraCharge,
+      data: responseData,
+      timestamp: formatForLogs(getColombiaTime())
     });
+
   } catch (error) {
-    console.error("Error al agregar cargo extra:", error);
-    next(error);
+    console.error("❌ [ADD-EXTRA-CHARGE] Error general:", error);
+    console.error("🕐 [ADD-EXTRA-CHARGE] Hora del error:", formatForLogs(getColombiaTime()));
+    
+    res.status(500).json({
+      error: true,
+      message: "Error interno del servidor",
+      details: error.message,
+      timestamp: formatForLogs(getColombiaTime())
+    });
   }
 };
+
+
 
 const getBookingInventoryStatus = async (req, res, next) => {
   try {
@@ -1169,82 +1857,382 @@ const getInventoryUsageReport = async (req, res, next) => {
 };
 
 
-const generateBill = async (req, res) => {
-  const { bookingId } = req.params;
 
+
+// ...existing code...
+
+const generateBill = async (req, res, next) => {
   try {
-    // Buscar la reserva
+    console.log("🧾 Iniciando generación de factura");
+    console.log("🕐 Hora de procesamiento:", formatForLogs(getColombiaTime()));
+    
+    const { bookingId } = req.params;
+
+    if (!bookingId) {
+      return res.status(400).json({ error: true, message: "bookingId es requerido" });
+    }
+
+    // ⭐ VERIFICAR SI YA EXISTE UNA FACTURA PARA ESTA RESERVA
+    const existingBill = await Bill.findOne({
+      where: { bookingId: bookingId }
+    });
+
+    if (existingBill) {
+      console.log("⚠️ Ya existe una factura para esta reserva:", existingBill.idBill);
+      return res.status(200).json({
+        error: false,
+        message: "Factura ya existe para esta reserva",
+        data: existingBill,
+        timestamp: formatForLogs(getColombiaTime())
+      });
+    }
+
+    // ⭐ OBTENER DATOS DE LA RESERVA
     const booking = await Booking.findByPk(bookingId, {
       include: [
-        { model: Room },
-        { model: ExtraCharge },
-        { model: Buyer, as: "guest", attributes: ["scostumername", "selectronicmail", "sdocno"] },
+        { 
+          model: Room, 
+          as: 'room'
+        },
+        {
+          model: Buyer,
+          as: 'guest',
+          attributes: ["scostumername", "selectronicmail", "sdocno"]
+        },
+        {
+          model: Payment,
+          as: 'payments',
+          where: { paymentStatus: 'completed' },
+          required: false
+        },
+        {
+          model: ExtraCharge,
+          as: 'extraCharges',
+          required: false
+        }
       ],
     });
 
     if (!booking) {
-      throw new CustomError("Reserva no encontrada", 404);
+      return res.status(404).json({ 
+        error: true, 
+        message: "Reserva no encontrada" 
+      });
     }
 
-    // Calcular los montos
-    const reservationAmount = parseFloat(booking.totalAmount) || 0; // Monto base de la reserva
-    const extraChargesAmount = booking.ExtraCharges.reduce(
-      (sum, charge) => sum + (parseFloat(charge.price) || 0),
-      0
-    ); // Total de cargos extra
-    const totalAmount = reservationAmount + extraChargesAmount; // Total final
-
-    // Crear la factura
-    const bill = await Bill.create({
+    console.log("📋 Reserva encontrada:", {
       bookingId: booking.bookingId,
-      reservationAmount,
-      extraChargesAmount,
-      totalAmount,
-      generatedBy: req.user?.n_document || "system",
-      details: {
-        roomCharge: reservationAmount,
-        extraCharges: booking.ExtraCharges,
-        nights: calculateNights(booking.checkIn, booking.checkOut),
-        roomDetails: booking.Room,
-        guestDetails: booking.guest,
-      },
+      roomNumber: booking.room?.roomNumber || booking.roomNumber,
+      guestName: booking.guest?.scostumername,
+      status: booking.status
     });
 
-    res.json({
+    // ⭐ VERIFICAR QUE LA RESERVA ESTÉ EN ESTADO ADECUADO
+    if (!['checked-in', 'completed'].includes(booking.status)) {
+      return res.status(400).json({ 
+        error: true, 
+        message: "La reserva debe estar en estado 'checked-in' o 'completed' para generar factura" 
+      });
+    }
+
+    // ⭐ CALCULAR TOTALES CORRECTAMENTE
+    const baseAmount = parseFloat(booking.totalAmount) || 0;
+    const extraCharges = booking.extraCharges || [];
+    
+    // ⭐ USAR 'amount' EN LUGAR DE 'price' SEGÚN TU MODELO ExtraCharge
+    const totalExtras = extraCharges.reduce((sum, charge) => {
+      const chargeAmount = parseFloat(charge.amount || charge.price || 0);
+      console.log(`💰 Cargo extra: ${charge.description} = ${chargeAmount}`);
+      return sum + chargeAmount;
+    }, 0);
+    
+    const totalAmount = baseAmount + totalExtras;
+
+    console.log("💰 Cálculo de totales:", {
+      baseAmount,
+      totalExtras,
+      totalAmount,
+      extraChargesCount: extraCharges.length
+    });
+
+    // ⭐ CREAR LA FACTURA SOLO CON CAMPOS QUE EXISTEN EN TU MODELO
+    const billData = {
+      bookingId: booking.bookingId,
+      reservationAmount: baseAmount,
+      extraChargesAmount: totalExtras,
+      taxAmount: 0, // ⭐ PUEDES CALCULAR IMPUESTOS SI ES NECESARIO
+      totalAmount: totalAmount,
+      taxInvoiceId: null, // ⭐ GENERAR SI TIENES INTEGRACIÓN FISCAL
+      status: 'pending', // ⭐ USAR VALOR VÁLIDO DEL ENUM
+      paymentMethod: null, // ⭐ SE LLENARÁ CUANDO SE PAGUE
+    };
+
+    console.log("📝 [GENERATE-BILL] Datos de factura a crear:");
+    console.log(JSON.stringify(billData, null, 2));
+
+    // ⭐ VALIDAR DATOS ANTES DE CREAR
+    if (totalAmount < 0) {
+      return res.status(400).json({
+        error: true,
+        message: "El monto total de la factura no puede ser negativo",
+        data: { totalAmount }
+      });
+    }
+
+    // ⭐ CREAR REGISTRO EN LA BASE DE DATOS
+    let savedBill = null;
+    try {
+      savedBill = await Bill.create(billData);
+      console.log("💾 Factura guardada en BD:", savedBill.idBill);
+    } catch (billError) {
+      console.error("❌ Error al guardar factura:", billError.message);
+      console.error("❌ Detalles del error:", {
+        name: billError.name,
+        message: billError.message,
+        errors: billError.errors,
+        sql: billError.sql
+      });
+      
+      return res.status(500).json({
+        error: true,
+        message: "Error al crear la factura en la base de datos",
+        details: billError.message,
+        validationErrors: billError.errors
+      });
+    }
+
+    // ⭐ ACTUALIZAR ESTADO DE LA RESERVA A 'COMPLETED' SI ESTABA EN CHECK-IN
+    if (booking.status === 'checked-in') {
+      try {
+        await booking.update({ 
+          status: 'completed',
+          completedAt: getColombiaTime()
+        });
+        console.log("✅ Estado de reserva actualizado a 'completed'");
+      } catch (updateError) {
+        console.warn("⚠️ Error al actualizar estado de reserva:", updateError.message);
+        // No fallar la factura por esto
+      }
+    }
+
+    // ⭐ CREAR RESPUESTA CON INFORMACIÓN ADICIONAL PARA EL FRONTEND
+    const responseData = {
+      ...savedBill.toJSON(),
+      // ⭐ INFORMACIÓN ADICIONAL PARA EL FRONTEND (NO GUARDADA EN BD)
+      guestInfo: {
+        name: booking.guest?.scostumername || 'Huésped',
+        document: booking.guest?.sdocno || booking.guestId,
+        email: booking.guest?.selectronicmail || null
+      },
+      roomInfo: {
+        number: booking.room?.roomNumber || booking.roomNumber,
+        type: booking.room?.type || 'Standard',
+        checkIn: formatForLogs(booking.checkIn),
+        checkOut: formatForLogs(booking.checkOut),
+      },
+      bookingDetails: {
+        roomCharge: baseAmount,
+        extraCharges: extraCharges.map(charge => ({
+          description: charge.description,
+          amount: parseFloat(charge.amount || charge.price || 0),
+          quantity: charge.quantity || 1
+        })),
+        nights: calculateNights(booking.checkIn, booking.checkOut),
+        guestCount: booking.guestCount
+      },
+      // ⭐ FECHAS FORMATEADAS
+      createdAtFormatted: formatForLogs(savedBill.createdAt),
+      totalAmountFormatted: `$${totalAmount.toLocaleString()}`
+    };
+
+    console.log("✅ Factura generada exitosamente:", {
+      idBill: savedBill.idBill,
+      totalAmount: savedBill.totalAmount,
+      generatedAt: formatForLogs(getColombiaTime())
+    });
+
+    res.status(201).json({
       error: false,
       message: "Factura generada exitosamente",
-      data: bill,
+      data: responseData,
+      timestamp: formatForLogs(getColombiaTime())
     });
+
   } catch (error) {
-    console.error("Error al generar la factura:", error);
-    res.status(500).json({
-      error: true,
-      message: "Error al generar la factura",
+    console.error("❌ Error al generar la factura:", error);
+    console.error("🕐 Hora del error:", formatForLogs(getColombiaTime()));
+    
+    res.status(500).json({ 
+      error: true, 
+      message: "Error al generar la factura", 
       details: error.message,
+      timestamp: formatForLogs(getColombiaTime())
     });
   }
 };
+
+// ...existing code...
+
+
+
+
+
+// ...existing code...
 
 const getAllBills = async (req, res) => {
   try {
+    console.log("🧾 Consultando todas las facturas");
+    console.log("🕐 Hora de consulta:", formatForLogs(getColombiaTime()));
+
     const bills = await Bill.findAll({
       include: [
-        { model: Booking, include: [{ model: Buyer, as: "guest" }] },
+        { 
+          model: Booking, 
+          as: 'booking', // ⭐ USAR EL ALIAS CORRECTO
+          include: [
+            { 
+              model: Buyer, 
+              as: "guest",
+              attributes: ["sdocno", "scostumername", "selectronicmail"]
+            },
+            {
+              model: Room,
+              as: 'room', // ⭐ ALIAS CORRECTO PARA ROOM
+              attributes: ['roomNumber', 'type']
+            }
+          ]
+        },
       ],
+      order: [['createdAt', 'DESC']] // ⭐ ORDENAR POR MÁS RECIENTES PRIMERO
+    });
+
+    console.log(`✅ Encontradas ${bills.length} facturas`);
+
+    // ⭐ PROCESAR DATOS CON INFORMACIÓN ADICIONAL - CORREGIDO
+    const billsWithDetails = bills.map(bill => {
+      const billData = bill.toJSON();
+      
+      // ⭐ AGREGAR INFORMACIÓN CALCULADA SOLO CON CAMPOS EXISTENTES
+      return {
+        ...billData,
+        // ⭐ INFORMACIÓN FORMATEADA DE FECHAS - SOLO LAS QUE EXISTEN EN TU MODELO
+        createdAtFormatted: formatForLogs(billData.createdAt),
+        updatedAtFormatted: formatForLogs(billData.updatedAt),
+        
+        // ⭐ INFORMACIÓN DEL HUÉSPED
+        guestName: billData.booking?.guest?.scostumername || 'N/A',
+        guestDocument: billData.booking?.guest?.sdocno || 'N/A',
+        guestEmail: billData.booking?.guest?.selectronicmail || 'N/A',
+        
+        // ⭐ INFORMACIÓN DE LA HABITACIÓN
+        roomNumber: billData.booking?.room?.roomNumber || 'N/A',
+        roomType: billData.booking?.room?.type || 'N/A',
+        
+        // ⭐ ESTADO DE PAGO - USAR SOLO EL CAMPO 'status' QUE SÍ EXISTE
+        isPaid: billData.status === 'paid',
+        isPending: billData.status === 'pending',
+        isCancelled: billData.status === 'cancelled',
+        statusLabel: billData.status === 'paid' ? 'Pagada' : 
+                    billData.status === 'pending' ? 'Pendiente' : 'Cancelada',
+        
+        // ⭐ TOTALES FORMATEADOS - SOLO CAMPOS QUE EXISTEN
+        totalAmountFormatted: billData.totalAmount ? 
+          `$${parseFloat(billData.totalAmount).toLocaleString()}` : '$0',
+        reservationAmountFormatted: billData.reservationAmount ? 
+          `$${parseFloat(billData.reservationAmount).toLocaleString()}` : '$0',
+        extraChargesAmountFormatted: billData.extraChargesAmount ? 
+          `$${parseFloat(billData.extraChargesAmount).toLocaleString()}` : '$0',
+        taxAmountFormatted: billData.taxAmount ? 
+          `$${parseFloat(billData.taxAmount).toLocaleString()}` : '$0',
+        
+        // ⭐ INFORMACIÓN DE PAGO - SOLO SI EXISTE
+        paymentMethodLabel: billData.paymentMethod ? 
+          getPaymentMethodLabel(billData.paymentMethod) : 'No especificado',
+        
+        // ⭐ INFORMACIÓN DE LA RESERVA
+        bookingId: billData.booking?.bookingId || billData.bookingId,
+        checkIn: billData.booking?.checkIn ? formatForLogs(billData.booking.checkIn) : null,
+        checkOut: billData.booking?.checkOut ? formatForLogs(billData.booking.checkOut) : null,
+        
+        // ⭐ CÁLCULOS ADICIONALES
+        hasExtraCharges: parseFloat(billData.extraChargesAmount || 0) > 0,
+        hasTaxes: parseFloat(billData.taxAmount || 0) > 0,
+        
+        // ⭐ IDENTIFICADOR DE FACTURA FISCAL
+        hasTaxInvoice: !!billData.taxInvoiceId,
+        taxInvoiceDisplay: billData.taxInvoiceId || 'No generada'
+      };
+    });
+
+    // ⭐ CREAR RESUMEN CON CAMPOS CORRECTOS
+    const summary = {
+      totalBills: bills.length,
+      paidBills: billsWithDetails.filter(b => b.isPaid).length,
+      pendingBills: billsWithDetails.filter(b => b.isPending).length,
+      cancelledBills: billsWithDetails.filter(b => b.isCancelled).length,
+      totalRevenue: billsWithDetails
+        .filter(b => b.isPaid)
+        .reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0),
+      totalPendingAmount: billsWithDetails
+        .filter(b => b.isPending)
+        .reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0),
+      totalExtraCharges: billsWithDetails
+        .reduce((sum, bill) => sum + parseFloat(bill.extraChargesAmount || 0), 0),
+      totalTaxes: billsWithDetails
+        .reduce((sum, bill) => sum + parseFloat(bill.taxAmount || 0), 0),
+      // ⭐ FORMATEOS
+      totalRevenueFormatted: `$${billsWithDetails
+        .filter(b => b.isPaid)
+        .reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0)
+        .toLocaleString()}`,
+      totalPendingFormatted: `$${billsWithDetails
+        .filter(b => b.isPending)
+        .reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0)
+        .toLocaleString()}`
+    };
+
+    console.log("📊 Resumen de facturas:", {
+      total: summary.totalBills,
+      paid: summary.paidBills,
+      pending: summary.pendingBills,
+      revenue: summary.totalRevenueFormatted
     });
 
     res.json({
       error: false,
-      data: bills,
+      message: "Facturas obtenidas exitosamente",
+      data: billsWithDetails,
+      summary: summary,
+      timestamp: formatForLogs(getColombiaTime())
     });
+
   } catch (error) {
-    console.error("Error al obtener las facturas:", error);
+    console.error("❌ Error al obtener las facturas:", error);
+    console.error("🕐 Hora del error:", formatForLogs(getColombiaTime()));
+    
     res.status(500).json({
       error: true,
       message: "Error al obtener las facturas",
+      details: error.message,
+      timestamp: formatForLogs(getColombiaTime())
     });
   }
 };
+
+// ⭐ FUNCIÓN HELPER PARA ETIQUETAS DE MÉTODOS DE PAGO
+const getPaymentMethodLabel = (method) => {
+  const labels = {
+    'cash': 'Efectivo',
+    'credit_card': 'Tarjeta de Crédito',
+    'debit_card': 'Tarjeta de Débito',
+    'transfer': 'Transferencia'
+  };
+  return labels[method] || method;
+};
+
+// ...existing code...
+
+
 
 
 const updateBookingStatus = async (req, res) => {
@@ -1413,10 +2401,10 @@ module.exports = {
   getUserBookings,
   getBookingById,
   getAllBookings,
-  checkIn,
+  checkInGuest, // ⭐ CAMBIAR DE checkIn A checkInGuest
   checkOut,
   calculateTotalAmount,
-  addExtraCharges,
+  addExtraCharge,
   downloadBookingPdf,
   generateBill,
   updateBookingStatus,
@@ -1425,6 +2413,6 @@ module.exports = {
   getRevenueReport,
   getBookingByToken,
   updateOnlinePayment,
-  getBookingInventoryStatus, // ⭐ NUEVOn
-  getInventoryUsageReport, // ⭐ NUEVO
+  getBookingInventoryStatus,
+  getInventoryUsageReport,
 };

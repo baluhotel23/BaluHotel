@@ -15,7 +15,23 @@ import DashboardLayout from "../Dashboard/DashboardLayout";
 
 const CheckOut = () => {
   const dispatch = useDispatch();
-  const { bookings, loading, error } = useSelector((state) => state.booking);
+  
+  // ⭐ SELECTORES CORREGIDOS PARA TU REDUCER
+  const { 
+    bookings: allBookings = [], 
+    loading = {}, 
+    errors = {} 
+  } = useSelector((state) => state.booking || {});
+  
+  // ⭐ LOADING ESPECÍFICO PARA BOOKINGS
+  const isLoadingBookings = loading.bookings || loading.general || false;
+  const bookingsError = errors.bookings || errors.general || null;
+
+  // ⭐ FILTRAR SOLO RESERVAS CHECKED-IN
+  const bookings = Array.isArray(allBookings) 
+    ? allBookings.filter(booking => booking.status === 'checked-in')
+    : [];
+  
   const [selectedBooking, setSelectedBooking] = useState(null);
   
   // ⭐ ESTADOS PARA MANEJO DE INVENTARIO Y PASAJEROS
@@ -29,7 +45,21 @@ const CheckOut = () => {
     (state) => state.registrationPass?.registrationsByBooking || {}
   );
 
+  // ⭐ DEBUG TEMPORAL - REMOVER DESPUÉS DE CONFIRMAR QUE FUNCIONA
   useEffect(() => {
+    console.log('🔍 [CHECKOUT] Estado actual:', {
+      isLoadingBookings,
+      bookingsError,
+      allBookingsLength: allBookings?.length,
+      checkedInBookingsLength: bookings?.length,
+      loading: loading,
+      errors: errors,
+      allBookings: allBookings
+    });
+  }, [isLoadingBookings, bookingsError, allBookings?.length, bookings?.length, loading, errors]);
+
+  useEffect(() => {
+    console.log('🔍 [CHECKOUT] Disparando getAllBookings con status checked-in');
     dispatch(getAllBookings({ status: "checked-in" }));
   }, [dispatch]);
 
@@ -40,7 +70,7 @@ const CheckOut = () => {
     console.log('🔍 Cargando básicos para checkout - reserva:', bookingId);
     
     // ⭐ USAR LOS BÁSICOS QUE VIENEN CON LA RESERVA (desde getAllBookings)
-    const loadedBasics = booking.Room?.BasicInventories || [];
+    const loadedBasics = booking.room?.BasicInventories || [];
     console.log('📦 Básicos obtenidos para checkout:', loadedBasics);
     
     if (loadedBasics && loadedBasics.length > 0) {
@@ -157,12 +187,12 @@ const CheckOut = () => {
       toast.info(`Factura generada para reserva #${bookingId}`);
 
       // 3. ⭐ ACTUALIZAR HABITACIÓN A "PARA LIMPIAR" (NO DISPONIBLE)
-      if (booking.Room) {
+      if (booking.room) {
         await dispatch(
-          updateRoomStatus(booking.Room.roomNumber, { status: "Para Limpiar" })
+          updateRoomStatus(booking.room.roomNumber, { status: "Para Limpiar" })
         );
         toast.success(
-          `Habitación #${booking.Room.roomNumber} marcada como "Para Limpiar"`
+          `Habitación #${booking.room.roomNumber} marcada como "Para Limpiar"`
         );
       }
 
@@ -208,11 +238,32 @@ const CheckOut = () => {
     dispatch(getAllBookings({ status: "checked-in" }));
   };
 
-  if (loading) return <div className="flex justify-center items-center h-64">
-    <div className="text-lg">🔄 Cargando reservas para checkout...</div>
-  </div>;
+  // ⭐ CONDICIONES DE LOADING Y ERROR CORREGIDAS
+  if (isLoadingBookings) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-green-500 border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
+            <p className="text-xl text-gray-700">🔄 Cargando reservas para checkout...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
   
-  if (error) return <div className="text-red-500 text-center p-4">❌ {error}</div>;
+  if (bookingsError) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center min-h-[calc(100vh-200px)] px-4">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-center" role="alert">
+            <strong className="font-bold">Error!</strong>
+            <span className="block sm:inline"> No se pudieron cargar las reservas: {bookingsError}. Por favor, intente más tarde.</span>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -224,17 +275,24 @@ const CheckOut = () => {
           </div>
         </div>
 
-        {bookings.length === 0 && (
+       
+
+        {bookings.length === 0 && !isLoadingBookings && (
           <div className="bg-blue-50 border border-blue-200 p-6 text-blue-700 rounded-lg text-center">
             <div className="text-xl mb-2">🏖️</div>
             <div className="font-medium">No hay habitaciones para check-out</div>
-            <div className="text-sm mt-1">Todas las reservas están en otros estados</div>
+            <div className="text-sm mt-1">
+              {allBookings.length > 0 
+                ? `Hay ${allBookings.length} reserva(s) en otros estados`
+                : "No hay reservas checked-in disponibles"
+              }
+            </div>
           </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {bookings.map((booking) => {
-            const payments = booking.Payments || [];
+            const payments = booking.payments || [];
             const totalPagado = payments.reduce(
               (sum, p) => sum + (parseFloat(p.amount) || 0),
               0
@@ -268,7 +326,7 @@ const CheckOut = () => {
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="text-xl font-bold text-gray-800">
-                        🏠 Habitación #{booking.Room?.roomNumber}
+                        🏠 Habitación #{booking.room?.roomNumber || booking.roomNumber}
                       </h3>
                       <p className="text-gray-600">Reserva #{booking.bookingId}</p>
                     </div>
@@ -297,9 +355,6 @@ const CheckOut = () => {
                         <span className="font-medium text-gray-700">👤 Huésped:</span>
                         <br />
                         {booking.guest.scostumername}
-                        {booking.guest.selectronicmail && (
-                          <span className="text-gray-500"> • {booking.guest.selectronicmail}</span>
-                        )}
                       </div>
                     </div>
                   )}
@@ -401,7 +456,7 @@ const CheckOut = () => {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-gray-500 text-sm">Click &quot;Cargar&quot; para ver los pasajeros</p>
+                          <p className="text-gray-500 text-sm">Click "Cargar" para ver los pasajeros</p>
                         )}
                       </div>
 
@@ -448,7 +503,7 @@ const CheckOut = () => {
                             </div>
                           </div>
                         ) : (
-                          <p className="text-gray-500 text-sm">Click &quot;Verificar&quot; para cargar inventario</p>
+                          <p className="text-gray-500 text-sm">Click "Verificar" para cargar inventario</p>
                         )}
                       </div>
                     </div>
@@ -501,17 +556,17 @@ const CheckOut = () => {
           amountToPay={Math.max(
             0,
             parseFloat(selectedBooking.totalAmount) +
-              selectedBooking.ExtraCharges.reduce(
+              (selectedBooking.ExtraCharges || []).reduce(
                 (sum, e) => sum + (parseFloat(e.price) || 0),
                 0
               ) -
-              selectedBooking.Payments.reduce(
+              (selectedBooking.payments || []).reduce(
                 (sum, p) => sum + (parseFloat(p.amount) || 0),
                 0
               )
           )}
           currentBuyerData={selectedBooking.guest}
-          selectedRoom={selectedBooking.Room}
+          selectedRoom={selectedBooking.room}
           onPaymentSuccess={handlePaymentSuccess}
         />
       )}

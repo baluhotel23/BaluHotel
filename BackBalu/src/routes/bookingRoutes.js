@@ -12,9 +12,9 @@ const {
     getUserBookings,
     getBookingById,
     getAllBookings,
-    checkIn, // ⭐ ACTUALIZADO
-    checkOut, // ⭐ ACTUALIZADO
-    addExtraCharges,
+    checkInGuest, // ⭐ CAMBIAR DE checkIn A checkInGuest
+    checkOut,
+    addExtraCharge,
     generateBill,
     updateBookingStatus,
     cancelBooking,
@@ -24,8 +24,8 @@ const {
     getBookingByToken,
     updateOnlinePayment,
     getAllBills,
-    getBookingInventoryStatus, // ⭐ NUEVO
-    getInventoryUsageReport // ⭐ NUEVO
+    getBookingInventoryStatus,
+    getInventoryUsageReport
 } = require('../controllers/bookingController');
 
 // Rutas públicas (no requieren autenticación)
@@ -55,13 +55,14 @@ router.get('/reservas/all', getAllBookings);
 router.get('/:bookingId', getBookingById);
 
 // ⭐ CHECK-IN/CHECK-OUT ACTUALIZADOS
-router.put('/:bookingId/check-in', checkIn); // Ahora incluye asignación de inventario
-router.put('/:bookingId/check-out', checkOut); // Ahora incluye procesamiento de inventario
+router.put('/:bookingId/check-in', checkInGuest); // ⭐ USAR checkInGuest
+router.put('/:bookingId/check-out', checkOut);
 
 // ⭐ NUEVAS RUTAS DE INVENTARIO
-router.get('/:bookingId/inventory/status', getBookingInventoryStatus); // Estado de inventario por reserva
+router.get('/:bookingId/inventory/status', getBookingInventoryStatus);
 
-router.post('/:bookingId/extra-charges', addExtraCharges);
+router.post('/:bookingId/extra-charges', addExtraCharge
+);
 router.get('/:bookingId/bill', generateBill);
 router.put('/:bookingId/status', updateBookingStatus);
 
@@ -71,7 +72,6 @@ router.delete('/:bookingId', allowRoles(['owner', 'admin']), cancelBooking);
 // Rutas de reportes (solo owner y admin)
 router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyReport);
 router.get('/reports/revenue', allowRoles(['owner', 'admin']), getRevenueReport);
-// ⭐ NUEVO REPORTE DE USO DE INVENTARIO
 router.get('/reports/inventory-usage', allowRoles(['owner', 'admin']), getInventoryUsageReport);
 
 module.exports = router;

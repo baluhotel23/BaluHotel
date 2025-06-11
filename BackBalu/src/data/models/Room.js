@@ -39,7 +39,7 @@ module.exports = (sequelize) => {
 
     available: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false,
+      defaultValue: true,
     },
     isPromo: {
       type: DataTypes.BOOLEAN,

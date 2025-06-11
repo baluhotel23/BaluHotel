@@ -7,9 +7,28 @@ const path = require('path');
 const { passport } = require('./passport');
 const { JWT_SECRET_KEY } = require('./config/envs');
 const authRoutes = require('./routes/authRoutes');
-const { errorHandler, CustomError } = require('./middleware/error'); // Fixed path
+const { errorHandler, CustomError } = require('./middleware/error');
+
+// ⭐ CONFIGURAR ZONA HORARIA DE COLOMBIA AL INICIO
+process.env.TZ = 'America/Bogota';
 
 const app = express();
+
+// ⭐ OPCIONAL: Si tienes moment.js instalado
+// const moment = require('moment-timezone');
+// moment.tz.setDefault('America/Bogota');
+
+// ⭐ LOG PARA CONFIRMAR ZONA HORARIA
+console.log('🇨🇴 [SERVER] Zona horaria configurada:', process.env.TZ);
+console.log('🕐 [SERVER] Hora actual Colombia:', new Date().toLocaleString('es-CO', {
+  timeZone: 'America/Bogota',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit'
+}));
 
 // Basic Middlewares
 app.use(express.json());
@@ -25,7 +44,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
-
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*'); 

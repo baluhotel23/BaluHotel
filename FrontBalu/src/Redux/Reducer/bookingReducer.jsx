@@ -96,47 +96,63 @@ const bookingReducer = (state = initialState, action) => {
   console.log('📮 [REDUCER] Action received:', {
     type: action.type,
     payloadType: typeof action.payload,
-    payloadLength: Array.isArray(action.payload) ? action.payload.length : 'not array',
     timestamp: new Date().toISOString()
   });
   
   switch (action.type) {
     case "CHECK_AVAILABILITY_REQUEST":
-      console.log('🔄 [REDUCER] Setting loading to true');
+      console.log('🔄 [REDUCER] Processing availability request');
       return { 
         ...state, 
         loading: { ...state.loading, availability: true }, 
-        errors: { ...state.errors, availability: null } 
+        errors: { ...state.errors, availability: null },
+        success: { ...state.success, message: null }
       };
       
-    case "CHECK_AVAILABILITY_SUCCESS":
-      console.log('✅ [REDUCER] Processing SUCCESS:', {
-        payloadLength: action.payload?.length,
-        payload: action.payload
+    case "CHECK_AVAILABILITY_SUCCESS": {
+      console.log('✅ [REDUCER] Processing availability success:', {
+        hasPayload: !!action.payload,
+        payloadKeys: action.payload ? Object.keys(action.payload) : [],
+        roomsCount: action.payload?.rooms?.length || 0,
+        summary: action.payload?.summary
       });
+      
+      // ⭐ MANEJAR TANTO FORMATO NUEVO COMO LEGACY
+      const rooms = action.payload?.rooms || action.payload || [];
+      const summary = action.payload?.summary || {
+        total: Array.isArray(rooms) ? rooms.length : 0,
+        available: Array.isArray(rooms) ? rooms.filter(r => r.isAvailable).length : 0
+      };
       
       const newState = { 
         ...state, 
         loading: { ...state.loading, availability: false },
-        availability: action.payload,
-        cache: { ...state.cache, lastUpdated: Date.now() }
+        availability: rooms,
+        // ⭐ AGREGAR INFORMACIÓN DE RESUMEN
+        availabilitySummary: summary,
+        // ⭐ MANTENER FILTROS APLICADOS
+        filters: {
+          ...state.filters,
+          lastSearch: action.payload?.filters || null
+        },
+        cache: { 
+          ...state.cache, 
+          lastUpdated: action.payload?.timestamp || Date.now() 
+        },
+        errors: { ...state.errors, availability: null }
       };
       
-      console.log('📊 [REDUCER] New state created:', {
-        availabilityLength: newState.availability?.length,
-        loading: newState.loading.availability,
-        cacheUpdated: newState.cache.lastUpdated
+      console.log('📊 [REDUCER] New availability state:', {
+        roomsCount: newState.availability?.length,
+        availableCount: summary.available,
+        loading: newState.loading.availability
       });
       
       return newState;
+    }
       
-    case "CHECK_AVAILABILITY_FAILURE":
-      console.log('❌ [REDUCER] Processing FAILURE:', action.payload);
-      return { 
-        ...state, 
-        loading: { ...state.loading, availability: false },
-        errors: { ...state.errors, availability: action.payload }
-      };
+    // Removed unreachable and invalid lexical declaration
+      
 
     // ⭐ GET ROOM TYPES - OPTIMIZADO
     case "GET_ROOM_TYPES_REQUEST":
@@ -402,27 +418,34 @@ const bookingReducer = (state = initialState, action) => {
       };
 
     // ⭐ ADD EXTRA CHARGES - OPTIMIZADO
-    case "ADD_EXTRA_CHARGE_REQUEST":
+   case "ADD_EXTRA_CHARGE_REQUEST":
       return { 
         ...state, 
         loading: { ...state.loading, booking: true }, 
-        errors: { ...state.errors, booking: null } 
+        errors: { ...state.errors, booking: null },
+        success: { ...state.success, message: null }
       };
     case "ADD_EXTRA_CHARGE_SUCCESS": {
+      console.log('✅ [REDUCER] Procesando cargo extra exitoso:', action.payload);
+      
       const updatedBookings = state.bookings.map(booking => {
         if (booking.bookingId === action.payload.bookingId) {
+          const newExtraCharges = [
+            ...(booking.ExtraCharges || []),
+            action.payload.extraCharge
+          ];
+          
+          console.log('📦 [REDUCER] Actualizando ExtraCharges para reserva:', booking.bookingId, newExtraCharges);
+          
           return {
             ...booking,
-            ExtraCharges: [
-              ...(booking.ExtraCharges || []),
-              action.payload.extraCharge
-            ]
+            ExtraCharges: newExtraCharges
           };
         }
         return booking;
       });
 
-      return { 
+      const newState = { 
         ...state, 
         loading: { ...state.loading, booking: false }, 
         extraCharges: [...state.extraCharges, action.payload.extraCharge],
@@ -436,14 +459,20 @@ const bookingReducer = (state = initialState, action) => {
               ]
             }
           : state.bookingDetails,
-        success: { message: 'Cargo adicional agregado exitosamente', type: 'update' }
+        success: { message: 'Cargo adicional agregado exitosamente', type: 'update' },
+        errors: { ...state.errors, booking: null }
       };
+      
+      console.log('📊 [REDUCER] Estado actualizado con cargo extra');
+      return newState;
     }
     case "ADD_EXTRA_CHARGE_FAILURE":
+      console.error('❌ [REDUCER] Error al agregar cargo extra:', action.payload);
       return { 
         ...state, 
         loading: { ...state.loading, booking: false }, 
-        errors: { ...state.errors, booking: action.payload }
+        errors: { ...state.errors, booking: action.payload },
+        success: { ...state.success, message: null }
       };
 
     // ⭐ GENERATE BILL - OPTIMIZADO
