@@ -149,9 +149,8 @@ const Footer = () => {
                         </div>
 
                         <div className="flex items-center space-x-2 text-gray-400 text-sm">
-                            <span>Hecho con</span>
-                            <FontAwesomeIcon icon={faHeart} className="text-red-500" />
-                            <span>en Restrepo, Meta</span>
+                        
+                            <span>Code Desarrolladores</span>
                         </div>
 
                         <div className="text-gray-400 text-sm">
