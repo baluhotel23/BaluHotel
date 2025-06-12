@@ -15,6 +15,7 @@ import registrationPassReducer from '../Reducer/registrationPassReducer'; // ⭐
 import purchaseReducer from '../Reducer/purchaseReducer';
 import financialReducer from '../Reducer/financialReducer';
 import laundryReducer from '../Reducer/laundryReducer'; // ⭐ NUEVO
+import adminReducer from '../Reducer/adminReducer'; // ⭐ NUEVO
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -30,7 +31,8 @@ const rootReducer = combineReducers({
   taxxa: taxxaReducer,
   registrationPass: registrationPassReducer, // ⭐ Nombre de variable corregido
   purchase: purchaseReducer,
-  financial: financialReducer
+  financial: financialReducer,
+  admin: adminReducer, 
 });
 
 export const store = configureStore({
