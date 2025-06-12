@@ -765,33 +765,107 @@ const handleRegisterLocalPayment = async () => {
           </div>
 
           {/* Available Rooms Section */}
-          {availableRooms.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="bg-green-100 p-2 rounded-lg">
-                  <span className="text-2xl">🏠</span>
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800">2. Habitaciones Disponibles</h2>
-              </div>
-              
-              <RoomStatusGrid 
-                rooms={availableRooms}
-                checkIn={checkIn}
-                checkOut={checkOut}
-                onRoomSelect={handleSelectRoom}
-                selectedRoom={selectedRoom}
-              />
-            </div>
-          )}
+         {availableRooms.length > 0 && (
+  <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
+    <div className="flex items-center gap-3 mb-6">
+      <div className="bg-green-100 p-2 rounded-lg">
+        <span className="text-2xl">🏠</span>
+      </div>
+      <h2 className="text-2xl font-bold text-gray-800">2. Habitaciones Disponibles</h2>
+      <div className="ml-auto bg-blue-100 text-blue-800 px-4 py-1 rounded-full text-sm font-medium">
+        {availableRooms.length} habitación(es) para {format(checkIn, 'dd/MM/yyyy')} - {format(checkOut, 'dd/MM/yyyy')}
+      </div>
+    </div>
+    
+    <RoomStatusGrid 
+      rooms={availableRooms}
+      checkIn={checkIn}
+      checkOut={checkOut}
+      onRoomSelect={handleSelectRoom}
+      selectedRoom={selectedRoom}
+    />
+  </div>
+)}
 
-          {/* No Rooms Available Message */}
-          {availability && availableRooms.length === 0 && !isLoadingAvailability && (
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-8 mb-8 text-center">
-              <div className="text-6xl mb-4">😔</div>
-              <h3 className="text-2xl font-bold text-orange-800 mb-2">No hay habitaciones disponibles</h3>
-              <p className="text-orange-600 text-lg">Para los criterios seleccionados. Intente con otras fechas.</p>
+{/* No Rooms Available Message */}
+{availability && availableRooms.length === 0 && !isLoadingAvailability && (
+  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-8 mb-8 text-center">
+    <div className="text-6xl mb-4">😔</div>
+    <h3 className="text-2xl font-bold text-orange-800 mb-2">No hay habitaciones disponibles</h3>
+    <p className="text-orange-600 text-lg">Para los criterios seleccionados. Intente con otras fechas.</p>
+  </div>
+)}
+
+{/* General Room Status with Upcoming Bookings */}
+{availability && availability.length > 0 && (
+  <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+    <div className="flex items-center gap-3 mb-6">
+      <div className="bg-indigo-100 p-2 rounded-lg">
+        <span className="text-2xl">📊</span>
+      </div>
+      <h2 className="text-2xl font-bold text-gray-800">Estado General de Habitaciones</h2>
+    </div>
+    
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {availability.map(room => (
+        <div 
+          key={room.roomNumber}
+          className={`border rounded-lg p-4 ${
+            room.isAvailable ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+          }`}
+        >
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-bold text-xl">
+              Hab. {room.roomNumber} 
+              <span className="text-sm font-normal ml-2">({room.type})</span>
+            </h3>
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+              room.isAvailable ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'
+            }`}>
+              {room.isAvailable ? 'Disponible' : room.status || 'No Disponible'}
+            </span>
+          </div>
+          
+          {room.bookedDates && room.bookedDates.length > 0 ? (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Próximas reservas:</p>
+              <ul className="space-y-2">
+                {room.bookedDates.map((booking, idx) => (
+                  <li key={idx} className="bg-white border border-gray-200 rounded px-3 py-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-blue-800 font-medium">#{booking.bookingId}</span>
+                      <span className="text-gray-600">
+                        {new Date(booking.checkIn).toLocaleDateString()} - {new Date(booking.checkOut).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
+          ) : (
+            <p className="text-sm text-gray-600">Sin reservas próximas</p>
           )}
+          
+          <div className="mt-3 flex justify-end">
+            <button 
+              onClick={() => handleSelectRoom(room)}
+              disabled={!room.isAvailable}
+              className={`text-sm px-3 py-1 rounded ${
+                selectedRoom && selectedRoom.roomNumber === room.roomNumber 
+                  ? 'bg-blue-600 text-white' 
+                  : room.isAvailable 
+                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {selectedRoom && selectedRoom.roomNumber === room.roomNumber ? 'Seleccionada' : 'Seleccionar'}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
 
           {/* Booking Details Section */}
           {selectedRoom && !createdBookingId && (

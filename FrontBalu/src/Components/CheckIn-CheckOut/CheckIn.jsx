@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   getAllBookings,
   updateBookingStatus,
@@ -20,6 +21,8 @@ import { toast } from "react-toastify";
 
 const CheckIn = () => {
   const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
+  const navigate = useNavigate();
   
   // ⭐ SELECTORES PRINCIPALES
   const { 
@@ -581,35 +584,28 @@ const CheckIn = () => {
             )}
 
             {/* ⭐ ACCIONES RÁPIDAS */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={() => window.location.href = '/dashboard/checkout'}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                🏨 Ir a Check-Out
-              </button>
-              <button
-                onClick={() => {
-                  const newRange = {
-                    from: dayjs().subtract(7, 'day').format("YYYY-MM-DD"),
-                    to: dayjs().add(7, 'day').format("YYYY-MM-DD")
-                  };
-                  setDateRange(newRange);
-                }}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                📅 Últimos 14 días
-              </button>
-              <button
-                onClick={() => {
-                  const today = dayjs().format("YYYY-MM-DD");
-                  setDateRange({ from: today, to: today });
-                }}
-                className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                🔄 Solo hoy
-              </button>
-            </div>
+           <div className="flex flex-col sm:flex-row gap-4 justify-center">
+  {(user?.role === "owner" || user?.role === "admin" || user?.role === "recept") && (
+    <button
+      onClick={() => navigate('/admin/CheckOut')}
+      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+    >
+      🏨 Ir a Check-Out
+    </button>
+  )}
+  <button
+    onClick={() => {
+      const newRange = {
+        from: dayjs().subtract(7, 'day').format("YYYY-MM-DD"),
+        to: dayjs().add(7, 'day').format("YYYY-MM-DD")
+      };
+      setDateRange(newRange);
+    }}
+    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+  >
+    Ver ±7 días
+  </button>
+</div>
 
             {/* ⭐ DEBUG INFO - SOLO EN DESARROLLO */}
             {process.env.NODE_ENV === 'development' && (
