@@ -229,7 +229,7 @@ const CreateRoom = () => {
 
   return (
     <DashboardLayout>
-      <h1 className="text-2xl font-semibold bg-zinc-300 mb-4">
+      <h1 className="text-2xl font-semibold bg-zinc-300 mb-4 mt-12">
         Crear Habitación
       </h1>
       
