@@ -166,23 +166,48 @@ const initialState = {
 
     // ⭐ HABITACIÓN INDIVIDUAL - OPTIMIZADO
     case "GET_ROOM_REQUEST":
-      return { 
-        ...state, 
-        loading: { ...state.loading, general: true }, 
-        errors: { ...state.errors, general: null } 
-      };
-    case "GET_ROOM_SUCCESS":
-      return { 
-        ...state, 
-        loading: { ...state.loading, general: false }, 
-        selectedRoom: action.payload
-      };
-    case "GET_ROOM_FAILURE":
-      return { 
-        ...state, 
-        loading: { ...state.loading, general: false }, 
-        errors: { ...state.errors, general: action.payload }
-      };
+  console.log('🔄 [REDUCER] GET_ROOM_REQUEST - Setting loading para habitación individual');
+  return { 
+    ...state, 
+    loading: { ...state.loading, general: true }, 
+    errors: { ...state.errors, general: null },
+    selectedRoom: null // ⭐ LIMPIAR HABITACIÓN ANTERIOR
+  };
+
+case "GET_ROOM_SUCCESS": {
+  console.log('✅ [REDUCER] GET_ROOM_SUCCESS recibido para habitación individual');
+  console.log('📊 [REDUCER] Payload recibido:', action.payload);
+  console.log('🔍 [REDUCER] Tipo de payload:', typeof action.payload);
+  console.log('🏨 [REDUCER] Room Number:', action.payload?.roomNumber);
+  console.log('📋 [REDUCER] BasicInventories:', action.payload?.BasicInventories?.length);
+  console.log('🛎️ [REDUCER] Services:', action.payload?.Services?.length);
+  console.log('📅 [REDUCER] Bookings:', action.payload?.bookings?.length);
+  console.log('✅ [REDUCER] Can Check In:', action.payload?.canCheckIn);
+  
+  const newStateRoom = { 
+    ...state, 
+    loading: { ...state.loading, general: false }, 
+    errors: { ...state.errors, general: null },
+    selectedRoom: action.payload
+  };
+  
+  console.log('📋 [REDUCER] Nuevo estado selectedRoom:', {
+    hasSelectedRoom: !!newStateRoom.selectedRoom,
+    roomNumber: newStateRoom.selectedRoom?.roomNumber,
+    loading: newStateRoom.loading.general
+  });
+  
+  return newStateRoom;
+}
+
+case "GET_ROOM_FAILURE":
+  console.log('❌ [REDUCER] GET_ROOM_FAILURE para habitación individual:', action.payload);
+  return { 
+    ...state, 
+    loading: { ...state.loading, general: false }, 
+    errors: { ...state.errors, general: action.payload },
+    selectedRoom: null
+  };
 
     // ⭐ BÚSQUEDA DE HABITACIÓN - OPTIMIZADO
     case "SEARCH_ROOM_REQUEST":

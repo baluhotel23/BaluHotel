@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPurchases } from '../../Redux/Actions/purchaseActions';
 import { Link } from 'react-router-dom';
-import { FaEye, FaSearch, FaPlus, FaFilePdf } from 'react-icons/fa';
+import { FaEye, FaSearch, FaPlus, FaFilePdf, FaFileAlt, FaExternalLinkAlt } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import DashboardLayout from '../Dashboard/DashboardLayout';
@@ -94,13 +94,69 @@ const PurchaseList = () => {
     }
   };
 
+  // ⭐ NUEVA FUNCIÓN PARA MOSTRAR EL COMPROBANTE
+  const renderReceiptStatus = (receiptUrl) => {
+    if (!receiptUrl) {
+      return (
+        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs flex items-center">
+          <FaFileAlt className="mr-1" />
+          Sin comprobante
+        </span>
+      );
+    }
+
+    return (
+      <div className="flex items-center space-x-1">
+        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs flex items-center">
+          <FaFilePdf className="mr-1" />
+          Disponible
+        </span>
+        <a
+          href={receiptUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:text-blue-700 p-1"
+          title="Ver comprobante"
+        >
+          <FaExternalLinkAlt className="text-xs" />
+        </a>
+      </div>
+    );
+  };
+
+  // ⭐ FUNCIÓN PARA ABRIR COMPROBANTE EN MODAL (OPCIONAL)
+  const openReceiptModal = (receiptUrl) => {
+    if (!receiptUrl) return;
+    
+    // Crear modal simple para mostrar el PDF
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg max-w-4xl w-full h-5/6 flex flex-col">
+        <div class="flex justify-between items-center p-4 border-b">
+          <h3 class="text-lg font-semibold">Comprobante de Compra</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+        </div>
+        <div class="flex-1 p-4">
+          <iframe src="${receiptUrl}" width="100%" height="100%" class="border-0"></iframe>
+        </div>
+        <div class="p-4 border-t flex justify-end">
+          <a href="${receiptUrl}" target="_blank" class="bg-blue-500 text-white px-4 py-2 rounded mr-2">Abrir en nueva pestaña</a>
+          <button onclick="this.closest('.fixed').remove()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded">Cerrar</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+  };
+
   return (
      <DashboardLayout>
     <div className="bg-white shadow-md rounded-lg p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-700">Historial de Compras</h2>
         <Link 
-          to="/purchases/new" 
+          to="/purchaseForm" 
           className="bg-blue-500 text-white px-4 py-2 rounded-md flex items-center hover:bg-blue-600"
         >
           <FaPlus className="mr-2" /> Nueva Compra
@@ -202,6 +258,8 @@ const PurchaseList = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                {/* ⭐ NUEVA COLUMNA PARA COMPROBANTE */}
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Comprobante</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
@@ -223,6 +281,10 @@ const PurchaseList = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     {renderPaymentStatus(purchase.paymentStatus)}
                   </td>
+                  {/* ⭐ NUEVA CELDA PARA MOSTRAR COMPROBANTE */}
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {renderReceiptStatus(purchase.receiptUrl)}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="flex justify-center space-x-2">
                       <Link 
@@ -232,12 +294,16 @@ const PurchaseList = () => {
                       >
                         <FaEye />
                       </Link>
-                      <button
-                        className="text-red-500 hover:text-red-700"
-                        title="Exportar a PDF"
-                      >
-                        <FaFilePdf />
-                      </button>
+                      {/* ⭐ BOTÓN PARA VER COMPROBANTE EN MODAL (OPCIONAL) */}
+                      {purchase.receiptUrl && (
+                        <button
+                          onClick={() => openReceiptModal(purchase.receiptUrl)}
+                          className="text-green-500 hover:text-green-700"
+                          title="Ver comprobante en modal"
+                        >
+                          <FaFilePdf />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

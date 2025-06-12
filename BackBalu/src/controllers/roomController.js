@@ -135,6 +135,8 @@ const getRoomById = async (req, res, next) => {
       });
     }
 
+    console.log('🔍 Iniciando getRoomById para habitación:', roomNumber);
+
     const room = await Room.findByPk(roomNumber, {
       include: [
         {
@@ -152,11 +154,13 @@ const getRoomById = async (req, res, next) => {
         },
         {
           model: Service,
-          attributes: ["name"],
+          as: 'Services',
+          attributes: ["serviceId", "name", "category", "icon"],
           through: { attributes: [] },
         },
         {
           model: Booking,
+          as: 'bookings', // ⭐ USAR EL ALIAS CORRECTO (minúsculas)
           where: { status: { [Op.in]: ['checked-in', 'confirmed'] } },
           required: false,
           attributes: ['bookingId', 'status', 'checkIn', 'checkOut'],
@@ -164,6 +168,7 @@ const getRoomById = async (req, res, next) => {
             {
               model: BookingInventoryUsage,
               as: 'inventoryUsages',
+              required: false,
               include: [
                 {
                   model: BasicInventory,
@@ -223,17 +228,21 @@ const getRoomById = async (req, res, next) => {
       });
     }
 
+    console.log('✅ getRoomById completado exitosamente');
+
     res.status(200).json({
       error: false,
       data: {
         ...roomData,
         canCheckIn,
         inventoryChecklist,
-        currentBookings: roomData.Bookings || []
+        currentBookings: roomData.bookings || [] // ⭐ USAR 'bookings' (minúsculas)
       },
       message: "Habitación obtenida correctamente",
     });
   } catch (error) {
+    console.error('❌ Error en getRoomById:', error.message);
+    console.error('❌ Stack trace:', error.stack);
     next(error);
   }
 };

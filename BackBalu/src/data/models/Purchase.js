@@ -32,9 +32,24 @@ module.exports = (sequelize) => {
       values: ['pending', 'paid', 'partial'],
       defaultValue: 'pending',
     },
-    receiptUrl: { // Nuevo campo para la URL del comprobante
+    receiptUrl: {
       type: DataTypes.STRING,
     },
+    createdBy: { // ⭐ AGREGAR ESTE CAMPO
+      type: DataTypes.STRING,
+      allowNull: true,
+      references: {
+        model: 'Users',
+        key: 'n_document'
+      }
+    },
+    notes: { // ⭐ CAMPO ADICIONAL QUE PUEDE SER ÚTIL
+      type: DataTypes.TEXT,
+      allowNull: true,
+    }
+  }, {
+    timestamps: true,
+    paranoid: true,
   });
 
   return Purchase;
