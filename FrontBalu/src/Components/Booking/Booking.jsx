@@ -820,12 +820,7 @@ const handlePaymentSuccess = async (transaction) => {
                   </p>
                 )}
               </div>
-              {availabilitySummary.total > 0 && (
-                <div className="mt-3 text-sm text-blue-600">
-                  📊 {availabilitySummary.available}/{availabilitySummary.total}{" "}
-                  habitaciones disponibles
-                </div>
-              )}
+              
             </div>
 
             {/* Search form */}
