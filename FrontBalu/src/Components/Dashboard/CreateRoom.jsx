@@ -272,11 +272,11 @@ const CreateRoom = () => {
                 className="mt-1 block w-full shadow-sm sm:text-sm border-2 rounded-md p-2"
               >
                 <option value="">Selecciona un tipo</option>
-                <option value="Individual">Individual</option>
+               
                 <option value="Doble">Doble</option>
                 <option value="Triple">Triple</option>
                 <option value="Cuadruple">Cuádruple</option>
-                <option value="Suite">Suite</option>
+                <option value="Pareja">Pareja</option>
               </select>
             </div>
 
