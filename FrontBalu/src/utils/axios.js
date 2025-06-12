@@ -5,7 +5,7 @@ import axios from 'axios';
 const api = axios.create({
 
   baseURL: 'https://baluhotel.onrender.com/', // Ajusta esto a tu URL de backend
-  timeout: 10000,
+  timeout: 18000,
   headers: {
     'Content-Type': 'application/json'
   }
