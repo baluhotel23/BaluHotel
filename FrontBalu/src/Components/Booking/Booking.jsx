@@ -688,80 +688,107 @@ const Booking = () => {
   }, [bookingTotal, paymentOption]);
 
   // ... (handlePaymentSuccess y el resto del componente JSX) ...
-  const handlePaymentSuccess = async (transaction) => {
-    if (!currentBuyerData || !selectedRoom) {
-      toast.error("Faltan datos para crear la reserva.");
+  // ⭐ MODIFICAR LA FUNCIÓN handlePaymentSuccess
+const handlePaymentSuccess = async (transaction) => {
+  if (!currentBuyerData || !selectedRoom) {
+    toast.error("Faltan datos para crear la reserva.");
+    return;
+  }
+  const totalGuests = adults + children;
+  const nights = differenceInDays(checkOut, checkIn);
+
+  const bookingData = {
+    checkIn: format(checkIn, "yyyy-MM-dd"),
+    checkOut: format(checkOut, "yyyy-MM-dd"),
+    pointOfSale: "Online",
+    status: "confirmed",
+    guestCount: totalGuests,
+    roomNumber: selectedRoom.roomNumber,
+    totalAmount: bookingTotal,
+    adults,
+    children,
+    nights,
+    guestId: currentBuyerData.sdocno,
+    paymentType: "online",
+    paymentMethod: transaction.payment_method_type || "credit_card",
+    paymentStatus: transaction.status,
+    transactionId: transaction.id,
+    paymentReference: transaction.reference,
+    paymentDetails: {
+      cardType: transaction.paymentMethod?.extra?.cardType,
+      cardBrand: transaction.paymentMethod?.extra?.brand,
+      lastFour: transaction.paymentMethod?.extra?.lastFour,
+    },
+    buyerInfo: {
+      name: currentBuyerData.scostumername,
+      docType: currentBuyerData.wdoctype,
+      sdocno: currentBuyerData.sdocno,
+      email: currentBuyerData.selectronicmail,
+      phone: currentBuyerData.stelephone,
+    },
+  };
+
+  try {
+    const createResponse = await dispatch(createBooking(bookingData));
+    if (!createResponse || !createResponse.success) {
+      toast.error(
+        "Error al confirmar la reserva: " +
+          (createResponse?.message || "Error desconocido")
+      );
       return;
     }
-    const totalGuests = adults + children;
-    const nights = differenceInDays(checkOut, checkIn);
 
-    const bookingData = {
-      checkIn: format(checkIn, "yyyy-MM-dd"),
-      checkOut: format(checkOut, "yyyy-MM-dd"),
-      pointOfSale: "Online",
-      status: "confirmed",
-      guestCount: totalGuests,
-      roomNumber: selectedRoom.roomNumber,
-      totalAmount: bookingTotal,
-      adults,
-      children,
-      nights,
-      guestId: currentBuyerData.sdocno,
-      paymentType: "online",
-      paymentMethod: transaction.payment_method_type || "credit_card",
-      paymentStatus: transaction.status,
+    const bookingId = createResponse.data.booking.bookingId;
+
+    const paymentPayload = {
+      bookingId,
+      amount: amountToPay,
       transactionId: transaction.id,
       paymentReference: transaction.reference,
-      paymentDetails: {
-        cardType: transaction.paymentMethod?.extra?.cardType,
-        cardBrand: transaction.paymentMethod?.extra?.brand,
-        lastFour: transaction.paymentMethod?.extra?.lastFour,
-      },
-      buyerInfo: {
-        name: currentBuyerData.scostumername,
-        docType: currentBuyerData.wdoctype,
-        sdocno: currentBuyerData.sdocno,
-        email: currentBuyerData.selectronicmail,
-        phone: currentBuyerData.stelephone,
-      },
+      paymentMethod: transaction.payment_method_type || "credit_card",
+      status: transaction.status,
     };
 
-    try {
-      const createResponse = await dispatch(createBooking(bookingData));
-      if (!createResponse || !createResponse.success) {
-        toast.error(
-          "Error al confirmar la reserva: " +
-            (createResponse?.message || "Error desconocido")
-        );
-        return;
-      }
+    await dispatch(updateOnlinePayment(paymentPayload));
 
-      const bookingId = createResponse.data.booking.bookingId;
-
-      const paymentPayload = {
-        bookingId,
-        amount: amountToPay,
+    // ⭐ PREPARAR DATOS COMPLETOS PARA LA PÁGINA DE AGRADECIMIENTO
+    const reservationData = {
+      bookingId,
+      bookingDetails: {
+        ...bookingData,
+        roomType: selectedRoom.type,
+        roomDescription: selectedRoom.description,
+        checkInFormatted: format(checkIn, "dd/MM/yyyy", { locale: es }),
+        checkOutFormatted: format(checkOut, "dd/MM/yyyy", { locale: es }),
+      },
+      paymentDetails: {
+        amountPaid: amountToPay,
+        totalAmount: bookingTotal,
+        paymentOption: paymentOption,
         transactionId: transaction.id,
         paymentReference: transaction.reference,
         paymentMethod: transaction.payment_method_type || "credit_card",
-        status: transaction.status,
-      };
+        remainingAmount: paymentOption === "mitad" ? bookingTotal - amountToPay : 0,
+      },
+      guestInfo: currentBuyerData,
+      priceBreakdown,
+    };
 
-      await dispatch(updateOnlinePayment(paymentPayload));
+    // ⭐ GUARDAR EN LOCALSTORAGE Y REDIRIGIR
+    localStorage.setItem('reservationData', JSON.stringify(reservationData));
+    
+    toast.success("¡Reserva confirmada exitosamente!");
+    
+    // ⭐ REDIRIGIR A THANKYOU
+    navigate('/thankyou');
 
-      toast.success("Reserva confirmada y pago registrado exitosamente.");
-      if (createResponse.data.trackingLink) {
-        // window.open(createResponse.data.trackingLink, '_blank');
-      }
-      navigate(`/booking-confirmation/${bookingId}`);
-    } catch (error) {
-      console.error("Error al procesar la reserva y el pago online:", error);
-      toast.error(
-        "Error al procesar la reserva y el pago online. Intente de nuevo."
-      );
-    }
-  };
+  } catch (error) {
+    console.error("Error al procesar la reserva y el pago online:", error);
+    toast.error(
+      "Error al procesar la reserva y el pago online. Intente de nuevo."
+    );
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pt-32">
