@@ -43,6 +43,7 @@ import FinancialBalance from "./Components/Dashboard/FinancialBalance";
 import FacturasPendientes from "./Components/Taxxa/FacturasPendientes";
 import PanelTaxxa from "./Components/Taxxa/PanelTaxxa";
 import InvoiceList from "./Components/Taxxa/InvoiceList";
+import ConfiguracionHotel from "./Components/Dashboard/ConfiguracionHotel";
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -186,6 +187,15 @@ const AppContent = () => {
             element={
               <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <RoomAvailability />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/panelConfiguracion"
+            element={
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
+                <ConfiguracionHotel />
               </PrivateRoute>
             }
           />
