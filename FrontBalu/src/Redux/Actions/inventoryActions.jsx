@@ -12,17 +12,7 @@ export const getInventory = (filters = {}) => async (dispatch) => {
   }
 };
 
-export const createPurchase = (purchaseData) => async (dispatch) => {
-  try {
-    const { data } = await api.post('/inventory/purchase', purchaseData);
-    dispatch({ type: 'CREATE_PURCHASE', payload: data.data });
-    toast.success('Compra registrada exitosamente');
-    return { success: true, data: data.data };
-  } catch (error) {
-    toast.error(error.response?.data?.message || 'Error al registrar la compra');
-    return { success: false, error };
-  }
-};
+
 
 export const getLowStockItems = () => async (dispatch) => {
   try {

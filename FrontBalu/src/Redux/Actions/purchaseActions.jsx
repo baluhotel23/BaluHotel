@@ -1,27 +1,40 @@
 import api from '../../utils/axios';
 import { toast } from 'react-toastify';
 
-
 export const createPurchase = (purchaseData) => async (dispatch) => {
   dispatch({ type: 'CREATE_PURCHASE_REQUEST' });
   
   try {
+    console.log('🚀 Enviando datos de compra:', purchaseData); // ⭐ DEBUG
+    
     const { data } = await api.post('/inventory/purchase', purchaseData);
+    
     dispatch({ type: 'CREATE_PURCHASE_SUCCESS', payload: data.data });
-    toast.success('Compra registrada exitosamente');
-    return { success: true, data: data.data };
+    
+    console.log('✅ Compra creada exitosamente:', data.data); // ⭐ DEBUG
+    
+    // ⭐ REMOVER TOAST AUTOMÁTICO PARA EVITAR DUPLICADOS
+    // toast.success('Compra registrada exitosamente');
+    
+    return { success: true, data: data.data, message: 'Compra registrada exitosamente' };
   } catch (error) {
+    console.error('❌ Error al crear compra:', error); // ⭐ DEBUG
+    
     const errorMessage = error.response?.data?.message || 'Error al registrar la compra';
+    
     dispatch({ 
       type: 'CREATE_PURCHASE_FAILURE', 
       payload: errorMessage 
     });
-    toast.error(errorMessage);
-    return { success: false, error };
+    
+    // ⭐ REMOVER TOAST AUTOMÁTICO PARA EVITAR DUPLICADOS
+    // toast.error(errorMessage);
+    
+    return { success: false, error: errorMessage };
   }
 };
 
-// Fetch All Purchases Action
+// Fetch All Purchases Action - ✅ MANTENER COMO ESTÁ
 export const fetchPurchases = () => async (dispatch) => {
   dispatch({ type: 'FETCH_PURCHASES_REQUEST' });
   
@@ -35,12 +48,12 @@ export const fetchPurchases = () => async (dispatch) => {
       type: 'FETCH_PURCHASES_FAILURE', 
       payload: errorMessage 
     });
-    toast.error(errorMessage);
+    toast.error(errorMessage); // ✅ Este toast sí está bien aquí
     return { success: false, error };
   }
 };
 
-// Fetch Purchase Detail Action
+// Fetch Purchase Detail Action - ✅ MANTENER COMO ESTÁ
 export const fetchPurchaseDetail = (id) => async (dispatch) => {
   dispatch({ type: 'FETCH_PURCHASE_DETAIL_REQUEST' });
   
@@ -54,7 +67,7 @@ export const fetchPurchaseDetail = (id) => async (dispatch) => {
       type: 'FETCH_PURCHASE_DETAIL_FAILURE', 
       payload: errorMessage 
     });
-    toast.error(errorMessage);
+    toast.error(errorMessage); // ✅ Este toast sí está bien aquí
     return { success: false, error };
   }
 };

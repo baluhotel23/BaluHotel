@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getRoomById } from '../../Redux/Actions/roomActions';
@@ -16,8 +16,13 @@ const RoomDetail = () => {
   const { roomNumber } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { selectedRoom: room, loading, error } = useSelector(state => state.room);
+  const { selectedRoom, loading, errors } = useSelector(state => ({
+    selectedRoom: state.room?.selectedRoom,
+    loading: state.room?.loading?.general || false,
+    errors: state.room?.errors?.general || null
+  }));
 
+const room = selectedRoom && selectedRoom.roomNumber === roomNumber ? selectedRoom : null;
   useEffect(() => {
     // Scroll to top when component mounts or roomNumber changes
     window.scrollTo(0, 0);
@@ -33,11 +38,11 @@ const RoomDetail = () => {
     </div>
   );
 
-  if (error) return (
+  if (errors) return (
     <div className="flex justify-center items-center min-h-[calc(100vh-150px)] px-4 bg-gray-50">
       <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-md shadow-lg text-center max-w-md">
         <p className="font-bold text-xl mb-2">Error al cargar la habitación</p>
-        <p className="mb-4">{error}. Por favor, intente más tarde o contacte soporte.</p>
+        <p className="mb-4">{errors}. Por favor, intente más tarde o contacte soporte.</p>
         <button
           onClick={() => navigate('/RoomsSection')}
           className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-200 shadow hover:shadow-md"
@@ -167,7 +172,7 @@ const RoomDetail = () => {
             {/* Right Column: Price, Booking Button */}
             <div className="lg:col-span-1">
               <div className="sticky top-28 bg-gray-50 p-6 rounded-lg shadow-md"> {/* Sticky for booking details */}
-                <h3 className="text-xl font-semibold text-gray-800 mb-4 text-center">Reserva tu Estancia</h3>
+                <h3 className="text-xl font-semibold text-gray-800 mb-4 text-center">Reserva tu estadía</h3>
                 
                 {/* New Swiper for room images in booking section */}
                 {galleryImages.length > 0 ? (
@@ -203,12 +208,7 @@ const RoomDetail = () => {
                   </div>
                 )}
 
-                {/* Price can be optionally re-added here if desired, quizás más pequeño
-                <div className="text-2xl font-bold text-yellow-600 mb-1 text-center">
-                  ${parseFloat(room.price).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </div>
-                <p className="text-xs text-gray-500 mb-4 text-center">por noche</p>
-                */}
+               
 
                 <button
                   onClick={() => navigate('/booking', { state: { roomNumber: room.roomNumber, roomType: room.type, roomPrice: room.price } })}
@@ -223,15 +223,7 @@ const RoomDetail = () => {
         </div>
       </div>
       
-      {/* StickyBookingForm Section - REMAINS REMOVED as per previous step */}
-      {/* 
-      <div className="py-8 md:py-12 bg-white border-t border-gray-200">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-6 text-center">Verifica Disponibilidad</h2>
-          <StickyBookingForm />
-        </div>
-      </div> 
-      */}
+     
 
     </div>
   );

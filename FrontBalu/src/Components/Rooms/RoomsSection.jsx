@@ -108,7 +108,7 @@ function RoomsSection() {
   
   // ⭐ VERIFICACIONES SEGURAS PARA EVITAR CRASHES
   const uniqueRoomTypes = [...new Set(rooms.map(room => room.type).filter(Boolean))].sort();
-  const maxGuestCapacity = rooms.length > 0 ? Math.max(...rooms.map(room => room.maxGuests || 0), 0) : 0;
+  //const maxGuestCapacity = rooms.length > 0 ? Math.max(...rooms.map(room => room.maxGuests || 0), 0) : 0;
 
   return (
     <div className="bg-gray-100 min-h-screen px-2 sm:px-4 lg:px-6 py-8">
@@ -130,8 +130,8 @@ function RoomsSection() {
         </div>
 
         <div id="filterSortMenu" className="hidden lg:grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
-          {/* Search Input */}
-          <div className="w-full">
+        
+          {/* <div className="w-full">
             <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
               <FontAwesomeIcon icon={faSearch} className="mr-1 text-gray-500" /> Buscar
             </label>
@@ -143,7 +143,7 @@ function RoomsSection() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full p-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 transition-all"
             />
-          </div>
+          </div> */}
 
           {/* Filter by Type */}
           <div className="w-full">
@@ -163,7 +163,7 @@ function RoomsSection() {
             </select>
           </div>
 
-          {/* Filter by Capacity */}
+          {/* Filter by Capacity
           <div className="w-full">
             <label htmlFor="filterCapacity" className="block text-sm font-medium text-gray-700 mb-1">
               <FontAwesomeIcon icon={faUsers} className="mr-1 text-gray-500" /> Capacidad (mín.)
@@ -179,7 +179,7 @@ function RoomsSection() {
                 <option key={i+1} value={i+1}>{i+1} Huésped{i > 0 ? 'es' : ''}</option>
               ))}
             </select>
-          </div>
+          </div> */}
           
           {/* Sort Options - Simplified */}
           <div className="w-full">

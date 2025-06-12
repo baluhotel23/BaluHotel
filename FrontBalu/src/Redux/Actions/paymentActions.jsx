@@ -22,7 +22,9 @@ export const registerLocalPayment = (paymentData) => {
     try {
       const response = await api.post('/admin/paymentLocal', paymentData);
       dispatch(registerLocalPaymentSuccess(response.data));
-      toast.success('Pago local registrado exitosamente');
+      
+      // ⭐ ELIMINAMOS EL TOAST AUTOMÁTICO PARA EVITAR DUPLICADOS
+      // toast.success('Pago local registrado exitosamente');
       
       // ⭐ RETORNAR EL RESULTADO PARA QUE EL COMPONENTE LO PUEDA USAR
       return {
@@ -31,9 +33,11 @@ export const registerLocalPayment = (paymentData) => {
         message: 'Pago registrado exitosamente'
       };
     } catch (error) {
-      const errorMessage = error.response ? error.response.data.message : 'Error al registrar el pago local';
-      dispatch(registerLocalPaymentFailure(error.response ? error.response.data : error));
-      toast.error(errorMessage);
+      const errorMessage = error.response?.data?.message || 'Error al registrar el pago local';
+      dispatch(registerLocalPaymentFailure(error.response?.data || error));
+      
+      // ⭐ ELIMINAMOS EL TOAST AUTOMÁTICO PARA EVITAR DUPLICADOS
+      // toast.error(errorMessage);
       
       // ⭐ RETORNAR ERROR TAMBIÉN
       return {

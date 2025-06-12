@@ -62,13 +62,79 @@ export const getRoomTypes = () => async (dispatch) => {
 
 // Obtener una habitación por roomNumber
 export const getRoomById = (roomNumber) => async (dispatch) => {
+  console.log('🚀 [ACTION] getRoomById iniciado para habitación:', roomNumber);
   dispatch({ type: 'GET_ROOM_REQUEST' });
+  
   try {
-    const { data } = await api.get(`/rooms/${roomNumber}`);
-    dispatch({ type: 'GET_ROOM_SUCCESS', payload: data.data });
+    console.log('📡 [ACTION] Llamando a api.get(`/rooms/${roomNumber}`)');
+    console.log('🔗 [ACTION] URL completa:', `${api.defaults.baseURL}/rooms/${roomNumber}`);
+    
+    const response = await api.get(`/rooms/${roomNumber}`);
+    
+    console.log('📥 [ACTION] Respuesta completa de getRoomById:', response);
+    console.log('📊 [ACTION] Status:', response.status);
+    console.log('📋 [ACTION] Data completa:', response.data);
+    console.log('🏨 [ACTION] Datos de habitación:', response.data.data);
+    console.log('🔍 [ACTION] Estructura de data.data:', {
+      roomNumber: response.data.data?.roomNumber,
+      description: response.data.data?.description,
+      BasicInventories: response.data.data?.BasicInventories?.length,
+      Services: response.data.data?.Services?.length,
+      bookings: response.data.data?.bookings?.length,
+      inventoryChecklist: response.data.data?.inventoryChecklist?.length,
+      canCheckIn: response.data.data?.canCheckIn
+    });
+    
+    // ⭐ VALIDAR ESTRUCTURA DE RESPUESTA
+    if (response.data && response.data.data) {
+      console.log('✅ [ACTION] Estructura válida, dispatching GET_ROOM_SUCCESS');
+      console.log('📦 [ACTION] Payload que se enviará al reducer:', response.data.data);
+      
+      dispatch({ 
+        type: 'GET_ROOM_SUCCESS', 
+        payload: response.data.data 
+      });
+      
+      console.log('🎯 [ACTION] GET_ROOM_SUCCESS dispatched exitosamente');
+      
+      // ⭐ RETORNAR LOS DATOS PARA USO EXTERNO
+      return {
+        error: false,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } else {
+      console.warn('⚠️ [ACTION] Estructura de respuesta inesperada en getRoomById');
+      const errorMsg = 'Estructura de respuesta inválida';
+      dispatch({ 
+        type: 'GET_ROOM_FAILURE', 
+        payload: errorMsg
+      });
+      return {
+        error: true,
+        message: errorMsg
+      };
+    }
+    
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Error al obtener la habitación';
-    dispatch({ type: 'GET_ROOM_FAILURE', payload: errorMessage });
+    console.error('❌ [ACTION] Error completo en getRoomById:', error);
+    console.error('❌ [ACTION] Error message:', error.message);
+    console.error('❌ [ACTION] Error response:', error.response);
+    console.error('❌ [ACTION] Error status:', error.response?.status);
+    console.error('❌ [ACTION] Error data:', error.response?.data);
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Error al obtener la habitación';
+    console.log('📝 [ACTION] Error message final:', errorMessage);
+    
+    dispatch({ 
+      type: 'GET_ROOM_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    return {
+      error: true,
+      message: errorMessage
+    };
   }
 };
 // Buscar una habitación por input (query string)

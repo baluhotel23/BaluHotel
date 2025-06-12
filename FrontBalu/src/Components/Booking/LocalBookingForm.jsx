@@ -613,56 +613,49 @@ useEffect(() => {
     }
   };
   
-  const handleRegisterLocalPayment = async () => {
-    if (!createdBookingId || paymentAmount <= 0 || !paymentMethodLocal) {
-      toast.error('Datos de pago incompletos o reserva no creada.');
-      return;
-    }
-    
-    const paymentPayload = {
-      bookingId: createdBookingId,
-      amount: parseFloat(paymentAmount),
-      paymentMethod: paymentMethodLocal,
-      paymentType: (parseFloat(paymentAmount) >= currentBookingTotalForPayment) ? 'full' : 'partial', 
-    };
-    
-    try {
-      const resultPaymentAction = await dispatch(registerLocalPayment(paymentPayload));
-      const isSuccess = resultPaymentAction && (
-        resultPaymentAction.success || 
-        resultPaymentAction.type?.includes('fulfilled') ||
-        resultPaymentAction.payload?.success ||
-        !resultPaymentAction.error
-      );
-
-      if (isSuccess) {
-        const isFullPayment = parseFloat(paymentAmount) >= currentBookingTotalForPayment;
-        const remainingAmount = currentBookingTotalForPayment - parseFloat(paymentAmount);
-        
-        if (isFullPayment) {
-          toast.success('¡Pago completo registrado exitosamente! Reserva totalmente pagada.');
-        } else {
-          toast.success(`Pago parcial registrado exitosamente. Restante: $${remainingAmount.toFixed(2)}`);
-        }
-        
-        resetFormToInitialState();
-        
-        setTimeout(() => {
-          navigate('/dashboard', { replace: true });
-        }, 1500);
-        
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 3000);
-        
-      } else {
-        toast.error(resultPaymentAction?.message || resultPaymentAction?.error || 'Error al registrar el pago local.');
-      }
-    } catch (error) {
-      console.error('Error en handleRegisterLocalPayment:', error);
-      toast.error('Error inesperado al registrar el pago.');
-    }
+const handleRegisterLocalPayment = async () => {
+  if (!createdBookingId || paymentAmount <= 0 || !paymentMethodLocal) {
+    toast.error('Datos de pago incompletos o reserva no creada.');
+    return;
+  }
+  
+  const paymentPayload = {
+    bookingId: createdBookingId,
+    amount: parseFloat(paymentAmount),
+    paymentMethod: paymentMethodLocal,
+    paymentType: (parseFloat(paymentAmount) >= currentBookingTotalForPayment) ? 'full' : 'partial', 
   };
+  
+  try {
+    const resultPaymentAction = await dispatch(registerLocalPayment(paymentPayload));
+    
+    // ⭐ VERIFICAR ÉXITO DE FORMA MÁS SIMPLE
+    if (resultPaymentAction && resultPaymentAction.success) {
+      const isFullPayment = parseFloat(paymentAmount) >= currentBookingTotalForPayment;
+      const remainingAmount = currentBookingTotalForPayment - parseFloat(paymentAmount);
+      
+      if (isFullPayment) {
+        toast.success('¡Pago completo registrado exitosamente! Reserva totalmente pagada.');
+      } else {
+        toast.success(`Pago parcial registrado exitosamente. Restante: $${remainingAmount.toFixed(2)}`);
+      }
+      
+      // ⭐ RESETEAR FORMULARIO PRIMERO
+      resetFormToInitialState();
+      
+      // ⭐ NAVEGACIÓN SIMPLE Y DIRECTA
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 3000); // Dar tiempo para que se vea el toast
+      
+    } else {
+      toast.error(resultPaymentAction?.message || resultPaymentAction?.error || 'Error al registrar el pago local.');
+    }
+  } catch (error) {
+    console.error('Error en handleRegisterLocalPayment:', error);
+    toast.error('Error inesperado al registrar el pago.');
+  }
+};
 
   const resetFormToInitialState = () => {
     setShowPaymentForm(false);

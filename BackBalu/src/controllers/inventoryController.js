@@ -106,70 +106,161 @@ const getInventoryByType = async (req, res) => {
 };
 
 const createPurchase = async (req, res) => {
-  const { supplier, items, totalAmount, paymentMethod, paymentStatus, invoiceNumber, purchaseDate } = req.body;
+  console.log('🔍 === INICIO createPurchase ===');
+  console.log('📄 req.file:', req.file);
+  console.log('📋 req.body:', req.body);
+  
+  const { supplier, items, totalAmount, paymentMethod, paymentStatus, invoiceNumber, purchaseDate, notes, receiptUrl } = req.body;
 
-  let receiptUrl = null;
+  let finalReceiptUrl = null;
 
-  // Subir el comprobante si existe
-  if (req.file) {
+  // ⭐ OPCIÓN 1: Usar receiptUrl del frontend (Cloudinary Widget)
+  if (receiptUrl) {
+    console.log('📎 ReceiptUrl recibida del frontend:', receiptUrl);
+    finalReceiptUrl = receiptUrl;
+  }
+  // ⭐ OPCIÓN 2: Usar archivo físico (Multer + upload manual)
+  else if (req.file) {
+    console.log('📎 Archivo detectado:');
+    console.log('  - Filename:', req.file.filename);
+    console.log('  - Original name:', req.file.originalname);
+    console.log('  - Mimetype:', req.file.mimetype);
+    console.log('  - Size:', req.file.size);
+    console.log('  - Path:', req.file.path);
+    
     const { mimetype, path } = req.file;
 
     if (mimetype !== 'application/pdf') {
-      throw new Error('El archivo debe ser un PDF');
+      console.log('❌ Tipo de archivo inválido:', mimetype);
+      throw new CustomError('El archivo debe ser un PDF', 400);
     }
 
     try {
+      console.log('🚀 Iniciando upload a Cloudinary...');
+      console.log('📍 Path del archivo:', path);
+      
       const uploadResult = await uploadToCloudinary(path, 'purchase_receipts');
-      receiptUrl = uploadResult.secure_url;
+      
+      console.log('✅ Upload exitoso a Cloudinary:');
+      console.log('  - URL segura:', uploadResult.secure_url);
+      console.log('  - Public ID:', uploadResult.public_id);
+      console.log('  - Resultado completo:', uploadResult);
+      
+      finalReceiptUrl = uploadResult.secure_url;
+      
+      console.log('📌 receiptUrl asignada:', finalReceiptUrl);
+      
     } catch (error) {
-      console.error('Error al subir el comprobante a Cloudinary:', error);
-      throw new Error('No se pudo subir el comprobante');
+      console.error('❌ Error al subir el comprobante a Cloudinary:', error);
+      console.error('📍 Path que falló:', path);
+      console.error('📋 Error completo:', error.message);
+      throw new CustomError('No se pudo subir el comprobante', 500);
     }
+  } else {
+    console.log('⚠️ No se detectó archivo ni receiptUrl');
   }
 
-  // Crear la compra
-  const purchase = await Purchase.create({
+  console.log('📌 URL final del comprobante:', finalReceiptUrl);
+
+  // ⭐ VALIDAR DATOS REQUERIDOS
+  if (!supplier || !items || items.length === 0) {
+    console.log('❌ Datos requeridos faltantes:', { supplier, itemsLength: items?.length });
+    throw new CustomError('Proveedor e items son requeridos', 400);
+  }
+
+  console.log('📊 Datos de la compra a crear:');
+  const purchaseData = {
     supplier,
-    totalAmount,
+    totalAmount: parseFloat(totalAmount),
     paymentMethod,
     paymentStatus: paymentStatus || 'pending',
     invoiceNumber: invoiceNumber || null,
     purchaseDate: purchaseDate || new Date(),
-    receiptUrl,
-    createdBy: req.user.n_document,
-  });
+    receiptUrl: finalReceiptUrl, // ⭐ USAR LA URL FINAL
+    createdBy: req.user?.n_document || null,
+    notes: notes || null,
+  };
+  console.log('🏗️ Purchase data:', purchaseData);
 
-  // ⭐ CORREGIR: Crear items con el campo correcto
-  for (const item of items) {
+  // Crear la compra
+  const purchase = await Purchase.create(purchaseData);
+  
+  console.log('✅ Compra creada exitosamente:');
+  console.log('  - ID:', purchase.id);
+  console.log('  - receiptUrl en DB:', purchase.receiptUrl);
+  console.log('  - Compra completa:', purchase.toJSON());
+
+  // ⭐ CREAR ITEMS CON VALIDACIÓN MEJORADA
+  console.log('📦 Procesando items...');
+  for (const [index, item] of items.entries()) {
+    console.log(`📋 Procesando item ${index + 1}:`, item);
+    
     const inventoryItem = await BasicInventory.findByPk(item.itemId);
     if (!inventoryItem) {
+      console.log(`❌ Item ${item.itemId} no encontrado`);
       throw new CustomError(`Item ${item.itemId} no encontrado`, 404);
     }
 
-    const itemPrice = item.price || item.unitPrice;
+    const itemPrice = parseFloat(item.price || item.unitPrice || 0);
+    const quantity = parseInt(item.quantity || 0);
 
-    await PurchaseItem.create({
+    console.log(`  - Precio: ${itemPrice}, Cantidad: ${quantity}`);
+
+    if (quantity <= 0 || itemPrice < 0) {
+      console.log(`❌ Cantidad o precio inválidos para ${inventoryItem.name}`);
+      throw new CustomError(`Cantidad y precio deben ser válidos para el item ${inventoryItem.name}`, 400);
+    }
+
+    const purchaseItemData = {
       purchaseId: purchase.id,
-      basicId: item.itemId, // ⭐ USAR basicId en lugar de itemId
-      quantity: item.quantity,
-      price: parseFloat(itemPrice),
-      total: parseFloat(item.quantity * itemPrice),
-    });
+      basicId: item.itemId,
+      quantity: quantity,
+      price: itemPrice,
+      total: quantity * itemPrice,
+    };
+    
+    console.log(`📝 Creando PurchaseItem:`, purchaseItemData);
+    
+    await PurchaseItem.create(purchaseItemData);
 
     // ⭐ ACTUALIZAR STOCK CORRECTAMENTE SEGÚN TIPO
+    console.log(`📈 Actualizando stock para ${inventoryItem.name} (${inventoryItem.inventoryType})`);
     if (inventoryItem.inventoryType === 'reusable') {
-      // Para reutilizables, agregar al stock limpio
-      await inventoryItem.increment('cleanStock', { by: item.quantity });
+      await inventoryItem.increment('cleanStock', { by: quantity });
+      console.log(`  ✅ cleanStock incrementado en ${quantity}`);
     } else {
-      // Para consumibles/vendibles, agregar al stock actual
-      await inventoryItem.increment('currentStock', { by: item.quantity });
+      await inventoryItem.increment('currentStock', { by: quantity });
+      console.log(`  ✅ currentStock incrementado en ${quantity}`);
     }
   }
+
+  // ⭐ OBTENER LA COMPRA COMPLETA CON SUS RELACIONES
+  console.log('🔍 Obteniendo compra completa con relaciones...');
+  const completePurchase = await Purchase.findByPk(purchase.id, {
+    include: [
+      {
+        model: PurchaseItem,
+        as: 'items',
+        include: [
+          {
+            model: BasicInventory,
+            as: 'inventoryItem'
+          }
+        ]
+      }
+    ]
+  });
+
+  console.log('✅ Compra completa obtenida:');
+  console.log('  - receiptUrl final:', completePurchase.receiptUrl);
+  console.log('  - Items incluidos:', completePurchase.items?.length || 0);
+
+  console.log('🎉 === FIN createPurchase EXITOSO ===');
 
   res.status(201).json({
     error: false,
     message: 'Compra registrada exitosamente',
-    data: purchase,
+    data: completePurchase,
   });
 };
 
@@ -592,37 +683,56 @@ const markAsDirty = async (req, res) => {
   };
 
   const getAllPurchases = async (req, res) => {
-    const purchases = await Purchase.findAll({
-      include: {
+  const purchases = await Purchase.findAll({
+    include: [
+      {
         model: PurchaseItem,
-        include: BasicInventory
-      },
-      order: [['purchaseDate', 'DESC']]
-    });
-    res.json({
-      error: false,
-      message: 'Compras recuperadas exitosamente',
-      data: purchases
-    });
-  };
+        as: 'items', // ✅ Correcto según las asociaciones
+        include: [
+          {
+            model: BasicInventory,
+            as: 'inventoryItem' // ⭐ CAMBIAR DE 'inventory' A 'inventoryItem'
+          }
+        ]
+      }
+    ],
+    order: [['purchaseDate', 'DESC']]
+  });
+  
+  res.json({
+    error: false,
+    message: 'Compras recuperadas exitosamente',
+    data: purchases
+  });
+};
 
   const getPurchaseDetails = async (req, res) => {
-    const { id } = req.params;
-    const purchase = await Purchase.findByPk(id, {
-      include: {
+  const { id } = req.params;
+  const purchase = await Purchase.findByPk(id, {
+    include: [
+      {
         model: PurchaseItem,
-        include: BasicInventory
+        as: 'items', // ✅ Correcto según las asociaciones
+        include: [
+          {
+            model: BasicInventory,
+            as: 'inventoryItem' // ⭐ CAMBIAR DE 'inventory' A 'inventoryItem'
+          }
+        ]
       }
-    });
-    if (!purchase) {
-      throw new CustomError('Compra no encontrada', 404);
-    }
-    res.json({
-      error: false,
-      message: 'Compra recuperada exitosamente',
-      data: purchase
-    });
+    ]
+  });
+  
+  if (!purchase) {
+    throw new CustomError('Compra no encontrada', 404);
   }
+  
+  res.json({
+    error: false,
+    message: 'Compra recuperada exitosamente',
+    data: purchase
+  });
+};
 
   const getAllSuppliers = async (req, res) => {
     const suppliers = await Purchase.findAll({
@@ -813,24 +923,28 @@ const getConsumptionReport = async (req, res) => {
   // Reporte de movimientos del inventario: Muestra los registros de movimientos (por ejemplo, compras, incrementos o decrementos)
   // Aquí se ejemplifica obteniendo la información de PurchaseItem si es que éste almacena movimientos.
   const getInventoryMovements = async (req, res) => {
-    // Se asume que PurchaseItem registra movimientos de stock.
-    // Si tienes fecha de creación, puedes ordenarlos cronológicamente.
-    const movements = await PurchaseItem.findAll({
-      include: [
-        {
-          model: BasicInventory,
-          attributes: ['id', 'name']
-        }
-      ],
-      order: [['createdAt', 'DESC']]
-    });
-  
-    res.json({
-      error: false,
-      message: 'Reporte de movimientos del inventario generado exitosamente',
-      data: movements
-    });
-  };
+  const movements = await PurchaseItem.findAll({
+    include: [
+      {
+        model: BasicInventory,
+        as: 'inventoryItem', // ⭐ CAMBIAR DE 'inventory' A 'inventoryItem'
+        attributes: ['id', 'name']
+      },
+      {
+        model: Purchase,
+        as: 'purchase', // ✅ Correcto según las asociaciones
+        attributes: ['id', 'supplier', 'purchaseDate']
+      }
+    ],
+    order: [['createdAt', 'DESC']]
+  });
+
+  res.json({
+    error: false,
+    message: 'Reporte de movimientos del inventario generado exitosamente',
+    data: movements
+  });
+};
 
   const getRoomAssignments = async (req, res) => {
     // ❌ PROBLEMA: RoomCheckIn no tiene relación directa con BasicInventory

@@ -7,6 +7,22 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+    purchaseId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'Purchases',
+        key: 'id'
+      }
+    },
+    basicId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'BasicInventories',
+        key: 'id'
+      }
+    },
     quantity: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -23,7 +39,6 @@ module.exports = (sequelize) => {
   }, {
     timestamps: true,
     paranoid: true,
-   
   });
 
   return PurchaseItem;
