@@ -1055,6 +1055,11 @@ const getAllBookings = async (req, res, next) => {
       toDate
     } = req.query;
 
+    console.log("🔍 [GET-ALL-BOOKINGS] Parámetros:", {
+      page, limit, status, roomNumber, guestId, 
+      includeInventory, fromDate, toDate
+    });
+
     const where = {};
     if (status) where.status = status;
     if (roomNumber) where.roomNumber = roomNumber;
@@ -1079,7 +1084,7 @@ const getAllBookings = async (req, res, next) => {
             as: 'BasicInventories',
             attributes: ['id', 'name', 'description', 'currentStock'],
             through: {
-              attributes: ['quantity'], // ⭐ CANTIDAD ASIGNADA A LA HABITACIÓN
+              attributes: ['quantity'],
               as: 'RoomBasics'
             }
           }
@@ -1088,9 +1093,9 @@ const getAllBookings = async (req, res, next) => {
       { 
         model: Buyer, 
         as: "guest", 
-        attributes: ["sdocno", "scostumername"] 
+        attributes: ["sdocno", "scostumername", "selectronicmail", "stelephone"]
       },
-      // ⭐ INCLUIR PAGOS - INFORMACIÓN CRUCIAL PARA CHECK-IN
+      // 🔧 INCLUIR PAGOS - CORREGIDO SIN 'notes'
       {
         model: Payment,
         as: 'payments',
@@ -1102,30 +1107,30 @@ const getAllBookings = async (req, res, next) => {
           'paymentDate', 
           'paymentType', 
           'transactionId',
-          'paymentReference'
+          'paymentReference',
+          'processedBy' // ✅ USAR CAMPO QUE SÍ EXISTE
         ],
-        // ⭐ SOLO PAGOS COMPLETADOS
         where: {
-          paymentStatus: ['completed', 'pending'] // ⭐ INCLUIR PENDING TAMBIÉN
+          paymentStatus: ['completed', 'pending']
         },
-
-        required: false // ⭐ LEFT JOIN - incluir reservas sin pagos
+        required: false
       },
       {
-  model: ExtraCharge,
-  as: 'extraCharges', // Cambiar de 'ExtraCharges' a 'extraCharges'
-  attributes: [
-    'id',
-    'description',
-    'amount',
-    'quantity',
-    'chargeType',
-    'chargeDate',
-    'notes'
-  ],
-  required: false // LEFT JOIN - incluir reservas sin cargos extras
-}
-];
+        model: ExtraCharge,
+        as: 'extraCharges',
+        attributes: [
+          'id',
+          'description',
+          'amount',
+          'quantity',
+          'chargeType',
+          'chargeDate',
+          'notes'
+        ],
+        required: false
+      }
+    ];
+
     // ⭐ INCLUIR INVENTARIO SI SE SOLICITA
     if (includeInventory === 'true') {
       includeOptions.push({
@@ -1148,45 +1153,113 @@ const getAllBookings = async (req, res, next) => {
       include: includeOptions,
       order: [
         ['createdAt', 'DESC'],
-        // ⭐ ORDENAR PAGOS POR FECHA (MÁS RECIENTE PRIMERO)
-        [{ model: Payment, as: 'payments' }, 'paymentDate', 'DESC']
+        [{ model: Payment, as: 'payments' }, 'paymentDate', 'DESC'],
+        [{ model: ExtraCharge, as: 'extraCharges' }, 'chargeDate', 'DESC']
       ],
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit),
-      distinct: true // ⭐ EVITAR DUPLICADOS POR MÚLTIPLES PAGOS
+      distinct: true
     });
 
-    // ⭐ PROCESAR DATOS CON ESTADO DE INVENTARIO Y PAGOS
+    // 🔧 FUNCIÓN HELPER PARA PROCESAR DATOS FINANCIEROS
+    const processBookingFinancials = (bookingData) => {
+      // Obtener datos base
+      const totalReserva = parseFloat(bookingData.totalAmount || 0);
+      const extraCharges = bookingData.extraCharges || [];
+      const payments = bookingData.payments || [];
+      
+      // Calcular total de extras
+      const totalExtras = extraCharges.reduce((sum, charge) => {
+        const amount = parseFloat(charge.amount || 0);
+        const quantity = parseInt(charge.quantity || 1);
+        return sum + (amount * quantity);
+      }, 0);
+      
+      // Calcular total pagado (solo pagos completados)
+      const totalPagado = payments
+        .filter(payment => payment.paymentStatus === 'completed')
+        .reduce((sum, payment) => {
+          const amount = parseFloat(payment.amount || 0);
+          return sum + (isNaN(amount) ? 0 : amount);
+        }, 0);
+      
+      // Calcular pagos pendientes
+      const totalPendingPayments = payments
+        .filter(payment => payment.paymentStatus === 'pending')
+        .reduce((sum, payment) => {
+          const amount = parseFloat(payment.amount || 0);
+          return sum + (isNaN(amount) ? 0 : amount);
+        }, 0);
+      
+      // Totales finales
+      const totalFinal = totalReserva + totalExtras;
+      const totalPendiente = Math.max(0, totalFinal - totalPagado);
+      
+      // Estado del pago
+      let paymentStatus = 'unpaid';
+      if (totalPagado >= totalFinal) {
+        paymentStatus = 'fully_paid';
+      } else if (totalPagado > 0) {
+        paymentStatus = 'partially_paid';
+      }
+
+      return {
+        totalReserva,
+        totalExtras,
+        totalPagado,
+        totalPendingPayments,
+        totalFinal,
+        totalPendiente,
+        paymentStatus,
+        isFullyPaid: totalPendiente === 0,
+        hasExtras: totalExtras > 0,
+        extraChargesCount: extraCharges.length,
+        paymentsCount: payments.filter(p => p.paymentStatus === 'completed').length,
+        pendingPaymentsCount: payments.filter(p => p.paymentStatus === 'pending').length,
+        // ⭐ CAMPOS FORMATEADOS PARA EL FRONTEND
+        totalReservaFormatted: `$${totalReserva.toLocaleString()}`,
+        totalExtrasFormatted: `$${totalExtras.toLocaleString()}`,
+        totalPagadoFormatted: `$${totalPagado.toLocaleString()}`,
+        totalFinalFormatted: `$${totalFinal.toLocaleString()}`,
+        totalPendienteFormatted: `$${totalPendiente.toLocaleString()}`,
+        // ⭐ PORCENTAJE DE PAGO
+        paymentPercentage: totalFinal > 0 ? Math.round((totalPagado / totalFinal) * 100) : 0
+      };
+    };
+
+    // ⭐ PROCESAR DATOS CON INFORMACIÓN FINANCIERA MEJORADA
     const bookingsWithAllInfo = rows.map(booking => {
       const bookingData = booking.toJSON();
       
-      // ⭐ CALCULAR INFORMACIÓN DE PAGOS
-      if (bookingData.payments && bookingData.payments.length > 0) {
-        const totalPaid = bookingData.payments
-          .filter(p => p.paymentStatus === 'completed')
-          .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
-        
-        const totalAmount = parseFloat(bookingData.totalAmount || 0);
-        
-        bookingData.paymentInfo = {
-          totalPaid,
-          totalAmount,
-          balance: totalAmount - totalPaid,
-          paymentStatus: totalPaid >= totalAmount ? 'fully_paid' : 
-                        totalPaid > 0 ? 'partially_paid' : 'unpaid',
-          paymentCount: bookingData.payments.length,
-          lastPayment: bookingData.payments[0] // ⭐ MÁS RECIENTE POR EL ORDER BY
-        };
-      } else {
-        bookingData.paymentInfo = {
-          totalPaid: 0,
-          totalAmount: parseFloat(bookingData.totalAmount || 0),
-          balance: parseFloat(bookingData.totalAmount || 0),
-          paymentStatus: 'unpaid',
-          paymentCount: 0,
-          lastPayment: null
-        };
-      }
+      // 🔧 AGREGAR CÁLCULOS FINANCIEROS MEJORADOS
+      const financialSummary = processBookingFinancials(bookingData);
+      
+      // ⭐ MANTENER LA ESTRUCTURA ORIGINAL DE paymentInfo PARA COMPATIBILIDAD
+      bookingData.paymentInfo = {
+        totalPaid: financialSummary.totalPagado,
+        totalAmount: financialSummary.totalReserva,
+        balance: financialSummary.totalPendiente,
+        paymentStatus: financialSummary.paymentStatus,
+        paymentCount: financialSummary.paymentsCount,
+        lastPayment: bookingData.payments && bookingData.payments.length > 0 
+          ? bookingData.payments[0] 
+          : null
+      };
+
+      // 🔧 AGREGAR NUEVA ESTRUCTURA FINANCIERA COMPLETA
+      bookingData.financialSummary = financialSummary;
+
+      // ⭐ INFORMACIÓN DE ESTADO DE LA RESERVA MEJORADA
+      bookingData.bookingStatus = {
+        canCheckIn: booking.status === 'confirmed' && financialSummary.totalPagado >= (financialSummary.totalReserva * 0.5), // Al menos 50% pagado
+        canCheckOut: booking.status === 'checked-in' && financialSummary.isFullyPaid,
+        requiresPayment: financialSummary.totalPendiente > 0,
+        readyForCheckOut: booking.status === 'checked-in' && financialSummary.isFullyPaid,
+        isOverdue: booking.status === 'checked-in' && new Date() > new Date(booking.checkOut),
+        daysSinceCheckIn: booking.status === 'checked-in' 
+          ? Math.floor((new Date() - new Date(booking.checkIn)) / (1000 * 60 * 60 * 24))
+          : 0
+      };
       
       // ⭐ INFORMACIÓN DE INVENTARIO SI SE SOLICITA
       if (includeInventory === 'true' && bookingData.inventoryUsages) {
@@ -1198,12 +1271,63 @@ const getAllBookings = async (req, res, next) => {
           readyForCheckOut: booking.status === 'checked-in' && bookingData.inventoryUsages.length > 0
         };
       }
+
+      // ⭐ AGREGAR METADATOS ÚTILES
+      bookingData.metadata = {
+        lastUpdated: bookingData.updatedAt,
+        lastPaymentDate: financialSummary.paymentsCount > 0 
+          ? bookingData.payments[0]?.paymentDate 
+          : null,
+        lastExtraChargeDate: financialSummary.extraChargesCount > 0 
+          ? bookingData.extraCharges[0]?.chargeDate 
+          : null,
+        processingFlags: {
+          needsAttention: financialSummary.totalPendiente > 0 && booking.status === 'checked-in',
+          hasUnprocessedExtras: financialSummary.hasExtras && financialSummary.totalPendiente > 0,
+          readyForBilling: booking.status === 'checked-in' && financialSummary.isFullyPaid
+        }
+      };
       
       return bookingData;
     });
 
+    // 🔧 CALCULAR ESTADÍSTICAS GLOBALES
+    const statistics = {
+      totalBookings: count,
+      bookingsByStatus: {
+        confirmed: bookingsWithAllInfo.filter(b => b.status === 'confirmed').length,
+        checkedIn: bookingsWithAllInfo.filter(b => b.status === 'checked-in').length,
+        completed: bookingsWithAllInfo.filter(b => b.status === 'completed').length,
+        cancelled: bookingsWithAllInfo.filter(b => b.status === 'cancelled').length
+      },
+      financialStats: {
+        totalRevenue: bookingsWithAllInfo
+          .reduce((sum, b) => sum + b.financialSummary.totalPagado, 0),
+        totalPendingAmount: bookingsWithAllInfo
+          .reduce((sum, b) => sum + b.financialSummary.totalPendiente, 0),
+        totalExtraCharges: bookingsWithAllInfo
+          .reduce((sum, b) => sum + b.financialSummary.totalExtras, 0),
+        fullyPaidBookings: bookingsWithAllInfo.filter(b => b.financialSummary.isFullyPaid).length,
+        partiallyPaidBookings: bookingsWithAllInfo.filter(b => b.financialSummary.paymentStatus === 'partially_paid').length,
+        unpaidBookings: bookingsWithAllInfo.filter(b => b.financialSummary.paymentStatus === 'unpaid').length
+      },
+      operationalStats: {
+        bookingsNeedingAttention: bookingsWithAllInfo.filter(b => b.metadata.processingFlags.needsAttention).length,
+        readyForCheckOut: bookingsWithAllInfo.filter(b => b.bookingStatus.readyForCheckOut).length,
+        overdueCheckOuts: bookingsWithAllInfo.filter(b => b.bookingStatus.isOverdue).length
+      }
+    };
+
+    console.log("📊 [GET-ALL-BOOKINGS] Estadísticas:", {
+      total: statistics.totalBookings,
+      byStatus: statistics.bookingsByStatus,
+      revenue: `$${statistics.financialStats.totalRevenue.toLocaleString()}`,
+      pending: `$${statistics.financialStats.totalPendingAmount.toLocaleString()}`
+    });
+
     res.json({
       error: false,
+      message: `${count} reserva(s) obtenida(s) exitosamente`,
       data: {
         bookings: bookingsWithAllInfo,
         pagination: {
@@ -1211,9 +1335,16 @@ const getAllBookings = async (req, res, next) => {
           page: parseInt(page),
           limit: parseInt(limit),
           totalPages: Math.ceil(count / parseInt(limit))
+        },
+        statistics,
+        queryInfo: {
+          filters: { status, roomNumber, guestId, fromDate, toDate },
+          includeInventory: includeInventory === 'true',
+          timestamp: new Date().toISOString()
         }
       }
     });
+
   } catch (error) {
     console.error('❌ [GET-ALL-BOOKINGS] Error:', error);
     next(error);

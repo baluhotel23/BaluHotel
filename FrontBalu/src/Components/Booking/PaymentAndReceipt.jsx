@@ -15,18 +15,74 @@ const PaymentAndReceipt = ({
   const dispatch = useDispatch();
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+  const [showExtraCharges, setShowExtraCharges] = useState(false);
 
-  // 🔧 CALCULAR MONTO PENDIENTE REAL INTERNAMENTE
+  // 🔧 FUNCIÓN PARA FORMATEAR FECHAS
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('es-CO', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+    } catch (error) {
+      console.warn("Error formateando fecha:", error);
+      return 'Fecha inválida';
+    }
+  };
+
+  // 🔧 FUNCIÓN PARA OBTENER ETIQUETA DEL MÉTODO DE PAGO
+  const getPaymentMethodLabel = (method) => {
+    const methods = {
+      'cash': '💵 Efectivo',
+      'card': '💳 Tarjeta',
+      'credit_card': '💳 Tarjeta de Crédito',
+      'debit_card': '💳 Tarjeta de Débito',
+      'transfer': '🏦 Transferencia',
+      'bank_transfer': '🏦 Transferencia Bancaria',
+      'other': '📝 Otro',
+      'wompi': '🌐 Wompi',
+      'online': '🌐 Pago Online'
+    };
+    return methods[method] || `📄 ${method}`;
+  };
+
+  // 🔧 CALCULAR MONTO PENDIENTE REAL USANDO financialSummary SI ESTÁ DISPONIBLE
   const calculateRealPendingAmount = () => {
+    // 🎯 PRIORIZAR financialSummary DEL BACKEND SI ESTÁ DISPONIBLE
+    if (bookingData?.financialSummary) {
+      console.log('📊 [PAYMENT] Usando financialSummary del backend:', bookingData.financialSummary);
+      return {
+        totalReserva: bookingData.financialSummary.totalReserva,
+        totalExtras: bookingData.financialSummary.totalExtras,
+        totalPagado: bookingData.financialSummary.totalPagado,
+        totalFinal: bookingData.financialSummary.totalFinal,
+        pendienteReal: bookingData.financialSummary.totalPendiente
+      };
+    }
+
+    // 🔧 CÁLCULO DE RESPALDO SI NO HAY financialSummary
+    console.log('⚠️ [PAYMENT] financialSummary no disponible, calculando localmente');
+    
     const totalReserva = parseFloat(bookingData?.totalAmount || 0);
     const extraCharges = bookingData?.extraCharges || [];
     const payments = bookingData?.payments || [];
     
+    // Calcular total de extras (considerando cantidad)
     const totalExtras = extraCharges.reduce((sum, charge) => {
       const amount = parseFloat(charge.amount || 0);
-      return sum + (isNaN(amount) ? 0 : amount);
+      const quantity = parseInt(charge.quantity || 1);
+      return sum + (amount * quantity);
     }, 0);
     
+    // Calcular total pagado (solo pagos completados)
     const totalPagado = payments
       .filter(payment => payment.paymentStatus === 'completed')
       .reduce((sum, payment) => {
@@ -34,8 +90,17 @@ const PaymentAndReceipt = ({
         return sum + (isNaN(amount) ? 0 : amount);
       }, 0);
     
+    // Calcular total final y pendiente
     const totalFinal = totalReserva + totalExtras;
     const pendienteReal = Math.max(0, totalFinal - totalPagado);
+
+    console.log('📊 [PAYMENT] Cálculo financiero local:', {
+      totalReserva,
+      totalExtras,
+      totalPagado,
+      totalFinal,
+      pendienteReal
+    });
     
     return {
       totalReserva,
@@ -63,14 +128,7 @@ const PaymentAndReceipt = ({
         format: [226.77, 839.28], // Formato ticket
       });
 
-      const date = new Date().toLocaleDateString("es-CO", {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      
+      const date = formatDateTime(new Date());
       const receiptNumber = `#${paymentDetails.paymentId || Date.now()}`;
       const pageWidth = doc.internal.pageSize.width;
       let currentY = 30;
@@ -148,66 +206,86 @@ const PaymentAndReceipt = ({
       currentY += 12;
 
       if (bookingData?.checkIn) {
-        const checkInDate = new Date(bookingData.checkIn).toLocaleDateString('es-CO');
-        doc.text(`Check-in: ${checkInDate}`, 15, currentY);
+        doc.text(`Check-in: ${formatDateTime(bookingData.checkIn)}`, 15, currentY);
         currentY += 12;
       }
 
       if (bookingData?.checkOut) {
-        const checkOutDate = new Date(bookingData.checkOut).toLocaleDateString('es-CO');
-        doc.text(`Check-out: ${checkOutDate}`, 15, currentY);
+        doc.text(`Check-out: ${formatDateTime(bookingData.checkOut)}`, 15, currentY);
         currentY += 12;
       }
 
       currentY += 15;
 
-      // 💰 DESGLOSE FINANCIERO
+      // 💰 DESGLOSE FINANCIERO COMPLETO
       doc.setFont(undefined, 'bold');
-      doc.text("DESGLOSE DE PAGO:", 15, currentY);
+      doc.text("DESGLOSE FINANCIERO:", 15, currentY);
       currentY += 15;
 
       doc.setFont(undefined, 'normal');
       
       // Total reserva
-      const totalReserva = parseFloat(bookingData?.totalAmount || 0);
       doc.text(`Costo reserva:`, 15, currentY);
-      doc.text(`$${totalReserva.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      doc.text(`$${financialData.totalReserva.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
       currentY += 12;
 
-      // Extras si los hay
+      // Extras detallados si los hay
       const extraCharges = bookingData?.extraCharges || [];
-      const totalExtras = extraCharges.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-      if (totalExtras > 0) {
+      if (extraCharges.length > 0) {
         doc.text(`Consumos extras:`, 15, currentY);
-        doc.text(`$${totalExtras.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+        currentY += 10;
+        
+        extraCharges.forEach((charge) => {
+          const amount = parseFloat(charge.amount || 0);
+          const quantity = parseInt(charge.quantity || 1);
+          const total = amount * quantity;
+          
+          doc.setFontSize(7);
+          doc.text(`• ${charge.description || 'Cargo extra'}`, 20, currentY);
+          doc.text(`${quantity}x$${amount.toLocaleString()} = $${total.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+          currentY += 10;
+        });
+        
+        doc.setFontSize(8);
+        doc.text(`Subtotal extras:`, 15, currentY);
+        doc.text(`$${financialData.totalExtras.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
         currentY += 12;
       }
 
       // Subtotal
-      const subtotal = totalReserva + totalExtras;
       doc.text("─".repeat(35), pageWidth / 2, currentY, { align: "center" });
       currentY += 10;
       
-      doc.text(`Subtotal:`, 15, currentY);
-      doc.text(`$${subtotal.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      doc.text(`Total cuenta:`, 15, currentY);
+      doc.text(`$${financialData.totalFinal.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
       currentY += 15;
+
+      // Pagos anteriores
+      const previousPayments = bookingData?.payments?.filter(p => p.paymentStatus === 'completed') || [];
+      if (previousPayments.length > 0 && financialData.totalPagado > 0) {
+        doc.text(`Pagos anteriores:`, 15, currentY);
+        doc.text(`-$${financialData.totalPagado.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+        currentY += 12;
+      }
 
       // MONTO DE ESTE PAGO
       doc.setFont(undefined, 'bold');
-      doc.text(`MONTO PAGADO:`, 15, currentY);
+      doc.text(`PAGO ACTUAL:`, 15, currentY);
       doc.text(`$${parseFloat(paymentDetails.amount).toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
       currentY += 15;
 
       // Método de pago
       doc.setFont(undefined, 'normal');
-      const paymentMethodText = {
-        cash: "Efectivo",
-        card: "Tarjeta",
-        transfer: "Transferencia",
-        other: "Otro"
-      };
-      doc.text(`Método: ${paymentMethodText[paymentMethod] || paymentMethod}`, 15, currentY);
+      doc.text(`Método: ${getPaymentMethodLabel(paymentMethod).replace(/[^\w\s]/g, '')}`, 15, currentY);
       currentY += 20;
+
+      // Saldo restante si es pago parcial
+      const remainingAfterPayment = financialData.pendienteReal - parseFloat(paymentDetails.amount);
+      if (remainingAfterPayment > 0) {
+        doc.text(`Saldo pendiente:`, 15, currentY);
+        doc.text(`$${remainingAfterPayment.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+        currentY += 15;
+      }
 
       // 🎯 LÍNEA SEPARADORA FINAL
       doc.text("━".repeat(35), pageWidth / 2, currentY, { align: "center" });
@@ -274,7 +352,7 @@ const PaymentAndReceipt = ({
         paymentMethod: paymentMethod,
         paymentDate: new Date().toISOString(),
         paymentStatus: 'completed',
-        notes: `Pago ${paymentMethod === 'cash' ? 'en efectivo' : `con ${paymentMethod}`} - Check-out`,
+        notes: `Pago ${getPaymentMethodLabel(paymentMethod).replace(/[^\w\s]/g, '')} - Check-out`,
         paymentType: 'checkout',
         description: `Pago ${paymentAmount === currentFinancialData.pendienteReal ? 'total' : 'parcial'} de reserva #${bookingData.bookingId}`,
         // 🔧 METADATOS ADICIONALES
@@ -384,13 +462,17 @@ const PaymentAndReceipt = ({
     );
   }
 
+  // 🔧 OBTENER DATOS PARA LOS HISTORIALES
+  const paymentHistory = bookingData?.payments?.filter(p => p.paymentStatus === 'completed') || [];
+  const extraCharges = bookingData?.extraCharges || [];
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         {/* 🎯 HEADER */}
         <div className="bg-blue-600 text-white p-4 rounded-t-lg">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-bold">💳 Procesar Pago</h3>
+            <h3 className="text-lg font-bold">💳 Procesar Pago - Reserva #{bookingData?.bookingId}</h3>
             <button
               onClick={() => onPaymentSuccess && onPaymentSuccess(null)}
               className="text-white hover:text-gray-200 text-xl font-bold"
@@ -405,13 +487,22 @@ const PaymentAndReceipt = ({
           {/* 🏨 INFORMACIÓN DE LA RESERVA */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h4 className="font-semibold text-gray-800 mb-2">📋 Información de la Reserva</h4>
-            <div className="text-sm text-gray-600 space-y-1">
-              <div>Reserva #{bookingData?.bookingId}</div>
-              <div>Habitación: {selectedRoom?.roomNumber || bookingData?.roomNumber}</div>
-              <div>Huésped: {currentBuyerData?.scostumername}</div>
-              {currentBuyerData?.sdocno && (
-                <div>Documento: {currentBuyerData.sdocno}</div>
-              )}
+            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+              <div>
+                <div>Habitación: {selectedRoom?.roomNumber || bookingData?.roomNumber} ({selectedRoom?.type})</div>
+                <div>Huésped: {currentBuyerData?.scostumername}</div>
+                {currentBuyerData?.sdocno && (
+                  <div>Documento: {currentBuyerData.sdocno}</div>
+                )}
+              </div>
+              <div>
+                {bookingData?.checkIn && (
+                  <div>Check-in: {formatDateTime(bookingData.checkIn)}</div>
+                )}
+                {bookingData?.checkOut && (
+                  <div>Check-out: {formatDateTime(bookingData.checkOut)}</div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -421,28 +512,120 @@ const PaymentAndReceipt = ({
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Costo reserva:</span>
-                <span>${financialData.totalReserva.toLocaleString()}</span>
+                <span className="font-medium">${financialData.totalReserva.toLocaleString()}</span>
               </div>
               {financialData.totalExtras > 0 && (
                 <div className="flex justify-between">
                   <span>Consumos extras:</span>
-                  <span>${financialData.totalExtras.toLocaleString()}</span>
+                  <span className="font-medium text-blue-600">
+                    +${financialData.totalExtras.toLocaleString()}
+                    <button
+                      onClick={() => setShowExtraCharges(!showExtraCharges)}
+                      className="ml-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                    >
+                      {showExtraCharges ? 'Ocultar' : 'Ver detalle'}
+                    </button>
+                  </span>
                 </div>
               )}
               <div className="flex justify-between font-medium border-t pt-2">
                 <span>Total cuenta:</span>
                 <span>${financialData.totalFinal.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-green-600">
-                <span>Ya pagado:</span>
-                <span>-${financialData.totalPagado.toLocaleString()}</span>
-              </div>
+              {financialData.totalPagado > 0 && (
+                <div className="flex justify-between">
+                  <span>Ya pagado:</span>
+                  <span className="text-green-600 font-medium">
+                    -${financialData.totalPagado.toLocaleString()}
+                    {paymentHistory.length > 0 && (
+                      <button
+                        onClick={() => setShowPaymentHistory(!showPaymentHistory)}
+                        className="ml-2 text-xs text-green-600 hover:text-green-800 underline"
+                      >
+                        {showPaymentHistory ? 'Ocultar' : 'Ver pagos'}
+                      </button>
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between font-bold text-red-600 border-t pt-2">
                 <span>Pendiente:</span>
                 <span>${financialData.pendienteReal.toLocaleString()}</span>
               </div>
             </div>
           </div>
+
+          {/* 📋 HISTORIAL DE PAGOS (EXPANDIBLE) */}
+          {showPaymentHistory && paymentHistory.length > 0 && (
+            <div className="mb-6 p-4 bg-green-50 rounded-lg">
+              <h4 className="font-semibold text-green-800 mb-3">💳 Historial de Pagos</h4>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {paymentHistory.map((payment, index) => (
+                  <div key={payment.paymentId || index} className="flex justify-between items-center text-sm bg-white p-2 rounded border">
+                    <div>
+                      <div className="font-medium">{getPaymentMethodLabel(payment.paymentMethod)}</div>
+                      <div className="text-xs text-gray-600">
+                        {formatDateTime(payment.paymentDate)}
+                      </div>
+                      {payment.paymentType && (
+                        <div className="text-xs text-gray-500">
+                          Tipo: {payment.paymentType}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-green-600">
+                        ${parseFloat(payment.amount || 0).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-green-600">
+                        {payment.paymentStatus}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 🍽️ DETALLE DE CARGOS EXTRAS (EXPANDIBLE) */}
+          {showExtraCharges && extraCharges.length > 0 && (
+            <div className="mb-6 p-4 bg-amber-50 rounded-lg">
+              <h4 className="font-semibold text-amber-800 mb-3">➕ Detalle de Consumos Extras</h4>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {extraCharges.map((charge, index) => {
+                  const amount = parseFloat(charge.amount || 0);
+                  const quantity = parseInt(charge.quantity || 1);
+                  const total = amount * quantity;
+                  
+                  return (
+                    <div key={charge.id || index} className="flex justify-between items-center text-sm bg-white p-2 rounded border">
+                      <div>
+                        <div className="font-medium">{charge.description || 'Cargo extra'}</div>
+                        <div className="text-xs text-gray-600">
+                          {formatDateTime(charge.chargeDate)}
+                        </div>
+                        {charge.chargeType && (
+                          <div className="text-xs text-gray-500">
+                            Tipo: {charge.chargeType}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-amber-600">
+                          ${total.toLocaleString()}
+                        </div>
+                        {quantity > 1 && (
+                          <div className="text-xs text-amber-600">
+                            {quantity} x ${amount.toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 💸 MONTO A PAGAR */}
           <div className="mb-4">
@@ -465,17 +648,24 @@ const PaymentAndReceipt = ({
                 placeholder="0.00"
                 disabled={isProcessing}
               />
+              <button
+                onClick={() => setPaymentAmount(financialData.pendienteReal)}
+                className="px-3 py-2 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
+                disabled={isProcessing}
+              >
+                Máximo
+              </button>
             </div>
             <div className="text-xs text-gray-500 mt-1 space-y-1">
               <div>Máximo: ${financialData.pendienteReal.toLocaleString()}</div>
               {paymentAmount < financialData.pendienteReal && paymentAmount > 0 && (
                 <div className="text-orange-600">
-                  Pago parcial - Quedará pendiente: ${(financialData.pendienteReal - paymentAmount).toLocaleString()}
+                  ⚠️ Pago parcial - Quedará pendiente: ${(financialData.pendienteReal - paymentAmount).toLocaleString()}
                 </div>
               )}
               {paymentAmount === financialData.pendienteReal && paymentAmount > 0 && (
                 <div className="text-green-600">
-                  ✅ Pago completo - Se saldará la cuenta
+                  ✅ Pago completo - Se saldará toda la cuenta
                 </div>
               )}
             </div>
@@ -542,6 +732,7 @@ PaymentAndReceipt.propTypes = {
     roomNumber: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     checkIn: PropTypes.string,
     checkOut: PropTypes.string,
+    financialSummary: PropTypes.object, // Nueva prop para los datos del backend
   }).isRequired,
   amountToPay: PropTypes.number.isRequired,
   currentBuyerData: PropTypes.shape({

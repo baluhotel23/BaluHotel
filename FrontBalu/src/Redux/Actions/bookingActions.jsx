@@ -297,20 +297,64 @@ export const addExtraCharge = (chargeData) => async (dispatch) => {
 // GENERATE BILL (GET /bookings/:id/bill)
 export const generateBill = (bookingId) => async (dispatch) => {
   dispatch({ type: 'GENERATE_BILL_REQUEST' });
+  
   try {
+    console.log(`🧾 [GENERATE-BILL] Iniciando generación para reserva: ${bookingId}`);
+    
     // Generar la factura
     const { data: billData } = await api.get(`/bookings/${bookingId}/bill`);
+    
+    console.log('✅ [GENERATE-BILL] Factura generada:', billData.data);
     dispatch({ type: 'GENERATE_BILL_SUCCESS', payload: billData.data });
 
     // Enviar la factura a Taxxa
-    const { data: taxxaResponse } = await api.post('/taxxa/invoice', { idBill: billData.data.idBill });
-    dispatch({ type: 'SEND_BILL_TO_TAXXA_SUCCESS', payload: taxxaResponse });
-    toast.success('Factura generada y enviada a Taxxa con éxito');
+    try {
+      const { data: taxxaResponse } = await api.post('/taxxa/invoice', { 
+        idBill: billData.data.idBill 
+      });
+      
+      console.log('✅ [TAXXA] Factura enviada a Taxxa:', taxxaResponse);
+      dispatch({ type: 'SEND_BILL_TO_TAXXA_SUCCESS', payload: taxxaResponse });
+      
+      toast.success('🧾 Factura generada y enviada a Taxxa con éxito');
+      
+      return {
+        success: true,
+        bill: billData.data,
+        taxxa: taxxaResponse
+      };
+      
+    } catch (taxxaError) {
+      console.warn('⚠️ [TAXXA] Error al enviar a Taxxa:', taxxaError);
+      dispatch({ type: 'SEND_BILL_TO_TAXXA_FAILURE', payload: taxxaError.message });
+      
+      // La factura se generó pero falló Taxxa
+      toast.warning('🧾 Factura generada correctamente, pero falló el envío a Taxxa');
+      
+      return {
+        success: true,
+        bill: billData.data,
+        taxxa: null,
+        taxxaError: taxxaError.message
+      };
+    }
+    
   } catch (error) {
+    console.error('❌ [GENERATE-BILL] Error:', error);
+    
     const errorMessage =
-      error.response?.data?.message || 'Error al generar o enviar la factura';
+      error.response?.data?.message || 
+      error.response?.data?.details ||
+      error.message ||
+      'Error al generar la factura';
+      
     dispatch({ type: 'GENERATE_BILL_FAILURE', payload: errorMessage });
-    toast.error(errorMessage);
+    toast.error(`❌ ${errorMessage}`);
+    
+    return {
+      success: false,
+      error: errorMessage
+    };
   }
 };
 export const getAllBills = (queryParams) => async (dispatch) => {

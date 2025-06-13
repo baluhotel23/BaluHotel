@@ -39,10 +39,13 @@ const initialState = {
     warnings: []
   },
   
-  // ⭐ FACTURACIÓN
+ // ⭐ FACTURACIÓN
   bill: null,
   bills: [],
   extraCharges: [], // Movido aquí para mejor organización
+  // 🆕 NUEVOS CAMPOS PARA TAXXA
+  taxxaStatus: null, // 'success' | 'failed' | null
+  currentBill: null, // Alias para compatibilidad
   
   // ⭐ REPORTES ORGANIZADOS
   reports: {
@@ -485,47 +488,64 @@ const bookingReducer = (state = initialState, action) => {
         success: { ...state.success, message: null }
       };
 
-    // ⭐ GENERATE BILL - OPTIMIZADO
+    // ⭐ GENERATE BILL - MEJORADO PARA INCLUIR TAXXA
     case "GENERATE_BILL_REQUEST":
       return { 
         ...state, 
         loading: { ...state.loading, bills: true }, 
         errors: { ...state.errors, bills: null },
-        bill: null 
+        bill: null,
+        currentBill: null, // 🆕 ALIAS PARA COMPATIBILIDAD
+        taxxaStatus: null // 🆕 RESETEAR ESTADO DE TAXXA
       };
+
     case "GENERATE_BILL_SUCCESS":
       return { 
         ...state, 
         loading: { ...state.loading, bills: false }, 
         bill: action.payload,
-        success: { message: 'Factura generada exitosamente', type: 'create' }
+        currentBill: action.payload, // 🆕 ALIAS PARA COMPATIBILIDAD
+        bills: [...state.bills, action.payload], // 🆕 AGREGAR A LA LISTA
+        success: { message: 'Factura generada exitosamente', type: 'create' },
+        errors: { ...state.errors, bills: null }
       };
+
     case "GENERATE_BILL_FAILURE":
       return { 
         ...state, 
         loading: { ...state.loading, bills: false }, 
-        errors: { ...state.errors, bills: action.payload }
+        errors: { ...state.errors, bills: action.payload },
+        bill: null,
+        currentBill: null,
+        taxxaStatus: null
       };
 
-    // ⭐ SEND BILL TO TAXXA - OPTIMIZADO
+    // ⭐ SEND BILL TO TAXXA - MEJORADO CON ESTADOS
     case "SEND_BILL_TO_TAXXA_REQUEST":
       return { 
         ...state, 
         loading: { ...state.loading, bills: true }, 
-        errors: { ...state.errors, bills: null } 
+        errors: { ...state.errors, bills: null },
+        taxxaStatus: 'pending' // 🆕 ESTADO PENDIENTE
       };
+
     case "SEND_BILL_TO_TAXXA_SUCCESS":
       return {
         ...state,
         loading: { ...state.loading, bills: false },
-        bill: { ...state.bill, status: "sent" },
-        success: { message: 'Factura enviada a Taxxa exitosamente', type: 'update' }
+        bill: state.bill ? { ...state.bill, taxxaStatus: "sent" } : state.bill,
+        currentBill: state.currentBill ? { ...state.currentBill, taxxaStatus: "sent" } : state.currentBill,
+        taxxaStatus: 'success', // 🆕 ESTADO EXITOSO
+        success: { message: 'Factura enviada a Taxxa exitosamente', type: 'update' },
+        errors: { ...state.errors, bills: null }
       };
+
     case "SEND_BILL_TO_TAXXA_FAILURE":
       return { 
         ...state, 
         loading: { ...state.loading, bills: false }, 
-        errors: { ...state.errors, bills: action.payload }
+        errors: { ...state.errors, bills: action.payload },
+        taxxaStatus: 'failed' // 🆕 ESTADO FALLIDO
       };
 
     // ⭐ GET ALL BILLS - OPTIMIZADO
