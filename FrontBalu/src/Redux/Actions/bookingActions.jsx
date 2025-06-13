@@ -255,62 +255,41 @@ export const checkOut = (bookingId) => async (dispatch) => {
 // ADD EXTRA CHARGES (POST /bookings/:id/extra-charges)
 export const addExtraCharge = (chargeData) => async (dispatch) => {
   dispatch({ type: "ADD_EXTRA_CHARGE_REQUEST" });
-  
+
   try {
     console.log("📤 Enviando cargo extra:", chargeData);
-    
-    // ⭐ VERIFICAR QUE bookingId EXISTE EN chargeData
-    if (!chargeData.bookingId) {
-      throw new Error("bookingId es requerido en chargeData");
+
+    // Verificar que los datos estén correctamente estructurados
+    if (!chargeData.extraCharge || !chargeData.extraCharge.bookingId) {
+      throw new Error("bookingId es requerido en chargeData.extraCharge");
     }
-    
-    // ⭐ USAR LA RUTA CORRECTA CON chargeData.bookingId
-    const { data } = await api.post(`/bookings/${chargeData.bookingId}/extra-charges`, chargeData);
-    
+
+    const { bookingId } = chargeData.extraCharge;
+
+    // Enviar los datos al backend
+    const { data } = await api.post(`/bookings/${bookingId}/extra-charges`, chargeData);
+
     console.log("✅ Respuesta del servidor:", data);
-    
-    // ⭐ VERIFICAR QUE LA RESPUESTA SEA EXITOSA
-    if (data.error) {
-      throw new Error(data.message || "Error en la respuesta del servidor");
-    }
-    
-    // ⭐ ASEGURAR QUE EL PAYLOAD INCLUYA TODA LA INFORMACIÓN NECESARIA
-    const payload = {
-      bookingId: chargeData.bookingId,
-      extraCharge: data.data, // El cargo extra creado
-      message: data.message || "Cargo extra agregado exitosamente"
-    };
-    
-    console.log("📦 Payload para dispatch:", payload);
-    
-    dispatch({ 
-      type: "ADD_EXTRA_CHARGE_SUCCESS", 
-      payload: payload
+
+    dispatch({
+      type: "ADD_EXTRA_CHARGE_SUCCESS",
+      payload: data.data,
     });
-    
-    return { error: false, data: payload };
+
+    return { error: false, data: data.data };
   } catch (error) {
     console.error("❌ Error en addExtraCharge:", error);
-    
-    // ⭐ MANEJO MEJORADO DE ERRORES
-    const errorMessage = error.response?.data?.message || 
-                        error.response?.data?.details || 
-                        error.message || 
-                        "Error al agregar cargo extra";
-    
-    console.error("❌ Error message:", errorMessage);
-    console.error("❌ Error details:", {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      url: error.config?.url,
-      method: error.config?.method
+
+    const errorMessage =
+      error.response?.data?.message ||
+      error.message ||
+      "Error al agregar cargo extra";
+
+    dispatch({
+      type: "ADD_EXTRA_CHARGE_FAILURE",
+      payload: errorMessage,
     });
-    
-    dispatch({ 
-      type: "ADD_EXTRA_CHARGE_FAILURE", 
-      payload: errorMessage 
-    });
-    
+
     return { error: true, message: errorMessage };
   }
 };

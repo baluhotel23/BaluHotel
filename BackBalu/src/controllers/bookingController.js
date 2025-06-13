@@ -1108,10 +1108,24 @@ const getAllBookings = async (req, res, next) => {
         where: {
           paymentStatus: ['completed', 'pending'] // ⭐ INCLUIR PENDING TAMBIÉN
         },
-        required: false // ⭐ LEFT JOIN - incluir reservas sin pagos
-      }
-    ];
 
+        required: false // ⭐ LEFT JOIN - incluir reservas sin pagos
+      },
+      {
+  model: ExtraCharge,
+  as: 'extraCharges', // Cambiar de 'ExtraCharges' a 'extraCharges'
+  attributes: [
+    'id',
+    'description',
+    'amount',
+    'quantity',
+    'chargeType',
+    'chargeDate',
+    'notes'
+  ],
+  required: false // LEFT JOIN - incluir reservas sin cargos extras
+}
+];
     // ⭐ INCLUIR INVENTARIO SI SE SOLICITA
     if (includeInventory === 'true') {
       includeOptions.push({
@@ -1539,7 +1553,6 @@ const addExtraCharge = async (req, res) => {
     console.log("🔍 [ADD-EXTRA-CHARGE] req.body:", JSON.stringify(req.body, null, 2));
     console.log("🕐 [ADD-EXTRA-CHARGE] Hora de procesamiento:", formatForLogs(getColombiaTime()));
 
-    // ⭐ OBTENER bookingId DEL PARÁMETRO DE LA URL
     const { bookingId } = req.params;
     const { extraCharge } = req.body;
 
@@ -1548,7 +1561,7 @@ const addExtraCharge = async (req, res) => {
       extraCharge: extraCharge
     });
 
-    // ⭐ VALIDACIONES MEJORADAS CON LOGS ESPECÍFICOS
+    // Validaciones
     if (!bookingId) {
       console.error("❌ [ADD-EXTRA-CHARGE] bookingId faltante en params");
       return res.status(400).json({ 
@@ -1573,17 +1586,18 @@ const addExtraCharge = async (req, res) => {
       });
     }
 
-    if (!extraCharge.price || isNaN(parseFloat(extraCharge.price))) {
-      console.error("❌ [ADD-EXTRA-CHARGE] price inválido:", extraCharge.price);
+    // 🔧 CORRECCIÓN: Usar 'amount' en lugar de 'price'
+    if (!extraCharge.amount || isNaN(parseFloat(extraCharge.amount))) {
+      console.error("❌ [ADD-EXTRA-CHARGE] amount inválido:", extraCharge.amount);
       return res.status(400).json({ 
         error: true, 
-        message: "price es requerido y debe ser un número válido" 
+        message: "amount es requerido y debe ser un número válido" 
       });
     }
 
     console.log("✅ [ADD-EXTRA-CHARGE] Validaciones básicas pasadas");
 
-    // ⭐ VERIFICAR QUE LA RESERVA EXISTE
+    // Verificar que la reserva existe
     const booking = await Booking.findByPk(bookingId);
     if (!booking) {
       console.error("❌ [ADD-EXTRA-CHARGE] Reserva no encontrada:", bookingId);
@@ -1599,17 +1613,17 @@ const addExtraCharge = async (req, res) => {
       roomNumber: booking.roomNumber
     });
 
-    // ⭐ CREAR EL CARGO EXTRA CON LOGGING DETALLADO
+    // 🔧 CORRECCIÓN: Usar extraCharge.amount en lugar de extraCharge.price
     const chargeData = {
       bookingId: parseInt(bookingId),
       description: extraCharge.description.trim(),
-      // ⭐ USAR 'amount' SEGÚN TU MODELO
-      amount: parseFloat(extraCharge.price),
+      amount: parseFloat(extraCharge.amount), // ✅ CORREGIDO: usar 'amount'
       quantity: parseInt(extraCharge.quantity) || 1,
       chargeType: extraCharge.chargeType || 'service',
       chargeDate: getColombiaTime(),
       chargedBy: req.user?.n_document || 'system',
       notes: extraCharge.notes || null,
+      basicId: extraCharge.basicId || null, // 🔧 AÑADIR basicId si viene
       isApproved: true,
       approvedAt: getColombiaTime(),
       approvedBy: req.user?.n_document || 'system'
@@ -1617,14 +1631,15 @@ const addExtraCharge = async (req, res) => {
 
     console.log("📝 [ADD-EXTRA-CHARGE] Datos para crear cargo:", JSON.stringify(chargeData, null, 2));
 
-    // ⭐ CREAR CON TRY-CATCH ESPECÍFICO
+    // Crear con try-catch específico
     let newExtraCharge;
     try {
       newExtraCharge = await ExtraCharge.create(chargeData);
       console.log("✅ [ADD-EXTRA-CHARGE] Cargo creado exitosamente:", {
         id: newExtraCharge.id,
         description: newExtraCharge.description,
-        amount: newExtraCharge.amount
+        amount: newExtraCharge.amount,
+        totalAmount: newExtraCharge.totalAmount // 🔧 MOSTRAR TOTAL CALCULADO
       });
     } catch (createError) {
       console.error("❌ [ADD-EXTRA-CHARGE] Error específico al crear:", createError);
@@ -1642,12 +1657,12 @@ const addExtraCharge = async (req, res) => {
       });
     }
 
-    // ⭐ FORMATEAR RESPUESTA PARA COMPATIBILIDAD CON FRONTEND
+    // 🔧 FORMATEAR RESPUESTA CONSISTENTE
     const responseData = {
       ...newExtraCharge.toJSON(),
-      // ⭐ AGREGAR 'price' PARA COMPATIBILIDAD
-      price: newExtraCharge.amount,
-      // ⭐ FORMATEAR FECHAS
+      // ✅ MANTENER COMPATIBILIDAD: incluir tanto 'amount' como 'price'
+      price: newExtraCharge.amount, // Para compatibilidad con frontend antiguo
+      // Formatear fechas
       chargeDate: formatForLogs(newExtraCharge.chargeDate),
       createdAt: formatForLogs(newExtraCharge.createdAt)
     };
@@ -1655,8 +1670,9 @@ const addExtraCharge = async (req, res) => {
     console.log("📤 [ADD-EXTRA-CHARGE] Respuesta preparada:", {
       id: responseData.id,
       description: responseData.description,
-      price: responseData.price,
-      amount: responseData.amount
+      amount: responseData.amount, // ✅ VALOR CORRECTO
+      price: responseData.price,   // ✅ COMPATIBILIDAD
+      totalAmount: responseData.totalAmount
     });
 
     res.status(201).json({

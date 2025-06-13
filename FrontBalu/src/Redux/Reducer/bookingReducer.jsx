@@ -426,46 +426,56 @@ const bookingReducer = (state = initialState, action) => {
         success: { ...state.success, message: null }
       };
     case "ADD_EXTRA_CHARGE_SUCCESS": {
-      console.log('✅ [REDUCER] Procesando cargo extra exitoso:', action.payload);
+  console.log('✅ [REDUCER] Procesando cargo extra exitoso:', action.payload);
+  console.log('📊 [REDUCER] Estado actual de bookings:', state.bookings);
+  
+  const updatedBookings = state.bookings.map(booking => {
+    if (booking.bookingId === action.payload.bookingId) {
+      const newExtraCharges = [
+        ...(booking.ExtraCharges || []),
+        action.payload.extraCharge
+      ];
       
-      const updatedBookings = state.bookings.map(booking => {
-        if (booking.bookingId === action.payload.bookingId) {
-          const newExtraCharges = [
-            ...(booking.ExtraCharges || []),
-            action.payload.extraCharge
-          ];
-          
-          console.log('📦 [REDUCER] Actualizando ExtraCharges para reserva:', booking.bookingId, newExtraCharges);
-          
-          return {
-            ...booking,
-            ExtraCharges: newExtraCharges
-          };
-        }
-        return booking;
-      });
-
-      const newState = { 
-        ...state, 
-        loading: { ...state.loading, booking: false }, 
-        extraCharges: [...state.extraCharges, action.payload.extraCharge],
-        bookings: updatedBookings,
-        bookingDetails: state.bookingDetails?.bookingId === action.payload.bookingId 
-          ? {
-              ...state.bookingDetails,
-              ExtraCharges: [
-                ...(state.bookingDetails.ExtraCharges || []),
-                action.payload.extraCharge
-              ]
-            }
-          : state.bookingDetails,
-        success: { message: 'Cargo adicional agregado exitosamente', type: 'update' },
-        errors: { ...state.errors, booking: null }
+      console.log('📦 [REDUCER] Actualizando ExtraCharges para reserva:', booking.bookingId);
+      console.log('📦 [REDUCER] ExtraCharges anteriores:', booking.ExtraCharges || []);
+      console.log('📦 [REDUCER] ExtraCharges nuevos:', newExtraCharges);
+      
+      return {
+        ...booking,
+        ExtraCharges: newExtraCharges
       };
-      
-      console.log('📊 [REDUCER] Estado actualizado con cargo extra');
-      return newState;
     }
+    return booking;
+  });
+
+  // Verificar si realmente se actualizó algún booking
+  const bookingUpdated = updatedBookings.some((booking, index) => {
+    return JSON.stringify(booking) !== JSON.stringify(state.bookings[index]);
+  });
+  
+  console.log('🔍 [REDUCER] ¿Se actualizó algún booking?', bookingUpdated);
+
+  const newState = { 
+    ...state, 
+    loading: { ...state.loading, booking: false }, 
+    extraCharges: [...state.extraCharges, action.payload.extraCharge],
+    bookings: updatedBookings,
+    bookingDetails: state.bookingDetails?.bookingId === action.payload.bookingId 
+      ? {
+          ...state.bookingDetails,
+          ExtraCharges: [
+            ...(state.bookingDetails.ExtraCharges || []),
+            action.payload.extraCharge
+          ]
+        }
+      : state.bookingDetails,
+    success: { message: 'Cargo adicional agregado exitosamente', type: 'update' },
+    errors: { ...state.errors, booking: null }
+  };
+  
+  console.log('📊 [REDUCER] Estado actualizado con cargo extra');
+  return newState;
+}
     case "ADD_EXTRA_CHARGE_FAILURE":
       console.error('❌ [REDUCER] Error al agregar cargo extra:', action.payload);
       return { 
