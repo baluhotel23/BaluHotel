@@ -39,10 +39,13 @@ const initialState = {
     warnings: []
   },
   
-  // ⭐ FACTURACIÓN
+ // ⭐ FACTURACIÓN
   bill: null,
   bills: [],
   extraCharges: [], // Movido aquí para mejor organización
+  // 🆕 NUEVOS CAMPOS PARA TAXXA
+  taxxaStatus: null, // 'success' | 'failed' | null
+  currentBill: null, // Alias para compatibilidad
   
   // ⭐ REPORTES ORGANIZADOS
   reports: {
@@ -426,46 +429,56 @@ const bookingReducer = (state = initialState, action) => {
         success: { ...state.success, message: null }
       };
     case "ADD_EXTRA_CHARGE_SUCCESS": {
-      console.log('✅ [REDUCER] Procesando cargo extra exitoso:', action.payload);
+  console.log('✅ [REDUCER] Procesando cargo extra exitoso:', action.payload);
+  console.log('📊 [REDUCER] Estado actual de bookings:', state.bookings);
+  
+  const updatedBookings = state.bookings.map(booking => {
+    if (booking.bookingId === action.payload.bookingId) {
+      const newExtraCharges = [
+        ...(booking.ExtraCharges || []),
+        action.payload.extraCharge
+      ];
       
-      const updatedBookings = state.bookings.map(booking => {
-        if (booking.bookingId === action.payload.bookingId) {
-          const newExtraCharges = [
-            ...(booking.ExtraCharges || []),
-            action.payload.extraCharge
-          ];
-          
-          console.log('📦 [REDUCER] Actualizando ExtraCharges para reserva:', booking.bookingId, newExtraCharges);
-          
-          return {
-            ...booking,
-            ExtraCharges: newExtraCharges
-          };
-        }
-        return booking;
-      });
-
-      const newState = { 
-        ...state, 
-        loading: { ...state.loading, booking: false }, 
-        extraCharges: [...state.extraCharges, action.payload.extraCharge],
-        bookings: updatedBookings,
-        bookingDetails: state.bookingDetails?.bookingId === action.payload.bookingId 
-          ? {
-              ...state.bookingDetails,
-              ExtraCharges: [
-                ...(state.bookingDetails.ExtraCharges || []),
-                action.payload.extraCharge
-              ]
-            }
-          : state.bookingDetails,
-        success: { message: 'Cargo adicional agregado exitosamente', type: 'update' },
-        errors: { ...state.errors, booking: null }
+      console.log('📦 [REDUCER] Actualizando ExtraCharges para reserva:', booking.bookingId);
+      console.log('📦 [REDUCER] ExtraCharges anteriores:', booking.ExtraCharges || []);
+      console.log('📦 [REDUCER] ExtraCharges nuevos:', newExtraCharges);
+      
+      return {
+        ...booking,
+        ExtraCharges: newExtraCharges
       };
-      
-      console.log('📊 [REDUCER] Estado actualizado con cargo extra');
-      return newState;
     }
+    return booking;
+  });
+
+  // Verificar si realmente se actualizó algún booking
+  const bookingUpdated = updatedBookings.some((booking, index) => {
+    return JSON.stringify(booking) !== JSON.stringify(state.bookings[index]);
+  });
+  
+  console.log('🔍 [REDUCER] ¿Se actualizó algún booking?', bookingUpdated);
+
+  const newState = { 
+    ...state, 
+    loading: { ...state.loading, booking: false }, 
+    extraCharges: [...state.extraCharges, action.payload.extraCharge],
+    bookings: updatedBookings,
+    bookingDetails: state.bookingDetails?.bookingId === action.payload.bookingId 
+      ? {
+          ...state.bookingDetails,
+          ExtraCharges: [
+            ...(state.bookingDetails.ExtraCharges || []),
+            action.payload.extraCharge
+          ]
+        }
+      : state.bookingDetails,
+    success: { message: 'Cargo adicional agregado exitosamente', type: 'update' },
+    errors: { ...state.errors, booking: null }
+  };
+  
+  console.log('📊 [REDUCER] Estado actualizado con cargo extra');
+  return newState;
+}
     case "ADD_EXTRA_CHARGE_FAILURE":
       console.error('❌ [REDUCER] Error al agregar cargo extra:', action.payload);
       return { 
@@ -475,47 +488,64 @@ const bookingReducer = (state = initialState, action) => {
         success: { ...state.success, message: null }
       };
 
-    // ⭐ GENERATE BILL - OPTIMIZADO
+    // ⭐ GENERATE BILL - MEJORADO PARA INCLUIR TAXXA
     case "GENERATE_BILL_REQUEST":
       return { 
         ...state, 
         loading: { ...state.loading, bills: true }, 
         errors: { ...state.errors, bills: null },
-        bill: null 
+        bill: null,
+        currentBill: null, // 🆕 ALIAS PARA COMPATIBILIDAD
+        taxxaStatus: null // 🆕 RESETEAR ESTADO DE TAXXA
       };
+
     case "GENERATE_BILL_SUCCESS":
       return { 
         ...state, 
         loading: { ...state.loading, bills: false }, 
         bill: action.payload,
-        success: { message: 'Factura generada exitosamente', type: 'create' }
+        currentBill: action.payload, // 🆕 ALIAS PARA COMPATIBILIDAD
+        bills: [...state.bills, action.payload], // 🆕 AGREGAR A LA LISTA
+        success: { message: 'Factura generada exitosamente', type: 'create' },
+        errors: { ...state.errors, bills: null }
       };
+
     case "GENERATE_BILL_FAILURE":
       return { 
         ...state, 
         loading: { ...state.loading, bills: false }, 
-        errors: { ...state.errors, bills: action.payload }
+        errors: { ...state.errors, bills: action.payload },
+        bill: null,
+        currentBill: null,
+        taxxaStatus: null
       };
 
-    // ⭐ SEND BILL TO TAXXA - OPTIMIZADO
+    // ⭐ SEND BILL TO TAXXA - MEJORADO CON ESTADOS
     case "SEND_BILL_TO_TAXXA_REQUEST":
       return { 
         ...state, 
         loading: { ...state.loading, bills: true }, 
-        errors: { ...state.errors, bills: null } 
+        errors: { ...state.errors, bills: null },
+        taxxaStatus: 'pending' // 🆕 ESTADO PENDIENTE
       };
+
     case "SEND_BILL_TO_TAXXA_SUCCESS":
       return {
         ...state,
         loading: { ...state.loading, bills: false },
-        bill: { ...state.bill, status: "sent" },
-        success: { message: 'Factura enviada a Taxxa exitosamente', type: 'update' }
+        bill: state.bill ? { ...state.bill, taxxaStatus: "sent" } : state.bill,
+        currentBill: state.currentBill ? { ...state.currentBill, taxxaStatus: "sent" } : state.currentBill,
+        taxxaStatus: 'success', // 🆕 ESTADO EXITOSO
+        success: { message: 'Factura enviada a Taxxa exitosamente', type: 'update' },
+        errors: { ...state.errors, bills: null }
       };
+
     case "SEND_BILL_TO_TAXXA_FAILURE":
       return { 
         ...state, 
         loading: { ...state.loading, bills: false }, 
-        errors: { ...state.errors, bills: action.payload }
+        errors: { ...state.errors, bills: action.payload },
+        taxxaStatus: 'failed' // 🆕 ESTADO FALLIDO
       };
 
     // ⭐ GET ALL BILLS - OPTIMIZADO

@@ -1,576 +1,900 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  getAllBookings,
-  updateBookingStatus,
-  generateBill,
-} from "../../Redux/Actions/bookingActions";
-import { updateRoomStatus } from "../../Redux/Actions/roomActions";
-import { getRegistrationPassesByBooking } from "../../Redux/Actions/registerActions";
-import dayjs from "dayjs";
-import ExtraCharges from "./ExtraCharge";
-import PaymentAndReceipt from "../Booking/PaymentAndReceipt";
 import { toast } from "react-toastify";
-import DashboardLayout from "../Dashboard/DashboardLayout";
+import PaymentAndReceipt from "../Booking/PaymentAndReceipt";
+import ExtraCharges from "./ExtraCharge";
+import { 
+  getAllBookings, 
+  updateBookingStatus, 
+  generateBill // 🧾 NUEVA IMPORTACIÓN
+} from "../../Redux/Actions/bookingActions";
 
 const CheckOut = () => {
   const dispatch = useDispatch();
   
-  // ⭐ SELECTORES CORREGIDOS PARA TU REDUCER
+  // 📊 SELECTORES ADAPTADOS A TU ESTRUCTURA
   const { 
     bookings: allBookings = [], 
     loading = {}, 
-    errors = {} 
+    errors = {},
+    currentBill = null, // 🧾 FACTURA ACTUAL (COMPATIBLE CON TU ESTRUCTURA)
+    bill = null, // 🧾 FALLBACK
+    taxxaStatus = null // 📤 ESTADO DE TAXXA
   } = useSelector((state) => state.booking || {});
   
-  // ⭐ LOADING ESPECÍFICO PARA BOOKINGS
-  const isLoadingBookings = loading.bookings || loading.general || false;
-  const bookingsError = errors.bookings || errors.general || null;
-
-  // ⭐ FILTRAR SOLO RESERVAS CHECKED-IN
-  const bookings = Array.isArray(allBookings) 
-    ? allBookings.filter(booking => booking.status === 'checked-in')
-    : [];
-  
+  // 🔧 ESTADOS LOCALES
   const [selectedBooking, setSelectedBooking] = useState(null);
-  
-  // ⭐ ESTADOS PARA MANEJO DE INVENTARIO Y PASAJEROS
-  const [expandedBookings, setExpandedBookings] = useState({});
-  const [basicsByBooking, setBasicsByBooking] = useState({});
-  const [checkedBasics, setCheckedBasics] = useState({});
-  const [passengersByBooking, setPassengersByBooking] = useState({});
+  const [showExtraCharges, setShowExtraCharges] = useState(false);
+  const [selectedBookingForExtras, setSelectedBookingForExtras] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showBillModal, setShowBillModal] = useState(false); // 🧾 MODAL DE FACTURA
+  const [generatedBill, setGeneratedBill] = useState(null); // 🧾 FACTURA GENERADA
+  const [filters, setFilters] = useState({
+    status: '',
+    roomNumber: '',
+    guestId: ''
+  });
+  const [sortBy, setSortBy] = useState('checkOut');
 
-  // ⭐ OBTENER DATOS DE REGISTRATION PASSES
-  const allRegistrationsByBooking = useSelector(
-    (state) => state.registrationPass?.registrationsByBooking || {}
-  );
-
-  // ⭐ DEBUG TEMPORAL - REMOVER DESPUÉS DE CONFIRMAR QUE FUNCIONA
-  useEffect(() => {
-    console.log('🔍 [CHECKOUT] Estado actual:', {
-      isLoadingBookings,
-      bookingsError,
-      allBookingsLength: allBookings?.length,
-      checkedInBookingsLength: bookings?.length,
-      loading: loading,
-      errors: errors,
-      allBookings: allBookings
-    });
-  }, [isLoadingBookings, bookingsError, allBookings?.length, bookings?.length, loading, errors]);
-
-  useEffect(() => {
-    console.log('🔍 [CHECKOUT] Disparando getAllBookings con status checked-in');
-    dispatch(getAllBookings({ status: "checked-in" }));
-  }, [dispatch]);
-
-  // ⭐ CARGAR INVENTARIO BÁSICO POR RESERVA
-  const handleLoadBasics = (booking) => {
-    const bookingId = booking.bookingId;
+  // 🔧 FUNCIÓN PARA OBTENER DÍAS HASTA CHECK-OUT
+  const getDaysUntilCheckOut = (checkOutDate) => {
+    if (!checkOutDate) return null;
     
-    console.log('🔍 Cargando básicos para checkout - reserva:', bookingId);
+    const today = new Date();
+    const checkOut = new Date(checkOutDate);
+    const diffTime = checkOut - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    // ⭐ USAR LOS BÁSICOS QUE VIENEN CON LA RESERVA (desde getAllBookings)
-    const loadedBasics = booking.room?.BasicInventories || [];
-    console.log('📦 Básicos obtenidos para checkout:', loadedBasics);
-    
-    if (loadedBasics && loadedBasics.length > 0) {
-      setBasicsByBooking((prev) => ({
-        ...prev,
-        [bookingId]: loadedBasics.map(basic => ({
-          id: basic.id,
-          name: basic.name,
-          description: basic.description,
-          quantity: basic.RoomBasics?.quantity || 0,
-          currentStock: basic.currentStock,
-          verified: false // ⭐ PARA CHECKOUT, INICIA COMO NO VERIFICADO
-        }))
-      }));
-
-      setCheckedBasics((prev) => ({
-        ...prev,
-        [bookingId]: loadedBasics.reduce((acc, basic) => {
-          acc[basic.id] = false; // ⭐ PARA VERIFICACIÓN DE DEVOLUCIÓN
-          return acc;
-        }, {}),
-      }));
-      
-      console.log("✅ Básicos cargados para checkout - reserva", bookingId);
-      toast.success(`Inventario básico cargado para verificación`);
-    } else {
-      toast.info(`No hay inventario básico para esta habitación`);
-    }
+    return diffDays;
   };
 
-  // ⭐ CARGAR PASAJEROS REGISTRADOS
-  const handleLoadPassengers = async (bookingId) => {
-    try {
-      console.log('🔍 Cargando pasajeros para checkout - reserva:', bookingId);
-      
-      await dispatch(getRegistrationPassesByBooking(bookingId));
-      
-      // Los pasajeros se cargan en el estado de Redux
-      const passengers = allRegistrationsByBooking[bookingId] || [];
-      console.log('👥 Pasajeros obtenidos:', passengers);
-      
-      setPassengersByBooking((prev) => ({
-        ...prev,
-        [bookingId]: passengers
-      }));
-      
-      if (passengers.length > 0) {
-        toast.success(`${passengers.length} pasajero(s) cargado(s) para revisión`);
+  // 🔧 FUNCIÓN PARA OBTENER PRIORIDAD DE CHECK-OUT
+  const getCheckOutPriority = (booking) => {
+    const daysUntil = getDaysUntilCheckOut(booking.checkOut);
+    
+    if (daysUntil === null) return 999;
+    if (daysUntil < 0) return -1000 + daysUntil;
+    if (daysUntil === 0) return 0;
+    if (daysUntil === 1) return 1;
+    return daysUntil;
+  };
+
+  // 📋 FILTRAR Y ORDENAR RESERVAS
+  const bookings = React.useMemo(() => {
+    console.log("🔄 [CHECKOUT] Procesando reservas para mostrar...");
+    
+    let filteredBookings = allBookings.filter(booking => 
+      booking.status === 'checked-in' || 
+      booking.status === 'confirmed' ||
+      (booking.status === 'completed' && booking.financialSummary?.totalPendiente > 0)
+    );
+
+    console.log(`📊 [CHECKOUT] Reservas filtradas: ${filteredBookings.length} de ${allBookings.length} total`);
+
+    if (filters.status) {
+      filteredBookings = filteredBookings.filter(b => b.status === filters.status);
+    }
+    if (filters.roomNumber) {
+      filteredBookings = filteredBookings.filter(b => 
+        b.roomNumber?.toString().includes(filters.roomNumber) ||
+        b.room?.roomNumber?.toString().includes(filters.roomNumber)
+      );
+    }
+    if (filters.guestId) {
+      filteredBookings = filteredBookings.filter(b => 
+        b.guestId?.toString().includes(filters.guestId) ||
+        b.guest?.sdocno?.toString().includes(filters.guestId)
+      );
+    }
+
+    const sortedBookings = [...filteredBookings].sort((a, b) => {
+      if (sortBy === 'checkOut') {
+        const priorityA = getCheckOutPriority(a);
+        const priorityB = getCheckOutPriority(b);
+        
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        
+        const dateA = new Date(a.checkOut || '9999-12-31');
+        const dateB = new Date(b.checkOut || '9999-12-31');
+        return dateA - dateB;
+        
+      } else if (sortBy === 'amount') {
+        const amountA = a.financialSummary?.totalPendiente || 0;
+        const amountB = b.financialSummary?.totalPendiente || 0;
+        return amountB - amountA;
+        
+      } else if (sortBy === 'room') {
+        const roomA = a.roomNumber || a.room?.roomNumber || '';
+        const roomB = b.roomNumber || b.room?.roomNumber || '';
+        return roomA.toString().localeCompare(roomB.toString());
+        
       } else {
-        toast.info("No hay pasajeros registrados para esta reserva");
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
       }
+    });
+
+    return sortedBookings;
+  }, [allBookings, filters, sortBy]);
+
+  // 🔄 CARGAR RESERVAS AL MONTAR EL COMPONENTE
+  useEffect(() => {
+    loadBookings();
+  }, []);
+
+  // 🔄 FUNCIÓN PARA CARGAR RESERVAS
+  const loadBookings = async () => {
+    setIsLoading(true);
+    try {
+      console.log("🔄 [CHECKOUT] Cargando reservas...");
+      await dispatch(getAllBookings({
+        includeInventory: false,
+        ...filters
+      }));
+      console.log("✅ [CHECKOUT] Reservas cargadas exitosamente");
     } catch (error) {
-      console.error("❌ Error al cargar pasajeros:", error);
-      toast.error("Error al cargar información de pasajeros");
+      console.error("❌ [CHECKOUT] Error cargando reservas:", error);
+      toast.error("Error al cargar las reservas");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // ⭐ MANEJAR VERIFICACIÓN DE INVENTARIO BÁSICO
-  const handleCheckBasic = (bookingId, basicId) => {
-    setCheckedBasics((prev) => ({
-      ...prev,
-      [bookingId]: {
-        ...prev[bookingId],
-        [basicId]: !prev[bookingId]?.[basicId],
-      },
-    }));
-  };
+  // 🧾 NUEVA FUNCIÓN PARA GENERAR FACTURA
+  const handleGenerateBill = async (booking) => {
+    if (!booking?.bookingId) {
+      toast.error("Error: No se encontró la información de la reserva");
+      return;
+    }
 
-  // ⭐ EXPANDIR/COLAPSAR DETALLES DE RESERVA
-  const toggleBookingDetails = (bookingId) => {
-    setExpandedBookings((prev) => ({
-      ...prev,
-      [bookingId]: !prev[bookingId]
-    }));
-  };
+    // Validar que la reserva tenga pagos completados
+    if (!booking.financialSummary?.isFullyPaid) {
+      toast.error("❌ No se puede generar factura. La reserva debe estar completamente pagada.");
+      return;
+    }
 
-  // ⭐ CHECKOUT MEJORADO CON VALIDACIONES
-  const handleCheckOut = async (bookingId) => {
+    // Validar estado de la reserva
+    if (!['checked-in', 'completed'].includes(booking.status)) {
+      toast.error("❌ La reserva debe estar en estado 'checked-in' o 'completed' para generar factura");
+      return;
+    }
+
     try {
-      const booking = bookings.find((b) => b.bookingId === bookingId);
+      console.log("🧾 [CHECKOUT] Generando factura para reserva:", booking.bookingId);
       
+      const result = await dispatch(generateBill(booking.bookingId));
+      
+      if (result.success) {
+        console.log("✅ [CHECKOUT] Factura generada exitosamente:", result.bill);
+        
+        // Guardar la factura generada y mostrar modal
+        setGeneratedBill(result.bill);
+        setShowBillModal(true);
+        
+        // Recargar datos para reflejar cambios
+        await loadBookings();
+        
+        // Mostrar información sobre Taxxa
+        if (result.taxxa) {
+          console.log("✅ [CHECKOUT] Factura enviada a Taxxa exitosamente");
+        } else if (result.taxxaError) {
+          console.warn("⚠️ [CHECKOUT] Error al enviar a Taxxa:", result.taxxaError);
+        }
+        
+      } else {
+        throw new Error(result.error || "Error al generar factura");
+      }
+      
+    } catch (error) {
+      console.error("❌ [CHECKOUT] Error generando factura:", error);
+      toast.error(`❌ Error al generar factura: ${error.message}`);
+    }
+  };
+
+  // 💳 MANEJAR ÉXITO DE PAGO
+  const handlePaymentSuccess = async (paymentData) => {
+    if (!paymentData) {
+      setSelectedBooking(null);
+      return;
+    }
+
+    console.log("✅ [CHECKOUT] Pago exitoso:", paymentData);
+    
+    toast.success(
+      paymentData.isFullyPaid 
+        ? "✅ Pago completo registrado exitosamente"
+        : `✅ Pago parcial de $${parseFloat(paymentData.amount).toLocaleString()} registrado`
+    );
+
+    await loadBookings();
+    setSelectedBooking(null);
+
+    if (paymentData.isFullyPaid) {
+      setTimeout(() => {
+        toast.info("🎉 La reserva está lista para finalizar el check-out", {
+          autoClose: 5000
+        });
+      }, 1000);
+    }
+  };
+
+  // 🏁 MANEJAR CHECK-OUT FINAL
+  const handleCheckOut = async (bookingId) => {
+    if (!bookingId) {
+      toast.error("ID de reserva no válido");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log("🏁 [CHECKOUT] Procesando check-out para reserva:", bookingId);
+
+      const booking = bookings.find(b => b.bookingId === bookingId);
       if (!booking) {
-        toast.error("Reserva no encontrada");
+        throw new Error("Reserva no encontrada");
+      }
+
+      if (!booking.financialSummary?.isFullyPaid) {
+        toast.error("❌ No se puede completar el check-out. Quedan pagos pendientes.");
         return;
       }
 
-      // ⭐ VALIDAR INVENTARIO BÁSICO SI EXISTE
-      const bookingBasics = basicsByBooking[bookingId] || [];
-      if (bookingBasics.length > 0) {
-        const checkedBasicsForBooking = checkedBasics[bookingId] || {};
-        const allBasicsChecked = bookingBasics.every(basic => 
-          checkedBasicsForBooking[basic.id] === true
-        );
+      const result = await dispatch(updateBookingStatus({
+        bookingId,
+        status: 'completed',
+        notes: 'Check-out completado desde panel administrativo'
+      }));
 
-        if (!allBasicsChecked) {
-          const confirmed = window.confirm(
-            "No has verificado todo el inventario básico. ¿Deseas continuar con el checkout de todas formas?"
-          );
-          if (!confirmed) {
-            toast.warning("Checkout cancelado. Verifica el inventario básico.");
-            return;
-          }
-        }
+      if (result.success) {
+        toast.success("🎉 Check-out completado exitosamente");
+        await loadBookings();
+        console.log("✅ [CHECKOUT] Check-out completado para reserva:", bookingId);
+      } else {
+        throw new Error(result.error || "Error al completar el check-out");
       }
 
-      console.log("🏁 Iniciando proceso de checkout para reserva:", bookingId);
-
-      // 1. ⭐ ACTUALIZAR ESTADO DE RESERVA A COMPLETED
-      await dispatch(updateBookingStatus(bookingId, { status: "completed" }));
-      toast.success(`Reserva #${bookingId} marcada como completada`);
-
-      // 2. ⭐ GENERAR FACTURA
-      await dispatch(generateBill(bookingId));
-      toast.info(`Factura generada para reserva #${bookingId}`);
-
-      // 3. ⭐ ACTUALIZAR HABITACIÓN A "PARA LIMPIAR" (NO DISPONIBLE)
-      if (booking.room) {
-        await dispatch(
-          updateRoomStatus(booking.room.roomNumber, { status: "Para Limpiar" })
-        );
-        toast.success(
-          `Habitación #${booking.room.roomNumber} marcada como "Para Limpiar"`
-        );
-      }
-
-      // 4. ⭐ LIMPIAR ESTADOS LOCALES
-      setBasicsByBooking((prev) => {
-        const updated = { ...prev };
-        delete updated[bookingId];
-        return updated;
-      });
-      setCheckedBasics((prev) => {
-        const updated = { ...prev };
-        delete updated[bookingId];
-        return updated;
-      });
-      setPassengersByBooking((prev) => {
-        const updated = { ...prev };
-        delete updated[bookingId];
-        return updated;
-      });
-      setExpandedBookings((prev) => {
-        const updated = { ...prev };
-        delete updated[bookingId];
-        return updated;
-      });
-
-      // 5. ⭐ RECARGAR LISTA DE RESERVAS
-      dispatch(getAllBookings({ status: "checked-in" }));
-      
-      toast.success(
-        `🎉 Check-out completado exitosamente para reserva #${bookingId}`
-      );
     } catch (error) {
-      console.error("❌ Error al realizar check-out:", error);
-      toast.error(
-        "Error al procesar el check-out. Verifique los datos o intente nuevamente."
-      );
+      console.error("❌ [CHECKOUT] Error en check-out:", error);
+      toast.error(`❌ Error al completar check-out: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handlePaymentSuccess = () => {
-    toast.success("Pago realizado exitosamente.");
-    setSelectedBooking(null);
-    dispatch(getAllBookings({ status: "checked-in" }));
+  // ➕ MANEJAR CARGOS EXTRAS
+  const handleOpenExtraCharges = (booking) => {
+    setSelectedBookingForExtras(booking);
+    setShowExtraCharges(true);
   };
 
-  // ⭐ CONDICIONES DE LOADING Y ERROR CORREGIDAS
-  if (isLoadingBookings) {
+  // ✅ MANEJAR ÉXITO DE CARGO EXTRA
+  const handleExtraChargeSuccess = async () => {
+    toast.success("✅ Cargo extra agregado exitosamente");
+    await loadBookings();
+    setShowExtraCharges(false);
+    setSelectedBookingForExtras(null);
+  };
+
+  // 🔍 MANEJAR FILTROS
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  // 🔍 APLICAR FILTROS
+  const applyFilters = () => {
+    loadBookings();
+  };
+
+  // 🧹 LIMPIAR FILTROS
+  const clearFilters = () => {
+    setFilters({
+      status: '',
+      roomNumber: '',
+      guestId: ''
+    });
+    setSortBy('checkOut');
+    setTimeout(() => {
+      loadBookings();
+    }, 100);
+  };
+
+  // 📊 OBTENER ESTADÍSTICAS DE LA PÁGINA ACTUAL
+  const statistics = {
+    total: bookings.length,
+    readyForCheckout: bookings.filter(b => 
+      b.status === 'checked-in' && b.financialSummary?.isFullyPaid
+    ).length,
+    needingPayment: bookings.filter(b => 
+      !b.financialSummary?.isFullyPaid
+    ).length,
+    overdue: bookings.filter(b => getDaysUntilCheckOut(b.checkOut) < 0).length,
+    today: bookings.filter(b => getDaysUntilCheckOut(b.checkOut) === 0).length,
+    tomorrow: bookings.filter(b => getDaysUntilCheckOut(b.checkOut) === 1).length,
+    totalPending: bookings.reduce((sum, b) => 
+      sum + (b.financialSummary?.totalPendiente || 0), 0
+    )
+  };
+
+  // 🔧 FUNCIÓN PARA OBTENER BADGE DE FECHA
+  const getCheckOutBadge = (booking) => {
+    const daysUntil = getDaysUntilCheckOut(booking.checkOut);
+    
+    if (daysUntil === null) {
+      return <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">Sin fecha</span>;
+    }
+    
+    if (daysUntil < 0) {
+      return (
+        <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded font-medium">
+          ⚠️ Vencido ({Math.abs(daysUntil)} días)
+        </span>
+      );
+    }
+    
+    if (daysUntil === 0) {
+      return <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded font-medium">🕐 HOY</span>;
+    }
+    
+    if (daysUntil === 1) {
+      return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded font-medium">📅 MAÑANA</span>;
+    }
+    
+    if (daysUntil <= 3) {
+      return (
+        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
+          📅 En {daysUntil} días
+        </span>
+      );
+    }
+    
     return (
-      <DashboardLayout>
-        <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-green-500 border-t-transparent border-solid rounded-full animate-spin mb-4"></div>
-            <p className="text-xl text-gray-700">🔄 Cargando reservas para checkout...</p>
-          </div>
-        </div>
-      </DashboardLayout>
+      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+        📅 En {daysUntil} días
+      </span>
     );
-  }
-  
-  if (bookingsError) {
-    return (
-      <DashboardLayout>
-        <div className="flex justify-center items-center min-h-[calc(100vh-200px)] px-4">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-center" role="alert">
-            <strong className="font-bold">Error!</strong>
-            <span className="block sm:inline"> No se pudieron cargar las reservas: {bookingsError}. Por favor, intente más tarde.</span>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  };
 
   return (
-    <DashboardLayout>
-      <div className="container mx-auto p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold text-gray-800">🏨 Check-Out de Habitaciones</h2>
-          <div className="text-sm text-gray-600">
-            📊 {bookings.length} reserva(s) lista(s) para checkout
-          </div>
-        </div>
-
-       
-
-        {bookings.length === 0 && !isLoadingBookings && (
-          <div className="bg-blue-50 border border-blue-200 p-6 text-blue-700 rounded-lg text-center">
-            <div className="text-xl mb-2">🏖️</div>
-            <div className="font-medium">No hay habitaciones para check-out</div>
-            <div className="text-sm mt-1">
-              {allBookings.length > 0 
-                ? `Hay ${allBookings.length} reserva(s) en otros estados`
-                : "No hay reservas checked-in disponibles"
-              }
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {bookings.map((booking) => {
-            const payments = booking.payments || [];
-            const totalPagado = payments.reduce(
-              (sum, p) => sum + (parseFloat(p.amount) || 0),
-              0
-            );
-            const totalReserva = parseFloat(booking.totalAmount) || 0;
-            const extras = booking.ExtraCharges || [];
-            const totalExtras = extras.reduce(
-              (sum, e) => sum + (parseFloat(e.price) || 0),
-              0
-            );
-            const totalFinal = totalReserva + totalExtras;
-            const totalPendiente = Math.max(0, totalFinal - totalPagado);
-
-            // ⭐ OBTENER DATOS DE INVENTARIO Y PASAJEROS
-            const bookingBasics = basicsByBooking[booking.bookingId] || [];
-            const bookingPassengers = passengersByBooking[booking.bookingId] || [];
-            const isExpanded = expandedBookings[booking.bookingId];
-
-            // ⭐ VERIFICAR SI EL INVENTARIO ESTÁ COMPLETO
-            const basicsChecked = checkedBasics[booking.bookingId] || {};
-            const allBasicsVerified = bookingBasics.length === 0 || 
-              bookingBasics.every(basic => basicsChecked[basic.id] === true);
-
-            return (
-              <div
-                key={booking.bookingId}
-                className="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-300"
-              >
-                {/* ⭐ HEADER DE LA RESERVA */}
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-800">
-                        🏠 Habitación #{booking.room?.roomNumber || booking.roomNumber}
-                      </h3>
-                      <p className="text-gray-600">Reserva #{booking.bookingId}</p>
-                    </div>
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                      🟢 Checked-in
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-gray-700">📅 Check-in:</span>
-                      <br />
-                      {dayjs(booking.checkIn).format("DD/MM/YYYY")}
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-700">📅 Check-out:</span>
-                      <br />
-                      {dayjs(booking.checkOut).format("DD/MM/YYYY")}
-                    </div>
-                  </div>
-
-                  {/* ⭐ INFORMACIÓN DE HUÉSPED */}
-                  {booking.guest && (
-                    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                      <div className="text-sm">
-                        <span className="font-medium text-gray-700">👤 Huésped:</span>
-                        <br />
-                        {booking.guest.scostumername}
-                      </div>
-                    </div>
-                  )}
+    <div className="min-h-screen bg-gray-50">
+      {/* 🎯 HEADER */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  🏁 Gestión de Check-Out
+                </h1>
+                <p className="mt-2 text-gray-600">
+                  Administra pagos, facturas y check-outs - Ordenado por fecha de salida
+                </p>
+              </div>
+              
+              {/* 📊 ESTADÍSTICAS MEJORADAS */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
+                <div className="bg-red-50 p-3 rounded-lg">
+                  <div className="text-lg font-bold text-red-600">{statistics.overdue}</div>
+                  <div className="text-xs text-red-600">Vencidos</div>
                 </div>
-
-                {/* ⭐ INFORMACIÓN FINANCIERA */}
-                <div className="p-6 border-b border-gray-200">
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                    <div>
-                      <span className="font-medium text-gray-700">💰 Total reserva:</span>
-                      <br />
-                      <span className="text-lg font-bold">${totalReserva.toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-700">➕ Extras:</span>
-                      <br />
-                      <span className="text-lg font-bold text-blue-600">${totalExtras.toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium text-gray-700">💳 Estado de pago:</span>
-                      <span className={`font-bold ${
-                        totalPendiente > 0 ? "text-red-600" : "text-green-600"
-                      }`}>
-                        {totalPagado >= totalFinal ? "✅ Pagado" : 
-                         totalPagado > 0 ? "⚠️ Parcial" : "❌ Sin pago"}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Pagado: ${totalPagado.toLocaleString()} / Total: ${totalFinal.toLocaleString()}
-                    </div>
-                    {totalPendiente > 0 && (
-                      <div className="text-red-600 font-medium mt-1">
-                        Pendiente: ${totalPendiente.toLocaleString()}
-                      </div>
-                    )}
-                  </div>
+                <div className="bg-orange-50 p-3 rounded-lg">
+                  <div className="text-lg font-bold text-orange-600">{statistics.today}</div>
+                  <div className="text-xs text-orange-600">Hoy</div>
                 </div>
-
-                {/* ⭐ CARGOS EXTRAS */}
-                <div className="p-6 border-b border-gray-200">
-                  <h4 className="font-medium text-gray-700 mb-3">💰 Cargos extras</h4>
-                  {extras.length > 0 ? (
-                    <ul className="space-y-1 text-sm mb-3">
-                      {extras.map((extra, idx) => (
-                        <li key={idx} className="flex justify-between items-center">
-                          <span>{extra.description}</span>
-                          <span className="font-medium">${(parseFloat(extra.price) || 0).toLocaleString()}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-500 text-sm mb-3">Sin cargos extras</p>
-                  )}
-                  <ExtraCharges bookingId={booking.bookingId} />
+                <div className="bg-yellow-50 p-3 rounded-lg">
+                  <div className="text-lg font-bold text-yellow-600">{statistics.tomorrow}</div>
+                  <div className="text-xs text-yellow-600">Mañana</div>
                 </div>
-
-                {/* ⭐ DETALLES EXPANDIBLES */}
-                <div className="p-6">
-                  <button
-                    onClick={() => toggleBookingDetails(booking.bookingId)}
-                    className="w-full flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <span className="font-medium text-gray-700">
-                      📋 Ver detalles completos
-                    </span>
-                    <span className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                      ⬇️
-                    </span>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="mt-4 space-y-4">
-                      {/* ⭐ SECCIÓN DE PASAJEROS */}
-                      <div className="border rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-3">
-                          <h5 className="font-medium text-gray-700">👥 Pasajeros registrados</h5>
-                          <button
-                            onClick={() => handleLoadPassengers(booking.bookingId)}
-                            className="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                          >
-                            🔄 Cargar
-                          </button>
-                        </div>
-                        
-                        {bookingPassengers.length > 0 ? (
-                          <div className="space-y-2">
-                            {bookingPassengers.map((passenger, idx) => (
-                              <div key={idx} className="flex items-center gap-3 p-2 bg-green-50 rounded text-sm">
-                                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                                <span className="font-medium">{passenger.name}</span>
-                                <span className="text-gray-600">•</span>
-                                <span>{passenger.nationality}</span>
-                                <span className="text-gray-600">•</span>
-                                <span className="font-mono text-gray-500">{passenger.idNumber}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500 text-sm">Click "Cargar" para ver los pasajeros</p>
-                        )}
-                      </div>
-
-                      {/* ⭐ SECCIÓN DE INVENTARIO BÁSICO */}
-                      <div className="border rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-3">
-                          <h5 className="font-medium text-gray-700">📦 Inventario básico</h5>
-                          <button
-                            onClick={() => handleLoadBasics(booking)}
-                            className="text-sm bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
-                          >
-                            🔍 Verificar
-                          </button>
-                        </div>
-
-                        {bookingBasics.length > 0 ? (
-                          <div className="space-y-2">
-                            {bookingBasics.map((basic) => (
-                              <label
-                                key={basic.id}
-                                className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={basicsChecked[basic.id] || false}
-                                  onChange={() => handleCheckBasic(booking.bookingId, basic.id)}
-                                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                                />
-                                <span className="text-sm text-gray-700">{basic.name}</span>
-                                <span className="text-xs text-gray-500 ml-auto">
-                                  Qty: {basic.quantity}
-                                </span>
-                              </label>
-                            ))}
-                            <div className={`mt-2 p-2 rounded text-sm ${
-                              allBasicsVerified 
-                                ? "bg-green-50 text-green-700" 
-                                : "bg-yellow-50 text-yellow-700"
-                            }`}>
-                              {allBasicsVerified 
-                                ? "✅ Inventario verificado" 
-                                : "⚠️ Verificar todos los elementos"
-                              }
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-gray-500 text-sm">Click "Verificar" para cargar inventario</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* ⭐ ACCIONES DE CHECKOUT */}
-                <div className="p-6 bg-gray-50 rounded-b-xl">
-                  <div className="flex gap-3">
-                    {totalPendiente > 0 && (
-                      <button
-                        className="flex-1 px-4 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                        onClick={() => setSelectedBooking(booking)}
-                      >
-                        <span>💳</span>
-                        Pagar pendiente
-                      </button>
-                    )}
-                    <button
-                      className={`flex-1 px-4 py-2 rounded-lg text-white transition-colors flex items-center justify-center gap-2 ${
-                        totalPendiente > 0
-                          ? "bg-yellow-600 hover:bg-yellow-700"
-                          : "bg-green-600 hover:bg-green-700"
-                      }`}
-                      onClick={() => handleCheckOut(booking.bookingId)}
-                    >
-                      <span>🏁</span>
-                      {totalPendiente > 0
-                        ? "Finalizar (Pago pendiente)"
-                        : "Finalizar Check-Out"}
-                    </button>
-                  </div>
-                  
-                  {!allBasicsVerified && bookingBasics.length > 0 && (
-                    <p className="text-yellow-600 text-xs mt-2 text-center">
-                      ⚠️ Recuerda verificar el inventario básico antes del checkout
-                    </p>
-                  )}
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <div className="text-lg font-bold text-green-600">{statistics.readyForCheckout}</div>
+                  <div className="text-xs text-green-600">Listas</div>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ⭐ MODAL DE PAGO */}
+      {/* 🔍 FILTROS Y ORDENAMIENTO */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {/* Filtro por ordenamiento */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📊 Ordenar por:
+              </label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="checkOut">📅 Fecha de salida</option>
+                <option value="amount">💰 Monto pendiente</option>
+                <option value="room">🚪 Número habitación</option>
+                <option value="created">🕐 Fecha creación</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Estado:
+              </label>
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todos los estados</option>
+                <option value="confirmed">Confirmadas</option>
+                <option value="checked-in">Check-in</option>
+                <option value="completed">Completadas</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Habitación:
+              </label>
+              <input
+                type="text"
+                value={filters.roomNumber}
+                onChange={(e) => handleFilterChange('roomNumber', e.target.value)}
+                placeholder="Ej: 101"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Documento Huésped:
+              </label>
+              <input
+                type="text"
+                value={filters.guestId}
+                onChange={(e) => handleFilterChange('guestId', e.target.value)}
+                placeholder="Documento"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div className="flex items-end gap-2">
+              <button
+                onClick={applyFilters}
+                disabled={isLoading}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                🔍 Filtrar
+              </button>
+              <button
+                onClick={clearFilters}
+                disabled={isLoading}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 disabled:opacity-50 transition-colors"
+              >
+                🧹
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 📋 LISTA DE RESERVAS */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        {isLoading && !loading.bills ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-center">
+              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600">Cargando reservas...</p>
+            </div>
+          </div>
+        ) : bookings.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🏨</div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No hay reservas para check-out
+            </h3>
+            <p className="text-gray-600">
+              No se encontraron reservas que requieran procesamiento de check-out.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {bookings.map((booking) => {
+              const financials = booking.financialSummary;
+              const daysUntilCheckOut = getDaysUntilCheckOut(booking.checkOut);
+              
+              return (
+                <div 
+                  key={booking.bookingId} 
+                  className={`bg-white rounded-xl shadow-lg border-l-4 hover:shadow-xl transition-shadow duration-300 ${
+                    daysUntilCheckOut < 0 ? 'border-l-red-500' :
+                    daysUntilCheckOut === 0 ? 'border-l-orange-500' :
+                    daysUntilCheckOut === 1 ? 'border-l-yellow-500' :
+                    'border-l-blue-500'
+                  }`}
+                >
+                  
+                  {/* 📋 HEADER DE LA RESERVA CON FECHA DESTACADA */}
+                  <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-t-xl">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-lg font-bold">
+                          🏨 Reserva #{booking.bookingId}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-sm opacity-90">
+                            📅 Check-out: {new Date(booking.checkOut).toLocaleDateString('es-CO')}
+                          </span>
+                          {getCheckOutBadge(booking)}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          booking.status === 'completed' ? 'bg-green-500' :
+                          booking.status === 'checked-in' ? 'bg-yellow-500' : 'bg-blue-500'
+                        }`}>
+                          {booking.status === 'completed' ? '✅ Completada' :
+                           booking.status === 'checked-in' ? '🏠 Check-in' : '📝 Confirmada'}
+                        </span>
+                        {booking.bookingStatus?.isOverdue && (
+                          <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full">
+                            ⏰ Vencida
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-2 text-sm opacity-90">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div>🚪 Habitación {booking.room?.roomNumber} ({booking.room?.type})</div>
+                          <div>👤 {booking.guest?.scostumername}</div>
+                        </div>
+                        <div>
+                          <div>📧 {booking.guest?.selectronicmail}</div>
+                          <div>📞 {booking.guest?.stelephone}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 💰 INFORMACIÓN FINANCIERA MEJORADA */}
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                      <div>
+                        <span className="font-medium text-gray-700">💰 Total reserva:</span>
+                        <br />
+                        <span className="text-lg font-bold">{financials.totalReservaFormatted}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">➕ Consumos extras:</span>
+                        <br />
+                        <span className="text-lg font-bold text-blue-600">
+                          {financials.totalExtrasFormatted}
+                          {financials.extraChargesCount > 0 && (
+                            <span className="text-xs ml-1">({financials.extraChargesCount} items)</span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 📊 RESUMEN FINANCIERO DETALLADO */}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium text-gray-700">💳 Estado de cuenta:</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-bold ${
+                            financials.isFullyPaid ? "text-green-600" : 
+                            financials.paymentStatus === 'partially_paid' ? "text-yellow-600" : "text-red-600"
+                          }`}>
+                            {financials.isFullyPaid ? "✅ Pagado" : 
+                             financials.paymentStatus === 'partially_paid' ? "⚠️ Parcial" : "❌ Pendiente"}
+                          </span>
+                          <span className="text-xs bg-gray-200 px-2 py-1 rounded">
+                            {financials.paymentPercentage}%
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Total cuenta:</span>
+                          <span className="font-medium">{financials.totalFinalFormatted}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-green-600">Pagado:</span>
+                          <span className="text-green-600 font-medium">{financials.totalPagadoFormatted}</span>
+                        </div>
+                        {!financials.isFullyPaid && (
+                          <div className="flex justify-between border-t pt-1">
+                            <span className="text-red-600 font-medium">Pendiente:</span>
+                            <span className="text-red-600 font-bold">{financials.totalPendienteFormatted}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 📈 BARRA DE PROGRESO DE PAGO */}
+                      <div className="mt-3">
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                          <span>Progreso de pago</span>
+                          <span>{financials.paymentPercentage}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              financials.paymentPercentage === 100 ? 'bg-green-500' :
+                              financials.paymentPercentage >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${financials.paymentPercentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 📅 INFORMACIÓN DE FECHAS MEJORADA */}
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">📅 Check-in:</span>
+                        <div className="font-medium">
+                          {new Date(booking.checkIn).toLocaleDateString('es-CO', {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">📅 Check-out:</span>
+                        <div className="font-medium">
+                          {new Date(booking.checkOut).toLocaleDateString('es-CO', {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">⏰ Estado:</span>
+                        <div className="font-medium">
+                          {getCheckOutBadge(booking)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ⏰ INFORMACIÓN ADICIONAL SEGÚN ESTADO */}
+                    {booking.bookingStatus?.isOverdue && (
+                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                        ⚠️ Check-out vencido ({Math.abs(daysUntilCheckOut)} días de retraso)
+                      </div>
+                    )}
+
+                    {daysUntilCheckOut === 0 && (
+                      <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-orange-700 text-sm">
+                        🕐 Check-out programado para HOY - Prioridad alta
+                      </div>
+                    )}
+
+                    {daysUntilCheckOut === 1 && (
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 text-sm">
+                        📅 Check-out programado para MAÑANA - Preparar proceso
+                      </div>
+                    )}
+
+                    {booking.status === 'checked-in' && daysUntilCheckOut > 1 && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">
+                        🏠 Huésped en estadía ({booking.bookingStatus?.daysSinceCheckIn || 0} días) - Salida en {daysUntilCheckOut} días
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 🎛️ ACCIONES MEJORADAS CON FACTURACIÓN */}
+                  <div className="p-6 bg-gray-50 rounded-b-xl">
+                    <div className="flex gap-3 mb-3">
+                      {/* 💳 BOTÓN DE PAGO */}
+                      {!financials.isFullyPaid && (
+                        <button
+                          className="flex-1 px-4 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                          onClick={() => setSelectedBooking(booking)}
+                          disabled={isLoading || loading.bills}
+                        >
+                          <span>💳</span>
+                          Realizar Pago
+                          <span className="text-xs bg-blue-500 px-2 py-1 rounded ml-1">
+                            {financials.totalPendienteFormatted}
+                          </span>
+                        </button>
+                      )}
+                      
+                      {/* ➕ BOTÓN DE EXTRAS */}
+                      {booking.status === 'checked-in' && (
+                        <button
+                          className="px-4 py-2 rounded-lg text-blue-600 border border-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2"
+                          onClick={() => handleOpenExtraCharges(booking)}
+                          disabled={isLoading || loading.bills}
+                        >
+                          <span>➕</span>
+                          Extras
+                          {financials.extraChargesCount > 0 && (
+                            <span className="text-xs bg-blue-100 px-1 py-0.5 rounded">
+                              {financials.extraChargesCount}
+                            </span>
+                          )}
+                        </button>
+                      )}
+
+                      {/* 🧾 BOTÓN DE GENERAR FACTURA */}
+                      {financials.isFullyPaid && ['checked-in', 'completed'].includes(booking.status) && (
+                        <button
+                          className="px-4 py-2 rounded-lg text-white bg-purple-600 hover:bg-purple-700 transition-colors flex items-center gap-2"
+                          onClick={() => handleGenerateBill(booking)}
+                          disabled={isLoading || loading.bills}
+                        >
+                          {loading.bills ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Generando...
+                            </>
+                          ) : (
+                            <>
+                              <span>🧾</span>
+                              Generar Factura
+                            </>
+                          )}
+                        </button>
+                      )}
+                      
+                      {/* 🏁 BOTÓN DE CHECK-OUT */}
+                      <button
+                        className={`flex-1 px-4 py-2 rounded-lg text-white transition-colors flex items-center justify-center gap-2 ${
+                          !financials.isFullyPaid || booking.status !== 'checked-in'
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : daysUntilCheckOut <= 0 
+                              ? "bg-red-600 hover:bg-red-700 animate-pulse"
+                              : daysUntilCheckOut <= 1
+                                ? "bg-orange-600 hover:bg-orange-700"
+                                : "bg-green-600 hover:bg-green-700"
+                        }`}
+                        onClick={() => financials.isFullyPaid && booking.status === 'checked-in' && handleCheckOut(booking.bookingId)}
+                        disabled={!financials.isFullyPaid || booking.status !== 'checked-in' || isLoading || loading.bills}
+                      >
+                        <span>{!financials.isFullyPaid ? "⏳" : daysUntilCheckOut <= 0 ? "🚨" : "🏁"}</span>
+                        {!financials.isFullyPaid ? "Pago Requerido" : 
+                         daysUntilCheckOut <= 0 ? "CHECK-OUT URGENTE" :
+                         daysUntilCheckOut <= 1 ? "Finalizar Mañana" :
+                         "Finalizar Check-Out"}
+                      </button>
+                    </div>
+
+                    {/* 📊 ESTADO DE LA RESERVA */}
+                    <div className="text-center">
+                      {!financials.isFullyPaid ? (
+                        <p className="text-sm text-yellow-600 bg-yellow-50 p-2 rounded">
+                          ⚠️ Saldo pendiente: {financials.totalPendienteFormatted}
+                          {financials.extraChargesCount > 0 && (
+                            <span className="block text-xs mt-1">
+                              Incluye {financials.extraChargesCount} consumo(s) extra(s)
+                            </span>
+                          )}
+                        </p>
+                      ) : booking.status !== 'checked-in' ? (
+                        <p className="text-sm text-blue-600 bg-blue-50 p-2 rounded">
+                          ✅ Pagos completados - Estado: {
+                            booking.status === 'completed' ? 'Completada' :
+                            booking.status === 'confirmed' ? 'Confirmada' : booking.status
+                          }
+                          <span className="block text-xs mt-1 text-purple-600">
+                            🧾 Puede generar factura fiscal
+                          </span>
+                        </p>
+                      ) : daysUntilCheckOut <= 0 ? (
+                        <p className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                          🚨 CHECK-OUT VENCIDO - Procesamiento urgente requerido
+                        </p>
+                      ) : (
+                        <p className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                          ✅ Cuenta saldada - Listo para check-out y facturación
+                          {daysUntilCheckOut === 1 && (
+                            <span className="block text-xs mt-1 text-orange-600">
+                              📅 Programado para mañana
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 💳 MODAL DE PAGO */}
       {selectedBooking && (
         <PaymentAndReceipt
           bookingData={selectedBooking}
-          amountToPay={Math.max(
-            0,
-            parseFloat(selectedBooking.totalAmount) +
-              (selectedBooking.ExtraCharges || []).reduce(
-                (sum, e) => sum + (parseFloat(e.price) || 0),
-                0
-              ) -
-              (selectedBooking.payments || []).reduce(
-                (sum, p) => sum + (parseFloat(p.amount) || 0),
-                0
-              )
-          )}
+          amountToPay={selectedBooking.financialSummary.totalPendiente}
           currentBuyerData={selectedBooking.guest}
           selectedRoom={selectedBooking.room}
           onPaymentSuccess={handlePaymentSuccess}
         />
       )}
-    </DashboardLayout>
+
+      {/* ➕ MODAL DE CARGOS EXTRAS */}
+      {showExtraCharges && selectedBookingForExtras && (
+        <ExtraCharges
+          bookingId={selectedBookingForExtras.bookingId}
+          isLoading={isLoading}
+          onSuccess={handleExtraChargeSuccess}
+          onClose={() => {
+            setShowExtraCharges(false);
+            setSelectedBookingForExtras(null);
+          }}
+        />
+      )}
+
+      {/* 🧾 MODAL DE FACTURA GENERADA */}
+      {showBillModal && generatedBill && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="text-center">
+                <div className="text-6xl mb-4">🧾</div>
+                <h3 className="text-lg font-bold mb-4 text-green-600">Factura Generada</h3>
+                <p className="text-gray-600 mb-4">
+                  La factura se ha generado exitosamente para la reserva #{generatedBill.bookingId}
+                </p>
+                
+                <div className="bg-green-50 p-4 rounded mb-4">
+                  <div className="text-sm text-green-700 space-y-1">
+                    <div>ID Factura: <span className="font-bold">{generatedBill.idBill}</span></div>
+                    <div>Total: <span className="font-bold">{generatedBill.totalAmountFormatted}</span></div>
+                    <div>Estado: <span className="font-bold">{generatedBill.status}</span></div>
+                    {generatedBill.createdAtFormatted && (
+                      <div>Generada: <span className="font-bold">{generatedBill.createdAtFormatted}</span></div>
+                    )}
+                  </div>
+                </div>
+
+                {taxxaStatus === 'success' && (
+                  <div className="bg-blue-50 p-3 rounded mb-4">
+                    <div className="text-sm text-blue-700">
+                      ✅ Enviada a Taxxa exitosamente
+                    </div>
+                  </div>
+                )}
+
+                {taxxaStatus === 'failed' && (
+                  <div className="bg-yellow-50 p-3 rounded mb-4">
+                    <div className="text-sm text-yellow-700">
+                      ⚠️ Error al enviar a Taxxa (revisar conexión)
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setShowBillModal(false);
+                    setGeneratedBill(null);
+                  }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
