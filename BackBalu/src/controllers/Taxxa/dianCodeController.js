@@ -1,4 +1,4 @@
-const dianCatalogService = require('../../services/DianCatalogService');
+const dianCatalogService = require('../../services/dianCatalogService');
 
 // 🌍 Obtener países
 const getCountries = async (req, res, next) => {
