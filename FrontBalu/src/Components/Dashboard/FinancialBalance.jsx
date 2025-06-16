@@ -95,15 +95,73 @@ const FinancialBalance = () => {
 
   // Datos para la tendencia mensual
   const prepareMonthlyTrendData = () => {
-    if (!revenueByPeriod || !revenueByPeriod.length) return [];
-    
-    return revenueByPeriod.map(item => ({
-      name: format(new Date(item.date), 'MMM', { locale: es }),
-      ingresos: item.revenue,
-      gastos: item.expenses,
-      balance: item.revenue - item.expenses
-    }));
-  };
+  if (!revenueByPeriod || !revenueByPeriod.length) {
+    console.warn('⚠️ [FINANCIAL] No hay datos de revenue por período');
+    return [];
+  }
+  
+  console.log('📊 [FINANCIAL] Procesando datos mensuales:', revenueByPeriod);
+  
+  return revenueByPeriod
+    .map((item, index) => {
+      // 🔧 VALIDAR Y LIMPIAR LA FECHA
+      let validDate = null;
+      
+      try {
+        if (!item.date) {
+          console.warn(`⚠️ [FINANCIAL] Item ${index} sin fecha:`, item);
+          return null;
+        }
+        
+        // 🎯 INTENTAR DIFERENTES FORMATOS DE FECHA
+        if (typeof item.date === 'string') {
+          // Formato ISO: "2025-06-01"
+          validDate = parseISO(item.date);
+        } else if (item.date instanceof Date) {
+          validDate = item.date;
+        } else {
+          // Intentar conversión directa
+          validDate = new Date(item.date);
+        }
+        
+        // ✅ VERIFICAR QUE LA FECHA SEA VÁLIDA
+        if (!isValid(validDate)) {
+          console.warn(`⚠️ [FINANCIAL] Fecha inválida en item ${index}:`, {
+            originalDate: item.date,
+            parsedDate: validDate,
+            item
+          });
+          return null;
+        }
+        
+        const formattedMonth = format(validDate, 'MMM', { locale: es });
+        
+        console.log(`✅ [FINANCIAL] Item ${index} procesado:`, {
+          originalDate: item.date,
+          validDate,
+          formattedMonth,
+          revenue: item.revenue,
+          expenses: item.expenses
+        });
+        
+        return {
+          name: formattedMonth,
+          ingresos: parseFloat(item.revenue || 0),
+          gastos: parseFloat(item.expenses || 0),
+          balance: parseFloat(item.revenue || 0) - parseFloat(item.expenses || 0)
+        };
+        
+      } catch (error) {
+        console.error(`❌ [FINANCIAL] Error procesando item ${index}:`, {
+          error: error.message,
+          item,
+          originalDate: item.date
+        });
+        return null;
+      }
+    })
+    .filter(item => item !== null); // 🗑️ REMOVER ITEMS INVÁLIDOS
+};
 
   // Formateadores para nombres más amigables
   const formatPaymentMethod = (method) => {
