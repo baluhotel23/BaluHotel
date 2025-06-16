@@ -39,20 +39,21 @@ const PaymentAndReceipt = ({
   };
 
   // 🔧 FUNCIÓN PARA OBTENER ETIQUETA DEL MÉTODO DE PAGO
-  const getPaymentMethodLabel = (method) => {
-    const methods = {
-      'cash': '💵 Efectivo',
-      'card': '💳 Tarjeta',
-      'credit_card': '💳 Tarjeta de Crédito',
-      'debit_card': '💳 Tarjeta de Débito',
-      'transfer': '🏦 Transferencia',
-      'bank_transfer': '🏦 Transferencia Bancaria',
-      'other': '📝 Otro',
-      'wompi': '🌐 Wompi',
-      'online': '🌐 Pago Online'
-    };
-    return methods[method] || `📄 ${method}`;
+const getPaymentMethodLabel = (method) => {
+  const methods = {
+    'cash': '💵 Efectivo',
+    'credit_card': '💳 Tarjeta de Crédito',    // ✅ CAMBIAR 'card' por 'credit_card'
+    'debit_card': '💳 Tarjeta de Débito',
+    'tR ESTEransfer': '🏦 Transferencia',
+     // ✅ AGREGA
+    // Mantener compatibilidad con valores legacy
+    'card': '💳 Tarjeta',                       // ⚠️ Solo para mostrar, no enviar
+    'bank_transfer': '🏦 Transferencia Bancaria',
+    'other': '📝 Otro',
+    'online': '🌐 Pago Online'
   };
+  return methods[method] || `📄 ${method}`;
+};
 
   // 🔧 CALCULAR MONTO PENDIENTE REAL USANDO financialSummary SI ESTÁ DISPONIBLE
   const calculateRealPendingAmount = () => {
@@ -122,195 +123,188 @@ const PaymentAndReceipt = ({
 
   // 🔧 FUNCIÓN MEJORADA PARA GENERAR PDF
   const generatePDF = (paymentDetails) => {
-    try {
-      const doc = new jsPDF({
-        unit: "pt",
-        format: [226.77, 839.28], // Formato ticket
-      });
+  try {
+    const doc = new jsPDF({
+      unit: "pt",
+      format: [226.77, 839.28], // Formato ticket
+    });
 
-      const date = formatDateTime(new Date());
-      const receiptNumber = `#${paymentDetails.paymentId || Date.now()}`;
-      const pageWidth = doc.internal.pageSize.width;
-      let currentY = 30;
+    const date = formatDateTime(new Date());
+    const receiptNumber = `#${paymentDetails.paymentId || Date.now()}`;
+    const pageWidth = doc.internal.pageSize.width;
+    let currentY = 30;
 
-      // 🎨 HEADER DEL HOTEL
-      doc.setFontSize(16);
-      doc.setFont(undefined, 'bold');
-      doc.text("BALU HOTEL", pageWidth / 2, currentY, { align: "center" });
-      currentY += 25;
+    // 🎨 HEADER DEL HOTEL
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text("BALU HOTEL", pageWidth / 2, currentY, { align: "center" });
+    currentY += 25;
 
-      doc.setFontSize(8);
-      doc.setFont(undefined, 'normal');
-      doc.text("NIT: 123.456.789-0", pageWidth / 2, currentY, { align: "center" });
-      currentY += 15;
-      doc.text("Calle 123 #45-67, Ciudad", pageWidth / 2, currentY, { align: "center" });
-      currentY += 15;
-      doc.text("Tel: (123) 456-7890", pageWidth / 2, currentY, { align: "center" });
-      currentY += 25;
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.text("NIT: 123.456.789-0", pageWidth / 2, currentY, { align: "center" });
+    currentY += 15;
+    doc.text("Calle 123 #45-67, Ciudad", pageWidth / 2, currentY, { align: "center" });
+    currentY += 15;
+    doc.text("Tel: (123) 456-7890", pageWidth / 2, currentY, { align: "center" });
+    currentY += 25;
 
-      // 🧾 INFORMACIÓN DEL RECIBO
-      doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
-      doc.text(`RECIBO DE PAGO ${receiptNumber}`, pageWidth / 2, currentY, { align: "center" });
-      currentY += 20;
+    // 🧾 INFORMACIÓN DEL RECIBO
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text(`RECIBO DE PAGO ${receiptNumber}`, pageWidth / 2, currentY, { align: "center" });
+    currentY += 20;
 
-      doc.setFontSize(8);
-      doc.setFont(undefined, 'normal');
-      doc.text(`Fecha: ${date}`, pageWidth / 2, currentY, { align: "center" });
-      currentY += 25;
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Fecha: ${date}`, pageWidth / 2, currentY, { align: "center" });
+    currentY += 25;
 
-      // 🎯 LÍNEA SEPARADORA
-      doc.text("━".repeat(35), pageWidth / 2, currentY, { align: "center" });
-      currentY += 20;
+    // 🎯 LÍNEA SEPARADORA - CORREGIDA
+    doc.text("=" + "=".repeat(33) + "=", pageWidth / 2, currentY, { align: "center" });
+    currentY += 20;
 
-      // 👤 DATOS DEL HUÉSPED
-      doc.setFontSize(9);
-      doc.setFont(undefined, 'bold');
-      doc.text("DATOS DEL HUÉSPED:", 15, currentY);
-      currentY += 15;
+    // 👤 DATOS DEL HUÉSPED
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    doc.text("DATOS DEL HUESPED:", 15, currentY);
+    currentY += 15;
 
-      doc.setFont(undefined, 'normal');
-      const guestName = currentBuyerData?.scostumername || 'N/A';
-      const guestDoc = currentBuyerData?.sdocno || 'N/A';
-      const guestEmail = currentBuyerData?.selectronicmail;
-      const guestPhone = currentBuyerData?.stelephone;
+    doc.setFont(undefined, 'normal');
+    const guestName = currentBuyerData?.scostumername || 'N/A';
+    const guestDoc = currentBuyerData?.sdocno || 'N/A';
+    
+    doc.text(`Nombre: ${guestName}`, 15, currentY);
+    currentY += 12;
+    doc.text(`Documento: ${guestDoc}`, 15, currentY);
+    currentY += 15;
 
-      doc.text(`Nombre: ${guestName}`, 15, currentY);
+    // 🏨 DATOS DE LA RESERVA
+    doc.setFont(undefined, 'bold');
+    doc.text("DATOS DE LA RESERVA:", 15, currentY);
+    currentY += 15;
+
+    doc.setFont(undefined, 'normal');
+    const roomInfo = `${selectedRoom?.type || 'Habitacion'} - ${selectedRoom?.roomNumber || bookingData?.roomNumber || 'N/A'}`;
+    doc.text(`Habitacion: ${roomInfo}`, 15, currentY);
+    currentY += 12;
+
+    doc.text(`Reserva #: ${bookingData?.bookingId || 'N/A'}`, 15, currentY);
+    currentY += 12;
+
+    if (bookingData?.checkIn) {
+      doc.text(`Check-in: ${formatDateTime(bookingData.checkIn)}`, 15, currentY);
       currentY += 12;
-      doc.text(`Documento: ${guestDoc}`, 15, currentY);
-      currentY += 12;
-
-      if (guestEmail) {
-        doc.text(`Email: ${guestEmail}`, 15, currentY);
-        currentY += 12;
-      }
-
-      if (guestPhone) {
-        doc.text(`Teléfono: ${guestPhone}`, 15, currentY);
-        currentY += 12;
-      }
-
-      currentY += 10;
-
-      // 🏨 DATOS DE LA RESERVA
-      doc.setFont(undefined, 'bold');
-      doc.text("DATOS DE LA RESERVA:", 15, currentY);
-      currentY += 15;
-
-      doc.setFont(undefined, 'normal');
-      const roomInfo = `${selectedRoom?.type || 'Habitación'} - ${selectedRoom?.roomNumber || bookingData?.roomNumber || 'N/A'}`;
-      doc.text(`Habitación: ${roomInfo}`, 15, currentY);
-      currentY += 12;
-
-      doc.text(`Reserva #: ${bookingData?.bookingId || 'N/A'}`, 15, currentY);
-      currentY += 12;
-
-      if (bookingData?.checkIn) {
-        doc.text(`Check-in: ${formatDateTime(bookingData.checkIn)}`, 15, currentY);
-        currentY += 12;
-      }
-
-      if (bookingData?.checkOut) {
-        doc.text(`Check-out: ${formatDateTime(bookingData.checkOut)}`, 15, currentY);
-        currentY += 12;
-      }
-
-      currentY += 15;
-
-      // 💰 DESGLOSE FINANCIERO COMPLETO
-      doc.setFont(undefined, 'bold');
-      doc.text("DESGLOSE FINANCIERO:", 15, currentY);
-      currentY += 15;
-
-      doc.setFont(undefined, 'normal');
-      
-      // Total reserva
-      doc.text(`Costo reserva:`, 15, currentY);
-      doc.text(`$${financialData.totalReserva.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-      currentY += 12;
-
-      // Extras detallados si los hay
-      const extraCharges = bookingData?.extraCharges || [];
-      if (extraCharges.length > 0) {
-        doc.text(`Consumos extras:`, 15, currentY);
-        currentY += 10;
-        
-        extraCharges.forEach((charge) => {
-          const amount = parseFloat(charge.amount || 0);
-          const quantity = parseInt(charge.quantity || 1);
-          const total = amount * quantity;
-          
-          doc.setFontSize(7);
-          doc.text(`• ${charge.description || 'Cargo extra'}`, 20, currentY);
-          doc.text(`${quantity}x$${amount.toLocaleString()} = $${total.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-          currentY += 10;
-        });
-        
-        doc.setFontSize(8);
-        doc.text(`Subtotal extras:`, 15, currentY);
-        doc.text(`$${financialData.totalExtras.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-        currentY += 12;
-      }
-
-      // Subtotal
-      doc.text("─".repeat(35), pageWidth / 2, currentY, { align: "center" });
-      currentY += 10;
-      
-      doc.text(`Total cuenta:`, 15, currentY);
-      doc.text(`$${financialData.totalFinal.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-      currentY += 15;
-
-      // Pagos anteriores
-      const previousPayments = bookingData?.payments?.filter(p => p.paymentStatus === 'completed') || [];
-      if (previousPayments.length > 0 && financialData.totalPagado > 0) {
-        doc.text(`Pagos anteriores:`, 15, currentY);
-        doc.text(`-$${financialData.totalPagado.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-        currentY += 12;
-      }
-
-      // MONTO DE ESTE PAGO
-      doc.setFont(undefined, 'bold');
-      doc.text(`PAGO ACTUAL:`, 15, currentY);
-      doc.text(`$${parseFloat(paymentDetails.amount).toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-      currentY += 15;
-
-      // Método de pago
-      doc.setFont(undefined, 'normal');
-      doc.text(`Método: ${getPaymentMethodLabel(paymentMethod).replace(/[^\w\s]/g, '')}`, 15, currentY);
-      currentY += 20;
-
-      // Saldo restante si es pago parcial
-      const remainingAfterPayment = financialData.pendienteReal - parseFloat(paymentDetails.amount);
-      if (remainingAfterPayment > 0) {
-        doc.text(`Saldo pendiente:`, 15, currentY);
-        doc.text(`$${remainingAfterPayment.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-        currentY += 15;
-      }
-
-      // 🎯 LÍNEA SEPARADORA FINAL
-      doc.text("━".repeat(35), pageWidth / 2, currentY, { align: "center" });
-      currentY += 20;
-
-      // 🙏 MENSAJE DE AGRADECIMIENTO
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'bold');
-      doc.text("¡Gracias por elegirnos!", pageWidth / 2, currentY, { align: "center" });
-      currentY += 15;
-
-      doc.setFontSize(8);
-      doc.setFont(undefined, 'normal');
-      doc.text("Conserve este recibo", pageWidth / 2, currentY, { align: "center" });
-
-      // 🔧 GENERAR Y MOSTRAR EL PDF
-      doc.output("dataurlnewwindow");
-      
-      console.log("✅ PDF generado exitosamente");
-      
-    } catch (error) {
-      console.error("❌ Error generando PDF:", error);
-      toast.error("Error al generar el recibo PDF");
     }
-  };
+
+    if (bookingData?.checkOut) {
+      doc.text(`Check-out: ${formatDateTime(bookingData.checkOut)}`, 15, currentY);
+      currentY += 12;
+    }
+
+    currentY += 15;
+
+    // 💰 DESGLOSE FINANCIERO COMPLETO
+    doc.setFont(undefined, 'bold');
+    doc.text("DESGLOSE FINANCIERO:", 15, currentY);
+    currentY += 15;
+
+    doc.setFont(undefined, 'normal');
+    
+    // Total reserva
+    doc.text(`Costo reserva:`, 15, currentY);
+    doc.text(`$${financialData.totalReserva.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+    currentY += 12;
+
+    // Extras detallados si los hay
+    const extraCharges = bookingData?.extraCharges || [];
+    if (extraCharges.length > 0) {
+      doc.text(`Consumos extras:`, 15, currentY);
+      currentY += 10;
+      
+      extraCharges.forEach((charge) => {
+        const amount = parseFloat(charge.amount || 0);
+        const quantity = parseInt(charge.quantity || 1);
+        const total = amount * quantity;
+        
+        doc.setFontSize(7);
+        doc.text(`• ${charge.description || 'Cargo extra'}`, 20, currentY);
+        doc.text(`${quantity}x$${amount.toLocaleString()} = $${total.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+        currentY += 10;
+      });
+      
+      doc.setFontSize(8);
+      doc.text(`Subtotal extras:`, 15, currentY);
+      doc.text(`$${financialData.totalExtras.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      currentY += 12;
+    }
+
+    // 🎯 LÍNEA SEPARADORA - CORREGIDA
+    doc.text("-".repeat(35), pageWidth / 2, currentY, { align: "center" });
+    currentY += 10;
+    
+    doc.text(`Total cuenta:`, 15, currentY);
+    doc.text(`$${financialData.totalFinal.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+    currentY += 15;
+
+    // Pagos anteriores
+    const previousPayments = bookingData?.payments?.filter(p => p.paymentStatus === 'completed') || [];
+    const previousPaymentsTotal = financialData.totalPagado - parseFloat(paymentDetails.amount);
+    
+    if (previousPaymentsTotal > 0) {
+      doc.text(`Pagos anteriores:`, 15, currentY);
+      doc.text(`-$${previousPaymentsTotal.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      currentY += 12;
+    }
+
+    // 🎯 LÍNEA SEPARADORA - CORREGIDA
+    doc.text("=".repeat(35), pageWidth / 2, currentY, { align: "center" });
+    currentY += 15;
+
+    // MONTO DE ESTE PAGO
+    doc.setFont(undefined, 'bold');
+    doc.text(`PAGO ACTUAL:`, 15, currentY);
+    doc.text(`$${parseFloat(paymentDetails.amount).toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+    currentY += 15;
+
+    // Método de pago - CORREGIDO
+    doc.setFont(undefined, 'normal');
+    const methodLabel = getPaymentMethodLabel(paymentMethod).replace(/[^\w\s]/g, '').trim();
+    doc.text(`Metodo: ${methodLabel}`, 15, currentY);
+    currentY += 20;
+
+    // Saldo restante si es pago parcial
+    const remainingAfterPayment = financialData.totalFinal - financialData.totalPagado;
+    if (remainingAfterPayment > 0) {
+      doc.text(`Saldo pendiente:`, 15, currentY);
+      doc.text(`$${remainingAfterPayment.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      currentY += 15;
+    }
+
+    // 🎯 LÍNEA SEPARADORA FINAL - CORREGIDA
+    doc.text("=".repeat(35), pageWidth / 2, currentY, { align: "center" });
+    currentY += 20;
+
+    // 🙏 MENSAJE DE AGRADECIMIENTO
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text("¡Gracias por elegirnos!", pageWidth / 2, currentY, { align: "center" });
+    currentY += 15;
+
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.text("Conserve este recibo", pageWidth / 2, currentY, { align: "center" });
+
+    // 🔧 GENERAR Y MOSTRAR EL PDF
+    doc.output("dataurlnewwindow");
+    
+    console.log("✅ PDF generado exitosamente");
+    
+  } catch (error) {
+    console.error("❌ Error generando PDF:", error);
+    toast.error("Error al generar el recibo PDF");
+  }
+};
 
   // 🔧 FUNCIÓN PRINCIPAL DE PAGO MEJORADA
   const handlePayment = async () => {
@@ -683,7 +677,8 @@ const PaymentAndReceipt = ({
               disabled={isProcessing}
             >
               <option value="cash">💵 Efectivo</option>
-              <option value="card">💳 Tarjeta</option>
+              <option value="credit_card">💳 Tarjeta de Crédito</option>
+              <option value="debit_card">💳 Tarjeta de Débito</option>
               <option value="transfer">🏦 Transferencia</option>
               <option value="other">📝 Otro</option>
             </select>

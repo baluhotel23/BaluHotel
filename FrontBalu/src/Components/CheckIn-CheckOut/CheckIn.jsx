@@ -31,16 +31,12 @@ const CheckIn = () => {
     errors = {} 
   } = useSelector((state) => state.booking || {});
   
-  // ⭐ LOADING ESPECÍFICO PARA GET_ALL_BOOKINGS
   const isLoadingBookings = loading.general || false;
   const bookingError = errors.general || null;
   
-  // ⭐ SELECTORES DE REGISTRATIONPASS - OPTIMIZADOS
+  // ⭐ SELECTORES DE REGISTRATIONPASS
   const { 
     registrationsByBooking = {}
-    // ⭐ REMOVER VARIABLES NO USADAS
-    // loading: registrationLoading = {}, 
-    // errors: registrationErrors = {} 
   } = useSelector((state) => state.registrationPass || {});
   
   // ⭐ ESTADOS LOCALES ORGANIZADOS POR FUNCIONALIDAD
@@ -85,7 +81,6 @@ const CheckIn = () => {
     const filtered = allBookings.filter(booking => {
       const hasValidStatus = validStatuses.includes(booking.status) || !booking.status;
       
-      // ⭐ DEBUG SOLO EN DESARROLLO
       if (process.env.NODE_ENV === 'development' && booking.bookingId) {
         console.log(`🔍 Booking ${booking.bookingId}: status=${booking.status}, included=${hasValidStatus}`);
       }
@@ -152,7 +147,6 @@ const CheckIn = () => {
           setPassengersLoaded(prev => ({ ...prev, [booking.bookingId]: true }));
         }
 
-        // ⭐ PEQUEÑO DELAY PARA EVITAR SOBRECARGA
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     };
@@ -188,36 +182,70 @@ const CheckIn = () => {
     return fromLocal || fromRedux;
   }, [registeredPassengers, registrationsByBooking]);
 
-  const getPassengersStatus = useCallback((bookingId) => {
+  // ⭐ FUNCIÓN MEJORADA PARA VALIDAR TODOS LOS PASAJEROS
+  const getPassengersStatus = useCallback((bookingId, requiredGuestCount) => {
     const loadedState = passengersLoaded[bookingId];
-    const hasError = passengersLoadingErrors[bookingId];
-    const hasPassengers = hasRegisteredPassengers(bookingId);
+    
+    // Obtener número de pasajeros registrados
+    const registeredCount = registrationsByBooking[bookingId]?.length || 
+                           registeredPassengers[bookingId]?.length || 0;
     
     if (loadedState === 'loading') {
-      return { status: 'loading', message: 'Verificando...', icon: '🔄' };
+      return { 
+        status: 'loading', 
+        message: 'Verificando...', 
+        icon: '🔄',
+        registeredCount,
+        requiredCount: requiredGuestCount,
+        isComplete: false
+      };
     }
     
-    if (hasError) {
-      return { status: 'error', message: 'Error al cargar', icon: '❌' };
-    }
+    // 🎯 VALIDACIÓN ESTRICTA: DEBEN ESTAR TODOS LOS HUÉSPEDES REGISTRADOS
+    const isComplete = registeredCount >= requiredGuestCount && requiredGuestCount > 0;
     
-    if (hasPassengers) {
-      const count = registrationsByBooking[bookingId]?.length || 
-                   registeredPassengers[bookingId]?.length || 0;
+    if (isComplete) {
       return { 
         status: 'completed', 
-        message: `Check-in completado (${count})`, 
+        message: `Check-in completo (${registeredCount}/${requiredGuestCount})`, 
         icon: '✅',
-        count 
+        registeredCount,
+        requiredCount: requiredGuestCount,
+        isComplete: true
+      };
+    }
+    
+    if (registeredCount > 0) {
+      return { 
+        status: 'partial', 
+        message: `Parcial (${registeredCount}/${requiredGuestCount})`, 
+        icon: '⚠️',
+        registeredCount,
+        requiredCount: requiredGuestCount,
+        isComplete: false
       };
     }
     
     if (loadedState === true) {
-      return { status: 'pending', message: 'Pendiente de check-in', icon: '⏳' };
+      return { 
+        status: 'pending', 
+        message: `Pendiente (0/${requiredGuestCount})`, 
+        icon: '⏳',
+        registeredCount,
+        requiredCount: requiredGuestCount,
+        isComplete: false
+      };
     }
     
-    return { status: 'unknown', message: 'Verificando...', icon: '🔄' };
-  }, [passengersLoaded, passengersLoadingErrors, hasRegisteredPassengers, registrationsByBooking, registeredPassengers]);
+    return { 
+      status: 'unknown', 
+      message: 'Verificando...', 
+      icon: '🔄',
+      registeredCount,
+      requiredCount: requiredGuestCount,
+      isComplete: false
+    };
+  }, [passengersLoaded, registrationsByBooking, registeredPassengers]);
 
   const getRoomInfo = useCallback((booking) => {
     const room = booking.Room || booking.room || null;
@@ -584,28 +612,28 @@ const CheckIn = () => {
             )}
 
             {/* ⭐ ACCIONES RÁPIDAS */}
-           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-  {(user?.role === "owner" || user?.role === "admin" || user?.role === "recept") && (
-    <button
-      onClick={() => navigate('/admin/CheckOut')}
-      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-    >
-      🏨 Ir a Check-Out
-    </button>
-  )}
-  <button
-    onClick={() => {
-      const newRange = {
-        from: dayjs().subtract(7, 'day').format("YYYY-MM-DD"),
-        to: dayjs().add(7, 'day').format("YYYY-MM-DD")
-      };
-      setDateRange(newRange);
-    }}
-    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-  >
-    Ver ±7 días
-  </button>
-</div>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {(user?.role === "owner" || user?.role === "admin" || user?.role === "recept") && (
+                <button
+                  onClick={() => navigate('/admin/CheckOut')}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  🏨 Ir a Check-Out
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  const newRange = {
+                    from: dayjs().subtract(7, 'day').format("YYYY-MM-DD"),
+                    to: dayjs().add(7, 'day').format("YYYY-MM-DD")
+                  };
+                  setDateRange(newRange);
+                }}
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Ver ±7 días
+              </button>
+            </div>
 
             {/* ⭐ DEBUG INFO - SOLO EN DESARROLLO */}
             {process.env.NODE_ENV === 'development' && (
@@ -703,7 +731,10 @@ const CheckIn = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {bookings.map((booking) => {
             const room = getRoomInfo(booking);
-            const passengersStatus = getPassengersStatus(booking.bookingId);
+            
+            // 🎯 PASAR EL NÚMERO REQUERIDO DE HUÉSPEDES
+            const requiredGuestCount = parseInt(booking.guestCount) || 1;
+            const passengersStatus = getPassengersStatus(booking.bookingId, requiredGuestCount);
             
             // ⭐ LÓGICA DE PAGOS
             const payments = booking.Payments || booking.payments || [];
@@ -780,19 +811,44 @@ const CheckIn = () => {
                     </div>
                   </div>
 
-                  {/* ⭐ ESTADO DE PASAJEROS */}
+                  {/* ⭐ ESTADO DE PASAJEROS MEJORADO */}
                   <div className="mt-3">
-                    <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                    <span className={`inline-block px-3 py-1 text-xs rounded-full font-medium ${
                       passengersStatus.status === 'completed' 
-                        ? 'bg-green-100 text-green-700'
+                        ? 'bg-green-100 text-green-700 border border-green-200'
+                        : passengersStatus.status === 'partial'
+                        ? 'bg-orange-100 text-orange-700 border border-orange-200'
                         : passengersStatus.status === 'pending'
-                        ? 'bg-yellow-100 text-yellow-700' 
+                        ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
                         : passengersStatus.status === 'loading'
-                        ? 'bg-blue-100 text-blue-700 animate-pulse'
-                        : 'bg-red-100 text-red-700'
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200 animate-pulse'
+                        : 'bg-red-100 text-red-700 border border-red-200'
                     }`}>
                       {passengersStatus.icon} {passengersStatus.message}
                     </span>
+                    
+                    {/* 🆕 INDICADOR VISUAL DE PROGRESO */}
+                    {passengersStatus.requiredCount > 1 && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              passengersStatus.isComplete 
+                                ? 'bg-green-500' 
+                                : passengersStatus.registeredCount > 0 
+                                ? 'bg-orange-500' 
+                                : 'bg-gray-300'
+                            }`}
+                            style={{ 
+                              width: `${Math.min(100, (passengersStatus.registeredCount / passengersStatus.requiredCount) * 100)}%` 
+                            }}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-gray-500 font-mono">
+                          {passengersStatus.registeredCount}/{passengersStatus.requiredCount}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -916,44 +972,81 @@ const CheckIn = () => {
                   )}
                 </div>
 
-                {/* ⭐ PROGRESO VISUAL */}
+                {/* ⭐ PROGRESO VISUAL ACTUALIZADO */}
                 <div className="px-6 py-4 bg-gray-50">
                   <h4 className="text-sm font-semibold text-gray-800 mb-3">
                     📋 Progreso del Check-in
                   </h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${
-                        inventoryLoaded ? "bg-green-500" : "bg-gray-300"
-                      }`}></div>
-                      <span className="text-xs text-gray-600">Inventario verificado</span>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full ${
+                          inventoryLoaded ? "bg-green-500" : "bg-gray-300"
+                        }`}></div>
+                        <span className="text-xs text-gray-600">Inventario verificado</span>
+                      </div>
+                      {inventoryLoaded && <span className="text-xs text-green-600">✓</span>}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${
-                        allInventoryDelivered ? "bg-green-500" : "bg-gray-300"
-                      }`}></div>
-                      <span className="text-xs text-gray-600">Inventario entregado</span>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full ${
+                          allInventoryDelivered ? "bg-green-500" : "bg-gray-300"
+                        }`}></div>
+                        <span className="text-xs text-gray-600">Inventario entregado</span>
+                      </div>
+                      {allInventoryDelivered && <span className="text-xs text-green-600">✓</span>}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${
-                        room.status === "Limpia" ? "bg-green-500" : "bg-gray-300"
-                      }`}></div>
-                      <span className="text-xs text-gray-600">Habitación limpia</span>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full ${
+                          room.status === "Limpia" ? "bg-green-500" : "bg-gray-300"
+                        }`}></div>
+                        <span className="text-xs text-gray-600">Habitación limpia</span>
+                      </div>
+                      {room.status === "Limpia" && <span className="text-xs text-green-600">✓</span>}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${
-                        passengersStatus.status === 'completed' ? "bg-green-500" : "bg-gray-300"
-                      }`}></div>
-                      <span className="text-xs text-gray-600">
-                        Ocupantes registrados {passengersStatus.status === 'completed' ? `(${passengersStatus.count})` : ''}
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full ${
+                          passengersStatus.isComplete ? "bg-green-500" : 
+                          passengersStatus.registeredCount > 0 ? "bg-orange-500" : "bg-gray-300"
+                        }`}></div>
+                        <span className="text-xs text-gray-600">
+                          Todos los ocupantes registrados
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono text-gray-500">
+                        {passengersStatus.registeredCount}/{passengersStatus.requiredCount}
+                        {passengersStatus.isComplete && <span className="text-green-600 ml-1">✓</span>}
                       </span>
+                    </div>
+
+                    {/* 🆕 INDICADOR DE ESTADO GENERAL */}
+                    <div className="mt-4 pt-3 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Estado general:</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          passengersStatus.isComplete && room.status === "Limpia" && allInventoryDelivered
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {passengersStatus.isComplete && room.status === "Limpia" && allInventoryDelivered
+                            ? '✅ Listo para ocupar'
+                            : '⏳ En progreso'
+                          }
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* ⭐ BOTONES DE ACCIÓN */}
+                {/* ⭐ BOTONES DE ACCIÓN CON VALIDACIÓN ESTRICTA */}
                 <div className="p-6 border-t border-gray-100">
                   <div className="grid grid-cols-1 gap-3">
+                    {/* Botón de limpiar habitación */}
                     <button
                       className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
                         room.status === "Limpia"
@@ -972,9 +1065,10 @@ const CheckIn = () => {
                         : "🧹 Marcar como limpia"}
                     </button>
 
+                    {/* Botón de registrar ocupantes */}
                     <button
                       className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                        passengersStatus.status === 'completed'
+                        passengersStatus.isComplete
                           ? "bg-green-500 text-white cursor-not-allowed"
                           : passengersStatus.status === 'loading'
                           ? "bg-blue-400 text-white cursor-not-allowed animate-pulse"
@@ -983,7 +1077,7 @@ const CheckIn = () => {
                           : "bg-gray-400 text-gray-700 cursor-not-allowed"
                       }`}
                       disabled={
-                        passengersStatus.status === 'completed' || 
+                        passengersStatus.isComplete || 
                         passengersStatus.status === 'loading' ||
                         room.status !== "Limpia"
                       }
@@ -993,14 +1087,69 @@ const CheckIn = () => {
                         )
                       }
                     >
-                      {passengersStatus.status === 'completed'
-                        ? `✅ ${passengersStatus.message}`
+                      {passengersStatus.isComplete
+                        ? `✅ Todos registrados (${passengersStatus.registeredCount}/${passengersStatus.requiredCount})`
                         : passengersStatus.status === 'loading'
                         ? "🔄 Verificando pasajeros..."
                         : room.status === "Limpia"
-                        ? "👥 Registrar ocupantes"
+                        ? `👥 Registrar ocupantes (${passengersStatus.registeredCount}/${passengersStatus.requiredCount})`
                         : "🔒 Limpiar habitación primero"}
                     </button>
+
+                    {/* 🆕 BOTÓN PARA COMPLETAR CHECK-IN - SOLO CUANDO TODO ESTÉ LISTO */}
+                    {passengersStatus.isComplete && room.status === "Limpia" && allInventoryDelivered && (
+                      <button
+                        className="w-full px-4 py-3 rounded-lg font-bold bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transform hover:-translate-y-0.5 shadow-lg transition-all duration-200"
+                        onClick={async () => {
+                          try {
+                            // Actualizar estado de reserva a checked-in
+                            const result = await dispatch(updateBookingStatus(booking.bookingId, { status: "checked-in" }));
+                            
+                            if (result && !result.error) {
+                              // Actualizar estado de habitación a ocupada
+                              if (room.roomNumber !== 'Sin asignar') {
+                                dispatch(updateRoomStatus(room.roomNumber, { status: "Ocupada" }));
+                              }
+                              
+                              toast.success(`✅ Check-in completado para reserva ${booking.bookingId}`);
+                              
+                              // Recargar datos
+                              setTimeout(() => {
+                                dispatch(getAllBookings({ 
+                                  fromDate: dateRange.from, 
+                                  toDate: dateRange.to
+                                }));
+                              }, 1000);
+                            } else {
+                              toast.error("Error al completar el check-in");
+                            }
+                          } catch (error) {
+                            console.error("Error completando check-in:", error);
+                            toast.error("Error al completar el check-in");
+                          }
+                        }}
+                      >
+                        🎉 COMPLETAR CHECK-IN
+                      </button>
+                    )}
+
+                    {/* Mensaje de requisitos faltantes */}
+                    {(!passengersStatus.isComplete || room.status !== "Limpia" || !allInventoryDelivered) && (
+                      <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800 font-medium mb-2">⚠️ Requisitos pendientes:</p>
+                        <ul className="text-xs text-yellow-700 space-y-1">
+                          {room.status !== "Limpia" && (
+                            <li>• Habitación debe estar limpia</li>
+                          )}
+                          {!allInventoryDelivered && inventoryItems.length > 0 && (
+                            <li>• Inventario básico debe estar entregado</li>
+                          )}
+                          {!passengersStatus.isComplete && (
+                            <li>• Todos los ocupantes deben estar registrados ({passengersStatus.registeredCount}/{passengersStatus.requiredCount})</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
 
                     {/* ⭐ BOTÓN DE RECARGA MANUAL */}
                     {passengersStatus.status === 'error' && (
