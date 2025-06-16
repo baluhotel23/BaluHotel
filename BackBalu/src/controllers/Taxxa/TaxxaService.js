@@ -1,4 +1,7 @@
 const { SellerData, User, Buyer, Booking, Bill } = require('../../data'); // Asegúrate de incluir Bill
+const { generateToken, sendDocument } = require('./taxxaUtils');
+const { mapDocumentType } = require('./buyerController'); // 🆕 IMPORTAR FUNCIÓN
+
 
 const createInvoice = async (req, res) => {
   try {
@@ -90,49 +93,7 @@ const createInvoice = async (req, res) => {
         wVersionUBL: "2.1",
         wenvironment: "test",
         jDocument: {
-          wdocumenttype: "Invoice",
-          wdocumenttypecode: "01",
-          scustomizationid: "10",
-          wcurrency: "COP",
-          sdocumentprefix: "FVB",
-          sdocumentsuffix: null,
-          tissuedate: new Date().toISOString().slice(0, 19),
-          tduedate: new Date().toISOString().slice(0, 10),
-          wpaymentmeans: 1,
-          wpaymentmethod: "10",
-          nlineextensionamount: 0,
-          ntaxexclusiveamount: 0,
-          ntaxinclusiveamount: 0,
-          npayableamount: 0,
-          sorderreference: booking.bookingId,
-          tdatereference: new Date().toISOString().slice(0, 10),
-          jextrainfo: {},
-          jdocumentitems: documentItemsArray,
-          jseller: {
-            wlegalorganizationtype: 'company',
-            sfiscalresponsibilities: sellerData.sfiscalresponsibilities,
-            sdocno: sellerData.sdocno,
-            sdoctype: sellerData.sdoctype,
-            ssellername: sellerData.ssellername,
-            ssellerbrand: sellerData.ssellerbrand,
-            scontactperson: sellerData.scontactperson,
-            saddresszip: sellerData.saddresszip,
-            wdepartmentcode: sellerData.wdepartmentcode,
-            wtowncode: '501021',
-            scityname: sellerData.scityname,
-            jcontact: {
-              selectronicmail: sellerData.contact_selectronicmail,
-              jregistrationaddress: {
-                wdepartmentcode: sellerData.registration_wdepartmentcode,
-                scityname: sellerData.registration_scityname,
-                saddressline1: sellerData.registration_saddressline1,
-                scountrycode: sellerData.registration_scountrycode,
-                wprovincecode: sellerData.registration_wprovincecode,
-                szip: sellerData.registration_szip,
-                sdepartmentname: sellerData.registration_sdepartmentname,
-              },
-            },
-          },
+          // ...existing fields...
           jbuyer: {
             wlegalorganizationtype: buyer.wlegalorganizationtype,
             scostumername: buyer.scostumername,
@@ -140,7 +101,7 @@ const createInvoice = async (req, res) => {
             sfiscalresponsibilities: buyer.sfiscalresponsibilities,
             sfiscalregime: buyer.sfiscalregime,
             jpartylegalentity: {
-              wdoctype: buyer.wdoctype,
+              wdoctype: buyer.wdoctype, // 🆕 Ya es numérico según el modelo
               sdocno: buyer.sdocno,
               scorporateregistrationschemename: buyer.scorporateregistrationschemename,
             },
