@@ -4,11 +4,16 @@ import {
   checkAvailability,
   createBooking,
   updateOnlinePayment,
+  
 } from "../../Redux/Actions/bookingActions";
 import { calculateRoomPrice } from "../../Redux/Actions/roomActions"; // ⭐ NUEVA IMPORTACIÓN
 import {
   fetchBuyerByDocument,
   createBuyer,
+  fetchCountries,
+  fetchDepartments,
+  fetchMunicipalities,
+  validateLocation
 } from "../../Redux/Actions/taxxaActions";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -79,13 +84,23 @@ const BuyerRegistrationFormPopup = ({
   initialSdocno,
 }) => {
   const dispatch = useDispatch();
+
+  const {
+    countries,
+    departmentsCache,
+    municipalitiesCache,
+    loadingCountries,
+    loadingDepartments,
+    loadingMunicipalities
+  } = useSelector(state => state.taxxa);
+
   const [buyerFormData, setBuyerFormData] = useState({
     sdocno: initialSdocno || "",
     wlegalorganizationtype: "person",
     scostumername: "",
-    stributaryidentificationkey: "O-1",
+    stributaryidentificationkey: "ZZ",  // 🔧 CORREGIR DEFAULT
     sfiscalresponsibilities: "R-99-PN",
-    sfiscalregime: "48",
+    sfiscalregime: "49",  // 🔧 CORREGIR DEFAULT
     wdoctype: "CC",
     scorporateregistrationschemename: "",
     scontactperson: "",
@@ -94,21 +109,130 @@ const BuyerRegistrationFormPopup = ({
     saddressline1: "",
     scityname: "",
     wdepartmentcode: "",
+    wtowncode: "",  // 🆕 AGREGAR ESTE CAMPO
   });
+
+  const [selectedCountry, setSelectedCountry] = useState('CO');
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedMunicipality, setSelectedMunicipality] = useState('');
+
+  // 🆕 AGREGAR ESTADOS PARA LISTAS LOCALES
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [municipalitiesList, setMunicipalitiesList] = useState([]);
+  const [localLoadingMunicipalities, setLocalLoadingMunicipalities] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      dispatch(fetchCountries());
+      dispatch(fetchDepartments('CO'));
+    }
+  }, [isOpen, dispatch]);
 
   useEffect(() => {
     if (initialSdocno) {
       setBuyerFormData((prev) => ({ ...prev, sdocno: initialSdocno }));
     }
-  }, [initialSdocno, isOpen]); // Reset form when opened with new initialSdocno
+  }, [initialSdocno, isOpen]);
 
+  // 🔧 CORREGIR EFECTOS PARA OBTENER LISTAS
+  useEffect(() => {
+    if (selectedCountry) {
+      dispatch(fetchDepartments(selectedCountry));
+    }
+  }, [selectedCountry, dispatch]);
+
+  useEffect(() => {
+    if (selectedDepartment) {
+      dispatch(fetchMunicipalities(selectedDepartment));
+    }
+  }, [selectedDepartment, dispatch]);
+
+  // 🆕 EFECTOS PARA ACTUALIZAR LISTAS LOCALES DESDE REDUX
+  useEffect(() => {
+    const departments = departmentsCache[`departments_${selectedCountry}`] || [];
+    setDepartmentsList(departments);
+    console.log('🏛️ [BUYER] Departamentos actualizados:', departments.length);
+  }, [departmentsCache, selectedCountry]);
+
+  useEffect(() => {
+  // 🔧 CORREGIR LA CLAVE PARA COINCIDIR CON EL REDUCER
+  const cacheKey = `municipalities_${selectedDepartment}__50`; // ← Doble underscore
+  const municipalities = municipalitiesCache[cacheKey] || [];
+  
+  console.log('🔍 [BUYER] Cache key buscado:', cacheKey);
+  console.log('🔍 [BUYER] Claves disponibles en cache:', Object.keys(municipalitiesCache));
+  console.log('🏙️ [BUYER] Municipios encontrados:', municipalities.length);
+  
+  setMunicipalitiesList(municipalities);
+}, [municipalitiesCache, selectedDepartment]);
   const handleChange = (e) => {
     const { name, value } = e.target;
     setBuyerFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // 🔧 CORREGIR handleDepartmentChange
+  const handleDepartmentChange = async (e) => {
+    const departmentCode = e.target.value;
+    setSelectedDepartment(departmentCode);
+    setSelectedMunicipality('');
+    setMunicipalitiesList([]); // ✅ AHORA ESTÁ DEFINIDA
+    
+    setBuyerFormData(prevData => ({
+      ...prevData,
+      wdepartmentcode: departmentCode,
+      wtowncode: '',
+      scityname: ''
+    }));
+    
+    if (departmentCode) {
+      setLocalLoadingMunicipalities(true); // ✅ AHORA ESTÁ DEFINIDA
+      try {
+        console.log('🏛️ [BUYER] Cargando municipios para departamento:', departmentCode);
+        
+        const municipalitiesData = await dispatch(fetchMunicipalities(departmentCode));
+        
+        if (municipalitiesData && Array.isArray(municipalitiesData)) {
+          setMunicipalitiesList(municipalitiesData);
+          console.log('🏙️ [BUYER] Municipios cargados:', municipalitiesData.length);
+        } else {
+          console.warn('⚠️ [BUYER] No se recibieron municipios válidos');
+          setMunicipalitiesList([]);
+        }
+      } catch (error) {
+        console.error('❌ [BUYER] Error cargando municipios:', error);
+        setMunicipalitiesList([]);
+      } finally {
+        setLocalLoadingMunicipalities(false); // ✅ AHORA ESTÁ DEFINIDA
+      }
+    }
+  };
+
+  // 🔧 CORREGIR handleMunicipalityChange
+  const handleMunicipalityChange = (e) => {
+    const municipalityCode = e.target.value;
+    setSelectedMunicipality(municipalityCode);
+    
+    const selectedMunicipalityData = municipalitiesList.find(
+      muni => muni.code === municipalityCode || muni.wtowncode === municipalityCode
+    );
+    
+    setBuyerFormData(prevData => ({
+      ...prevData,
+      wtowncode: municipalityCode,
+      scityname: selectedMunicipalityData?.name || ''
+    }));
+    
+    console.log('🏙️ [BUYER] Ciudad seleccionada:', {
+      code: municipalityCode,
+      name: selectedMunicipalityData?.name
+    });
+  };
+
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  try {
+    // 🔍 EXTRAER Y VALIDAR CAMPOS OBLIGATORIOS
     const {
       sdocno,
       scostumername,
@@ -118,29 +242,187 @@ const BuyerRegistrationFormPopup = ({
       scontactperson,
       stelephone,
     } = buyerFormData;
-    if (
-      !sdocno ||
-      !scostumername ||
-      !selectronicmail ||
-      !wdoctype ||
-      !scorporateregistrationschemename ||
-      !scontactperson ||
-      !stelephone
-    ) {
-      toast.error(
-        "Por favor, complete todos los campos obligatorios del huésped (*)."
-      );
+    
+    // ✅ VALIDACIÓN DE CAMPOS OBLIGATORIOS
+    const requiredFields = {
+      sdocno: 'Número de documento',
+      scostumername: 'Nombre completo',
+      selectronicmail: 'Email',
+      wdoctype: 'Tipo de documento',
+      scorporateregistrationschemename: 'Nombre comercial',
+      scontactperson: 'Persona de contacto',
+      stelephone: 'Teléfono'
+    };
+    
+    const missingFields = Object.entries(requiredFields)
+      .filter(([field]) => !buyerFormData[field] || buyerFormData[field].trim() === '')
+      .map(([, label]) => label);
+    
+    if (missingFields.length > 0) {
+      toast.error(`Por favor, complete los siguientes campos: ${missingFields.join(', ')}`);
       return;
     }
-    const resultAction = await dispatch(createBuyer(buyerFormData));
-    if (resultAction && resultAction.success) {
-      toast.success("Huésped registrado exitosamente.");
-      onBuyerRegistered(resultAction.data); // Pasa el buyer registrado
-      onClose();
-    } else {
-      toast.error(resultAction.message || "Error al registrar el huésped.");
+    
+    // 📧 VALIDACIÓN DE EMAIL
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(selectronicmail)) {
+      toast.error('Por favor, ingrese un email válido');
+      return;
     }
-  };
+    
+    // 📱 VALIDACIÓN DE TELÉFONO (opcional, básica)
+    if (stelephone.length < 7) {
+      toast.error('Por favor, ingrese un teléfono válido (mínimo 7 dígitos)');
+      return;
+    }
+    
+    console.log('🔍 [BUYER] Iniciando proceso de registro:', {
+      documento: sdocno,
+      nombre: scostumername,
+      email: selectronicmail,
+      tieneUbicacion: !!(buyerFormData.wtowncode && buyerFormData.wdepartmentcode)
+    });
+
+    // 🌍 VALIDACIÓN DE UBICACIÓN (OPCIONAL Y NO BLOQUEANTE)
+    let locationValidation = { isValid: true, errors: [] };
+    
+    if (buyerFormData.wtowncode && buyerFormData.wdepartmentcode) {
+      try {
+        console.log('🔍 [BUYER] Validando ubicación DIAN:', {
+          municipalityCode: buyerFormData.wtowncode,
+          departmentCode: buyerFormData.wdepartmentcode,
+          countryCode: selectedCountry
+        });
+        
+        locationValidation = await dispatch(validateLocation({
+          municipalityCode: buyerFormData.wtowncode,
+          departmentCode: buyerFormData.wdepartmentcode,
+          countryCode: selectedCountry || 'CO'
+        }));
+        
+        console.log('📊 [BUYER] Resultado validación ubicación:', locationValidation);
+        
+        if (locationValidation && !locationValidation.isValid) {
+          // 🔧 MOSTRAR WARNING PERO NO BLOQUEAR
+          toast.warning(`Advertencia en ubicación: ${locationValidation.errors.join(', ')}`);
+          console.warn('⚠️ [BUYER] Ubicación con advertencias, continuando...', locationValidation.errors);
+          
+          // 🤔 PREGUNTAR AL USUARIO SI QUIERE CONTINUAR
+          const userConfirms = window.confirm(
+            `Se detectaron las siguientes advertencias en la ubicación:\n\n${locationValidation.errors.join('\n')}\n\n¿Desea continuar con el registro?`
+          );
+          
+          if (!userConfirms) {
+            console.log('👤 [BUYER] Usuario canceló por advertencias de ubicación');
+            return;
+          }
+        } else if (locationValidation && locationValidation.isValid) {
+          console.log('✅ [BUYER] Ubicación validada correctamente');
+          toast.success('Ubicación validada correctamente');
+        }
+        
+      } catch (validationError) {
+        console.warn('⚠️ [BUYER] Error en validación DIAN (continuando):', validationError);
+        toast.warning('No se pudo validar la ubicación, pero se continuará con el registro');
+        // No bloquear el proceso por errores de validación
+      }
+    } else {
+      console.log('ℹ️ [BUYER] Sin datos de ubicación para validar');
+    }
+
+    // 🚀 CREAR BUYER
+    console.log('📝 [BUYER] Enviando datos de registro:', {
+      ...buyerFormData,
+      locationValidation: locationValidation.isValid ? 'válida' : 'con advertencias'
+    });
+    
+    const resultAction = await dispatch(createBuyer(buyerFormData));
+    
+    console.log('📬 [BUYER] Respuesta del servidor:', resultAction);
+    
+    // ✅ VERIFICAR RESULTADO
+    if (resultAction && resultAction.success) {
+      // 🎉 ÉXITO
+      console.log('✅ [BUYER] Registro exitoso:', resultAction.data);
+      
+      toast.success(
+        `¡Huésped registrado exitosamente! ${locationValidation.isValid ? '✅ Ubicación validada' : '⚠️ Con advertencias de ubicación'}`
+      );
+      
+      // 🔄 CALLBACK Y CIERRE
+      if (onBuyerRegistered && typeof onBuyerRegistered === 'function') {
+        onBuyerRegistered(resultAction.data);
+      }
+      
+      // 🚪 CERRAR MODAL
+      onClose();
+      
+      // 🔄 RESET COMPLETO DEL FORMULARIO
+      resetForm();
+      
+    } else {
+      // ❌ ERROR DEL SERVIDOR
+      const errorMessage = resultAction?.message || 
+                          resultAction?.error || 
+                          'Error desconocido al registrar el huésped';
+      
+      console.error('❌ [BUYER] Error del servidor:', {
+        resultAction,
+        message: errorMessage
+      });
+      
+      toast.error(`Error al registrar: ${errorMessage}`);
+    }
+    
+  } catch (networkError) {
+    // 🌐 ERROR DE RED O CONEXIÓN
+    console.error('❌ [BUYER] Error de red en handleSubmit:', networkError);
+    
+    if (networkError.code === 'NETWORK_ERROR') {
+      toast.error('Error de conexión. Verifique su internet e intente nuevamente.');
+    } else if (networkError.response?.status === 500) {
+      toast.error('Error interno del servidor. Intente nuevamente en unos momentos.');
+    } else if (networkError.response?.status === 400) {
+      toast.error('Datos inválidos. Revise la información ingresada.');
+    } else {
+      toast.error('Error inesperado. Intente nuevamente.');
+    }
+  }
+};
+
+// 🔄 FUNCIÓN AUXILIAR PARA RESET COMPLETO
+const resetForm = () => {
+  console.log('🔄 [BUYER] Reseteando formulario completo');
+  
+  setBuyerFormData({
+    sdocno: "",
+    wlegalorganizationtype: "person",
+    scostumername: "",
+    stributaryidentificationkey: "ZZ",
+    sfiscalresponsibilities: "R-99-PN",
+    sfiscalregime: "49",
+    wdoctype: "CC",
+    scorporateregistrationschemename: "",
+    scontactperson: "",
+    selectronicmail: "",
+    stelephone: "",
+    saddressline1: "",
+    scityname: "",
+    wdepartmentcode: "",
+    wtowncode: "",
+  });
+  
+  // Reset selectores
+  setSelectedCountry('CO');
+  setSelectedDepartment('');
+  setSelectedMunicipality('');
+  
+  // Reset listas locales
+  setMunicipalitiesList([]);
+  setLocalLoadingMunicipalities(false);
+  
+  console.log('✅ [BUYER] Formulario reseteado completamente');
+};
 
   const inputStyle = {
     width: "calc(100% - 16px)",
@@ -158,7 +440,7 @@ const BuyerRegistrationFormPopup = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <h4 style={{ marginTop: 0, marginBottom: "20px" }}>
-        Registrar Nuevo Huésped
+        Registrate para reservar
       </h4>
       <form onSubmit={handleSubmit}>
         <div>
@@ -172,6 +454,7 @@ const BuyerRegistrationFormPopup = ({
             style={inputStyle}
           />
         </div>
+        
         <div>
           <label style={labelStyle}>Tipo Documento (wdoctype):*</label>
           <select
@@ -192,11 +475,10 @@ const BuyerRegistrationFormPopup = ({
             <option value="PEP">PEP - Permiso Especial de Permanencia</option>
             <option value="PPT">PPT - Permiso Protección Temporal</option>
             <option value="FI">FI - NIT de Otro País</option>
-            <option value="NUIP">
-              NUIP - Número Único de Identificación Personal
-            </option>
+            <option value="NUIP">NUIP - Número Único de Identificación Personal</option>
           </select>
         </div>
+        
         <div>
           <label style={labelStyle}>Nombre Completo (scostumername):*</label>
           <input
@@ -208,6 +490,7 @@ const BuyerRegistrationFormPopup = ({
             style={inputStyle}
           />
         </div>
+        
         <div>
           <label style={labelStyle}>Email (selectronicmail):*</label>
           <input
@@ -219,6 +502,7 @@ const BuyerRegistrationFormPopup = ({
             style={inputStyle}
           />
         </div>
+        
         <div>
           <label style={labelStyle}>Teléfono (stelephone):*</label>
           <input
@@ -230,10 +514,9 @@ const BuyerRegistrationFormPopup = ({
             style={inputStyle}
           />
         </div>
+        
         <div>
-          <label style={labelStyle}>
-            Tipo Organización Legal (wlegalorganizationtype):*
-          </label>
+          <label style={labelStyle}>Tipo Organización Legal (wlegalorganizationtype):*</label>
           <select
             name="wlegalorganizationtype"
             value={buyerFormData.wlegalorganizationtype}
@@ -245,10 +528,9 @@ const BuyerRegistrationFormPopup = ({
             <option value="company">Empresa</option>
           </select>
         </div>
+        
         <div>
-          <label style={labelStyle}>
-            Clave Identificación Tributaria (stributaryidentificationkey):*
-          </label>
+          <label style={labelStyle}>Clave Identificación Tributaria (stributaryidentificationkey):*</label>
           <select
             name="stributaryidentificationkey"
             value={buyerFormData.stributaryidentificationkey}
@@ -262,10 +544,9 @@ const BuyerRegistrationFormPopup = ({
             <option value="ZA">ZA (IVA e INC)</option>
           </select>
         </div>
+        
         <div>
-          <label style={labelStyle}>
-            Responsabilidades Fiscales (sfiscalresponsibilities):*
-          </label>
+          <label style={labelStyle}>Responsabilidades Fiscales (sfiscalresponsibilities):*</label>
           <select
             name="sfiscalresponsibilities"
             value={buyerFormData.sfiscalresponsibilities}
@@ -280,6 +561,7 @@ const BuyerRegistrationFormPopup = ({
             <option value="O-47">O-47 (Régimen Simple de Tributación)</option>
           </select>
         </div>
+        
         <div>
           <label style={labelStyle}>Régimen Fiscal (sfiscalregime):*</label>
           <select
@@ -293,11 +575,9 @@ const BuyerRegistrationFormPopup = ({
             <option value="49">49 - No responsable de IVA</option>
           </select>
         </div>
+        
         <div>
-          <label style={labelStyle}>
-            Nombre Esquema Registro Corporativo
-            (scorporateregistrationschemename):*
-          </label>
+          <label style={labelStyle}>Nombre Comercial:</label>
           <input
             type="text"
             name="scorporateregistrationschemename"
@@ -308,10 +588,9 @@ const BuyerRegistrationFormPopup = ({
             placeholder="Ej: Registro Mercantil"
           />
         </div>
+        
         <div>
-          <label style={labelStyle}>
-            Persona de Contacto (scontactperson):*
-          </label>
+          <label style={labelStyle}>Persona de Contacto (scontactperson):*</label>
           <input
             type="text"
             name="scontactperson"
@@ -321,58 +600,144 @@ const BuyerRegistrationFormPopup = ({
             style={inputStyle}
           />
         </div>
-        <h5 style={{ marginTop: "15px", marginBottom: "5px" }}>
-          Dirección (Opcional)
-        </h5>
-        <div>
-          <label style={labelStyle}>Dirección (saddressline1):</label>
-          <input
-            type="text"
-            name="saddressline1"
-            value={buyerFormData.saddressline1}
-            onChange={handleChange}
-            style={inputStyle}
-          />
+
+        {/* 🆕 SECCIÓN DE UBICACIÓN CON SELECTORES DIAN */}
+        <div style={{ 
+          marginTop: "20px", 
+          padding: "15px", 
+          backgroundColor: "#f9f9f9", 
+          borderRadius: "8px",
+          border: "1px solid #e0e0e0"
+        }}>
+          <h5 style={{ 
+            marginTop: 0, 
+            marginBottom: "15px", 
+            color: "#333",
+            fontSize: "16px",
+            fontWeight: "bold"
+          }}>
+            📍 Ubicación (Opcional)
+          </h5>
+          
+          {/* Selector de Departamento */}
+          <div>
+            <label style={labelStyle}>Departamento:</label>
+            <select
+              value={selectedDepartment}
+              onChange={handleDepartmentChange}
+              disabled={loadingDepartments}
+              style={{
+                ...inputStyle,
+                backgroundColor: loadingDepartments ? "#f5f5f5" : "white"
+              }}
+            >
+              <option value="">Seleccionar departamento...</option>
+              {departmentsList.map(dept => (
+                <option key={dept.code} value={dept.code}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+            {loadingDepartments && (
+              <p style={{ 
+                fontSize: "12px", 
+                color: "#0066cc", 
+                margin: "5px 0",
+                fontStyle: "italic"
+              }}>
+                ⏳ Cargando departamentos...
+              </p>
+            )}
+          </div>
+
+          {/* Selector de Municipio */}
+          <div>
+            <label style={labelStyle}>Ciudad/Municipio:</label>
+            <select
+              value={selectedMunicipality}
+              onChange={handleMunicipalityChange}
+              disabled={localLoadingMunicipalities || !selectedDepartment}
+              style={{
+                ...inputStyle,
+                backgroundColor: (localLoadingMunicipalities || !selectedDepartment) ? "#f5f5f5" : "white"
+              }}
+            >
+              <option value="">
+                {!selectedDepartment 
+                  ? "Primero seleccione un departamento..." 
+                  : "Seleccionar ciudad..."
+                }
+              </option>
+              {municipalitiesList.map(muni => (
+                <option key={muni.code || muni.wtowncode} value={muni.code || muni.wtowncode}>
+                  {muni.name}
+                </option>
+              ))}
+            </select>
+            {localLoadingMunicipalities && (
+              <p style={{ 
+                fontSize: "12px", 
+                color: "#0066cc", 
+                margin: "5px 0",
+                fontStyle: "italic"
+              }}>
+                ⏳ Cargando ciudades...
+              </p>
+            )}
+          </div>
+
+          {/* Campo de Dirección */}
+          <div>
+            <label style={labelStyle}>Dirección completa:</label>
+            <input
+              type="text"
+              name="saddressline1"
+              value={buyerFormData.saddressline1}
+              onChange={handleChange}
+              style={inputStyle}
+              placeholder="Ej: Calle 123 #45-67, Barrio Centro"
+            />
+          </div>
+
+          {/* Campos ocultos para debug */}
+          {(buyerFormData.wdepartmentcode || buyerFormData.wtowncode) && (
+            <div style={{
+              marginTop: "10px",
+              padding: "8px",
+              backgroundColor: "#e8f4fd",
+              borderRadius: "4px",
+              border: "1px solid #b3d9ff",
+              fontSize: "12px"
+            }}>
+              <strong>🔍 Ubicación seleccionada:</strong><br/>
+              Departamento: {buyerFormData.wdepartmentcode}<br/>
+              Ciudad: {buyerFormData.wtowncode} ({buyerFormData.scityname})
+            </div>
+          )}
         </div>
-        <div>
-          <label style={labelStyle}>Ciudad (scityname):</label>
-          <input
-            type="text"
-            name="scityname"
-            value={buyerFormData.scityname}
-            onChange={handleChange}
-            style={inputStyle}
-          />
-        </div>
-        <div>
-          <label style={labelStyle}>
-            Código Departamento (wdepartmentcode):
-          </label>
-          <input
-            type="text"
-            name="wdepartmentcode"
-            value={buyerFormData.wdepartmentcode}
-            onChange={handleChange}
-            style={inputStyle}
-          />
-        </div>
+
         <button
           type="submit"
           style={{
-            padding: "10px 15px",
+            padding: "12px 20px",
             backgroundColor: "#4CAF50",
             color: "white",
             border: "none",
-            borderRadius: "4px",
+            borderRadius: "6px",
             cursor: "pointer",
             width: "auto",
             display: "block",
             marginLeft: "auto",
             marginRight: "auto",
-            marginTop: "20px",
+            marginTop: "25px",
+            fontSize: "16px",
+            fontWeight: "bold",
+            transition: "background-color 0.2s ease"
           }}
+          onMouseOver={(e) => e.target.style.backgroundColor = "#45a049"}
+          onMouseOut={(e) => e.target.style.backgroundColor = "#4CAF50"}
         >
-          Registrar Huésped
+          ✅ Registrar Huésped
         </button>
       </form>
     </Modal>
@@ -1190,7 +1555,7 @@ const handlePaymentSuccess = async (transaction) => {
               >
                 {buyerLoading
                   ? "⏳ Verificando..."
-                  : "🔍 Verificar / Registrar Huésped"}
+                  : "🔍 Verificar"}
               </button>
 
               {buyerLoading && (

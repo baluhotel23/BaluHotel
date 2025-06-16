@@ -182,3 +182,199 @@ export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
         }
     };
 };
+
+export const fetchCountries = () => async (dispatch, getState) => {
+  // Verificar si ya están en cache
+  const { countries } = getState().taxxa;
+  if (countries && countries.length > 0) {
+    return countries; // Retornar desde cache
+  }
+
+  dispatch({ type: 'FETCH_COUNTRIES_REQUEST' });
+
+  try {
+    const response = await api.get('/taxxa/dian/countries');
+    const data = response.data;
+
+    if (data && !data.error && data.data) {
+      dispatch({ type: 'FETCH_COUNTRIES_SUCCESS', payload: data.data });
+      return data.data;
+    } else {
+      const errorMsg = "Error al obtener países";
+      dispatch({ type: 'FETCH_COUNTRIES_FAILURE', payload: errorMsg });
+      toast.error(errorMsg);
+      return [];
+    }
+  } catch (error) {
+    const errorMsg = error.message || "Error al obtener países";
+    dispatch({ type: 'FETCH_COUNTRIES_FAILURE', payload: errorMsg });
+    toast.error(errorMsg);
+    return [];
+  }
+};
+
+// 🏛️ Obtener departamentos
+export const fetchDepartments = (countryCode = 'CO') => async (dispatch, getState) => {
+  // Cache key específico por país
+  const cacheKey = `departments_${countryCode}`;
+  const { departmentsCache } = getState().taxxa;
+  
+  if (departmentsCache && departmentsCache[cacheKey]) {
+    return departmentsCache[cacheKey];
+  }
+
+  dispatch({ type: 'FETCH_DEPARTMENTS_REQUEST' });
+
+  try {
+    const response = await api.get(`/taxxa/dian/departments?countryCode=${countryCode}`);
+    const data = response.data;
+
+    if (data && !data.error && data.data) {
+      dispatch({ 
+        type: 'FETCH_DEPARTMENTS_SUCCESS', 
+        payload: { 
+          departments: data.data, 
+          countryCode,
+          cacheKey 
+        } 
+      });
+      return data.data;
+    } else {
+      const errorMsg = "Error al obtener departamentos";
+      dispatch({ type: 'FETCH_DEPARTMENTS_FAILURE', payload: errorMsg });
+      toast.error(errorMsg);
+      return [];
+    }
+  } catch (error) {
+    const errorMsg = error.message || "Error al obtener departamentos";
+    dispatch({ type: 'FETCH_DEPARTMENTS_FAILURE', payload: errorMsg });
+    toast.error(errorMsg);
+    return [];
+  }
+};
+
+// 🏙️ Obtener municipios
+export const fetchMunicipalities = (departmentCode, options = {}) => async (dispatch, getState) => {
+  const { search = '', limit = 50 } = options;
+  
+  // Cache key más específico
+  const cacheKey = `municipalities_${departmentCode}_${search}_${limit}`;
+  const { municipalitiesCache } = getState().taxxa;
+  
+  if (municipalitiesCache && municipalitiesCache[cacheKey]) {
+    return municipalitiesCache[cacheKey];
+  }
+
+  dispatch({ type: 'FETCH_MUNICIPALITIES_REQUEST' });
+
+  try {
+    let url = `/taxxa/dian/municipalities?departmentCode=${departmentCode}&limit=${limit}`;
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+    }
+
+    const response = await api.get(url);
+    const data = response.data;
+
+    if (data && !data.error && data.data) {
+      dispatch({ 
+        type: 'FETCH_MUNICIPALITIES_SUCCESS', 
+        payload: { 
+          municipalities: data.data, 
+          departmentCode,
+          search,
+          limit,
+          cacheKey,
+          total: data.total,
+          showing: data.showing
+        } 
+      });
+      return data.data;
+    } else {
+      const errorMsg = "Error al obtener municipios";
+      dispatch({ type: 'FETCH_MUNICIPALITIES_FAILURE', payload: errorMsg });
+      toast.error(errorMsg);
+      return [];
+    }
+  } catch (error) {
+    const errorMsg = error.message || "Error al obtener municipios";
+    dispatch({ type: 'FETCH_MUNICIPALITIES_FAILURE', payload: errorMsg });
+    toast.error(errorMsg);
+    return [];
+  }
+};
+
+// 🔍 Validar ubicación
+export const validateLocation = (locationData) => async (dispatch) => {
+  dispatch({ type: 'VALIDATE_LOCATION_REQUEST' });
+
+  try {
+    const response = await api.post('/taxxa/dian/validate-location', locationData);
+    const data = response.data;
+
+    if (data && !data.error) {
+      dispatch({ type: 'VALIDATE_LOCATION_SUCCESS', payload: data.data });
+      
+      if (!data.data.isValid) {
+        toast.warning(`Ubicación inválida: ${data.data.errors.join(', ')}`);
+      }
+      
+      return data.data;
+    } else {
+      const errorMsg = "Error al validar ubicación";
+      dispatch({ type: 'VALIDATE_LOCATION_FAILURE', payload: errorMsg });
+      toast.error(errorMsg);
+      return { isValid: false, errors: [errorMsg] };
+    }
+  } catch (error) {
+    const errorMsg = error.message || "Error al validar ubicación";
+    dispatch({ type: 'VALIDATE_LOCATION_FAILURE', payload: errorMsg });
+    toast.error(errorMsg);
+    return { isValid: false, errors: [errorMsg] };
+  }
+};
+
+// 🔍 Buscar municipios (con debounce en el componente)
+export const searchMunicipalities = (searchTerm, departmentCode = null) => async (dispatch) => {
+  if (!searchTerm || searchTerm.length < 2) {
+    dispatch({ type: 'CLEAR_MUNICIPALITY_SEARCH' });
+    return [];
+  }
+
+  dispatch({ type: 'SEARCH_MUNICIPALITIES_REQUEST' });
+
+  try {
+    let url = `/taxxa/dian/municipalities?search=${encodeURIComponent(searchTerm)}&limit=20`;
+    if (departmentCode) {
+      url += `&departmentCode=${departmentCode}`;
+    }
+
+    const response = await api.get(url);
+    const data = response.data;
+
+    if (data && !data.error && data.data) {
+      dispatch({ 
+        type: 'SEARCH_MUNICIPALITIES_SUCCESS', 
+        payload: {
+          searchResults: data.data,
+          searchTerm,
+          departmentCode
+        }
+      });
+      return data.data;
+    } else {
+      dispatch({ type: 'SEARCH_MUNICIPALITIES_FAILURE', payload: "Error en búsqueda" });
+      return [];
+    }
+  } catch (error) {
+    const errorMsg = error.message || "Error buscando municipios";
+    dispatch({ type: 'SEARCH_MUNICIPALITIES_FAILURE', payload: errorMsg });
+    return [];
+  }
+};
+
+// 🗑️ Limpiar cache de catálogos (útil para actualizar datos)
+export const clearDianCache = () => (dispatch) => {
+  dispatch({ type: 'CLEAR_DIAN_CACHE' });
+  toast.info('Cache de catálogos DIAN limpiado');
+};
