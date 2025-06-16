@@ -1,6 +1,6 @@
 const { DataTypes } = require("sequelize");
 
-const dianCatalogService = require("../../services/dianCatalogService");
+const dianCatalogService = require("../../services/DianCatalogService");
 
 module.exports = (sequelize) => {
   const Buyer = sequelize.define(
