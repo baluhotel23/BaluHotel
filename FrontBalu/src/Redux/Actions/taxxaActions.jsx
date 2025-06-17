@@ -1,20 +1,23 @@
 import api from '../../utils/axios';
 import { toast } from 'react-toastify';
 
+// 🔍 OBTENER BUYER POR DOCUMENTO
 export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
   dispatch({ type: 'FETCH_BUYER_REQUEST' });
 
   try {
     const response = await api.get(`/taxxa/buyer/${sdocno}`);
     const data = response.data;
-    console.log(data);
+    console.log('📥 [BUYER] Respuesta recibida:', data);
 
     if (data && !data.error && data.data) {
       dispatch({ type: 'FETCH_BUYER_SUCCESS', payload: data.data });
+      return data.data;
     } else {
-      const errorMsg = "Usuario no encontrado";
+      const errorMsg = data.message || "Usuario no encontrado";
       dispatch({ type: 'FETCH_BUYER_FAILURE', payload: errorMsg });
       toast.error("Complete los datos del usuario");
+      return null;
     }
   } catch (error) {
     let errorMsg = error.message;
@@ -23,124 +26,221 @@ export const fetchBuyerByDocument = (sdocno) => async (dispatch) => {
     }
     dispatch({ type: 'FETCH_BUYER_FAILURE', payload: errorMsg });
     toast.error(errorMsg);
+    return null;
   }
 };
 
-  export const fetchSellerData = (n_document) => async (dispatch) => {
-    dispatch({ type: 'FETCH_SELLER_REQUEST' });
-  
-    try {
-      const response = await api.get(`/seller?n_document=${n_document}`); // Pasar el DNI como parámetro
-      const result = await response.json();
-  
-      if (response.ok) {
-        dispatch({ type: 'FETCH_SELLER_SUCCESS', payload: result.data });
-      } else {
-        dispatch({
-          type: 'FETCH_SELLER_FAILURE',
-          payload: result.message || "Error al obtener los datos del comercio",
-        });
-      }
-    } catch (error) {
-      dispatch({ type: 'FETCH_SELLER_FAILURE', payload: error.message });
+// 🔍 OBTENER SELLER DATA POR NIT
+export const fetchSellerData = (sdocno) => async (dispatch) => {
+  dispatch({ type: 'FETCH_SELLER_REQUEST' });
+
+  try {
+    console.log('🔍 [SELLER] Obteniendo datos del seller:', sdocno);
+    
+    const response = await api.get(`/taxxa/sellerData/${sdocno}`);
+    const data = response.data;
+
+    if (response.status === 200 && !data.error && data.data) {
+      dispatch({ 
+        type: 'FETCH_SELLER_SUCCESS', 
+        payload: data.data 
+      });
+      
+      console.log('✅ [SELLER] Datos obtenidos:', data.data.scostumername);
+      return data.data;
+    } else {
+      const errorMsg = data.message || "Datos del hotel no encontrados";
+      
+      dispatch({ 
+        type: 'FETCH_SELLER_FAILURE', 
+        payload: errorMsg 
+      });
+      
+      console.warn('⚠️ [SELLER] No encontrado:', errorMsg);
+      return null;
     }
-  };
-  
-  export const createSellerData = (sellerData) => async (dispatch) => {
-    dispatch({ type: 'CREATE_SELLER_REQUEST' });
-  
-    try {
-      const response = await api.put(`/admin/settings/hotel-settings`, sellerData);
-      const data = response.data;
-  
-      if (response.status === 200) {
-        dispatch({ type: 'CREATE_SELLER_SUCCESS', payload: data.data });
-        toast.success('Datos del comercio creados correctamente.');
-        return true; // <--- AÑADIDO: Retornar true en caso de éxito
-      } else {
-        dispatch({
-          type: 'CREATE_SELLER_FAILURE',
-          payload: data.error || "Error al crear los datos del comercio",
-        });
-        toast.error(data.error || "Error al crear los datos del comercio.");
-        return false; // <--- AÑADIDO: Retornar false en caso de fallo
-      }
-    } catch (error) {
-      dispatch({ type: 'CREATE_SELLER_FAILURE', payload: error.message });
-      toast.error(error.message || "Ha ocurrido un error inesperado.");
-      return false; // <--- AÑADIDO: Retornar false en caso de excepción
+  } catch (error) {
+    console.error('❌ [SELLER] Error en fetchSellerData:', error);
+    
+    const errorMsg = error.response?.status === 404 
+      ? "Datos del hotel no encontrados"
+      : error.response?.data?.message || error.message || "Error al obtener datos del hotel";
+    
+    dispatch({ 
+      type: 'FETCH_SELLER_FAILURE', 
+      payload: errorMsg 
+    });
+    
+    // No mostrar toast para 404, es normal si no existe
+    if (error.response?.status !== 404) {
+      toast.error(errorMsg);
     }
-  };
-  
-  export const updateSellerData = (n_document, sellerData) => async (dispatch) => {
-    dispatch({ type: 'UPDATE_SELLER_REQUEST' });
-  
-    try {
-      const response = await api.put(`/seller/${n_document}`, sellerData);
-      const data = response.data;
-  
-      if (response.status === 200) {
-        dispatch({ type: 'UPDATE_SELLER_SUCCESS', payload: data.data });
-        // Considera añadir un toast.success aquí también para consistencia si lo deseas
-        // toast.success('Datos del comercio actualizados correctamente.');
-        return true;
-      } else {
-        dispatch({
-          type: 'UPDATE_SELLER_FAILURE',
-          payload: data.error || "Error al actualizar los datos del comercio",
-        });
-        toast.error(data.error || "Error al actualizar los datos del comercio."); // Ya tienes toast de error
-        return false;
-      }
-    } catch (error) {
-      dispatch({ type: 'UPDATE_SELLER_FAILURE', payload: error.message });
-      toast.error(error.message || "Ha ocurrido un error inesperado."); // Ya tienes toast de error
+    
+    return null;
+  }
+};
+
+// 🆕 CREAR SELLER DATA
+export const createSellerData = (sellerData) => async (dispatch) => {
+  dispatch({ type: 'CREATE_SELLER_REQUEST' });
+
+  try {
+    console.log('📤 [SELLER] Enviando datos:', sellerData);
+    
+    const response = await api.post('/taxxa/sellerData', sellerData);
+    const data = response.data;
+
+    console.log('📥 [SELLER] Respuesta recibida:', data);
+
+    if (response.status === 201 || response.status === 200) {
+      dispatch({ 
+        type: 'CREATE_SELLER_SUCCESS', 
+        payload: data.data 
+      });
+      
+      const successMessage = response.status === 201 
+        ? 'Datos del hotel creados correctamente para Taxxa'
+        : 'Datos del hotel actualizados correctamente para Taxxa';
+        
+      toast.success(successMessage);
+      console.log('✅ [SELLER] Procesado exitosamente');
+      
+      return data.data;
+    } else {
+      const errorMessage = data.message || "Error al configurar datos del hotel";
+      
+      dispatch({
+        type: 'CREATE_SELLER_FAILURE',
+        payload: errorMessage,
+      });
+      
+      toast.error(errorMessage);
+      console.error('❌ [SELLER] Error en respuesta:', errorMessage);
+      
       return false;
     }
-  };
-  
-  export const sendInvoice = (invoiceData) => async (dispatch) => {
-    dispatch({ type: 'SEND_INVOICE_REQUEST' });
-    try {
-      console.log("invoiceData:", JSON.stringify(invoiceData, null, 2));
+  } catch (error) {
+    console.error('❌ [SELLER] Error en createSellerData:', error);
     
-      const response = await api.post(`/taxxa/sendInvoice`, invoiceData, {
-        headers: {
-          "Content-Type": "application/json",
-        },
+    const errorMsg = error.response?.data?.message || 
+                     (Array.isArray(error.response?.data?.details) 
+                       ? error.response.data.details.join(', ') 
+                       : error.response?.data?.details) ||
+                     error.message || 
+                     "Error inesperado al configurar Taxxa";
+    
+    dispatch({ 
+      type: 'CREATE_SELLER_FAILURE', 
+      payload: errorMsg 
+    });
+    
+    toast.error(errorMsg);
+    return false;
+  }
+};
+
+// 📝 ACTUALIZAR SELLER DATA
+export const updateSellerData = (sdocno, sellerData) => async (dispatch) => {
+  dispatch({ type: 'UPDATE_SELLER_REQUEST' });
+
+  try {
+    console.log('📝 [SELLER] Actualizando:', sdocno, sellerData);
+    
+    const response = await api.put(`/taxxa/sellerData/${sdocno}`, sellerData);
+    const data = response.data;
+
+    if (response.status === 200 && !data.error) {
+      dispatch({ 
+        type: 'UPDATE_SELLER_SUCCESS', 
+        payload: data.data 
       });
-    
-      dispatch({ type: 'SEND_INVOICE_SUCCESS', payload: response.data });
-      return response.data;
-    } catch (error) {
-      console.error("Error al enviar la factura:", error);
-    
-      const errorData = error.response?.data;
-      let errorMessage = "Error al enviar la factura";
-      let shouldResend = true;
-    
-      if (errorData && errorData.rerror) {
-        if (errorData.rerror === 1262 || errorData.rerror === 1236) {
-          shouldResend = false;
-          errorMessage = `Error al enviar la factura: Contingencia activada (rerror: ${errorData.rerror}). No es necesario reenviar la factura.`;
-        } else if (errorData.smessage?.string) {
-          const errorMessages = Object.values(errorData.smessage.string);
-          errorMessage = errorMessages.join('\n');
-        } else {
-          errorMessage = JSON.stringify(errorData);
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-    
-      dispatch({ type: 'SEND_INVOICE_FAILURE', payload: errorMessage });
+      
+      toast.success('Datos del hotel actualizados correctamente');
+      console.log('✅ [SELLER] Actualizado exitosamente');
+      
+      return data.data;
+    } else {
+      const errorMessage = data.message || "Error al actualizar los datos del hotel";
+      
+      dispatch({
+        type: 'UPDATE_SELLER_FAILURE',
+        payload: errorMessage,
+      });
+      
       toast.error(errorMessage);
-    
-      if (shouldResend) {
-        throw new Error(errorMessage);
-      }
+      console.error('❌ [SELLER] Error en actualización:', errorMessage);
+      
+      return false;
     }
-  };
+  } catch (error) {
+    console.error('❌ [SELLER] Error en updateSellerData:', error);
+    
+    const errorMsg = error.response?.data?.message || 
+                     (Array.isArray(error.response?.data?.details) 
+                       ? error.response.data.details.join(', ') 
+                       : error.response?.data?.details) ||
+                     error.message || 
+                     "Error inesperado al actualizar datos del hotel";
+    
+    dispatch({ 
+      type: 'UPDATE_SELLER_FAILURE', 
+      payload: errorMsg 
+    });
+    
+    toast.error(errorMsg);
+    return false;
+  }
+};
+
+// 📧 ENVIAR FACTURA
+export const sendInvoice = (invoiceData) => async (dispatch) => {
+  dispatch({ type: 'SEND_INVOICE_REQUEST' });
+  
+  try {
+    console.log('📧 [INVOICE] Enviando factura:', JSON.stringify(invoiceData, null, 2));
+  
+    const response = await api.post(`/taxxa/sendInvoice`, invoiceData, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  
+    dispatch({ type: 'SEND_INVOICE_SUCCESS', payload: response.data });
+    toast.success('Factura enviada exitosamente');
+    
+    return response.data;
+  } catch (error) {
+    console.error('❌ [INVOICE] Error al enviar factura:', error);
+  
+    const errorData = error.response?.data;
+    let errorMessage = "Error al enviar la factura";
+    let shouldResend = true;
+  
+    if (errorData && errorData.rerror) {
+      if (errorData.rerror === 1262 || errorData.rerror === 1236) {
+        shouldResend = false;
+        errorMessage = `Error al enviar la factura: Contingencia activada (rerror: ${errorData.rerror}). No es necesario reenviar la factura.`;
+        toast.warning(errorMessage);
+      } else if (errorData.smessage?.string) {
+        const errorMessages = Object.values(errorData.smessage.string);
+        errorMessage = errorMessages.join('\n');
+      } else {
+        errorMessage = JSON.stringify(errorData);
+      }
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+  
+    dispatch({ type: 'SEND_INVOICE_FAILURE', payload: errorMessage });
+    
+    if (shouldResend) {
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return { error: true, message: errorMessage, shouldResend };
+  }
+};
 
   export const createBuyer = (buyerData) => {
     return async (dispatch) => {
@@ -304,7 +404,7 @@ export const fetchMunicipalities = (departmentCode, options = {}) => async (disp
   }
 };
 
-// 🔍 Validar ubicación
+// 🔍 VALIDAR UBICACIÓN
 export const validateLocation = (locationData) => async (dispatch) => {
   dispatch({ type: 'VALIDATE_LOCATION_REQUEST' });
 
@@ -334,7 +434,7 @@ export const validateLocation = (locationData) => async (dispatch) => {
   }
 };
 
-// 🔍 Buscar municipios (con debounce en el componente)
+// 🔍 BUSCAR MUNICIPIOS
 export const searchMunicipalities = (searchTerm, departmentCode = null) => async (dispatch) => {
   if (!searchTerm || searchTerm.length < 2) {
     dispatch({ type: 'CLEAR_MUNICIPALITY_SEARCH' });
@@ -373,8 +473,69 @@ export const searchMunicipalities = (searchTerm, departmentCode = null) => async
   }
 };
 
-// 🗑️ Limpiar cache de catálogos (útil para actualizar datos)
+// ✅ VALIDAR CONFIGURACIÓN TAXXA
+export const validateTaxxaConfig = (sdocno) => async (dispatch) => {
+  dispatch({ type: 'VALIDATE_TAXXA_REQUEST' });
+
+  try {
+    console.log('🔍 [TAXXA] Validando configuración:', sdocno);
+    
+    const response = await api.get(`/taxxa/sellerData/${sdocno}/validate`);
+    const data = response.data;
+
+    if (response.status === 200 && !data.error) {
+      dispatch({ 
+        type: 'VALIDATE_TAXXA_SUCCESS', 
+        payload: data.data 
+      });
+      
+      console.log('✅ [TAXXA] Validación completada:', data.data.isValid);
+      return data.data;
+    } else {
+      const errorMessage = data.message || "Error al validar configuración";
+      
+      dispatch({
+        type: 'VALIDATE_TAXXA_FAILURE',
+        payload: errorMessage,
+      });
+      
+      toast.error(errorMessage);
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ [TAXXA] Error en validateTaxxaConfig:', error);
+    
+    const errorMsg = error.response?.data?.message || error.message || "Error al validar configuración";
+    
+    dispatch({ 
+      type: 'VALIDATE_TAXXA_FAILURE', 
+      payload: errorMsg 
+    });
+    
+    toast.error(errorMsg);
+    return null;
+  }
+};
+
+// 🗑️ LIMPIAR CACHE DIAN
 export const clearDianCache = () => (dispatch) => {
   dispatch({ type: 'CLEAR_DIAN_CACHE' });
   toast.info('Cache de catálogos DIAN limpiado');
 };
+
+// 🧹 LIMPIAR ERRORES
+export const clearSellerErrors = () => ({
+  type: 'CLEAR_SELLER_ERRORS'
+});
+
+export const clearSellerData = () => ({
+  type: 'CLEAR_SELLER_DATA'
+});
+
+export const clearBuyerErrors = () => ({
+  type: 'CLEAR_BUYER_ERRORS'
+});
+
+export const clearInvoiceErrors = () => ({
+  type: 'CLEAR_INVOICE_ERRORS'
+});
