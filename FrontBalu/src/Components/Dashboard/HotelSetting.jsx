@@ -1,445 +1,468 @@
-import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { createHotelSettings, updateHotelSettings, fetchHotelSettings } from "../../Redux/Actions/hotelActions";
-import { toast } from "react-toastify";
-import DashboardLayout from "./DashboardLayout";
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
+import { createSellerData } from '../../Redux/Actions/taxxaActions';
+import DashboardLayout from '../Dashboard/DashboardLayout';
+
 
 const HotelSetting = () => {
-    const dispatch = useDispatch();
-    const { hotelSettings, loading, error } = useSelector((state) => state.hotel); // Accede al estado del reducer
-
-    const [formData, setFormData] = useState({
-        name: "",
-        address: "",
-        contactInfo: [{ instagram: "" }],
-        wlegalorganizationtype: "company",
-        sfiscalresponsibilities: "O-47",
-        sdocno: "",
-        sdoctype: "NIT",
-        ssellername: "",
-        ssellerbrand: "",
-        scontactperson: "",
-        saddresszip: "",
-        wdepartmentcode: "",
-        wtowncode: "",
-        scityname: "",
-        contact_selectronicmail: "",
-        registration_wdepartmentcode: "",
-        registration_scityname: "",
-        registration_saddressline1: "",
-        registration_scountrycode: "CO",
-        registration_wprovincecode: "",
-        registration_szip: "",
-        registration_sdepartmentname: "",
-    });
-
-    const [isEditing, setIsEditing] = useState(false); // Estado para alternar entre creación y edición
-
-    // Cargar los datos del hotel al montar el componente
-    useEffect(() => {
-        dispatch(fetchHotelSettings());
-    }, [dispatch]);
-
-    // Actualizar el formulario si hay datos existentes
-    useEffect(() => {
-        if (hotelSettings) {
-            console.log('Datos del hotel:', hotelSettings); // Verifica los datos en la consola
-            setFormData({
-                ...hotelSettings,
-                contactInfo: Array.isArray(hotelSettings.contactInfo)
-                    ? hotelSettings.contactInfo
-                    : [{ instagram: "" }], // Asegúrate de que contactInfo sea un array
-            });
-            setIsEditing(true);
-        }
-    }, [hotelSettings]);
-
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prevFormData) => ({
-            ...prevFormData,
-            [name]: value,
-        }));
-    };
-
-    const handleInstagramChange = (e) => {
-        const { value } = e.target;
-        setFormData((prevFormData) => ({
-            ...prevFormData,
-            contactInfo: [{ instagram: value }],
-        }));
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+  const dispatch = useDispatch();
+  const { user } = useSelector(state => state.auth);
+  
+  // 🔧 ESTADO SIMPLIFICADO - Solo campos esenciales
+  const [formData, setFormData] = useState({
+    // Datos básicos del hotel
+    ssellername: '',
+    ssellerbrand: '',
+    scontactperson: '',
+    stelephone: '',
     
-        if (isEditing) {
-            const success = await dispatch(updateHotelSettings(formData));
-            if (success) {
-                toast.success("Datos del hotel actualizados correctamente.");
-            } else {
-                toast.error("Error al actualizar los datos del hotel.");
-            }
-        } else {
-            const createdData = await dispatch(createHotelSettings(formData));
-            if (createdData) {
-                setFormData(createdData); // Actualiza el formulario con los datos creados
-                setIsEditing(true); // Cambia a modo edición
-                toast.success("Datos del hotel creados correctamente.");
-            } else {
-                toast.error("Error al crear los datos del hotel.");
-            }
+    // Datos fiscales (con valores por defecto)
+    sdocno: user?.n_document || '',
+    sdoctype: 31, // NIT por defecto
+    wlegalorganizationtype: 'company',
+    sfiscalresponsibilities: 'O-13',
+    stributaryidentificationkey: '01',
+    sfiscalregime: '48',
+    scorporateregistrationschemename: 'DIAN',
+    
+    // Contacto
+    selectronicmail: user?.email || '',
+    
+    // Dirección básica
+    saddressline1: '',
+    scityname: '',
+    wdepartmentcode: '',
+    wtowncode: '',
+    saddresszip: '',
+    sdepartmentname: ''
+  });
+
+  // 🔧 ESTADOS DE CONTROL SIMPLES
+  const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [sellerExists, setSellerExists] = useState(false);
+
+  // 🔧 OPCIONES ESTÁTICAS SIMPLIFICADAS
+  const organizationTypes = [
+    { value: 'company', label: 'Persona Jurídica' },
+    { value: 'person', label: 'Persona Natural' }
+  ];
+
+  const fiscalResponsibilities = [
+    { value: 'O-13', label: 'O-13 - Gran contribuyente' },
+    { value: 'O-15', label: 'O-15 - Autorretenedor' },
+    { value: 'O-23', label: 'O-23 - Agente de retención IVA' },
+    { value: 'R-99-PN', label: 'R-99-PN - No responsable' }
+  ];
+
+  // 🔧 VERIFICAR SI EL SELLER YA EXISTE
+  const checkExistingSeller = async () => {
+    if (!formData.sdocno) return;
+    
+    try {
+      // Aquí podrías agregar una action para verificar si existe
+      // Por ahora asumimos que no existe
+      setSellerExists(false);
+    } catch (error) {
+      console.log('Seller no existe o error en verificación');
+      setSellerExists(false);
+    }
+  };
+
+  // 🔧 MANEJAR CAMBIOS EN EL FORMULARIO
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // 🔧 VALIDACIÓN SIMPLE
+  const validateForm = () => {
+    const requiredFields = [
+      'ssellername',
+      'scontactperson', 
+      'selectronicmail',
+      'stelephone',
+      'sdocno'
+    ];
+
+    const missingFields = requiredFields.filter(field => !formData[field]?.trim());
+    
+    if (missingFields.length > 0) {
+      toast.error('Por favor complete todos los campos obligatorios');
+      return false;
+    }
+
+    // Validar email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.selectronicmail)) {
+      toast.error('Por favor ingrese un email válido');
+      return false;
+    }
+
+    return true;
+  };
+
+  // 🔧 CONSTRUIR BODY PARA EL BACKEND
+  const buildRequestBody = () => {
+    return {
+      // Datos básicos
+      wlegalorganizationtype: formData.wlegalorganizationtype,
+      sfiscalresponsibilities: formData.sfiscalresponsibilities,
+      sdocno: formData.sdocno,
+      sdoctype: parseInt(formData.sdoctype),
+      ssellername: formData.ssellername,
+      ssellerbrand: formData.ssellerbrand || formData.ssellername,
+      scontactperson: formData.scontactperson,
+      saddresszip: formData.saddresszip,
+      wdepartmentcode: formData.wdepartmentcode,
+      wtowncode: formData.wtowncode,
+      scityname: formData.scityname,
+      
+      // Estructura anidada que espera el backend
+      jcontact: {
+        selectronicmail: formData.selectronicmail,
+        jregistrationaddress: {
+          wdepartmentcode: formData.wdepartmentcode,
+          scityname: formData.scityname,
+          saddressline1: formData.saddressline1,
+          scountrycode: 'CO',
+          wprovincecode: formData.wdepartmentcode,
+          szip: formData.saddresszip,
+          sdepartmentname: formData.sdepartmentname
         }
+      },
+      
+      // Datos fiscales
+      stelephone: formData.stelephone,
+      stributaryidentificationkey: formData.stributaryidentificationkey,
+      sfiscalregime: formData.sfiscalregime,
+      scorporateregistrationschemename: formData.scorporateregistrationschemename
     };
+  };
 
-    if (loading) return <p>Cargando...</p>;
-    if (error) return <p>Error: {error}</p>;
-    return (
-        <DashboardLayout>
-        <div className="max-w-4xl mx-auto p-6 bg-white shadow-md rounded-lg">
-            <h2 className="text-2xl font-bold text-center mb-4">
-                {isEditing ? "Actualizar Datos del Hotel" : "Datos Hotel"}
-            </h2>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                        Nombre del Hotel
-                    </label>
-                    <input
-                        type="text"
-                        id="name"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        required
-                    />
-                </div>
-                <div>
-                    <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                        Dirección
-                    </label>
-                    <input
-                        type="text"
-                        id="address"
-                        name="address"
-                        value={formData.address}
-                        onChange={handleChange}
-                        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        required
-                    />
-                </div>
-                <div>
-                    <label htmlFor="instagram" className="block text-sm font-medium text-gray-700">
-                        Instagram
-                    </label>
-                    <input
-                        type="url"
-                        id="instagram"
-                        name="instagram"
-                        value={formData.contactInfo?.[0]?.instagram || ""} // Validación para evitar errores
-                        onChange={handleInstagramChange}
-                        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                </div>
-                {/* Campos opcionales */}
-                <div>
-                    <label htmlFor="wlegalorganizationtype" className="block text-sm font-medium text-gray-700">
-                        Tipo de Organización Legal
-                    </label>
-                    <select
-                        id="wlegalorganizationtype"
-                        name="wlegalorganizationtype"
-                        value={formData.wlegalorganizationtype}
-                        onChange={handleChange}
-                       className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    >
-                        <option value="">Seleccionar</option>
-                        <option value="person">Persona Natural</option>
-            <option value="company">Persona Jurídica</option>
-                    </select>
-                </div>
-                <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Responsabilidad Fiscal:
-          </label>
-          <select
-            name="sfiscalresponsibilities"
-            value={formData.sfiscalresponsibilities}
-            onChange={handleChange}
-            className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
+  // 🔧 ENVIAR FORMULARIO
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+    
+    setLoading(true);
+    
+    try {
+      const requestBody = buildRequestBody();
+      console.log('📤 [HOTEL-SETTING] Enviando:', requestBody);
+      
+      const result = await dispatch(createSellerData(requestBody));
+      
+      if (result) {
+        console.log('✅ [HOTEL-SETTING] Guardado exitosamente');
+        setSellerExists(true);
+        setIsEditing(false);
+        // La action ya muestra el toast de éxito
+      }
+    } catch (error) {
+      console.error('❌ [HOTEL-SETTING] Error:', error);
+      // La action ya maneja el error y muestra el toast
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🔧 RESETEAR FORMULARIO
+  const handleReset = () => {
+    setFormData({
+      ssellername: '',
+      ssellerbrand: '',
+      scontactperson: '',
+      stelephone: '',
+      sdocno: user?.n_document || '',
+      sdoctype: 31,
+      wlegalorganizationtype: 'company',
+      sfiscalresponsibilities: 'O-13',
+      stributaryidentificationkey: '01',
+      sfiscalregime: '48',
+      scorporateregistrationschemename: 'DIAN',
+      selectronicmail: user?.email || '',
+      saddressline1: '',
+      scityname: '',
+      wdepartmentcode: '',
+      wtowncode: '',
+      saddresszip: '',
+      sdepartmentname: ''
+    });
+    setIsEditing(false);
+  };
+
+  // 🔧 EFECTOS
+  useEffect(() => {
+    checkExistingSeller();
+  }, [formData.sdocno]);
+
+  return (
+    <DashboardLayout>
+    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+      {/* Header */}
+      <div className="mb-8 border-b pb-4">
+        <h2 className="text-2xl font-bold text-gray-800">
+          🏨 Configuración del Hotel para Facturación
+        </h2>
+        <p className="text-gray-600 mt-2">
+          Configure los datos fiscales de su hotel para la facturación electrónica
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Información Básica del Hotel */}
+        <div className="bg-gray-50 p-6 rounded-lg">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            📋 Información Básica del Hotel
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nombre *
+              </label>
+              <input
+                type="text"
+                name="ssellername"
+                value={formData.ssellername}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ej: Hotel Balu Premium"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Marca
+              </label>
+              <input
+                type="text"
+                name="ssellerbrand"
+                value={formData.ssellerbrand}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ej: Balu Hotels"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Persona de Contacto *
+              </label>
+              <input
+                type="text"
+                name="scontactperson"
+                value={formData.scontactperson}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ej: Juan Pérez"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Teléfono de Contacto *
+              </label>
+              <input
+                type="tel"
+                name="stelephone"
+                value={formData.stelephone}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ej: +57 301 234 5678"
+                required
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Información Fiscal */}
+        <div className="bg-gray-50 p-6 rounded-lg">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            🏛️ Información Fiscal
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cédula *
+              </label>
+              <input
+                type="text"
+                name="sdocno"
+                value={formData.sdocno}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ej: 900123456-7"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo de Organización
+              </label>
+              <select
+                name="wlegalorganizationtype"
+                value={formData.wlegalorganizationtype}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {organizationTypes.map(type => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Responsabilidad Fiscal
+              </label>
+              <select
+                name="sfiscalresponsibilities"
+                value={formData.sfiscalresponsibilities}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {fiscalResponsibilities.map(resp => (
+                  <option key={resp.value} value={resp.value}>
+                    {resp.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email de Contacto *
+              </label>
+              <input
+                type="email"
+                name="selectronicmail"
+                value={formData.selectronicmail}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="admin@hotel.com"
+                required
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Dirección (Opcional) */}
+        <div className="bg-gray-50 p-6 rounded-lg">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            📍 Dirección (Opcional)
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Dirección Completa
+              </label>
+              <input
+                type="text"
+                name="saddressline1"
+                value={formData.saddressline1}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ej: Calle 123 #45-67"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ciudad
+              </label>
+              <input
+                type="text"
+                name="scityname"
+                value={formData.scityname}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ej: Bogotá"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Código Postal
+              </label>
+              <input
+                type="text"
+                name="saddresszip"
+                value={formData.saddresszip}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ej: 110111"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Botones de Acción */}
+        <div className="flex gap-4 pt-6">
+          <button
+            type="submit"
+            disabled={loading}
+            className={`flex-1 py-3 px-6 rounded-md font-medium text-white transition-colors ${
+              loading 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500'
+            }`}
           >
-            <option value="R-99-PN">No aplica – Otros *</option>
-            <option value="O-13"> Gran contribuyente </option>
-            <option value="O-15"> Autorretenedor</option>
-            <option value="O-23">Agente de retención IVA</option>
-            <option value="O-47">Régimen simple de tributación</option>
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Guardando...
+              </span>
+            ) : (
+              sellerExists ? '📝 Actualizar Datos' : '💾 Guardar Configuración'
+            )}
+          </button>
 
-          </select>
-        </div>
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Tipo de Documento:
-          </label>
-          <select
-            name="sdoctype"
-            value={formData.sdoctype}
-            onChange={handleChange}
-            className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          <button
+            type="button"
+            onClick={handleReset}
+            className="px-6 py-3 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 transition-colors"
           >
-            <option value="">Selecciona un tipo de documento</option>
-            <option value="RC">Registro civil</option>
-            <option value="TI">Tarjeta de identidad</option>
-            <option value="CC">Cédula de ciudadanía</option>
-            <option value="TE">Tarjeta de extranjería</option>
-            <option value="CE">Cédula de extranjería</option>
-            <option value="NIT">NIT</option>
-            <option value="PAS">Pasaporte</option>
-            <option value="DEX">Documento de identificación extranjero</option>
-            <option value="PEP">PEP (Permiso Especial de Permanencia)</option>
-            <option value="PPT">PPT (Permiso Protección Temporal)</option>
-            <option value="FI">NIT de otro país</option>
-            <option value="NUIP">NUIP</option>
-          </select>
-        </div>
-                <div>
-                    <label htmlFor="sdocno" className="block text-sm font-medium text-gray-700">
-                        Número de Documento
-                    </label>
-                    <input
-                        type="text"
-                        id="sdocno"
-                        name="sdocno"
-                        value={formData.sdocno}
-                        onChange={handleChange}
-                        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                </div>
-                <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">Razón Social del Vendedor:</label>
-          <input
-            type="text"
-            name="ssellername"
-            value={formData.ssellername}
-            onChange={handleChange}
-            className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
-                {/* Nombre del vendedor */}
-
-
-{/* Marca del vendedor */}
-<div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">Nombre Comercial:</label>
-          <input
-            type="text"
-            name="ssellerbrand"
-            value={formData.ssellerbrand}
-            onChange={handleChange}
-            className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
+            🔄 Limpiar
+          </button>
         </div>
 
-{/* Persona de contacto */}
-<div>
-    <label htmlFor="scontactperson" className="block text-sm font-medium text-gray-700">
-        Persona de Contacto
-    </label>
-    <input
-        type="text"
-        id="scontactperson"
-        name="scontactperson"
-        value={formData.scontactperson}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-
-{/* Código postal */}
-<div>
-    <label htmlFor="saddresszip" className="block text-sm font-medium text-gray-700">
-        Código Postal
-    </label>
-    <input
-        type="text"
-        id="saddresszip"
-        name="saddresszip"
-        value={formData.saddresszip}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-
-{/* Código del departamento */}
-<div>
-    <label htmlFor="wdeparregistration_wdepartmentcodementcode" className="block text-sm font-medium text-gray-700">
-        Código del Departamento
-    </label>
-    <input
-        type="text"
-        id="registration_wdepartmentcode"
-        name="registration_wdepartmentcode"
-        value={formData.registration_wdepartmentcode}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-
-{/* Código de la ciudad */}
-<div>
-    <label htmlFor="wtowncode" className="block text-sm font-medium text-gray-700">
-        Código de la Ciudad
-    </label>
-    <input
-        type="text"
-        id="wtowncode"
-        name="wtowncode"
-        value={formData.wtowncode}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-<div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700"> Ciudad (Nombre):</label>
-          <input
-            type="text"
-            name="registration_scityname"
-            value={formData.registration_scityname}
-            onChange={handleChange}
-            className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
-        {/* Código del Departamento */}
-<div>
-    <label htmlFor="wdepartmentcode" className="block text-sm font-medium text-gray-700">
-        Código del Departamento
-    </label>
-    <input
-        type="text"
-        id="wdepartmentcode"
-        name="wdepartmentcode"
-        value={formData.wdepartmentcode}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-
-{/* Nombre de la Ciudad */}
-<div>
-    <label htmlFor="scityname" className="block text-sm font-medium text-gray-700">
-        Nombre de la Ciudad
-    </label>
-    <input
-        type="text"
-        id="scityname"
-        name="scityname"
-        value={formData.scityname}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-
-{/* Correo electrónico de contacto */}
-<div>
-    <label htmlFor="contact_selectronicmail" className="block text-sm font-medium text-gray-700">
-        Correo Electrónico de Contacto
-    </label>
-    <input
-        type="email"
-        id="contact_selectronicmail"
-        name="contact_selectronicmail"
-        value={formData.contact_selectronicmail}
-        onChange={handleChange}
-        className="w-full px-4 py-2 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-
-{/* Dirección de registro */}
-<div>
-    <label htmlFor="registration_saddressline1" className="block text-sm font-medium text-gray-700">
-        Dirección de Registro
-    </label>
-    <input
-        type="text"
-        id="registration_saddressline1"
-        name="registration_saddressline1"
-        value={formData.registration_saddressline1}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-
-{/* País de registro */}
-<div>
-    <label htmlFor="registration_scountrycode" className="block text-sm font-medium text-gray-700">
-        País de Registro
-    </label>
-    <input
-        type="text"
-        id="registration_scountrycode"
-        name="registration_scountrycode"
-        value={formData.registration_scountrycode}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-
-{/* Provincia de registro */}
-<div>
-    <label htmlFor="registration_wprovincecode" className="block text-sm font-medium text-gray-700">
-        Provincia de Registro
-    </label>
-    <input
-        type="text"
-        id="registration_wprovincecode"
-        name="registration_wprovincecode"
-        value={formData.registration_wprovincecode}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-
-{/* Código postal de registro */}
-<div>
-    <label htmlFor="registration_szip" className="block text-sm font-medium text-gray-700">
-        Código Postal de Registro
-    </label>
-    <input
-        type="text"
-        id="registration_szip"
-        name="registration_szip"
-        value={formData.registration_szip}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-
-{/* Nombre del departamento de registro */}
-<div>
-    <label htmlFor="registration_sdepartmentname" className="block text-sm font-medium text-gray-700">
-        Nombre del Departamento de Registro
-    </label>
-    <input
-        type="text"
-        id="registration_sdepartmentname"
-        name="registration_sdepartmentname"
-        value={formData.registration_sdepartmentname}
-        onChange={handleChange}
-        className="w-full px-4 py-1 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-</div>
-                {/* Agrega más campos opcionales aquí */}
-                <button
-                    type="submit"
-                    className="col-span-1 md:col-span-2 bg-indigo-600 text-white py-2 px-4 rounded-md shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                >
-                    {isEditing ? "Actualizar" : "Crear"}
-                </button>
-            </form>
-        </div>
-        </DashboardLayout>
-    );
+        {/* Info del Estado */}
+        {sellerExists && (
+          <div className="bg-green-50 border border-green-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <span className="text-green-400">✅</span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-green-800">
+                  Los datos del hotel ya están configurados para facturación. 
+                  Puede actualizar la información cuando sea necesario.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </form>
+    </div>
+    </DashboardLayout>
+  );
 };
 
 export default HotelSetting;
