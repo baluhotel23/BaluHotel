@@ -146,7 +146,7 @@ const createInvoiceWithNumber = async (billData) => {
     console.log('🔧 Número convertido a string:', safeNextNumber);
     
     const invoiceData = {
-      billId: billData.billId, // Debe ser UUID
+      
       invoiceSequentialNumber: safeNextNumber, // String del número
       prefix: RESOLUTION_CONFIG.prefix,
       
