@@ -154,7 +154,7 @@ const documentBody = {
   jParams: {
     // 🔧 ESTRUCTURA EXACTA DEL EJEMPLO
     wVersionUBL: 2.1, // ✅ Número, no string
-    wenvironment: "test",
+    wenvironment: "prod",
     jDocument: {
       // 🔧 CAMPOS PRINCIPALES
       wdocumenttype: "Invoice", // ✅ Igual al ejemplo
