@@ -240,28 +240,28 @@ const documentBody = {
       
       // 🔧 COMPRADOR (estructura exacta del ejemplo)
           jbuyer: {
-            wlegalorganizationtype: buyerData.wlegalorganizationtype,
-            scostumername: buyerData.scostumername,
+            wlegalorganizationtype: buyer.wlegalorganizationtype,
+            scostumername: buyer.scostumername,
             stributaryidentificationkey: "O-1", // "O-1" es más estándar que "ZZ"
-            sfiscalresponsibilities: buyerData.sfiscalresponsibilities, // Usa "R-99-PN" de la BD
-            sfiscalregime: buyerData.sfiscalregime, // Usa "49" de la BD
+            sfiscalresponsibilities: buyer.sfiscalresponsibilities, // Usa "R-99-PN" de la BD
+            sfiscalregime: buyer.sfiscalregime, // Usa "49" de la BD
             jpartylegalentity: {
-              wdoctype: mapDocTypeToString(buyerData.wdoctype), // Mapea el código 13 a "CC"
-              sdocno: buyerData.sdocno,
-              scorporateregistrationschemename: buyerData.scorporateregistrationschemename
+              wdoctype: mapDocTypeToString(buyer.wdoctype), // Mapea el código 13 a "CC"
+              sdocno: buyer.sdocno,
+              scorporateregistrationschemename: buyer.scorporateregistrationschemename
             },
             jcontact: {
-              scontactperson: buyerData.scontactperson,
-              selectronicmail: buyerData.selectronicmail,
-              stelephone: buyerData.stelephone,
+              scontactperson: buyer.scontactperson,
+              selectronicmail: buyer.selectronicmail,
+              stelephone: buyer.stelephone,
               jpostaladdress: {
-                wdepartmentcode: buyerData.wdepartmentcode,
-                // Asumimos Meta por el código 50
-                scityname: buyerData.scityname,
-                saddressline1: buyerData.saddressline1,
-                scountrycode: buyerData.wcountrycode,
-                wprovincecode: buyerData.wdepartmentcode,
-                szip: buyerData.wtowncode
+                wdepartmentcode: buyer.wdepartmentcode,
+                sdepartmentname: "Meta", // Asumimos Meta por el código 50
+                scityname: buyer.scityname,
+                saddressline1: buyer.saddressline1,
+                scountrycode: buyer.wcountrycode,
+                wprovincecode: buyer.wdepartmentcode,
+                szip: buyer.wtowncode
               }
             }
           }
