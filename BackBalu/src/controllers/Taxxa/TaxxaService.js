@@ -301,7 +301,7 @@ const token = await generateToken();
     const taxxaResponse = await sendDocument(taxxaPayload);
     console.log('Respuesta de Taxxa:', JSON.stringify(taxxaResponse, null, 2));
 
-    if (taxxaResponse && taxxaResponse.rerror === 0) {
+if (taxxaResponse && taxxaResponse.rerror === 0) {
       console.log('=== Factura fiscal enviada exitosamente ===');
       
       // 🔧 MARCAR FACTURA FISCAL COMO ENVIADA
@@ -357,6 +357,7 @@ const token = await generateToken();
     });
   }
 };
+
 
 module.exports = {
   createInvoice,
