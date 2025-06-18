@@ -2381,8 +2381,6 @@ const getPaymentMethodLabel = (method) => {
   return labels[method] || method;
 };
 
-// ...existing code...
-
 
 
 
