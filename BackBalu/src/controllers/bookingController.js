@@ -2104,15 +2104,19 @@ const generateBill = async (req, res, next) => {
 
     // ⭐ CREAR LA FACTURA SOLO CON CAMPOS QUE EXISTEN EN TU MODELO
     const billData = {
-      bookingId: booking.bookingId,
-      reservationAmount: baseAmount,
-      extraChargesAmount: totalExtras,
-      taxAmount: 0, // ⭐ PUEDES CALCULAR IMPUESTOS SI ES NECESARIO
-      totalAmount: totalAmount,
-      taxInvoiceId: null, // ⭐ GENERAR SI TIENES INTEGRACIÓN FISCAL
-      status: 'pending', // ⭐ USAR VALOR VÁLIDO DEL ENUM
-      paymentMethod: null, // ⭐ SE LLENARÁ CUANDO SE PAGUE
-    };
+  bookingId: booking.bookingId,
+  reservationAmount: baseAmount,
+  extraChargesAmount: totalExtras,
+  taxAmount: 0,
+  totalAmount: totalAmount,
+  taxInvoiceId: null,
+  status: 'paid', // 🔧 LA FACTURA SE CREA COMO PAGADA
+  paymentMethod: 'cash', // 🔧 O EL MÉTODO QUE CORRESPONDA
+  taxxaStatus: 'not_sent', // 🔧 NUEVO CAMPO: Lista para enviar a Taxxa
+  sentToTaxxaAt: null,
+  taxxaResponse: null,
+  cufe: null
+};
 
     console.log("📝 [GENERATE-BILL] Datos de factura a crear:");
     console.log(JSON.stringify(billData, null, 2));
