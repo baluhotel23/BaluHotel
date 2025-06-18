@@ -7,7 +7,7 @@ const RESOLUTION_CONFIG = {
   to: 500,
   prefix: "FVK",
   resolutionNumber: "18764093638527",
-  startDate: "2025-05-27",
+  startDate: "2025-05-23",
   endDate: "2025-05-27"
 };
 const logResolutionConfig = () => {
