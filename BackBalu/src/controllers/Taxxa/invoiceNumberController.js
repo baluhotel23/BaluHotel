@@ -7,10 +7,19 @@ const RESOLUTION_CONFIG = {
   to: 500,
   prefix: "FVK",
   resolutionNumber: "18764093638527",
-  startDate: "2025-05-23",
+  startDate: "2025-05-27",
   endDate: "2025-05-27"
 };
-
+const logResolutionConfig = () => {
+  console.log('🏛️ === CONFIGURACIÓN DE RESOLUCIÓN DIAN ===');
+  console.log(`📋 Número de resolución: "${RESOLUTION_CONFIG.resolutionNumber}"`);
+  console.log(`📊 Rango autorizado: ${RESOLUTION_CONFIG.from} - ${RESOLUTION_CONFIG.to}`);
+  console.log(`📅 Vigencia: ${RESOLUTION_CONFIG.startDate} a ${RESOLUTION_CONFIG.endDate}`);
+  console.log(`🏷️ Prefijo: "${RESOLUTION_CONFIG.prefix}"`);
+  console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'no definido'}`);
+  console.log(`🔗 Taxxa URL: ${process.env.TAXXA_API_URL || 'no definida'}`);
+  console.log('===============================================');
+};
 /**
  * Obtiene el siguiente número secuencial disponible
  */
