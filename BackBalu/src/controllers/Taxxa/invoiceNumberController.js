@@ -1,4 +1,4 @@
-const { Invoice } = require('../../data');
+const { Invoice, sequelize } = require('../../data'); // ✅ Importar sequelize desde data
 const { Op } = require('sequelize');
 
 // 🔧 CONFIGURACIÓN DE RESOLUCIÓN
@@ -18,51 +18,53 @@ const getNextInvoiceNumber = async () => {
   try {
     console.log('🔢 Obteniendo siguiente número de Invoice...');
 
-    // Buscar el último número usado exitosamente
+    // 🔧 BUSCAR EL ÚLTIMO NÚMERO USADO (CUALQUIER ESTADO)
     const lastInvoice = await Invoice.findOne({
       where: {
-        invoiceSequentialNumber: { [Op.ne]: null },
-        status: 'sent'
+        invoiceSequentialNumber: { [Op.ne]: null }
+        // ✅ Eliminar filtro por status - considerar TODOS los números usados
       },
-      order: [['invoiceSequentialNumber', 'DESC']],
-      attributes: ['invoiceSequentialNumber', 'sentToTaxxaAt']
+      order: [
+        [sequelize.cast(sequelize.col('invoiceSequentialNumber'), 'INTEGER'), 'DESC']
+      ], // ✅ Ordenar numéricamente, no alfabéticamente
+      attributes: ['invoiceSequentialNumber', 'status', 'createdAt']
     });
 
-    let nextNumber = RESOLUTION_CONFIG.from; // ✅ SIEMPRE EMPEZAR DESDE 1
+    let nextNumber;
 
     if (lastInvoice && lastInvoice.invoiceSequentialNumber) {
       const lastNumber = parseInt(lastInvoice.invoiceSequentialNumber);
       nextNumber = lastNumber + 1;
       
-      console.log(`📊 Último número usado: ${lastNumber}`);
+      console.log(`📊 Último número usado: ${lastNumber} (estado: ${lastInvoice.status})`);
       console.log(`🔢 Siguiente número calculado: ${nextNumber}`);
     } else {
-      console.log('📊 No hay invoices previos enviados exitosamente');
+      nextNumber = RESOLUTION_CONFIG.from;
+      console.log('📊 No hay invoices previos');
       console.log(`🔢 Comenzando desde el número inicial: ${nextNumber}`);
     }
 
-    // Verificar que no exceda la resolución
+    // ✅ VERIFICAR QUE NO EXCEDA LA RESOLUCIÓN
     if (nextNumber > RESOLUTION_CONFIG.to) {
       throw new Error(`❌ Se ha alcanzado el límite de la resolución. Número ${nextNumber} excede el máximo ${RESOLUTION_CONFIG.to}`);
     }
 
-    // ✅ VERIFICAR DISPONIBILIDAD CONSIDERANDO TODOS LOS ESTADOS
-    // Buscar cualquier factura (pendiente, enviada, fallida) con ese número
+    // 🔧 VERIFICAR DISPONIBILIDAD REAL
     const existingInvoice = await Invoice.findOne({
       where: { 
-        invoiceSequentialNumber: nextNumber.toString(),
-        status: { [Op.in]: ['pending', 'sent'] } // Solo considerar activas
+        invoiceSequentialNumber: nextNumber.toString()
+        // ✅ No filtrar por status - si existe, está ocupado
       }
     });
 
     if (existingInvoice) {
       console.warn(`⚠️ Número ${nextNumber} ya está en uso (estado: ${existingInvoice.status})`);
       console.log('🔍 Buscando siguiente número disponible...');
-      return await findNextAvailableNumber(nextNumber + 1);
+      return await findNextAvailableNumber(nextNumber);
     }
 
     console.log(`✅ Número ${nextNumber} disponible para usar`);
-    return nextNumber.toString();
+    return nextNumber.toString(); // ✅ Retornar como string
 
   } catch (error) {
     console.error('❌ Error obteniendo siguiente número:', error.message);
@@ -70,30 +72,44 @@ const getNextInvoiceNumber = async () => {
   }
 };
 
+// 🔧 FUNCIÓN AUXILIAR PARA ENCONTRAR SIGUIENTE NÚMERO DISPONIBLE
+const findNextAvailableNumber = async (startFrom) => {
+  try {
+    console.log(`🔍 Buscando número disponible desde: ${startFrom}`);
+    
+    // ✅ OBTENER TODOS LOS NÚMEROS USADOS DE UNA VEZ
+    const usedNumbers = await Invoice.findAll({
+      attributes: ['invoiceSequentialNumber'],
+      where: {
+        invoiceSequentialNumber: { [Op.ne]: null }
+      },
+      raw: true
+    });
+
+    const usedSet = new Set(
+      usedNumbers.map(inv => parseInt(inv.invoiceSequentialNumber))
+    );
+
+    // ✅ BUSCAR PRIMER NÚMERO DISPONIBLE EN EL RANGO
+    for (let i = startFrom; i <= RESOLUTION_CONFIG.to; i++) {
+      if (!usedSet.has(i)) {
+        console.log(`✅ Número ${i} disponible encontrado`);
+        return i.toString();
+      }
+    }
+
+    throw new Error(`❌ No hay números disponibles en el rango ${startFrom}-${RESOLUTION_CONFIG.to}`);
+    
+  } catch (error) {
+    console.error('❌ Error buscando número disponible:', error.message);
+    throw error;
+  }
+};
+
 /**
  * Busca el siguiente número disponible en caso de conflicto
  */
-const findNextAvailableNumber = async (startFrom) => {
-  console.log(`🔍 Buscando número disponible desde: ${startFrom}`);
-  
-  for (let number = startFrom; number <= RESOLUTION_CONFIG.to; number++) {
-    const existing = await Invoice.findOne({
-      where: { 
-        invoiceSequentialNumber: number.toString(),
-        status: { [Op.in]: ['pending', 'sent'] } // Solo considerar activas
-      }
-    });
 
-    if (!existing) {
-      console.log(`✅ Número disponible encontrado: ${number}`);
-      return number.toString();
-    } else {
-      console.log(`❌ Número ${number} ya en uso (estado: ${existing.status})`);
-    }
-  }
-
-  throw new Error(`❌ No hay números disponibles en la resolución (${RESOLUTION_CONFIG.from}-${RESOLUTION_CONFIG.to})`);
-};
 
 /**
  * Crear una nueva factura fiscal (Invoice) con numeración secuencial
