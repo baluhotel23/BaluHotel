@@ -6,7 +6,7 @@ const RESOLUTION_CONFIG = {
   from: 1,
   to: 500,
   prefix: "FVK",
-  resolutionNumber: "18764001234567",
+  resolutionNumber: "18764093638527",
   startDate: "2024-01-01",
   endDate: "2024-12-31"
 };
