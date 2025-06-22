@@ -1,3 +1,4 @@
+
 const { 
   Booking, 
   Room, 
@@ -693,7 +694,7 @@ const updateOnlinePayment = async (req, res, next) => {
     const paidAmount = Number(amount);
 
     if (paidAmount < totalAmount) {
-      booking.status = "advanced";
+      booking.status = "confirmed";
     } else {
       booking.status = "confirmed";
     }

@@ -33,9 +33,10 @@ function Registration({
   const [formData, setFormData] = useState(initialPassengerState);
 
   // ⭐ OBTENER PASAJEROS YA REGISTRADOS DESDE PROPS O REDUX
+  const reduxRegisteredPassengers = useSelector((state) => state.registrationPass?.registrationsByBooking?.[bookingId] || []);
   const registeredPassengers = existingPassengers.length > 0 
     ? existingPassengers 
-    : useSelector((state) => state.registrationPass?.registrationsByBooking?.[bookingId] || []);
+    : reduxRegisteredPassengers;
 
   // Validar campos obligatorios
   const validatePassenger = (passenger) => {
@@ -443,5 +444,16 @@ function Registration({
     </div>
   );
 }
+
+import PropTypes from "prop-types";
+
+Registration.propTypes = {
+  bookingId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  existingPassengers: PropTypes.array,
+  guestCount: PropTypes.number,
+  booking: PropTypes.object,
+  onSuccess: PropTypes.func,
+  onClose: PropTypes.func,
+};
 
 export default Registration;

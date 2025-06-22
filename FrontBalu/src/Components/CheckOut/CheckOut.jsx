@@ -16,9 +16,6 @@ const CheckOut = () => {
   const { 
     bookings: allBookings = [], 
     loading = {}, 
-    errors = {},
-    currentBill = null, // 🧾 FACTURA ACTUAL (COMPATIBLE CON TU ESTRUCTURA)
-    bill = null, // 🧾 FALLBACK
     taxxaStatus = null // 📤 ESTADO DE TAXXA
   } = useSelector((state) => state.booking || {});
   
