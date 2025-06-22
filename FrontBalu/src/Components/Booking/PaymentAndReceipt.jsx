@@ -39,51 +39,58 @@ const PaymentAndReceipt = ({
   };
 
   // 🔧 FUNCIÓN PARA OBTENER ETIQUETA DEL MÉTODO DE PAGO
-const getPaymentMethodLabel = (method) => {
-  const methods = {
-    'cash': '💵 Efectivo',
-    'credit_card': '💳 Tarjeta de Crédito',    // ✅ CAMBIAR 'card' por 'credit_card'
-    'debit_card': '💳 Tarjeta de Débito',
-    'tR ESTEransfer': '🏦 Transferencia',
-     // ✅ AGREGA
-    // Mantener compatibilidad con valores legacy
-    'card': '💳 Tarjeta',                       // ⚠️ Solo para mostrar, no enviar
-    'bank_transfer': '🏦 Transferencia Bancaria',
-    'other': '📝 Otro',
-    'online': '🌐 Pago Online'
+  const getPaymentMethodLabel = (method) => {
+    const methods = {
+      'cash': '💵 Efectivo',
+      'credit_card': '💳 Tarjeta de Crédito',
+      'debit_card': '💳 Tarjeta de Débito',
+      'transfer': '🏦 Transferencia',
+      'bank_transfer': '🏦 Transferencia Bancaria',
+      'card': '💳 Tarjeta',
+      'other': '📝 Otro',
+      'online': '🌐 Pago Online'
+    };
+    return methods[method] || `📄 ${method}`;
   };
-  return methods[method] || `📄 ${method}`;
-};
 
-  // 🔧 CALCULAR MONTO PENDIENTE REAL USANDO financialSummary SI ESTÁ DISPONIBLE
-  const calculateRealPendingAmount = () => {
-    // 🎯 PRIORIZAR financialSummary DEL BACKEND SI ESTÁ DISPONIBLE
-    if (bookingData?.financialSummary) {
-      console.log('📊 [PAYMENT] Usando financialSummary del backend:', bookingData.financialSummary);
-      return {
-        totalReserva: bookingData.financialSummary.totalReserva,
-        totalExtras: bookingData.financialSummary.totalExtras,
-        totalPagado: bookingData.financialSummary.totalPagado,
-        totalFinal: bookingData.financialSummary.totalFinal,
-        pendienteReal: bookingData.financialSummary.totalPendiente
+  // 🔧 FUNCIÓN MEJORADA PARA OBTENER DATOS FINANCIEROS
+  const getFinancialData = () => {
+    console.log('📊 [PAYMENT] bookingData recibida:', bookingData);
+    
+    // 🎯 PRIORIZAR paymentInfo DEL BACKEND QUE TIENE TODOS LOS CÁLCULOS
+    if (bookingData?.paymentInfo) {
+      const paymentInfo = bookingData.paymentInfo;
+      const extraChargesInfo = bookingData.extraChargesInfo || {};
+      
+      const financialData = {
+        totalReserva: parseFloat(bookingData.totalAmount || 0),
+        totalExtras: parseFloat(extraChargesInfo.totalExtraCharges || 0),
+        totalPagado: parseFloat(paymentInfo.totalPaid || 0),
+        totalFinal: parseFloat(paymentInfo.totalAmount || bookingData.totalAmount || 0),
+        pendienteReal: parseFloat(paymentInfo.balance || 0),
+        // 🆕 INFORMACIÓN ADICIONAL
+        allPayments: paymentInfo.allPayments || [],
+        paymentCount: paymentInfo.paymentCount || 0,
+        paymentStatus: paymentInfo.paymentStatus || 'unpaid'
       };
+
+      console.log('📊 [PAYMENT] Datos financieros del backend:', financialData);
+      return financialData;
     }
 
-    // 🔧 CÁLCULO DE RESPALDO SI NO HAY financialSummary
-    console.log('⚠️ [PAYMENT] financialSummary no disponible, calculando localmente');
+    // 🔄 FALLBACK: Cálculo manual si no hay paymentInfo
+    console.log('⚠️ [PAYMENT] No hay paymentInfo, calculando manualmente');
     
     const totalReserva = parseFloat(bookingData?.totalAmount || 0);
     const extraCharges = bookingData?.extraCharges || [];
     const payments = bookingData?.payments || [];
     
-    // Calcular total de extras (considerando cantidad)
     const totalExtras = extraCharges.reduce((sum, charge) => {
       const amount = parseFloat(charge.amount || 0);
       const quantity = parseInt(charge.quantity || 1);
       return sum + (amount * quantity);
     }, 0);
-    
-    // Calcular total pagado (solo pagos completados)
+
     const totalPagado = payments
       .filter(payment => payment.paymentStatus === 'completed')
       .reduce((sum, payment) => {
@@ -91,220 +98,319 @@ const getPaymentMethodLabel = (method) => {
         return sum + (isNaN(amount) ? 0 : amount);
       }, 0);
     
-    // Calcular total final y pendiente
     const totalFinal = totalReserva + totalExtras;
     const pendienteReal = Math.max(0, totalFinal - totalPagado);
 
-    console.log('📊 [PAYMENT] Cálculo financiero local:', {
-      totalReserva,
-      totalExtras,
-      totalPagado,
-      totalFinal,
-      pendienteReal
-    });
-    
     return {
       totalReserva,
       totalExtras,
       totalPagado,
       totalFinal,
-      pendienteReal
+      pendienteReal,
+      allPayments: payments,
+      paymentCount: payments.filter(p => p.paymentStatus === 'completed').length,
+      paymentStatus: totalPagado >= totalFinal ? 'fully_paid' : totalPagado > 0 ? 'partially_paid' : 'unpaid'
     };
   };
 
-  const financialData = calculateRealPendingAmount();
+  const financialData = getFinancialData();
   const [paymentAmount, setPaymentAmount] = useState(financialData.pendienteReal);
 
   // 🔧 ACTUALIZAR MONTO CUANDO CAMBIEN LOS DATOS
   useEffect(() => {
-    const newFinancialData = calculateRealPendingAmount();
+    const newFinancialData = getFinancialData();
     setPaymentAmount(newFinancialData.pendienteReal);
   }, [bookingData]);
 
-  // 🔧 FUNCIÓN MEJORADA PARA GENERAR PDF
+  // 🆕 FUNCIÓN MEJORADA PARA GENERAR PDF CON HISTORIAL COMPLETO
   const generatePDF = (paymentDetails) => {
-  try {
-    const doc = new jsPDF({
-      unit: "pt",
-      format: [226.77, 839.28], // Formato ticket
-    });
+    try {
+      const doc = new jsPDF({
+        unit: "pt",
+        format: [226.77, 839.28], // Formato ticket
+      });
 
-    const date = formatDateTime(new Date());
-    const receiptNumber = `#${paymentDetails.paymentId || Date.now()}`;
-    const pageWidth = doc.internal.pageSize.width;
-    let currentY = 30;
+      const date = formatDateTime(new Date());
+      const receiptNumber = `#${paymentDetails.paymentId || Date.now()}`;
+      const pageWidth = doc.internal.pageSize.width;
+      let currentY = 30;
 
-    // 🎨 HEADER DEL HOTEL
-    doc.setFontSize(16);
-    doc.setFont(undefined, 'bold');
-    doc.text("BALU HOTEL", pageWidth / 2, currentY, { align: "center" });
-    currentY += 25;
+      // 🎨 HEADER DEL HOTEL
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.text("BALU HOTEL", pageWidth / 2, currentY, { align: "center" });
+      currentY += 25;
 
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-    doc.text("NIT: 123.456.789-0", pageWidth / 2, currentY, { align: "center" });
-    currentY += 15;
-    doc.text("Calle 123 #45-67, Ciudad", pageWidth / 2, currentY, { align: "center" });
-    currentY += 15;
-    doc.text("Tel: (123) 456-7890", pageWidth / 2, currentY, { align: "center" });
-    currentY += 25;
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      doc.text("NIT: 123.456.789-0", pageWidth / 2, currentY, { align: "center" });
+      currentY += 15;
+      doc.text("Calle 123 #45-67, Ciudad", pageWidth / 2, currentY, { align: "center" });
+      currentY += 15;
+      doc.text("Tel: (123) 456-7890", pageWidth / 2, currentY, { align: "center" });
+      currentY += 25;
 
-    // 🧾 INFORMACIÓN DEL RECIBO
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text(`RECIBO DE PAGO ${receiptNumber}`, pageWidth / 2, currentY, { align: "center" });
-    currentY += 20;
+      // 🧾 INFORMACIÓN DEL RECIBO
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text(`RECIBO DE PAGO ${receiptNumber}`, pageWidth / 2, currentY, { align: "center" });
+      currentY += 20;
 
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Fecha: ${date}`, pageWidth / 2, currentY, { align: "center" });
-    currentY += 25;
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Fecha: ${date}`, pageWidth / 2, currentY, { align: "center" });
+      currentY += 25;
 
-    // 🎯 LÍNEA SEPARADORA - CORREGIDA
-    doc.text("=" + "=".repeat(33) + "=", pageWidth / 2, currentY, { align: "center" });
-    currentY += 20;
+      // 🎯 LÍNEA SEPARADORA
+      const separator = "=".repeat(35);
+      doc.text(separator, pageWidth / 2, currentY, { align: "center" });
+      currentY += 20;
 
-    // 👤 DATOS DEL HUÉSPED
-    doc.setFontSize(9);
-    doc.setFont(undefined, 'bold');
-    doc.text("DATOS DEL HUESPED:", 15, currentY);
-    currentY += 15;
+      // 👤 DATOS DEL HUÉSPED
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.text("DATOS DEL HUESPED:", 15, currentY);
+      currentY += 15;
 
-    doc.setFont(undefined, 'normal');
-    const guestName = currentBuyerData?.scostumername || 'N/A';
-    const guestDoc = currentBuyerData?.sdocno || 'N/A';
-    
-    doc.text(`Nombre: ${guestName}`, 15, currentY);
-    currentY += 12;
-    doc.text(`Documento: ${guestDoc}`, 15, currentY);
-    currentY += 15;
-
-    // 🏨 DATOS DE LA RESERVA
-    doc.setFont(undefined, 'bold');
-    doc.text("DATOS DE LA RESERVA:", 15, currentY);
-    currentY += 15;
-
-    doc.setFont(undefined, 'normal');
-    const roomInfo = `${selectedRoom?.type || 'Habitacion'} - ${selectedRoom?.roomNumber || bookingData?.roomNumber || 'N/A'}`;
-    doc.text(`Habitacion: ${roomInfo}`, 15, currentY);
-    currentY += 12;
-
-    doc.text(`Reserva #: ${bookingData?.bookingId || 'N/A'}`, 15, currentY);
-    currentY += 12;
-
-    if (bookingData?.checkIn) {
-      doc.text(`Check-in: ${formatDateTime(bookingData.checkIn)}`, 15, currentY);
+      doc.setFont(undefined, 'normal');
+      const guestName = currentBuyerData?.scostumername || bookingData?.guest?.scostumername || 'N/A';
+      const guestDoc = currentBuyerData?.sdocno || bookingData?.guest?.sdocno || 'N/A';
+      
+      doc.text(`Nombre: ${guestName}`, 15, currentY);
       currentY += 12;
-    }
+      doc.text(`Documento: ${guestDoc}`, 15, currentY);
+      currentY += 15;
 
-    if (bookingData?.checkOut) {
-      doc.text(`Check-out: ${formatDateTime(bookingData.checkOut)}`, 15, currentY);
+      // 🏨 DATOS DE LA RESERVA
+      doc.setFont(undefined, 'bold');
+      doc.text("DATOS DE LA RESERVA:", 15, currentY);
+      currentY += 15;
+
+      doc.setFont(undefined, 'normal');
+      const roomInfo = `${selectedRoom?.type || bookingData?.room?.type || 'Habitacion'} - ${selectedRoom?.roomNumber || bookingData?.roomNumber || 'N/A'}`;
+      doc.text(`Habitacion: ${roomInfo}`, 15, currentY);
       currentY += 12;
-    }
 
-    currentY += 15;
+      doc.text(`Reserva #: ${bookingData?.bookingId || 'N/A'}`, 15, currentY);
+      currentY += 12;
 
-    // 💰 DESGLOSE FINANCIERO COMPLETO
-    doc.setFont(undefined, 'bold');
-    doc.text("DESGLOSE FINANCIERO:", 15, currentY);
-    currentY += 15;
+      if (bookingData?.checkIn) {
+        const checkInFormatted = formatDateTime(bookingData.checkIn).split(' ')[0]; // Solo fecha
+        doc.text(`Check-in: ${checkInFormatted}`, 15, currentY);
+        currentY += 12;
+      }
 
-    doc.setFont(undefined, 'normal');
-    
-    // Total reserva
-    doc.text(`Costo reserva:`, 15, currentY);
-    doc.text(`$${financialData.totalReserva.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-    currentY += 12;
+      if (bookingData?.checkOut) {
+        const checkOutFormatted = formatDateTime(bookingData.checkOut).split(' ')[0]; // Solo fecha
+        doc.text(`Check-out: ${checkOutFormatted}`, 15, currentY);
+        currentY += 12;
+      }
 
-    // Extras detallados si los hay
-    const extraCharges = bookingData?.extraCharges || [];
-    if (extraCharges.length > 0) {
-      doc.text(`Consumos extras:`, 15, currentY);
+      currentY += 15;
+
+      // 💰 SECCIÓN DE CUENTA - REORGANIZADA Y CLARA
+      doc.text("-".repeat(35), pageWidth / 2, currentY, { align: "center" });
+      currentY += 15;
+
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(10);
+      doc.text("RESUMEN DE CUENTA", pageWidth / 2, currentY, { align: "center" });
+      currentY += 15;
+
+      doc.text("-".repeat(35), pageWidth / 2, currentY, { align: "center" });
+      currentY += 10;
+
+      // 📊 DESGLOSE DE LA CUENTA
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      
+      // 1. COSTO RESERVA
+      doc.text("COSTO RESERVA:", 15, currentY);
+      doc.text(`$${financialData.totalReserva.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      currentY += 12;
+
+      // 2. EXTRAS (SI LOS HAY)
+      if (financialData.totalExtras > 0) {
+        doc.text("CONSUMOS EXTRAS:", 15, currentY);
+        doc.text(`+$${financialData.totalExtras.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+        currentY += 10;
+        
+        // Detalle de extras si hay pocos
+        const extraCharges = bookingData?.extraCharges || [];
+        if (extraCharges.length > 0 && extraCharges.length <= 5) {
+          doc.setFontSize(7);
+          extraCharges.forEach((charge) => {
+            const amount = parseFloat(charge.amount || 0);
+            const quantity = parseInt(charge.quantity || 1);
+            const total = amount * quantity;
+            
+            const description = (charge.description || 'Extra').substring(0, 20);
+            doc.text(`  • ${description}`, 15, currentY);
+            doc.text(`$${total.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+            currentY += 8;
+          });
+          doc.setFontSize(8);
+        }
+        currentY += 5;
+      }
+
+      // 3. TOTAL DE LA CUENTA
+      doc.text("-".repeat(25), 15, currentY);
+      doc.text("-".repeat(8), pageWidth - 65, currentY);
+      currentY += 8;
+      
+      doc.setFont(undefined, 'bold');
+      doc.text("TOTAL CUENTA:", 15, currentY);
+      doc.text(`$${financialData.totalFinal.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      currentY += 15;
+
+      // 🆕 4. HISTORIAL DE PAGOS COMPLETO
+      doc.setFont(undefined, 'normal');
+      doc.text("HISTORIAL DE PAGOS:", 15, currentY);
+      currentY += 12;
+
+      // 🔍 OBTENER PAGOS PREVIOS Y CALCULAR TOTALES
+      const currentPaymentAmount = parseFloat(paymentDetails.amount);
+      const totalPagadoConEste = financialData.totalPagado + currentPaymentAmount;
+      
+      // Mostrar pagos anteriores si los hay
+      if (financialData.allPayments.length > 0) {
+        doc.setFontSize(7);
+        
+        financialData.allPayments.forEach((payment, index) => {
+          const paymentDate = formatDateTime(payment.paymentDate).split(' ')[0];
+          const method = getPaymentMethodLabel(payment.paymentMethod).replace(/[^\w\s\-]/g, '').trim();
+          
+          doc.text(`  ${index + 1}. ${paymentDate} - ${method}`, 15, currentY);
+          doc.text(`$${parseFloat(payment.amount).toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+          currentY += 10;
+        });
+        
+        // Subtotal de pagos anteriores
+        if (financialData.allPayments.length > 0) {
+          doc.setFontSize(8);
+          doc.text("Subtotal pagos anteriores:", 15, currentY);
+          doc.text(`$${financialData.totalPagado.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+          currentY += 12;
+        }
+      }
+
+      // 5. ESTE PAGO ACTUAL
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(8);
+      doc.text("PAGO ACTUAL:", 15, currentY);
+      doc.text(`$${currentPaymentAmount.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      currentY += 12;
+
+      // Método de pago actual
+      doc.setFont(undefined, 'normal');
+      const methodLabel = getPaymentMethodLabel(paymentMethod).replace(/[^\w\s\-]/g, '').trim();
+      doc.text(`Metodo: ${methodLabel}`, 15, currentY);
+      currentY += 15;
+
+      // 6. TOTAL PAGADO HASTA AHORA (INCLUYENDO ESTE PAGO)
+      doc.text("-".repeat(25), 15, currentY);
+      doc.text("-".repeat(8), pageWidth - 65, currentY);
+      currentY += 8;
+      
+      doc.setFont(undefined, 'bold');
+      doc.text("TOTAL PAGADO:", 15, currentY);
+      doc.text(`$${totalPagadoConEste.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      currentY += 12;
+
+      // 7. SALDO RESTANTE
+      const saldoRestante = Math.max(0, financialData.totalFinal - totalPagadoConEste);
+      
+      if (saldoRestante > 0) {
+        doc.setFont(undefined, 'normal');
+        doc.text("SALDO PENDIENTE:", 15, currentY);
+        doc.text(`$${saldoRestante.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+        currentY += 15;
+      } else {
+        doc.setFont(undefined, 'bold');
+        doc.text("CUENTA PAGADA:", 15, currentY);
+        doc.text("$0", pageWidth - 15, currentY, { align: "right" });
+        currentY += 15;
+      }
+
+      // 🎯 LÍNEA SEPARADORA FINAL
+      doc.text("=".repeat(35), pageWidth / 2, currentY, { align: "center" });
+      currentY += 20;
+
+      // 📊 ESTADO FINAL DE LA CUENTA - MUY CLARO
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      
+      if (saldoRestante <= 0) {
+        doc.text("✓ PAGO 100%", pageWidth / 2, currentY, { align: "center" });
+        currentY += 15;
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
+        doc.text("No hay montos pendientes", pageWidth / 2, currentY, { align: "center" });
+      } else {
+        doc.text("PAGO PARCIAL REALIZADO", pageWidth / 2, currentY, { align: "center" });
+        currentY += 15;
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Resta pagar: $${saldoRestante.toLocaleString()}`, pageWidth / 2, currentY, { align: "center" });
+      }
+      
+      currentY += 20;
+
+      // 📈 RESUMEN VISUAL RÁPIDO
+      doc.text("-".repeat(35), pageWidth / 2, currentY, { align: "center" });
+      currentY += 15;
+
+      doc.setFontSize(7);
+      doc.setFont(undefined, 'normal');
+      doc.text("RESUMEN:", pageWidth / 2, currentY, { align: "center" });
+      currentY += 12;
+
+      // Porcentaje pagado
+      const porcentajePagado = Math.round((totalPagadoConEste / financialData.totalFinal) * 100);
+      doc.text(`Pagado: ${porcentajePagado}% de la cuenta total`, pageWidth / 2, currentY, { align: "center" });
       currentY += 10;
       
-      extraCharges.forEach((charge) => {
-        const amount = parseFloat(charge.amount || 0);
-        const quantity = parseInt(charge.quantity || 1);
-        const total = amount * quantity;
-        
-        doc.setFontSize(7);
-        doc.text(`• ${charge.description || 'Cargo extra'}`, 20, currentY);
-        doc.text(`${quantity}x$${amount.toLocaleString()} = $${total.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-        currentY += 10;
-      });
+      // Número total de pagos
+      const totalPagosRealizados = financialData.paymentCount + 1; // +1 por este pago
+      doc.text(`Total de pagos realizados: ${totalPagosRealizados}`, pageWidth / 2, currentY, { align: "center" });
+      currentY += 10;
       
-      doc.setFontSize(8);
-      doc.text(`Subtotal extras:`, 15, currentY);
-      doc.text(`$${financialData.totalExtras.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-      currentY += 12;
-    }
+      if (saldoRestante > 0) {
+        const porcentajePendiente = 100 - porcentajePagado;
+        doc.text(`Pendiente: ${porcentajePendiente}%`, pageWidth / 2, currentY, { align: "center" });
+        currentY += 15;
+      } else {
+        doc.text("Estado: PAGO COMPLETO", pageWidth / 2, currentY, { align: "center" });
+        currentY += 15;
+      }
 
-    // 🎯 LÍNEA SEPARADORA - CORREGIDA
-    doc.text("-".repeat(35), pageWidth / 2, currentY, { align: "center" });
-    currentY += 10;
-    
-    doc.text(`Total cuenta:`, 15, currentY);
-    doc.text(`$${financialData.totalFinal.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-    currentY += 15;
+      // 🎯 LÍNEA SEPARADORA FINAL
+      doc.text("=".repeat(35), pageWidth / 2, currentY, { align: "center" });
+      currentY += 20;
 
-    // Pagos anteriores
-    const previousPayments = bookingData?.payments?.filter(p => p.paymentStatus === 'completed') || [];
-    const previousPaymentsTotal = financialData.totalPagado - parseFloat(paymentDetails.amount);
-    
-    if (previousPaymentsTotal > 0) {
-      doc.text(`Pagos anteriores:`, 15, currentY);
-      doc.text(`-$${previousPaymentsTotal.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-      currentY += 12;
-    }
-
-    // 🎯 LÍNEA SEPARADORA - CORREGIDA
-    doc.text("=".repeat(35), pageWidth / 2, currentY, { align: "center" });
-    currentY += 15;
-
-    // MONTO DE ESTE PAGO
-    doc.setFont(undefined, 'bold');
-    doc.text(`PAGO ACTUAL:`, 15, currentY);
-    doc.text(`$${parseFloat(paymentDetails.amount).toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
-    currentY += 15;
-
-    // Método de pago - CORREGIDO
-    doc.setFont(undefined, 'normal');
-    const methodLabel = getPaymentMethodLabel(paymentMethod).replace(/[^\w\s]/g, '').trim();
-    doc.text(`Metodo: ${methodLabel}`, 15, currentY);
-    currentY += 20;
-
-    // Saldo restante si es pago parcial
-    const remainingAfterPayment = financialData.totalFinal - financialData.totalPagado;
-    if (remainingAfterPayment > 0) {
-      doc.text(`Saldo pendiente:`, 15, currentY);
-      doc.text(`$${remainingAfterPayment.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      // 🙏 MENSAJE DE AGRADECIMIENTO
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text("¡Gracias por su pago!", pageWidth / 2, currentY, { align: "center" });
       currentY += 15;
+
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      doc.text("Conserve este recibo", pageWidth / 2, currentY, { align: "center" });
+      currentY += 10;
+      doc.text("como comprobante de pago", pageWidth / 2, currentY, { align: "center" });
+
+      // 🔧 GENERAR Y MOSTRAR EL PDF
+      doc.output("dataurlnewwindow");
+      
+      console.log("✅ PDF generado exitosamente con historial completo de pagos");
+      
+    } catch (error) {
+      console.error("❌ Error generando PDF:", error);
+      toast.error("Error al generar el recibo PDF");
     }
-
-    // 🎯 LÍNEA SEPARADORA FINAL - CORREGIDA
-    doc.text("=".repeat(35), pageWidth / 2, currentY, { align: "center" });
-    currentY += 20;
-
-    // 🙏 MENSAJE DE AGRADECIMIENTO
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.text("¡Gracias por elegirnos!", pageWidth / 2, currentY, { align: "center" });
-    currentY += 15;
-
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-    doc.text("Conserve este recibo", pageWidth / 2, currentY, { align: "center" });
-
-    // 🔧 GENERAR Y MOSTRAR EL PDF
-    doc.output("dataurlnewwindow");
-    
-    console.log("✅ PDF generado exitosamente");
-    
-  } catch (error) {
-    console.error("❌ Error generando PDF:", error);
-    toast.error("Error al generar el recibo PDF");
-  }
-};
+  };
 
   // 🔧 FUNCIÓN PRINCIPAL DE PAGO MEJORADA
   const handlePayment = async () => {
@@ -314,7 +420,7 @@ const getPaymentMethodLabel = (method) => {
       return;
     }
 
-    const currentFinancialData = calculateRealPendingAmount();
+    const currentFinancialData = getFinancialData();
     
     if (paymentAmount > currentFinancialData.pendienteReal) {
       toast.error(`El monto del pago ($${paymentAmount.toLocaleString()}) no puede ser mayor al monto pendiente ($${currentFinancialData.pendienteReal.toLocaleString()})`);
@@ -380,8 +486,10 @@ const getPaymentMethodLabel = (method) => {
           ...result.data?.data
         };
 
-        // 🧾 GENERAR RECIBO
-        generatePDF(paymentDetails);
+        // 🧾 GENERAR RECIBO CON CONTEXTO COMPLETO
+        setTimeout(() => {
+          generatePDF(paymentDetails);
+        }, 500);
 
         // 🎉 MOSTRAR ÉXITO
         const remainingAmount = currentFinancialData.pendienteReal - paymentAmount;
@@ -457,7 +565,7 @@ const getPaymentMethodLabel = (method) => {
   }
 
   // 🔧 OBTENER DATOS PARA LOS HISTORIALES
-  const paymentHistory = bookingData?.payments?.filter(p => p.paymentStatus === 'completed') || [];
+  const paymentHistory = financialData.allPayments || bookingData?.payments?.filter(p => p.paymentStatus === 'completed') || [];
   const extraCharges = bookingData?.extraCharges || [];
 
   return (
@@ -727,7 +835,10 @@ PaymentAndReceipt.propTypes = {
     roomNumber: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     checkIn: PropTypes.string,
     checkOut: PropTypes.string,
-    financialSummary: PropTypes.object, // Nueva prop para los datos del backend
+    paymentInfo: PropTypes.object, // ⭐ DATOS DEL BACKEND
+    extraChargesInfo: PropTypes.object, // ⭐ DATOS DEL BACKEND
+    guest: PropTypes.object,
+    room: PropTypes.object,
   }).isRequired,
   amountToPay: PropTypes.number.isRequired,
   currentBuyerData: PropTypes.shape({
