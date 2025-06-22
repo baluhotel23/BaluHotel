@@ -11,7 +11,7 @@ import {
 } from "../../Redux/Actions/roomActions";
 import DashboardLayout from "../Dashboard/DashboardLayout";
 import { 
-  createRegistrationPass,
+  
   getRegistrationPassesByBooking 
 } from "../../Redux/Actions/registerActions";
 import { removeStock } from "../../Redux/Actions/inventoryActions";
