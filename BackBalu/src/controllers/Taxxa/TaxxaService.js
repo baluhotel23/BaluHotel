@@ -76,21 +76,19 @@ const createInvoice = async (req, res) => {
 
     // Validar que la factura interna esté pagada
     if (bill.status !== 'paid') {
-  return res.status(400).json({
-    message: 'La factura debe estar pagada',
-    success: false
-  });
-}
+      return res.status(400).json({
+        message: 'La factura debe estar pagada',
+        success: false
+      });
+    }
 
-if (bill.taxxaStatus === 'sent' && bill.taxInvoiceId) {
-  return res.status(200).json({
-    message: 'Factura ya enviada exitosamente',
-    success: true,
-    data: { taxInvoiceId: bill.taxInvoiceId }
-  });
-}
-
-
+    if (bill.taxxaStatus === 'sent' && bill.taxInvoiceId) {
+      return res.status(200).json({
+        message: 'Factura ya enviada exitosamente',
+        success: true,
+        data: { taxInvoiceId: bill.taxInvoiceId }
+      });
+    }
 
     // 🔧 OBTENER DATOS DEL VENDEDOR
     const sellerData = await SellerData.findOne({
@@ -130,177 +128,224 @@ if (bill.taxxaStatus === 'sent' && bill.taxInvoiceId) {
       });
     }
 
-    // 🔧 CONSTRUIR DOCUMENTO PARA TAXXA
-console.log('=== Construyendo documento para Taxxa (estructura corregida) ===');
+    // 🔧 CONSTRUIR DOCUMENTO PARA TAXXA - ESTRUCTURA CORREGIDA SEGÚN TU PROYECTO QUE FUNCIONA
+    console.log('=== Construyendo documento para Taxxa (estructura corregida) ===');
 
-// 🔧 CALCULAR TOTALES PRIMERO
-const baseAmount = parseFloat(bill.reservationAmount);
-const extraAmount = parseFloat(bill.extraChargesAmount) || 0;
-const totalBase = baseAmount + extraAmount;
-const taxAmount = parseFloat(bill.taxAmount) || 0;
-const totalWithTax = totalBase + taxAmount;
+    // 🔧 CALCULAR TOTALES PRIMERO
+    const baseAmount = parseFloat(bill.reservationAmount);
+    const extraAmount = parseFloat(bill.extraChargesAmount) || 0;
+    const totalBase = baseAmount + extraAmount;
+    const taxAmount = parseFloat(bill.taxAmount) || 0;
+    const totalWithTax = totalBase + taxAmount;
 
-// 🔧 MAPEAR TIPOS DE DOCUMENTO
-const mapDocTypeToText = (code) => {
-  const mapping = {
-    11: "RC", 12: "TI", 13: "CC", 21: "CE", 22: "CD", 
-    31: "NIT", 41: "PA", 42: "PEP", 50: "NIT", 91: "NUIP"
-  };
-  return mapping[code] || "CC";
-};
+    // 🔧 MAPEAR TIPOS DE DOCUMENTO
+    const mapDocTypeToText = (code) => {
+      const mapping = {
+        11: "RC", 12: "TI", 13: "CC", 21: "CE", 22: "CD", 
+        31: "NIT", 41: "PA", 42: "PEP", 50: "NIT", 91: "NUIP"
+      };
+      return mapping[code] || "CC";
+    };
 
-const documentBody = {
-  sMethod: 'classTaxxa.fjDocumentAdd',
-  jParams: {
-    // 🔧 ESTRUCTURA EXACTA DEL EJEMPLO
-    wVersionUBL: 2.1, // ✅ Número, no string
-    wenvironment: "prod",
-    jDocument: {
-      // 🔧 CAMPOS PRINCIPALES
-      wdocumenttype: "Invoice", // ✅ Igual al ejemplo
-      wdocumenttypecode: "01", // ✅ Igual al ejemplo
-      scustomizationid: "10", // ✅ Igual al ejemplo
-      wcurrency: "COP", // ✅ wcurrency no scurrency
+    // 🆕 FUNCIÓN PARA CONVERTIR NÚMERO A PALABRAS
+    const numberToWords = (num) => {
+      const numbers = {
+        140000: "ciento cuarenta mil",
+        160000: "ciento sesenta mil",
+        100000: "cien mil",
+        120000: "ciento veinte mil",
+        150000: "ciento cincuenta mil",
+        180000: "ciento ochenta mil",
+        200000: "doscientos mil"
+      };
       
-      // 🔧 NUMERACIÓN
-      sdocumentprefix: createdInvoice.prefix,
-      sdocumentsuffix: createdInvoice.invoiceSequentialNumber,
-      
-      // 🔧 FECHAS (formato exacto del ejemplo)
-      tissuedate: new Date().toISOString().replace('T', ' ').split('.')[0], // "2025-02-12 19:13:42"
-      tduedate: new Date().toISOString().split('T')[0], // "2025-02-12"
-      
-      // 🔧 INFORMACIÓN DE PAGO (igual al ejemplo)
-      wpaymentmeans: 1,
-      wpaymentmethod: "10",
-      
-      // 🔧 TOTALES (nombres exactos del ejemplo)
-      nlineextensionamount: totalBase,
-      ntaxexclusiveamount: totalBase,
-      ntaxinclusiveamount: totalWithTax,
-      npayableamount: totalWithTax,
-      
-      // 🔧 REFERENCIAS
-      sorderreference: createdInvoice.orderReference,
-      tdatereference: new Date().toISOString().split('T')[0],
-      
-      // 🔧 INFORMACIÓN EXTRA (igual al ejemplo)
-      jextrainfo: {},
-      
-      // 🔧 ITEMS (estructura exacta del ejemplo)
-      jdocumentitems: {
-        "0": {
+      if (numbers[num]) return numbers[num];
+      return `${num.toLocaleString()} pesos`;
+    };
+
+    const currentDate = new Date().toISOString().split('T')[0]; // "2025-06-22"
+
+    // 🆕 ESTRUCTURA CORREGIDA SEGÚN TU PROYECTO QUE FUNCIONA
+    const documentBody = {
+      sMethod: 'classTaxxa.fjDocumentAdd',
+      jParams: {
+        wVersionUBL: "2.1", // ⭐ Como string, igual que tu proyecto
+        wenvironment: "prod",
+        jDocument: {
+          // ⭐ CAMPOS DIRECTOS EN jDocument (IGUAL QUE TU PROYECTO QUE FUNCIONA)
+          wversionubl: "2.1",
+          wenvironment: "prod",
+          wdocumenttype: "Invoice",
+          wdocumenttypecode: "01",
+          scustomizationid: "10",
+          wcurrency: "COP",
+          
+          // 🔧 NUMERACIÓN
+          sdocumentprefix: createdInvoice.prefix,
+          sdocumentsuffix: parseInt(createdInvoice.invoiceSequentialNumber),
+          
+          // 🔧 FECHAS
+          tissuedate: currentDate,
+          tduedate: currentDate,
+          
+          // 🔧 INFORMACIÓN DE PAGO
+          wpaymentmeans: 1,
+          wpaymentmethod: "10",
+          
+          // 🔧 TOTALES
+          nlineextensionamount: totalBase,
+          ntaxexclusiveamount: totalBase,
+          ntaxinclusiveamount: totalWithTax,
+          npayableamount: totalWithTax,
+          
+          // 🔧 REFERENCIAS
+          sorderreference: createdInvoice.orderReference,
+          snotes: "",
+          snotetop: "",
+          
+          // 🆕 INFORMACIÓN EXTRA
           jextrainfo: {
-            sbarcode: "SERV001"
+            ntotalinvoicepayment: totalWithTax,
+            stotalinvoicewords: numberToWords(totalWithTax),
+            iitemscount: extraAmount > 0 ? "2" : "1"
           },
-          sdescription: `Servicios de hospedaje - Habitación ${booking.roomNumber}`,
-          wunitcode: "und",
-          sstandarditemidentification: "SERV001",
-          sstandardidentificationcode: "999",
-          nunitprice: baseAmount,
-          nusertotal: baseAmount,
-          nquantity: 1,
-          jtax: {
-            jiva: {
-              nrate: 0, // Sin IVA para servicios de hospedaje
-              sname: "IVA",
-              namount: 0,
-              nbaseamount: baseAmount
+          
+          // 🔧 ITEMS
+          jdocumentitems: {
+            "0": {
+              jextrainfo: {
+                sbarcode: `SERV001-${booking.roomNumber}`
+              },
+              sdescription: `Servicios de hospedaje - Habitación ${booking.roomNumber}`,
+              wunitcode: "und",
+              sstandarditemidentification: `SERV001-${booking.roomNumber}`,
+              sstandardidentificationcode: "999",
+              nunitprice: totalBase, // 🔴 USAR totalBase COMO EN EL EJEMPLO
+              nusertotal: totalBase,
+              nquantity: 1,
+              jtax: {
+                jiva: {
+                  nrate: taxAmount > 0 ? 19 : 0,
+                  sname: "IVA",
+                  namount: taxAmount,
+                  nbaseamount: totalBase
+                }
+              }
+            }
+          },
+          
+          // 🔧 COMPRADOR - ESTRUCTURA IGUAL QUE EL EJEMPLO QUE FUNCIONA
+          jbuyer: {
+            wlegalorganizationtype: buyer.wlegalorganizationtype || "person",
+            scostumername: buyer.scostumername,
+            stributaryidentificationkey: "O-1",
+            stributaryidentificationname: "IVA", // ⭐ CAMPO PRESENTE EN EL EJEMPLO
+            sfiscalresponsibilities: buyer.sfiscalresponsibilities || "R-99-PN",
+            sfiscalregime: "48",
+            jpartylegalentity: {
+              wdoctype: mapDocTypeToText(buyer.wdoctype),
+              sdocno: buyer.sdocno,
+              scorporateregistrationschemename: buyer.scostumername // ⭐ USAR NOMBRE DEL COMPRADOR
+            },
+            jcontact: {
+              scontactperson: buyer.scontactperson || buyer.scostumername,
+              selectronicmail: buyer.selectronicmail,
+              stelephone: buyer.stelephone?.replace(/^\+57/, '') || "3000000000",
+              // 🆕 DIRECCIÓN DEL COMPRADOR SI EXISTE
+              ...(buyer.jregistrationaddress && {
+                jregistrationaddress: {
+                  scountrycode: buyer.jregistrationaddress.scountrycode || "CO",
+                  wdepartmentcode: buyer.jregistrationaddress.wdepartmentcode || "11",
+                  wtowncode: buyer.jregistrationaddress.wtowncode || "11001",
+                  scityname: buyer.jregistrationaddress.scityname || "Bogotá",
+                  saddressline1: buyer.jregistrationaddress.saddressline1 || "Dirección no especificada",
+                  szip: buyer.jregistrationaddress.szip || "00000"
+                }
+              })
+            }
+          },
+          
+          // 🔧 VENDEDOR - ESTRUCTURA IGUAL QUE TU PROYECTO QUE FUNCIONA
+          jseller: {
+            wlegalorganizationtype: sellerData.wlegalorganizationtype === "person" ? "person" : "company",
+            sfiscalresponsibilities: sellerData.sfiscalresponsibilities,
+            sdocno: sellerData.sdocno,
+            sdoctype: mapDocTypeToText(sellerData.sdoctype),
+            ssellername: sellerData.scostumername,
+            ssellerbrand: sellerData.ssellerbrand || sellerData.scostumername,
+            scontactperson: sellerData.scontactperson?.trim(),
+            saddresszip: sellerData.spostalcode || "00000",
+            wdepartmentcode: sellerData.registration_wdepartmentcode || "11",
+            wtowncode: sellerData.registration_wprovincecode || "11001",
+            scityname: sellerData.registration_scityname || sellerData.scity,
+            jcontact: {
+              selectronicmail: sellerData.selectronicmail,
+              jregistrationaddress: {
+                wdepartmentcode: sellerData.registration_wdepartmentcode || "11",
+                sdepartmentname: sellerData.registration_sdepartmentname || "Cundinamarca",
+                scityname: sellerData.registration_scityname || sellerData.scity,
+                saddressline1: sellerData.registration_saddressline1 || sellerData.saddress,
+                scountrycode: sellerData.registration_scountrycode || "CO",
+                wprovincecode: sellerData.registration_wprovincecode || "11",
+                szip: sellerData.registration_szip || sellerData.spostalcode || "00000"
+              }
             }
           }
         }
-      },
-      
-      // 🔧 VENDEDOR (estructura exacta del ejemplo)
-      jseller: {
-        wlegalorganizationtype: sellerData.wlegalorganizationtype === "person" ? "person" : "company",
-        sfiscalresponsibilities: sellerData.sfiscalresponsibilities,
-        sdocno: sellerData.sdocno,
-        sdoctype: mapDocTypeToText(sellerData.sdoctype),
-        ssellername: sellerData.scostumername,
-        ssellerbrand: sellerData.scostumername, // Usar mismo nombre como marca
-        scontactperson: sellerData.scontactperson?.trim(),
-        saddresszip: sellerData.spostalcode || "00000",
-        wdepartmentcode: sellerData.registration_wdepartmentcode || "11",
-        wtowncode: sellerData.registration_wprovincecode || "11001",
-        scityname: sellerData.registration_scityname || sellerData.scity,
-        jcontact: {
-          selectronicmail: sellerData.selectronicmail,
-          jregistrationaddress: {
-            wdepartmentcode: sellerData.registration_wdepartmentcode || "11",
-            scityname: sellerData.registration_scityname || sellerData.scity,
-            saddressline1: sellerData.registration_saddressline1 || sellerData.saddress,
-            scountrycode: sellerData.registration_scountrycode || "CO",
-            wprovincecode: sellerData.registration_wprovincecode || "11",
-            szip: sellerData.registration_szip || sellerData.spostalcode || "00000",
-            sdepartmentname: sellerData.registration_sdepartmentname || "Cundinamarca"
+      }
+    };
+
+    // 🔧 AGREGAR SERVICIOS ADICIONALES SI EXISTEN
+    if (extraAmount > 0) {
+      documentBody.jParams.jDocument.jdocumentitems["1"] = {
+        jextrainfo: {
+          sbarcode: "SERV002-EXTRA"
+        },
+        sdescription: "Servicios adicionales y consumos",
+        wunitcode: "und",
+        sstandarditemidentification: "SERV002-EXTRA",
+        sstandardidentificationcode: "999",
+        nunitprice: extraAmount,
+        nusertotal: extraAmount,
+        nquantity: 1,
+        jtax: {
+          jiva: {
+            nrate: 19, // IVA para extras
+            sname: "IVA",
+            namount: extraAmount * 0.19,
+            nbaseamount: extraAmount
           }
         }
-      },
+      };
       
-      // 🔧 COMPRADOR (estructura exacta del ejemplo)
-      jbuyer: {
-        wlegalorganizationtype: buyer.wlegalorganizationtype || "person",
-        scostumername: buyer.scostumername,
-        stributaryidentificationkey: "O-1", // ✅ Usar "O-1" como en el ejemplo
-        sfiscalresponsibilities: buyer.sfiscalresponsibilities || "R-99-PN",
-        sfiscalregime: "48", // ✅ Usar "48" como en el ejemplo
-        jpartylegalentity: {
-          wdoctype: mapDocTypeToText(buyer.wdoctype),
-          sdocno: buyer.sdocno,
-          scorporateregistrationschemename: "Admin" // ✅ Usar "Admin" como en el ejemplo
-        },
-        jcontact: {
-          scontactperson: buyer.scontactperson || buyer.scostumername,
-          selectronicmail: buyer.selectronicmail,
-          stelephone: buyer.stelephone?.replace(/^\+57/, '') || "3000000000" // Quitar +57
-        }
-      }
+      // Actualizar contador de items
+      documentBody.jParams.jDocument.jextrainfo.iitemscount = "2";
     }
-  }
-};
 
-// 🔧 AGREGAR SERVICIOS ADICIONALES SI EXISTEN
-if (extraAmount > 0) {
-  documentBody.jParams.jDocument.jdocumentitems["1"] = {
-    jextrainfo: {
-      sbarcode: "SERV002"
-    },
-    sdescription: "Servicios adicionales",
-    wunitcode: "und",
-    sstandarditemidentification: "SERV002",
-    sstandardidentificationcode: "999",
-    nunitprice: extraAmount,
-    nusertotal: extraAmount,
-    nquantity: 1,
-    jtax: {
-      jiva: {
-        nrate: 0,
-        sname: "IVA",
-        namount: 0,
-        nbaseamount: extraAmount
-      }
-    }
-  };
-}
+    console.log('📄 Documento con estructura corregida:', JSON.stringify(documentBody, null, 2));
 
-console.log('📄 Documento con estructura corregida:', JSON.stringify(documentBody, null, 2));
-  
-const token = await generateToken();
+    // 🔧 GENERAR TOKEN
+    console.log('=== Generando token para Taxxa ===');
+    const token = await generateToken();
     if (!token) {
       await cancelInvoice(createdInvoice.id);
       throw new Error('No se pudo generar el token de autenticación');
     }
 
-    console.log('=== Enviando documento a Taxxa ===');
+    // 🔧 PREPARAR PAYLOAD FINAL - IGUAL QUE TU PROYECTO QUE FUNCIONA
     const taxxaPayload = {
       stoken: token,
-      jApi: documentBody,
+      jApi: documentBody // ⭐ ESTRUCTURA IGUAL QUE TU PROYECTO
     };
 
+    console.log('=== Enviando documento a Taxxa ===');
+    console.log('Payload a enviar:', JSON.stringify(taxxaPayload, null, 2));
+
+    // 🔧 ENVIAR DOCUMENTO
     const taxxaResponse = await sendDocument(taxxaPayload);
     console.log('Respuesta de Taxxa:', JSON.stringify(taxxaResponse, null, 2));
 
+    // 🔧 PROCESAR RESPUESTA - IGUAL QUE TU PROYECTO QUE FUNCIONA
     if (taxxaResponse && taxxaResponse.rerror === 0) {
       console.log('=== Factura fiscal enviada exitosamente ===');
       
@@ -311,7 +356,7 @@ const token = await generateToken();
       await bill.update({
         taxxaStatus: 'sent',
         taxInvoiceId: createdInvoice.getFullInvoiceNumber(),
-        cufe: taxxaResponse.scufe || taxxaResponse.cufe,
+        cufe: taxxaResponse.jApiResponse?.cufe || taxxaResponse.scufe || taxxaResponse.cufe,
         taxxaResponse: taxxaResponse,
         sentToTaxxaAt: new Date()
       });
@@ -323,9 +368,10 @@ const token = await generateToken();
           invoiceId: createdInvoice.id,
           invoiceNumber: createdInvoice.getFullInvoiceNumber(),
           billId: bill.idBill,
-          cufe: createdInvoice.cufe,
+          cufe: taxxaResponse.jApiResponse?.cufe || taxxaResponse.scufe,
           totalAmount: createdInvoice.totalAmount,
-          sentAt: createdInvoice.sentToTaxxaAt
+          sentAt: createdInvoice.sentToTaxxaAt,
+          taxxaResponse: taxxaResponse
         }
       });
       
@@ -335,11 +381,13 @@ const token = await generateToken();
       // 🔧 MARCAR FACTURA FISCAL COMO FALLIDA
       await createdInvoice.markAsFailed(new Error(taxxaResponse?.smessage || 'Error desconocido'));
       
-      throw new Error(`Error en la respuesta de Taxxa: ${taxxaResponse?.smessage || 'Respuesta inválida'}`);
+      throw new Error(`Error en la respuesta de Taxxa: ${taxxaResponse?.smessage || JSON.stringify(taxxaResponse)}`);
     }
 
   } catch (error) {
-    console.error('Error en el proceso de facturación fiscal:', error.message);
+    console.error('=== Error en el proceso de facturación fiscal ===');
+    console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
     
     // 🔧 CANCELAR FACTURA FISCAL SI SE CREÓ
     if (createdInvoice) {
