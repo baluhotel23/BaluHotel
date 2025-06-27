@@ -275,7 +275,7 @@ const CreateRoom = () => {
                
                 <option value="Doble">Doble</option>
                 <option value="Triple">Triple</option>
-                <option value="Cuadruple">Cuádruple</option>
+                <option value="Múltiple">Múltiple</option>
                 <option value="Pareja">Pareja</option>
               </select>
             </div>

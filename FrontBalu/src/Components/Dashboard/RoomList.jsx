@@ -466,7 +466,7 @@ const RoomList = () => {
                             <option value="Individual">Individual</option>
                             <option value="Doble">Doble</option>
                             <option value="Triple">Triple</option>
-                            <option value="Cuadruple">Cuádruple</option>
+                            <option value="Múltiple">Múltiple</option>
                             <option value="Suite">Suite</option>
                           </select>
                         ) : (

@@ -24,7 +24,7 @@ import WompiPayment from "../WompiPayment";
 import { useNavigate } from "react-router-dom";
 
 
-const ROOM_TYPES = [ "Doble", "Triple", "Cuadruple", "Pareja"];
+const ROOM_TYPES = [ "Doble", "Triple", "Múltiple", "Pareja"];
 
 
 // Definición del Modal

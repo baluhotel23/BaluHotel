@@ -708,7 +708,7 @@ const resetForm = () => {
   );
 };
 
-const ROOM_TYPES = ["Doble", "Triple", "Cuadruple", "Pareja"];
+const ROOM_TYPES = ["Doble", "Triple", "Múltiple", "Pareja"];
 
 const LocalBookingForm = () => {
   const dispatch = useDispatch();

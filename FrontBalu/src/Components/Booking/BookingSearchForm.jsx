@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 
 
 
-const ROOM_TYPES = ["Doble", "Triple", "Cuadruple", "Pareja"];
+const ROOM_TYPES = ["Doble", "Triple", "Múltiple", "Pareja"];
 
 const BookingSearchForm = ({ isCompact = false }) => {
   const dispatch = useDispatch();
