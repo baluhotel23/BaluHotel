@@ -5,10 +5,7 @@ import {
   getAllBookings,
   updateBookingStatus,
 } from "../../Redux/Actions/bookingActions";
-import {
-  updateRoomStatus,
-  updateRoomBasicsStock,
-} from "../../Redux/Actions/roomActions";
+import { updateRoomStatus } from "../../Redux/Actions/roomActions";
 import DashboardLayout from "../Dashboard/DashboardLayout";
 import { getRegistrationPassesByBooking } from "../../Redux/Actions/registerActions";
 import { removeStock } from "../../Redux/Actions/inventoryActions";
@@ -18,27 +15,19 @@ import { toast } from "react-toastify";
 
 const CheckIn = () => {
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth);
 
-  // ⭐ SELECTORES PRINCIPALES
+  // Redux selectors
   const {
     bookings: allBookings = [],
     loading = {},
     errors = {},
   } = useSelector((state) => state.booking || {});
-
-  const isLoadingBookings = loading.general || false;
-  const bookingError = errors.general || null;
-
-  // ⭐ SELECTORES DE REGISTRATIONPASS
   const { registrationsByBooking = {} } = useSelector(
     (state) => state.registrationPass || {}
   );
 
-  // ⭐ ESTADOS LOCALES ORGANIZADOS POR FUNCIONALIDAD
-
-  // Estados de UI
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [dateRange, setDateRange] = useState({
     from: dayjs().format("YYYY-MM-DD"),
@@ -50,54 +39,11 @@ const CheckIn = () => {
   const [checkedBasics, setCheckedBasics] = useState({});
   const [basicsByBooking, setBasicsByBooking] = useState({});
 
-  // Estados de pasajeros (locales para mejor control)
-  const [registeredPassengers, setRegisteredPassengers] = useState({});
-  const [passengersLoaded, setPassengersLoaded] = useState({});
-  const [passengersLoadingErrors, setPassengersLoadingErrors] = useState({});
+  const isLoadingBookings = loading.general || false;
+  const bookingError = errors.general || null;
 
-  // ⭐ DEBUG TEMPORAL - SOLO EN DESARROLLO
+  // Cargar reservas al cambiar fechas
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 [CHECKIN] Estado actual:", {
-        isLoadingBookings,
-        bookingError,
-        allBookingsLength: allBookings?.length,
-        filteredBookingsLength: bookings?.length,
-        selectedBooking,
-        passengersLoadedKeys: Object.keys(passengersLoaded),
-      });
-    }
-  }, [isLoadingBookings, bookingError, allBookings?.length, selectedBooking]);
-
-  // ⭐ MEMOIZAR BOOKINGS FILTRADOS
-  const bookings = useMemo(() => {
-    if (!Array.isArray(allBookings)) return [];
-
-    const validStatuses = ["pending", "confirmed", "paid"];
-
-    const filtered = allBookings.filter((booking) => {
-      const hasValidStatus =
-        validStatuses.includes(booking.status) || !booking.status;
-
-      if (process.env.NODE_ENV === "development" && booking.bookingId) {
-        console.log(
-          `🔍 Booking ${booking.bookingId}: status=${booking.status}, included=${hasValidStatus}`
-        );
-      }
-
-      return hasValidStatus;
-    });
-
-    return filtered;
-  }, [allBookings]);
-
-  // ⭐ CARGAR RESERVAS CUANDO CAMBIAN LAS FECHAS
-  useEffect(() => {
-    console.log("🔍 Cargando reservas para check-in:", {
-      fromDate: dateRange.from,
-      toDate: dateRange.to,
-    });
-
     dispatch(
       getAllBookings({
         fromDate: dateRange.from,
@@ -106,197 +52,43 @@ const CheckIn = () => {
     );
   }, [dispatch, dateRange.from, dateRange.to]);
 
-  // ⭐ LOG DE ESTADO DE RESERVAS - SOLO EN DESARROLLO
-  useEffect(() => {
-    if (process.env.NODE_ENV === "development" && allBookings.length > 0) {
-      console.log("📊 Estado de reservas en CheckIn:");
-      console.log("- Total reservas cargadas:", allBookings.length);
-      console.log("- Reservas para check-in:", bookings.length);
-      console.log("- Estados encontrados:", [
-        ...new Set(allBookings.map((b) => b.status)),
-      ]);
-    }
-  }, [allBookings.length, bookings.length]);
-
-  // ⭐ CARGAR PASAJEROS AUTOMÁTICAMENTE - OPTIMIZADO
-  useEffect(() => {
-    const loadPassengersForBookings = async () => {
-      const bookingsToLoad = bookings.filter(
-        (booking) =>
-          !passengersLoaded[booking.bookingId] &&
-          !passengersLoadingErrors[booking.bookingId] &&
-          passengersLoaded[booking.bookingId] !== "loading"
+  // Memoizar bookings filtrados
+  const bookings = useMemo(() => {
+    if (!Array.isArray(allBookings)) return [];
+    const validStatuses = ["pending", "confirmed", "paid"];
+    return allBookings.filter((booking) => {
+      const room = booking.Room || booking.room || {};
+      const isRoomClean = room.status === "Limpia";
+      const inventoryItems = basicsByBooking[booking.bookingId] || [];
+      const checkedItems = checkedBasics[booking.bookingId] || {};
+      const allInventoryDelivered =
+        inventoryItems.length > 0 &&
+        inventoryItems.every((item) => checkedItems[item.id] === true);
+      const requiredGuestCount = parseInt(booking.guestCount) || 1;
+      const registeredCount = booking.registrationPasses?.length || 0;
+      const allPassengersRegistered = registeredCount >= requiredGuestCount;
+      const hasValidStatus =
+        validStatuses.includes(booking.status) || !booking.status;
+      return (
+        hasValidStatus &&
+        (!isRoomClean || !allInventoryDelivered || !allPassengersRegistered)
       );
+    });
+  }, [allBookings, basicsByBooking, checkedBasics]);
 
-      if (bookingsToLoad.length === 0) return;
-
-      console.log(
-        `🔍 Verificando pasajeros para ${bookingsToLoad.length} reserva(s)`
-      );
-
-      for (const booking of bookingsToLoad) {
-        try {
-          setPassengersLoaded((prev) => ({
-            ...prev,
-            [booking.bookingId]: "loading",
-          }));
-
-          const result = await dispatch(
-            getRegistrationPassesByBooking(booking.bookingId)
-          );
-
-          if (result.isNotFound) {
-            setPassengersLoaded((prev) => ({
-              ...prev,
-              [booking.bookingId]: true,
-            }));
-          } else if (result.success) {
-            setPassengersLoaded((prev) => ({
-              ...prev,
-              [booking.bookingId]: true,
-            }));
-          } else {
-            setPassengersLoadingErrors((prev) => ({
-              ...prev,
-              [booking.bookingId]: true,
-            }));
-            setPassengersLoaded((prev) => ({
-              ...prev,
-              [booking.bookingId]: true,
-            }));
-          }
-        } catch (error) {
-          console.error(`❌ Error para reserva ${booking.bookingId}:`, error);
-          setPassengersLoadingErrors((prev) => ({
-            ...prev,
-            [booking.bookingId]: true,
-          }));
-          setPassengersLoaded((prev) => ({
-            ...prev,
-            [booking.bookingId]: true,
-          }));
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    };
-
-    loadPassengersForBookings();
-  }, [bookings, dispatch, passengersLoaded, passengersLoadingErrors]);
-
-  // ⭐ SINCRONIZAR REDUX CON ESTADO LOCAL
+  // Cargar pasajeros de cada reserva al montar/comprobar bookings
   useEffect(() => {
-    let hasChanges = false;
-    const updatedRegisteredPassengers = { ...registeredPassengers };
-
-    Object.entries(registrationsByBooking).forEach(
-      ([bookingId, passengers]) => {
-        if (passengers && passengers.length > 0) {
-          if (
-            !registeredPassengers[bookingId] ||
-            registeredPassengers[bookingId].length !== passengers.length
-          ) {
-            updatedRegisteredPassengers[bookingId] = passengers;
-            hasChanges = true;
-          }
-        }
+    bookings.forEach((booking) => {
+      if (!registrationsByBooking[booking.bookingId]) {
+        dispatch(getRegistrationPassesByBooking(booking.bookingId));
       }
-    );
+    });
+  }, [bookings, dispatch, registrationsByBooking]);
 
-    if (hasChanges) {
-      setRegisteredPassengers(updatedRegisteredPassengers);
-    }
-  }, [registrationsByBooking, registeredPassengers]);
-
-  // ⭐ FUNCIONES HELPER MEMOIZADAS
-
-  const hasRegisteredPassengers = useCallback(
-    (bookingId) => {
-      const fromLocal = registeredPassengers[bookingId]?.length > 0;
-      const fromRedux = registrationsByBooking[bookingId]?.length > 0;
-      return fromLocal || fromRedux;
-    },
-    [registeredPassengers, registrationsByBooking]
-  );
-
-  // ⭐ FUNCIÓN MEJORADA PARA VALIDAR TODOS LOS PASAJEROS
- const getPassengersStatus = useCallback(
-  (bookingId, requiredGuestCount) => {
-    const loadedState = passengersLoaded[bookingId];
-
-    // Sumar pasajeros registrados tanto locales como de redux
-    const localCount = registeredPassengers[bookingId]?.length || 0;
-    const reduxCount = registrationsByBooking[bookingId]?.length || 0;
-    // Tomar el máximo para evitar duplicados, o suma si sabes que no se solapan
-    const registeredCount = Math.max(localCount, reduxCount);
-
-    if (loadedState === "loading") {
-      return {
-        status: "loading",
-        message: "Verificando...",
-        icon: "🔄",
-        registeredCount,
-        requiredCount: requiredGuestCount,
-        isComplete: false,
-      };
-    }
-
-    // ✅ Considerar completo si hay igual o más pasajeros que los requeridos
-    const isComplete =
-      registeredCount >= requiredGuestCount && requiredGuestCount > 0;
-
-    if (isComplete) {
-      return {
-        status: "completed",
-        message: `Check-in completo (${registeredCount}/${requiredGuestCount})`,
-        icon: "✅",
-        registeredCount,
-        requiredCount: requiredGuestCount,
-        isComplete: true,
-      };
-    }
-
-    if (registeredCount > 0) {
-      return {
-        status: "partial",
-        message: `Parcial (${registeredCount}/${requiredGuestCount})`,
-        icon: "⚠️",
-        registeredCount,
-        requiredCount: requiredGuestCount,
-        isComplete: false,
-      };
-    }
-
-    if (loadedState === true) {
-      return {
-        status: "pending",
-        message: `Pendiente (0/${requiredGuestCount})`,
-        icon: "⏳",
-        registeredCount,
-        requiredCount: requiredGuestCount,
-        isComplete: false,
-      };
-    }
-
-    return {
-      status: "unknown",
-      message: "Verificando...",
-      icon: "🔄",
-      registeredCount,
-      requiredCount: requiredGuestCount,
-      isComplete: false,
-    };
-  },
-  [passengersLoaded, registrationsByBooking, registeredPassengers]
-);
-
+  // Helpers
   const getRoomInfo = useCallback((booking) => {
     const room = booking.Room || booking.room || null;
-
     if (!room) {
-      console.warn(
-        `⚠️ No se encontró información de habitación para reserva ${booking.bookingId}`
-      );
       return {
         roomNumber: booking.roomNumber || "Sin asignar",
         type: "Desconocido",
@@ -305,49 +97,63 @@ const CheckIn = () => {
         BasicInventories: [],
       };
     }
-
     return room;
   }, []);
 
-  const getRoomStatusColor = useCallback((status) => {
-    const colors = {
-      Limpia: "bg-green-100 text-green-700 border-green-200",
-      Ocupada: "bg-red-100 text-red-700 border-red-200",
-      Mantenimiento: "bg-orange-100 text-orange-700 border-orange-200",
-      Reservada: "bg-blue-100 text-blue-700 border-blue-200",
-      "Para Limpiar": "bg-yellow-100 text-yellow-700 border-yellow-200",
-      "Sin estado": "bg-gray-100 text-gray-600 border-gray-200",
-    };
-    return colors[status] || "bg-gray-100 text-gray-700 border-gray-200";
-  }, []);
-
-  // ⭐ HANDLERS DE ACCIONES
-
-  const handlePreparation = useCallback(
-    (roomNumber, status) => {
-      if (!roomNumber || roomNumber === "Sin asignar") {
-        toast.error("No se puede actualizar: habitación no asignada");
-        return;
+  // Estado visual de pasajeros
+  const getPassengersStatus = useCallback(
+    (bookingId, requiredCount) => {
+      const registered = registrationsByBooking[bookingId]?.length || 0;
+      if (registered >= requiredCount) {
+        return {
+          status: "completed",
+          icon: "✅",
+          message: `Todos registrados (${registered}/${requiredCount})`,
+          registeredCount: registered,
+          requiredCount,
+          isComplete: true,
+        };
       }
-
-      dispatch(updateRoomStatus(roomNumber, { status }));
-      toast.success(`Habitación ${roomNumber} marcada como ${status}`);
+      if (registered > 0) {
+        return {
+          status: "partial",
+          icon: "⏳",
+          message: `Faltan ocupantes (${registered}/${requiredCount})`,
+          registeredCount: registered,
+          requiredCount,
+          isComplete: false,
+        };
+      }
+      return {
+        status: "pending",
+        icon: "⏳",
+        message: `Pendiente (${registered}/${requiredCount})`,
+        registeredCount: registered,
+        requiredCount,
+        isComplete: false,
+      };
     },
-    [dispatch]
+    [registrationsByBooking]
   );
 
+  // Estado visual de habitación
+  const getRoomStatusColor = (status) => {
+    if (status === "Limpia")
+      return "bg-green-100 text-green-700 border-green-200";
+    if (status === "Ocupada")
+      return "bg-blue-100 text-blue-700 border-blue-200";
+    if (status === "Sucia") return "bg-red-100 text-red-700 border-red-200";
+    return "bg-gray-100 text-gray-700 border-gray-200";
+  };
+
+  // Inventario: cargar básicos
   const handleLoadBasics = useCallback(
     (booking) => {
       const room = getRoomInfo(booking);
       const bookingId = booking.bookingId;
-
-      console.log("🔍 Cargando básicos para reserva:", bookingId);
-
       const loadedBasics = room.BasicInventories || [];
-
       if (loadedBasics && loadedBasics.length > 0) {
         setCheckedBookings((prev) => ({ ...prev, [bookingId]: true }));
-
         setBasicsByBooking((prev) => ({
           ...prev,
           [bookingId]: loadedBasics.map((basic) => ({
@@ -358,7 +164,6 @@ const CheckIn = () => {
             currentStock: basic.currentStock,
           })),
         }));
-
         setCheckedBasics((prev) => ({
           ...prev,
           [bookingId]: loadedBasics.reduce((acc, basic) => {
@@ -366,7 +171,6 @@ const CheckIn = () => {
             return acc;
           }, {}),
         }));
-
         toast.success(`Inventario básico cargado para reserva ${bookingId}`);
       } else {
         toast.info(
@@ -377,6 +181,7 @@ const CheckIn = () => {
     [getRoomInfo]
   );
 
+  // Inventario: marcar/unmarcar básico
   const handleCheckBasic = useCallback((bookingId, basicId) => {
     setCheckedBasics((prev) => ({
       ...prev,
@@ -387,29 +192,26 @@ const CheckIn = () => {
     }));
   }, []);
 
+  // Inventario: confirmar entrega
   const handleConfirmBasics = useCallback(
     async (bookingId) => {
       const checked = checkedBasics[bookingId];
       const bookingBasics = basicsByBooking[bookingId] || [];
       const basicsToRemove = bookingBasics.filter((item) => checked?.[item.id]);
-
       if (basicsToRemove.length === 0) {
         toast.warning(
           "Seleccione al menos un básico para confirmar la entrega."
         );
         return;
       }
-
       try {
         for (const basic of basicsToRemove) {
           const result = await dispatch(removeStock(basic.id, basic.quantity));
-
           if (result && result.error) {
             toast.error(`Error al descontar ${basic.name}: ${result.message}`);
             return;
           }
         }
-
         setCheckedBasics((prev) => ({
           ...prev,
           [bookingId]: Object.keys(prev[bookingId] || {}).reduce((acc, key) => {
@@ -417,136 +219,75 @@ const CheckIn = () => {
             return acc;
           }, {}),
         }));
-
         toast.success(
           `Inventario básico entregado para la reserva ${bookingId} exitosamente.`
         );
+        // Refrescar reservas tras entregar inventario
+        setTimeout(() => {
+          dispatch(
+            getAllBookings({
+              fromDate: dateRange.from,
+              toDate: dateRange.to,
+            })
+          );
+        }, 1000);
       } catch (error) {
-        console.error("💥 Error en handleConfirmBasics:", error);
         toast.error("Error al confirmar la entrega de básicos.");
       }
     },
-    [checkedBasics, basicsByBooking, dispatch]
+    [checkedBasics, basicsByBooking, dispatch, dateRange.from, dateRange.to]
   );
 
-  const reloadPassengersForBooking = useCallback(
-    async (bookingId) => {
-      console.log(`🔄 Forzando recarga de pasajeros para reserva ${bookingId}`);
-
-      setPassengersLoaded((prev) => ({ ...prev, [bookingId]: "loading" }));
-      setPassengersLoadingErrors((prev) => ({ ...prev, [bookingId]: false }));
-
+  // Marcar habitación como limpia
+  const handlePreparation = useCallback(
+    async (roomNumber, status) => {
+      if (!roomNumber || roomNumber === "Sin asignar") return;
       try {
-        const result = await dispatch(
-          getRegistrationPassesByBooking(bookingId)
-        );
-
-        if (result.success || result.isNotFound) {
-          setPassengersLoaded((prev) => ({ ...prev, [bookingId]: true }));
-        } else {
-          setPassengersLoadingErrors((prev) => ({
-            ...prev,
-            [bookingId]: true,
-          }));
-          setPassengersLoaded((prev) => ({ ...prev, [bookingId]: true }));
-        }
-      } catch (error) {
-        console.error(`❌ Error en recarga forzada:`, error);
-        setPassengersLoadingErrors((prev) => ({ ...prev, [bookingId]: true }));
-        setPassengersLoaded((prev) => ({ ...prev, [bookingId]: true }));
-      }
-    },
-    [dispatch]
-  );
-
-  const handlePassengerRegistrationSuccess = useCallback(
-    async (bookingId, passengers) => {
-      console.log("✅ Iniciando proceso post-registro de pasajeros:", {
-        bookingId,
-        passengersCount: passengers?.length,
-      });
-
-      try {
-        // ⭐ 1. ACTUALIZAR ESTADO LOCAL INMEDIATAMENTE
-        setRegisteredPassengers((prev) => ({
-          ...prev,
-          [bookingId]: passengers,
-        }));
-
-        setPassengersLoaded((prev) => ({
-          ...prev,
-          [bookingId]: true,
-        }));
-
-        setPassengersLoadingErrors((prev) => ({
-          ...prev,
-          [bookingId]: false,
-        }));
-
-        // ⭐ 2. CERRAR FORMULARIO INMEDIATAMENTE
-        setSelectedBooking(null);
-
-        // ⭐ 3. MOSTRAR MENSAJE DE ÉXITO CON INFORMACIÓN
-        toast.success(
-          `✅ Check-in completado para reserva ${bookingId}. ` +
-            `La reserva ahora aparece en la sección Check-Out.`,
-          { autoClose: 5000 }
-        );
-
-        // ⭐ 4. ACTUALIZAR ESTADO DE RESERVA
-        const updateResult = await dispatch(
-          updateBookingStatus(bookingId, { status: "checked-in" })
-        );
-
-        if (updateResult && !updateResult.error) {
-          // ⭐ 5. MOSTRAR TOAST DE REDIRECCIÓN
-          toast.info(
-            `🔄 Reserva ${bookingId} movida a Check-Out. ¿Deseas ir a Check-Out?`,
-            {
-              autoClose: 8000,
-              onClick: () => {
-                window.location.href = "/dashboard/checkout";
-              },
-            }
+        await dispatch(updateRoomStatus(roomNumber, { status }));
+        toast.success(`Habitación ${roomNumber} marcada como ${status}`);
+        setTimeout(() => {
+          dispatch(
+            getAllBookings({
+              fromDate: dateRange.from,
+              toDate: dateRange.to,
+            })
           );
-        } else {
-          toast.warning(
-            "Pasajeros registrados, pero error al actualizar estado de reserva"
-          );
-        }
-
-        // ⭐ 6. RECARGAR DATOS CON DELAY MÍNIMO
-        setTimeout(async () => {
-          try {
-            await dispatch(
-              getAllBookings({
-                fromDate: dateRange.from,
-                toDate: dateRange.to,
-              })
-            );
-
-            await reloadPassengersForBooking(bookingId);
-            console.log("✅ Recarga de datos completada");
-          } catch (reloadError) {
-            console.error("❌ Error en recarga de datos:", reloadError);
-          }
         }, 1000);
       } catch (error) {
-        console.error("❌ Error en handlePassengerRegistrationSuccess:", error);
-        toast.error(
-          `❌ Error al completar check-in: ${
-            error.message || "Error desconocido"
-          }`
-        );
+        toast.error("Error al actualizar el estado de la habitación");
       }
     },
-    [dispatch, dateRange.from, dateRange.to, reloadPassengersForBooking]
+    [dispatch, dateRange.from, dateRange.to]
   );
 
+  // Registro de pasajeros: éxito
+  const handlePassengerRegistrationSuccess = useCallback(
+    async (bookingId, passengers) => {
+      setSelectedBooking(null);
+      toast.success(
+        `✅ Check-in completado para reserva ${bookingId}. La reserva ahora aparece en la sección Check-Out.`,
+        { autoClose: 5000 }
+      );
+      // Actualizar estado de reserva a checked-in
+      await dispatch(updateBookingStatus(bookingId, { status: "checked-in" }));
+      // Refrescar reservas y pasajeros
+      setTimeout(async () => {
+        await dispatch(
+          getAllBookings({
+            fromDate: dateRange.from,
+            toDate: dateRange.to,
+          })
+        );
+        await dispatch(getRegistrationPassesByBooking(bookingId));
+      }, 1000);
+    },
+    [dispatch, dateRange.from, dateRange.to]
+  );
+
+  // Cerrar formulario de registro
   const handleCloseRegistration = useCallback(
     (bookingId) => {
       setSelectedBooking(null);
-
       const booking = bookings.find((b) => b.bookingId === bookingId);
       if (booking) {
         const room = getRoomInfo(booking);
@@ -563,8 +304,15 @@ const CheckIn = () => {
     setDateRange((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  // ⭐ RENDERS CONDICIONALES
+  // Recargar pasajeros manualmente
+  const reloadPassengersForBooking = useCallback(
+    (bookingId) => {
+      dispatch(getRegistrationPassesByBooking(bookingId));
+    },
+    [dispatch]
+  );
 
+  // Renders condicionales y UI
   if (isLoadingBookings) {
     return (
       <DashboardLayout>
@@ -576,23 +324,24 @@ const CheckIn = () => {
   }
 
   if (
-  bookingError &&
-  bookingError !== "No hay pasajeros registrados (normal para reservas nuevas)" &&
-  bookingError !== "No hay pasajeros registrados" // por si el mensaje varía
-) {
-  return (
-    <DashboardLayout>
-      <div className="text-red-500 text-center p-4">❌ {bookingError}</div>
-    </DashboardLayout>
-  );
-}
+    bookingError &&
+    bookingError !==
+      "No hay pasajeros registrados (normal para reservas nuevas)" &&
+    bookingError !== "No hay pasajeros registrados"
+  ) {
+    return (
+      <DashboardLayout>
+        <div className="text-red-500 text-center p-4">❌ {bookingError}</div>
+      </DashboardLayout>
+    );
+  }
 
-  // ⭐ RENDER CUANDO NO HAY RESERVAS
+  // Render cuando no hay reservas
   if (bookings.length === 0 && !isLoadingBookings) {
     return (
       <DashboardLayout>
         <div className="max-w-7xl mx-auto p-6">
-          {/* ⭐ HEADER */}
+          {/* Header */}
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-gray-800 mb-2">
               🏨 Check-In de Habitaciones
@@ -602,8 +351,7 @@ const CheckIn = () => {
               habitaciones
             </p>
           </div>
-
-          {/* ⭐ SELECTOR DE FECHAS SIEMPRE VISIBLE */}
+          {/* Selector de fechas */}
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               📅 Filtrar por fechas
@@ -649,8 +397,7 @@ const CheckIn = () => {
               </button>
             </div>
           </div>
-
-          {/* ⭐ MENSAJE INFORMATIVO */}
+          {/* Mensaje informativo */}
           <div className="text-center py-12">
             <div className="text-6xl mb-4">✅</div>
             <h3 className="text-xl font-semibold text-gray-600 mb-2">
@@ -663,127 +410,17 @@ const CheckIn = () => {
                 ? `Hay ${allBookings.length} reserva(s) en otros estados. Las reservas con check-in completado aparecen en Check-Out.`
                 : "Intenta cambiar el rango de fechas para ver más reservas"}
             </p>
-
-            {/* ⭐ ESTADÍSTICAS RÁPIDAS */}
-            {allBookings.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto mb-6">
-                {(() => {
-                  const statusCounts = allBookings.reduce((acc, booking) => {
-                    const status = booking.status || "sin-estado";
-                    acc[status] = (acc[status] || 0) + 1;
-                    return acc;
-                  }, {});
-
-                  const statusConfigs = {
-                    "checked-in": {
-                      label: "En Check-Out",
-                      icon: "🏨",
-                      color: "bg-blue-100 text-blue-700",
-                    },
-                    completed: {
-                      label: "Completadas",
-                      icon: "✅",
-                      color: "bg-green-100 text-green-700",
-                    },
-                    cancelled: {
-                      label: "Canceladas",
-                      icon: "❌",
-                      color: "bg-red-100 text-red-700",
-                    },
-                    pending: {
-                      label: "Pendientes",
-                      icon: "⏳",
-                      color: "bg-yellow-100 text-yellow-700",
-                    },
-                  };
-
-                  return Object.entries(statusCounts).map(([status, count]) => {
-                    const config = statusConfigs[status] || {
-                      label: status,
-                      icon: "📋",
-                      color: "bg-gray-100 text-gray-700",
-                    };
-
-                    return (
-                      <div
-                        key={status}
-                        className={`p-4 rounded-lg ${config.color}`}
-                      >
-                        <div className="text-2xl mb-1">{config.icon}</div>
-                        <div className="font-semibold">{count}</div>
-                        <div className="text-sm">{config.label}</div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-            )}
-
-            {/* ⭐ ACCIONES RÁPIDAS */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              {(user?.role === "owner" ||
-                user?.role === "admin" ||
-                user?.role === "recept") && (
-                <button
-                  onClick={() => navigate("/admin/CheckOut")}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  🏨 Ir a Check-Out
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  const newRange = {
-                    from: dayjs().subtract(7, "day").format("YYYY-MM-DD"),
-                    to: dayjs().add(7, "day").format("YYYY-MM-DD"),
-                  };
-                  setDateRange(newRange);
-                }}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Ver ±7 días
-              </button>
-            </div>
-
-            {/* ⭐ DEBUG INFO - SOLO EN DESARROLLO */}
-            {process.env.NODE_ENV === "development" && (
-              <details className="mt-6 text-left max-w-2xl mx-auto">
-                <summary className="cursor-pointer text-gray-500 hover:text-gray-700 text-sm">
-                  🔧 Debug Info (Development)
-                </summary>
-                <div className="mt-2 p-4 bg-gray-100 rounded text-xs">
-                  <pre className="text-left overflow-x-auto">
-                    {JSON.stringify(
-                      {
-                        allBookingsCount: allBookings.length,
-                        filteredBookingsCount: bookings.length,
-                        isLoading: isLoadingBookings,
-                        error: bookingError,
-                        dateRange,
-                        statusBreakdown: allBookings.reduce((acc, b) => {
-                          acc[b.status || "null"] =
-                            (acc[b.status || "null"] || 0) + 1;
-                          return acc;
-                        }, {}),
-                      },
-                      null,
-                      2
-                    )}
-                  </pre>
-                </div>
-              </details>
-            )}
           </div>
         </div>
       </DashboardLayout>
     );
   }
 
-  // ⭐ RENDER PRINCIPAL CON RESERVAS
+  // Render principal con reservas
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto p-6">
-        {/* ⭐ HEADER */}
+        {/* Header */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-800 mb-2">
             🏨 Check-In de Habitaciones
@@ -792,17 +429,8 @@ const CheckIn = () => {
             Gestiona el proceso de entrada de huéspedes y preparación de
             habitaciones
           </p>
-          <div className="mt-2 text-sm text-blue-600">
-            📋 Mostrando {bookings.length} reserva(s) pendiente(s) de check-in
-            {allBookings.length > bookings.length && (
-              <span className="text-gray-500 ml-2">
-                ({allBookings.length - bookings.length} ya procesada(s))
-              </span>
-            )}
-          </div>
         </div>
-
-        {/* ⭐ SELECTOR DE FECHAS */}
+        {/* Selector de fechas */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
             📅 Filtrar por fechas
@@ -848,27 +476,23 @@ const CheckIn = () => {
             </button>
           </div>
         </div>
-
-        {/* ⭐ GRID DE RESERVAS */}
+        {/* Grid de reservas */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {bookings.map((booking) => {
             const room = getRoomInfo(booking);
-
-            // 🎯 PASAR EL NÚMERO REQUERIDO DE HUÉSPEDES
             const requiredGuestCount = parseInt(booking.guestCount) || 1;
             const passengersStatus = getPassengersStatus(
               booking.bookingId,
               requiredGuestCount
             );
-
-            // ⭐ LÓGICA DE PAGOS
-            const payments = booking.Payments || booking.payments || [];
-            const totalPagado = payments.reduce(
-              (sum, p) => sum + parseFloat(p.amount || 0),
-              0
-            );
+            // Lógica de pagos
+            const payments = booking.payments || [];
+            const totalPagado = payments
+              .filter((p) =>
+                ["authorized", "completed", "paid"].includes(p.paymentStatus)
+              )
+              .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
             const totalReserva = parseFloat(booking.totalAmount || 0);
-
             let estadoPago, pagoColor;
             if (totalPagado >= totalReserva) {
               estadoPago = "Pago completo";
@@ -880,8 +504,7 @@ const CheckIn = () => {
               estadoPago = "Sin pago";
               pagoColor = "bg-red-100 text-red-700";
             }
-
-            // ⭐ ESTADO DE INVENTARIO
+            // Estado de inventario
             const inventoryLoaded = checkedBookings[booking.bookingId];
             const inventoryItems = basicsByBooking[booking.bookingId] || [];
             const checkedItems = checkedBasics[booking.bookingId] || {};
@@ -894,7 +517,7 @@ const CheckIn = () => {
                 key={booking.bookingId}
                 className="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-300"
               >
-                {/* ⭐ HEADER CON INFORMACIÓN PRINCIPAL */}
+                {/* Header de reserva */}
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -921,8 +544,7 @@ const CheckIn = () => {
                       {room.status}
                     </span>
                   </div>
-
-                  {/* ⭐ INFORMACIÓN DEL HUÉSPED */}
+                  {/* Información del huésped */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-gray-600">
@@ -949,26 +571,40 @@ const CheckIn = () => {
                       </span>
                     </div>
                   </div>
-                  {Array.isArray(booking.registrationPasses) && booking.registrationPasses.length > 0 && (
-  <div className="mt-4">
-    <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
-      👥 Pasajeros registrados ({booking.registrationPasses.length})
-    </h4>
-    <ul className="space-y-1">
-      {booking.registrationPasses.map((pass, idx) => (
-        <li key={pass.registrationNumber} className="text-xs text-gray-700 flex flex-col md:flex-row md:items-center gap-1 md:gap-3 border-b border-gray-100 pb-1">
-          <span className="font-medium">{idx + 1}. {pass.name}</span>
-          <span className="text-gray-500">Doc: {pass.idNumber}</span>
-          <span className="text-gray-500">Nacionalidad: {pass.nationality}</span>
-          <span className="text-gray-500">Profesión: {pass.profession}</span>
-          <span className="text-gray-500">Estado civil: {pass.maritalStatus}</span>
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
-
-                  {/* ⭐ ESTADO DE PASAJEROS MEJORADO */}
+                  {Array.isArray(booking.registrationPasses) &&
+                    booking.registrationPasses.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                          👥 Pasajeros registrados (
+                          {booking.registrationPasses.length})
+                        </h4>
+                        <ul className="space-y-1">
+                          {booking.registrationPasses.map((pass, idx) => (
+                            <li
+                              key={pass.registrationNumber}
+                              className="text-xs text-gray-700 flex flex-col md:flex-row md:items-center gap-1 md:gap-3 border-b border-gray-100 pb-1"
+                            >
+                              <span className="font-medium">
+                                {idx + 1}. {pass.name}
+                              </span>
+                              <span className="text-gray-500">
+                                Doc: {pass.idNumber}
+                              </span>
+                              <span className="text-gray-500">
+                                Nacionalidad: {pass.nationality}
+                              </span>
+                              <span className="text-gray-500">
+                                Profesión: {pass.profession}
+                              </span>
+                              <span className="text-gray-500">
+                                Estado civil: {pass.maritalStatus}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  {/* Estado de pasajeros */}
                   <div className="mt-3">
                     <span
                       className={`inline-block px-3 py-1 text-xs rounded-full font-medium ${
@@ -980,44 +616,14 @@ const CheckIn = () => {
                           ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
                           : passengersStatus.status === "loading"
                           ? "bg-blue-100 text-blue-700 border border-blue-200 animate-pulse"
-                          : "bg-red-100 text-red-700 border border-red-200"
+                          : "bg-red-100 text-red-700 border-red-200"
                       }`}
                     >
                       {passengersStatus.icon} {passengersStatus.message}
                     </span>
-
-                    {/* 🆕 INDICADOR VISUAL DE PROGRESO */}
-                    {passengersStatus.requiredCount > 1 && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full transition-all duration-300 ${
-                              passengersStatus.isComplete
-                                ? "bg-green-500"
-                                : passengersStatus.registeredCount > 0
-                                ? "bg-orange-500"
-                                : "bg-gray-300"
-                            }`}
-                            style={{
-                              width: `${Math.min(
-                                100,
-                                (passengersStatus.registeredCount /
-                                  passengersStatus.requiredCount) *
-                                  100
-                              )}%`,
-                            }}
-                          ></div>
-                        </div>
-                        <span className="text-xs text-gray-500 font-mono">
-                          {passengersStatus.registeredCount}/
-                          {passengersStatus.requiredCount}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </div>
-
-                {/* ⭐ ESTADO DE PAGO */}
+                {/* Estado de pago */}
                 <div className="px-6 py-4 bg-gray-50">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600">
@@ -1063,13 +669,11 @@ const CheckIn = () => {
                     </div>
                   )}
                 </div>
-
-                {/* ⭐ SECCIÓN DE INVENTARIO BÁSICO */}
+                {/* Inventario básico */}
                 <div className="px-6 py-4">
                   <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
                     📦 Inventario básico
                   </h4>
-
                   <div className="space-y-2 mb-4">
                     {inventoryLoaded ? (
                       inventoryItems.length > 0 ? (
@@ -1117,7 +721,6 @@ const CheckIn = () => {
                       ))
                     )}
                   </div>
-
                   <div className="flex gap-2">
                     <button
                       className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -1130,7 +733,6 @@ const CheckIn = () => {
                     >
                       {inventoryLoaded ? "✅ Verificados" : "🔍 Verificar"}
                     </button>
-
                     {inventoryLoaded && inventoryItems.length > 0 && (
                       <button
                         className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -1145,7 +747,6 @@ const CheckIn = () => {
                       </button>
                     )}
                   </div>
-
                   {inventoryLoaded && (
                     <div
                       className={`mt-2 p-2 rounded-md ${
@@ -1162,8 +763,7 @@ const CheckIn = () => {
                     </div>
                   )}
                 </div>
-
-                {/* ⭐ PROGRESO VISUAL ACTUALIZADO */}
+                {/* Progreso visual */}
                 <div className="px-6 py-4 bg-gray-50">
                   <h4 className="text-sm font-semibold text-gray-800 mb-3">
                     📋 Progreso del Check-in
@@ -1184,7 +784,6 @@ const CheckIn = () => {
                         <span className="text-xs text-green-600">✓</span>
                       )}
                     </div>
-
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div
@@ -1202,7 +801,6 @@ const CheckIn = () => {
                         <span className="text-xs text-green-600">✓</span>
                       )}
                     </div>
-
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div
@@ -1220,7 +818,6 @@ const CheckIn = () => {
                         <span className="text-xs text-green-600">✓</span>
                       )}
                     </div>
-
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div
@@ -1244,8 +841,7 @@ const CheckIn = () => {
                         )}
                       </span>
                     </div>
-
-                    {/* 🆕 INDICADOR DE ESTADO GENERAL */}
+                    {/* Estado general */}
                     <div className="mt-4 pt-3 border-t border-gray-200">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-700">
@@ -1270,8 +866,7 @@ const CheckIn = () => {
                     </div>
                   </div>
                 </div>
-
-                {/* ⭐ BOTONES DE ACCIÓN CON VALIDACIÓN ESTRICTA */}
+                {/* Botones de acción */}
                 <div className="p-6 border-t border-gray-100">
                   <div className="grid grid-cols-1 gap-3">
                     {/* Botón de limpiar habitación */}
@@ -1297,7 +892,6 @@ const CheckIn = () => {
                         ? "✅ Habitación limpia"
                         : "🧹 Marcar como limpia"}
                     </button>
-
                     {/* Botón de registrar ocupantes */}
                     <button
                       className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
@@ -1330,24 +924,20 @@ const CheckIn = () => {
                         ? `👥 Registrar ocupantes (${passengersStatus.registeredCount}/${passengersStatus.requiredCount})`
                         : "🔒 Limpiar habitación primero"}
                     </button>
-
-                    {/* 🆕 BOTÓN PARA COMPLETAR CHECK-IN - SOLO CUANDO TODO ESTÉ LISTO */}
+                    {/* Botón para completar check-in */}
                     {passengersStatus.isComplete &&
                       room.status === "Limpia" &&
                       allInventoryDelivered && (
                         <button
-                          // ...
+                          className="w-full px-4 py-3 rounded-lg font-medium bg-green-600 text-white hover:bg-green-700 transition-all duration-200"
                           onClick={async () => {
                             try {
-                              // Actualizar estado de reserva a checked-in
                               const result = await dispatch(
                                 updateBookingStatus(booking.bookingId, {
                                   status: "checked-in",
                                 })
                               );
-
                               if (result && !result.error) {
-                                // Actualizar estado de habitación a ocupada
                                 if (room.roomNumber !== "Sin asignar") {
                                   dispatch(
                                     updateRoomStatus(room.roomNumber, {
@@ -1355,12 +945,9 @@ const CheckIn = () => {
                                     })
                                   );
                                 }
-
                                 toast.success(
                                   `✅ Check-in completado para reserva ${booking.bookingId}`
                                 );
-
-                                // Recargar datos
                                 setTimeout(() => {
                                   dispatch(
                                     getAllBookings({
@@ -1373,10 +960,6 @@ const CheckIn = () => {
                                 toast.error("Error al completar el check-in");
                               }
                             } catch (error) {
-                              console.error(
-                                "Error completando check-in:",
-                                error
-                              );
                               toast.error("Error al completar el check-in");
                             }
                           }}
@@ -1384,7 +967,6 @@ const CheckIn = () => {
                           🎉 COMPLETAR CHECK-IN
                         </button>
                       )}
-
                     {/* Mensaje de requisitos faltantes */}
                     {(!passengersStatus.isComplete ||
                       room.status !== "Limpia" ||
@@ -1411,8 +993,7 @@ const CheckIn = () => {
                         </ul>
                       </div>
                     )}
-
-                    {/* ⭐ BOTÓN DE RECARGA MANUAL */}
+                    {/* Botón de recarga manual */}
                     {passengersStatus.status === "error" && (
                       <button
                         className="w-full px-3 py-2 rounded text-sm text-blue-600 hover:bg-blue-50 border border-blue-200"
@@ -1424,14 +1005,12 @@ const CheckIn = () => {
                       </button>
                     )}
                   </div>
-
                   <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-700 text-center">
                     💡 Una vez completado el check-in, esta reserva aparecerá en
                     la sección Check-Out
                   </div>
                 </div>
-
-                {/* ⭐ FORMULARIO DE REGISTRO DE OCUPANTES */}
+                {/* Formulario de registro de ocupantes */}
                 {selectedBooking === booking.bookingId && (
                   <div className="border-t border-gray-200 bg-gray-50">
                     <div className="p-6">
