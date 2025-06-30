@@ -18,7 +18,7 @@ module.exports = (sequelize) => {
     },
     status: {
       type: DataTypes.ENUM,
-      values: ['pending', 'confirmed', 'checked-in', 'completed', 'advanced', 'cancelled', 'no_show_cancelled'],
+      values: ['pending', 'confirmed', 'paid', 'checked-in', 'completed', 'advanced', 'cancelled', 'no_show_cancelled'], // ⭐ AGREGAR 'paid'
       defaultValue: 'pending'
     },
     pointOfSale: {
@@ -38,12 +38,10 @@ module.exports = (sequelize) => {
     guestId: {
       type: DataTypes.STRING,
       allowNull: true,
-      // ⭐ NO REFERENCES AQUÍ - SE MANEJA EN ASSOCIATIONS
     },
     roomNumber: {
-      type: DataTypes.STRING, // ⭐ STRING para coincidir con Room
+      type: DataTypes.STRING,
       allowNull: false,
-      // ⭐ NO REFERENCES AQUÍ - SE MANEJA EN ASSOCIATIONS
     },
     trackingToken: {
       type: DataTypes.STRING,
@@ -52,13 +50,27 @@ module.exports = (sequelize) => {
     createdBy: {
       type: DataTypes.STRING,
       allowNull: true,
-      // ⭐ REFERENCIA A User.n_document PERO SIN FK CONSTRAINT
+    },
+    // ⭐ NUEVOS CAMPOS PARA DISTINGUIR PROCESOS
+    paymentCompletedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Timestamp cuando se completó el pago total'
+    },
+    actualCheckIn: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Timestamp real cuando se completó el check-in físico'
+    },
+    actualCheckOut: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Timestamp real cuando se completó el check-out físico'
     }
   }, {
     timestamps: true,
     tableName: 'Bookings'
   });
 
-  // ⭐ IMPORTANTE: RETURN DEL MODELO
   return Booking;
 };

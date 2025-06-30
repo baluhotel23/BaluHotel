@@ -10,7 +10,6 @@ module.exports = (sequelize) => {
     bookingId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      // ⭐ REMOVER REFERENCES - SE MANEJA EN ASSOCIATIONS
     },
     amount: {
       type: DataTypes.DECIMAL(10, 2),
@@ -28,7 +27,14 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     paymentStatus: {
-      type: DataTypes.ENUM("pending", "completed", "failed", "refunded"),
+      type: DataTypes.ENUM(
+        "pending",     // Pago iniciado pero no procesado
+        "authorized",  // Pago autorizado (reserva pagada, pero puede haber extras)
+        "completed",   // Pago totalmente finalizado (después del checkout)
+        "failed",      // Pago fallido
+        "refunded",    // Pago reembolsado
+        "partial"      // Pago parcial realizado
+      ),
       allowNull: false,
       defaultValue: "pending",
     },
@@ -46,14 +52,40 @@ module.exports = (sequelize) => {
       allowNull: true,
     },
     paymentType: {
-      type: DataTypes.ENUM("full", "partial", "online"),
+      type: DataTypes.ENUM(
+        "full",        // Pago completo de la reserva
+        "partial",     // Pago parcial de la reserva
+        "online",      // Pago online
+        "deposit",     // Depósito/anticipo
+        "final",       // Pago final (checkout con extras)
+        "extra_charge" // Pago solo de gastos extras
+      ),
       allowNull: true,
     },
     processedBy: {
       type: DataTypes.STRING,
       allowNull: true,
-      // ⭐ REMOVER REFERENCES - SE MANEJA EN ASSOCIATIONS
     },
+    // ⭐ NUEVOS CAMPOS PARA CONTROL DE GASTOS EXTRAS
+    includesExtras: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: "Indica si este pago incluye gastos extras"
+    },
+    isReservationPayment: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      comment: "Indica si es pago de la reserva base"
+    },
+    isCheckoutPayment: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: "Indica si es el pago final en checkout"
+    },
+    notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    }
   }, {
     timestamps: true,
   });

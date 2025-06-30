@@ -1098,40 +1098,40 @@ const CheckIn = () => {
 
                     {/* 🆕 BOTÓN PARA COMPLETAR CHECK-IN - SOLO CUANDO TODO ESTÉ LISTO */}
                     {passengersStatus.isComplete && room.status === "Limpia" && allInventoryDelivered && (
-                      <button
-                        className="w-full px-4 py-3 rounded-lg font-bold bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transform hover:-translate-y-0.5 shadow-lg transition-all duration-200"
-                        onClick={async () => {
-                          try {
-                            // Actualizar estado de reserva a checked-in
-                            const result = await dispatch(updateBookingStatus(booking.bookingId, { status: "checked-in" }));
-                            
-                            if (result && !result.error) {
-                              // Actualizar estado de habitación a ocupada
-                              if (room.roomNumber !== 'Sin asignar') {
-                                dispatch(updateRoomStatus(room.roomNumber, { status: "Ocupada" }));
-                              }
-                              
-                              toast.success(`✅ Check-in completado para reserva ${booking.bookingId}`);
-                              
-                              // Recargar datos
-                              setTimeout(() => {
-                                dispatch(getAllBookings({ 
-                                  fromDate: dateRange.from, 
-                                  toDate: dateRange.to
-                                }));
-                              }, 1000);
-                            } else {
-                              toast.error("Error al completar el check-in");
-                            }
-                          } catch (error) {
-                            console.error("Error completando check-in:", error);
-                            toast.error("Error al completar el check-in");
-                          }
-                        }}
-                      >
-                        🎉 COMPLETAR CHECK-IN
-                      </button>
-                    )}
+  <button
+    // ...
+    onClick={async () => {
+      try {
+        // Actualizar estado de reserva a checked-in
+        const result = await dispatch(updateBookingStatus(booking.bookingId, { status: "checked-in" }));
+        
+        if (result && !result.error) {
+          // Actualizar estado de habitación a ocupada
+          if (room.roomNumber !== 'Sin asignar') {
+            dispatch(updateRoomStatus(room.roomNumber, { status: "Ocupada" }));
+          }
+          
+          toast.success(`✅ Check-in completado para reserva ${booking.bookingId}`);
+          
+          // Recargar datos
+          setTimeout(() => {
+            dispatch(getAllBookings({ 
+              fromDate: dateRange.from, 
+              toDate: dateRange.to
+            }));
+          }, 1000);
+        } else {
+          toast.error("Error al completar el check-in");
+        }
+      } catch (error) {
+        console.error("Error completando check-in:", error);
+        toast.error("Error al completar el check-in");
+      }
+    }}
+  >
+    🎉 COMPLETAR CHECK-IN
+  </button>
+)}
 
                     {/* Mensaje de requisitos faltantes */}
                     {(!passengersStatus.isComplete || room.status !== "Limpia" || !allInventoryDelivered) && (

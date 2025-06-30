@@ -83,10 +83,10 @@ const getHotelScheduleEndpoint = async (req, res) => {
 };
 
 // Public endpoints
+
 const checkAvailability = async (req, res) => {
   try {
     const { checkIn, checkOut, roomType } = req.query;
-    
     console.log('🔍 checkAvailability called with:', { checkIn, checkOut, roomType });
 
     const where = {};
@@ -121,6 +121,8 @@ const checkAvailability = async (req, res) => {
 
     console.log(`📊 Found ${rooms.length} rooms`);
 
+    const now = getColombiaTime();
+
     const roomsWithAvailability = rooms.map((room) => {
       const activeBookings = (room.bookings || []).filter(
         (booking) => booking.status !== "cancelled"
@@ -141,7 +143,7 @@ const checkAvailability = async (req, res) => {
         unavailabilityReason = `Room status: ${room.status}`;
         console.log(`🚫 Room ${room.roomNumber}: Status ${room.status} prevents booking`);
       }
-      // 3. Verificar conflictos de fechas usando Luxon
+      // 3. Verificar conflictos de fechas
       else if (checkIn && checkOut && isValidDate(checkIn) && isValidDate(checkOut)) {
         const requestStart = toColombiaTime(checkIn);
         const requestEnd = toColombiaTime(checkOut);
@@ -149,11 +151,8 @@ const checkAvailability = async (req, res) => {
         const hasDateConflict = activeBookings.some((booking) => {
           const bookingStart = toColombiaTime(booking.checkIn);
           const bookingEnd = toColombiaTime(booking.checkOut);
-
-          return (
-            (bookingStart <= requestEnd && bookingEnd >= requestStart) ||
-            (requestStart <= bookingEnd && requestEnd >= bookingStart)
-          );
+          // Solo hay conflicto si los rangos se solapan
+          return (bookingStart < requestEnd && bookingEnd > requestStart);
         });
 
         if (hasDateConflict) {
@@ -162,14 +161,21 @@ const checkAvailability = async (req, res) => {
           console.log(`🚫 Room ${room.roomNumber}: Date conflict`);
         }
       }
-      
-      // No permitir reservas en habitaciones ocupadas
-      if (room.status === 'Ocupada') {
+
+      // ⭐ SOLO bloquear por "Ocupada" si la habitación está ocupada AHORA MISMO
+      if (
+        room.status === 'Ocupada' &&
+        activeBookings.some(booking => {
+          const bookingStart = toColombiaTime(booking.checkIn);
+          const bookingEnd = toColombiaTime(booking.checkOut);
+          return now >= bookingStart && now < bookingEnd;
+        })
+      ) {
         isAvailable = false;
-        unavailabilityReason = 'Room is currently occupied';
-        console.log(`🚫 Room ${room.roomNumber}: Currently occupied`);
+        unavailabilityReason = 'Room is currently occupied (now)';
+        console.log(`🚫 Room ${room.roomNumber}: Currently occupied (now)`);
       }
-      
+
       console.log(`🏨 Room ${room.roomNumber}: available=${room.available}, status=${room.status}, isAvailable=${isAvailable}`);
 
       const bookedDates = activeBookings.map((booking) => ({
@@ -226,6 +232,7 @@ const checkAvailability = async (req, res) => {
 };
 
 
+
 const getRoomTypes = async (req, res) => {
   try {
     const types = await Room.findAll({
@@ -251,7 +258,7 @@ const getRoomTypes = async (req, res) => {
 const createBooking = async (req, res, next) => {
   try {
     console.log('🚀 [CREATE-BOOKING] Starting createBooking process...');
-    console.log('🇨🇴 [CREATE-BOOKING] Server time Colombia:', formatForLogs(new Date()));
+    console.log('🇨🇴 [CREATE-BOOKING] Server time Colombia:', formatForLogs(getColombiaTime()));
     console.log('📥 [CREATE-BOOKING] Request body:', JSON.stringify(req.body, null, 2));
     console.log('👤 [CREATE-BOOKING] Request user:', req.user ? {
       n_document: req.user.n_document,
@@ -333,16 +340,19 @@ const createBooking = async (req, res, next) => {
 
     console.log('✅ [CREATE-BOOKING] Basic validations passed');
 
-    // ⭐ VALIDAR FECHAS CON UTILIDADES DE COLOMBIA
+    // ⭐ VALIDAR FECHAS CON UTILIDADES DE COLOMBIA - CORREGIDO
     console.log('📅 [CREATE-BOOKING] Validating dates...');
+    
+    // 🔧 CONVERTIR A OBJETOS Date NATIVOS PARA EVITAR ERRORES
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
-    const today = getColombiaDate();
+    const today = getColombiaTime(); // Esto retorna un DateTime de Luxon
 
     console.log('📅 [CREATE-BOOKING] Date objects:', {
       checkInDate: checkInDate.toISOString(),
       checkOutDate: checkOutDate.toISOString(),
-      today: today.toISOString(),
+      // 🔧 CORREGIR: Usar .toISO() para objetos DateTime de Luxon
+      today: today.toISO(), // ✅ CORRECCIÓN
       todayFormatted: formatForLogs(today),
       checkInFormatted: formatColombiaDate(checkInDate),
       checkOutFormatted: formatColombiaDate(checkOutDate)
@@ -356,12 +366,12 @@ const createBooking = async (req, res, next) => {
       });
     }
 
-    // ⭐ USAR UTILIDAD PARA COMPARAR FECHAS
+    // ⭐ USAR UTILIDAD PARA COMPARAR FECHAS - CORREGIDO
     if (isBeforeToday(checkInDate)) {
       console.log('❌ [CREATE-BOOKING] Invalid checkIn date - in the past');
       console.log('📅 [CREATE-BOOKING] Date comparison Colombia:', {
         checkInFormatted: formatColombiaDate(checkInDate),
-        todayFormatted: formatColombiaDate(today),
+        todayFormatted: formatForLogs(today), // Ya está formateado correctamente
         isPast: isBeforeToday(checkInDate)
       });
       return res.status(400).json({
@@ -593,7 +603,7 @@ const createBooking = async (req, res, next) => {
         createdAt: formatForLogs(newBooking.createdAt)
       });
     } catch (createError) {
-      console.error('❌ [CREATE-BOOKING] Error creating booking at:', formatForDetailedLogs(new Date()));
+      console.error('❌ [CREATE-BOOKING] Error creating booking at:', formatForLogs(getColombiaTime()));
       console.error('❌ [CREATE-BOOKING] Error details:', {
         name: createError.name,
         message: createError.message,
@@ -682,13 +692,13 @@ const createBooking = async (req, res, next) => {
       calculatedPrice: response.data.calculatedPrice,
       pointOfSale: response.data.pointOfSale,
       createdBy: response.data.createdBy,
-      completedAt: formatForLogs(new Date())
+      completedAt: formatForLogs(getColombiaTime())
     });
 
     res.status(201).json(response);
 
   } catch (error) {
-    console.error('❌ [CREATE-BOOKING] Unexpected error at:', formatForDetailedLogs(new Date()));
+    console.error('❌ [CREATE-BOOKING] Unexpected error at:', formatForLogs(getColombiaTime()));
     console.error('❌ [CREATE-BOOKING] Error details:', error);
     next(error);
   }
@@ -746,10 +756,27 @@ const updateOnlinePayment = async (req, res, next) => {
     const booking = await Booking.findByPk(bookingId, {
       include: [
         {
+          model: Room,
+          as: 'room',
+          attributes: ['roomNumber', 'status', 'type']
+        },
+        {
+          model: Buyer,
+          as: 'guest',
+          attributes: ['scostumername', 'sdocno']
+        },
+        {
           model: Payment,
           as: 'payments',
-          where: { paymentType: 'online' },
-          required: false
+          attributes: [
+            'paymentId', 'amount', 'paymentStatus', 'paymentType', 
+            'isCheckoutPayment', 'includesExtras', 'isReservationPayment'
+          ]
+        },
+        {
+          model: ExtraCharge,
+          as: 'extraCharges',
+          attributes: ['id', 'amount', 'description', 'quantity']
         }
       ]
     });
@@ -781,6 +808,37 @@ const updateOnlinePayment = async (req, res, next) => {
 
     console.log("✅ [UPDATE-ONLINE-PAYMENT] Reserva online confirmada");
 
+    // ⭐ CALCULAR TOTALES FINANCIEROS - IGUAL QUE EN registerLocalPayment
+    const paymentAmount = parseFloat(amount);
+    const reservationAmount = parseFloat(booking.totalAmount);
+    
+    // Calcular gastos extras
+    const extraChargesTotal = booking.extraCharges?.reduce((sum, charge) => {
+      const chargeAmount = parseFloat(charge.amount) || 0;
+      const quantity = parseInt(charge.quantity) || 1;
+      return sum + (chargeAmount * quantity);
+    }, 0) || 0;
+    
+    const grandTotal = reservationAmount + extraChargesTotal;
+    
+    // ⭐ CALCULAR PAGOS PREVIOS (solo authorized y completed)
+    const previousPayments = booking.payments?.filter(p => 
+      p.paymentStatus === 'authorized' || p.paymentStatus === 'completed'
+    ) || [];
+    
+    const totalPreviousPaid = previousPayments.reduce((sum, p) => 
+      sum + parseFloat(p.amount), 0
+    );
+
+    console.log("💰 [UPDATE-ONLINE-PAYMENT] Cálculo de pagos:", {
+      paymentAmount,
+      reservationAmount,
+      extraChargesTotal,
+      grandTotal,
+      totalPreviousPaid,
+      remaining: grandTotal - totalPreviousPaid
+    });
+
     // ⭐ BUSCAR PAGO EXISTENTE O CREAR UNO NUEVO
     console.log("🔍 [UPDATE-ONLINE-PAYMENT] Buscando pago existente...");
     
@@ -802,14 +860,18 @@ const updateOnlinePayment = async (req, res, next) => {
       try {
         payment = await Payment.create({
           bookingId,
-          amount: parseFloat(amount),
-          paymentMethod: paymentMethod || 'online',
+          amount: paymentAmount,
+          paymentMethod: paymentMethod || 'wompi',
           paymentType: "online",
           paymentStatus: "pending", // Se actualizará después
           paymentDate: getColombiaTime(),
           transactionId: transactionId || wompiTransactionId,
           paymentReference: paymentReference,
-          processedBy: 'wompi_webhook'
+          processedBy: 'wompi_webhook',
+          // ⭐ CAMPOS SEGÚN NUEVO MODELO
+          includesExtras: false, // Los pagos online son solo para reserva
+          isReservationPayment: true,
+          isCheckoutPayment: false
         });
         
         console.log("✅ [UPDATE-ONLINE-PAYMENT] Nuevo pago creado:", payment.paymentId);
@@ -829,7 +891,7 @@ const updateOnlinePayment = async (req, res, next) => {
     console.log("💾 [UPDATE-ONLINE-PAYMENT] Actualizando registro de pago...");
     
     const updateData = {
-      amount: parseFloat(amount), // Monto confirmado por Wompi
+      amount: paymentAmount, // Monto confirmado por Wompi
       paymentMethod: paymentMethod || payment.paymentMethod,
       transactionId: transactionId || wompiTransactionId || payment.transactionId,
       paymentReference: paymentReference || payment.paymentReference,
@@ -855,41 +917,23 @@ const updateOnlinePayment = async (req, res, next) => {
       });
     }
 
-    // ⭐ CALCULAR TOTALES Y ACTUALIZAR ESTADO DE RESERVA
-    console.log("🧮 [UPDATE-ONLINE-PAYMENT] Calculando totales de pago...");
-    
-    const totalAmount = parseFloat(booking.totalAmount);
-    const paidAmount = parseFloat(amount);
-    
-    // ⭐ VERIFICAR TODOS LOS PAGOS COMPLETADOS PARA ESTA RESERVA
-    const allCompletedPayments = await Payment.findAll({
-      where: { 
-        bookingId, 
-        paymentStatus: 'completed' 
-      }
-    });
-
-    const totalPaid = allCompletedPayments.reduce((sum, p) => {
-      return sum + parseFloat(p.amount || 0);
-    }, 0);
-
-    console.log("💰 [UPDATE-ONLINE-PAYMENT] Cálculo de pagos:", {
-      totalAmount,
-      currentPayment: paidAmount,
-      totalPaid,
-      remaining: totalAmount - totalPaid
-    });
-
-    // ⭐ ACTUALIZAR ESTADO DE LA RESERVA BASADO EN PAGOS
+    // ⭐ ACTUALIZAR ESTADO DE LA RESERVA BASADO EN PAGOS - NUEVA LÓGICA
     let newBookingStatus = booking.status;
+    let shouldUpdateBookingStatus = false;
     
     if (paymentStatus === "completed") {
-      if (totalPaid >= totalAmount) {
-        newBookingStatus = "confirmed"; // Pagado completamente
-        console.log("✅ [UPDATE-ONLINE-PAYMENT] Reserva completamente pagada");
+      // ⭐ APLICAR MISMA LÓGICA QUE registerLocalPayment
+      const totalPaid = totalPreviousPaid + paymentAmount;
+      
+      if (totalPaid >= reservationAmount) {
+        // ⭐ CAMBIO PRINCIPAL: Cambiar a 'paid' NO 'confirmed'
+        newBookingStatus = "paid";
+        shouldUpdateBookingStatus = true;
+        console.log("✅ [UPDATE-ONLINE-PAYMENT] Reserva completamente pagada - Status: PAID (listo para check-in físico)");
       } else if (totalPaid > 0) {
         newBookingStatus = "confirmed"; // Pago parcial pero confirmado
-        console.log("⚠️ [UPDATE-ONLINE-PAYMENT] Reserva parcialmente pagada");
+        shouldUpdateBookingStatus = true;
+        console.log("⚠️ [UPDATE-ONLINE-PAYMENT] Reserva parcialmente pagada - Status: CONFIRMED");
       }
     } else if (paymentStatus === "failed") {
       // Mantener estado actual si el pago falló
@@ -897,28 +941,130 @@ const updateOnlinePayment = async (req, res, next) => {
     }
 
     // ⭐ ACTUALIZAR RESERVA SI CAMBIÓ EL ESTADO
-    if (newBookingStatus !== booking.status) {
+    if (shouldUpdateBookingStatus && newBookingStatus !== booking.status) {
       console.log("🔄 [UPDATE-ONLINE-PAYMENT] Actualizando estado de reserva:", {
         from: booking.status,
         to: newBookingStatus
       });
       
       try {
-        await booking.update({
+        const bookingUpdateData = {
           status: newBookingStatus,
           statusUpdatedAt: getColombiaTime(),
           statusUpdatedBy: 'payment_system'
-        });
+        };
+
+        // ⭐ AGREGAR TIMESTAMP DE PAGO COMPLETO SI CORRESPONDE
+        if (newBookingStatus === 'paid') {
+          bookingUpdateData.paymentCompletedAt = getColombiaTime();
+        }
+
+        await booking.update(bookingUpdateData);
         console.log("✅ [UPDATE-ONLINE-PAYMENT] Estado de reserva actualizado");
+
+        // ⭐ ACTUALIZAR HABITACIÓN SEGÚN NUEVO ESTADO
+        const room = await Room.findByPk(booking.roomNumber);
+        if (room) {
+          let newRoomStatus = room.status;
+          let newRoomAvailability = room.available;
+          
+          if (newBookingStatus === 'paid') {
+            // ⭐ CUANDO ESTÁ PAGADO PERO NO CHECKED-IN, MANTENER RESERVADA
+            newRoomStatus = 'Reservada';
+            newRoomAvailability = false;
+          } else if (newBookingStatus === 'confirmed') {
+            newRoomStatus = 'Reservada';
+            newRoomAvailability = false;
+          }
+          
+          await room.update({
+            status: newRoomStatus,
+            available: newRoomAvailability
+          });
+          
+          console.log("🏨 [UPDATE-ONLINE-PAYMENT] Habitación actualizada:", {
+            roomNumber: booking.roomNumber,
+            status: newRoomStatus,
+            available: newRoomAvailability
+          });
+        }
+
       } catch (bookingUpdateError) {
         console.error("❌ [UPDATE-ONLINE-PAYMENT] Error al actualizar reserva:", bookingUpdateError);
         // No fallar por esto, solo log
       }
     }
 
-    // ⭐ PREPARAR RESPUESTA COMPLETA
-    console.log("📤 [UPDATE-ONLINE-PAYMENT] Preparando respuesta...");
+    // ⭐ OBTENER RESERVA ACTUALIZADA - IGUAL QUE registerLocalPayment
+    const updatedBooking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: Room,
+          as: 'room',
+          attributes: ['roomNumber', 'status', 'type']
+        },
+        {
+          model: Buyer,
+          as: 'guest',
+          attributes: ['scostumername', 'sdocno']
+        },
+        {
+          model: Payment,
+          as: 'payments',
+          attributes: [
+            'paymentId', 'amount', 'paymentMethod', 'paymentStatus', 
+            'paymentType', 'paymentDate', 'includesExtras', 'isReservationPayment'
+          ]
+        },
+        {
+          model: ExtraCharge,
+          as: 'extraCharges',
+          attributes: ['id', 'amount', 'description', 'quantity']
+        }
+      ]
+    });
+
+    // ⭐ CALCULAR TOTALES ACTUALIZADOS
+    const authorizedPayments = updatedBooking.payments?.filter(p => 
+      p.paymentStatus === 'authorized' || p.paymentStatus === 'completed'
+    ) || [];
     
+    const totalPaid = authorizedPayments.reduce((sum, p) => 
+      sum + parseFloat(p.amount), 0
+    );
+    
+    const newRemainingAmount = grandTotal - totalPaid;
+    const isFullyPaid = newRemainingAmount <= 0;
+
+    console.log("✅ [UPDATE-ONLINE-PAYMENT] Pago procesado exitosamente:", {
+      paymentId: payment.paymentId,
+      amount: paymentAmount,
+      status: paymentStatus,
+      bookingStatus: newBookingStatus,
+      totalPaid,
+      remainingAmount: newRemainingAmount,
+      isFullyPaid,
+      readyForPhysicalCheckIn: newBookingStatus === 'paid',
+      completedAt: formatForLogs(getColombiaTime())
+    });
+
+    // ⭐ DETERMINAR MENSAJE DE RESPUESTA - ACTUALIZADO
+    let responseMessage = '';
+    if (paymentStatus === "completed") {
+      if (newBookingStatus === 'paid') {
+        responseMessage = '✅ Pago online completado. Reserva lista para check-in físico.';
+      } else if (newBookingStatus === 'confirmed') {
+        responseMessage = '📊 Pago parcial completado. Reserva confirmada.';
+      } else {
+        responseMessage = '✅ Pago online registrado exitosamente.';
+      }
+    } else if (paymentStatus === "failed") {
+      responseMessage = '❌ Pago online falló. Verificar con el proveedor de pagos.';
+    } else {
+      responseMessage = '💳 Pago online en proceso.';
+    }
+
+    // ⭐ PREPARAR RESPUESTA COMPLETA
     const responseData = {
       payment: {
         ...payment.toJSON(),
@@ -928,30 +1074,33 @@ const updateOnlinePayment = async (req, res, next) => {
       booking: {
         bookingId: booking.bookingId,
         status: newBookingStatus,
-        totalAmount: totalAmount,
-        totalAmountFormatted: `$${totalAmount.toLocaleString()}`
+        totalAmount: reservationAmount,
+        totalAmountFormatted: `$${reservationAmount.toLocaleString()}`
       },
       paymentSummary: {
-        totalPaid: totalPaid,
+        reservationAmount,
+        extraChargesTotal,
+        grandTotal,
+        totalPaid,
+        remainingAmount: newRemainingAmount,
+        isFullyPaid,
+        readyForPhysicalCheckIn: newBookingStatus === 'paid', // ⭐ NUEVO CAMPO
+        canCheckout: isFullyPaid && newBookingStatus === 'checked-in',
+        paymentsCount: updatedBooking.payments?.length || 0,
+        // Formateos
         totalPaidFormatted: `$${totalPaid.toLocaleString()}`,
-        remaining: Math.max(0, totalAmount - totalPaid),
-        remainingFormatted: `$${Math.max(0, totalAmount - totalPaid).toLocaleString()}`,
-        isFullyPaid: totalPaid >= totalAmount,
-        paymentPercentage: totalAmount > 0 ? Math.round((totalPaid / totalAmount) * 100) : 0
-      }
+        remainingFormatted: `$${Math.max(0, newRemainingAmount).toLocaleString()}`,
+        grandTotalFormatted: `$${grandTotal.toLocaleString()}`,
+        paymentPercentage: reservationAmount > 0 ? Math.round((totalPaid / reservationAmount) * 100) : 0
+      },
+      statusChanged: shouldUpdateBookingStatus,
+      newStatus: newBookingStatus,
+      roomStatus: updatedBooking.room?.status
     };
-
-    console.log("✅ [UPDATE-ONLINE-PAYMENT] Pago procesado exitosamente:", {
-      paymentId: payment.paymentId,
-      amount: paidAmount,
-      status: paymentStatus,
-      bookingStatus: newBookingStatus,
-      completedAt: formatForLogs(getColombiaTime())
-    });
 
     res.status(200).json({
       error: false,
-      message: "Pago online registrado y reserva actualizada exitosamente",
+      message: responseMessage,
       data: responseData,
       timestamp: formatForLogs(getColombiaTime())
     });
@@ -2127,12 +2276,12 @@ const getBookingById = async (req, res) => {
           ],
           required: false
         },
-        { 
-          model: RegistrationPass, 
-          as: "registrationPasses",
-          attributes: ['id', 'passNumber', 'issuedAt', 'status'],
-          required: false
-        },
+       {
+  model: RegistrationPass,
+  as: "registrationPasses",
+  attributes: ['registrationNumber', 'checkInDate', 'name', 'nationality'], // agrega los que realmente existen
+  required: false
+},
         {
           model: BookingInventoryUsage,
           as: 'inventoryUsages',

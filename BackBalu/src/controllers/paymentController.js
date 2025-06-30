@@ -6,9 +6,11 @@ const { Op } = require("sequelize");
 const { 
   formatForLogs,
   formatForDetailedLogs,
-  getDaysDifference 
+  getDaysDifference,
+  getColombiaTime
 } = require('../utils/dateUtils');
 
+// ⭐ FUNCIÓN PARA MAPEAR MÉTODOS DE PAGO
 const mapPaymentMethod = (method) => {
   const methodMap = {
     'card': 'credit_card',
@@ -33,304 +35,738 @@ const mapPaymentMethod = (method) => {
   return mappedMethod;
 };
 
+// ⭐ FUNCIÓN PARA MAPEAR TIPOS DE PAGO
 const mapPaymentType = (type) => {
   const typeMap = {
-    'checkout': 'full',        // ✅ checkout → full (pago completo al salir)
-    'checkin': 'partial',      // ✅ checkin → partial (depósito al entrar)
-    'full': 'full',            // ✅ mantener full
-    'partial': 'partial',      // ✅ mantener partial
-    'online': 'online',        // ✅ mantener online
-    'deposit': 'partial',      // ✅ depósito → partial
-    'final': 'full',          // ✅ pago final → full
-    'complete': 'full',       // ✅ completo → full
-    'wompi': 'online',        // ✅ wompi → online
-    'wompi_checkout': 'online' // ✅ wompi_checkout → online
+    'checkout': 'final',          // ✅ checkout → final (pago final al salir)
+    'checkin': 'deposit',         // ✅ checkin → deposit (depósito al entrar)
+    'full': 'full',               // ✅ mantener full
+    'partial': 'partial',         // ✅ mantener partial
+    'online': 'online',           // ✅ mantener online
+    'deposit': 'deposit',         // ✅ mantener deposit
+    'final': 'final',             // ✅ mantener final
+    'complete': 'full',           // ✅ completo → full
+    'wompi': 'online',            // ✅ wompi → online
+    'wompi_checkout': 'online',   // ✅ wompi_checkout → online
+    'extra_charge': 'extra_charge' // ✅ mantener extra_charge
   };
   
   const mappedType = typeMap[type?.toLowerCase()];
   
   if (!mappedType) {
     console.warn(`⚠️ [PAYMENT-CONTROLLER] Tipo de pago no reconocido: '${type}', usando 'partial' por defecto`);
-    return 'partial';  // ✅ Default seguro
+    return 'partial';
   }
   
   console.log(`✅ [PAYMENT-CONTROLLER] Tipo mapeado: '${type}' → '${mappedType}'`);
   return mappedType;
 };
 
+// ⭐ FUNCIÓN PRINCIPAL PARA REGISTRAR PAGOS LOCALES
 const registerLocalPayment = async (req, res, next) => {
-  console.log('💳 [PAYMENT-CONTROLLER] === Iniciando Proceso: registerLocalPayment ===');
-  console.log('💳 [PAYMENT-CONTROLLER] Timestamp:', formatForLogs(new Date()));
-  
   try {
-    const { bookingId, amount, paymentMethod, paymentType: paymentTypeFromBody } = req.body;
-    
-    console.log('💳 [PAYMENT-CONTROLLER] Request data:', {
+    console.log("💳 [REGISTER-LOCAL-PAYMENT] ⭐ INICIANDO PROCESO");
+    console.log("🕐 [REGISTER-LOCAL-PAYMENT] Hora Colombia:", formatForLogs(getColombiaTime()));
+    console.log("📥 [REGISTER-LOCAL-PAYMENT] Request body:", JSON.stringify(req.body, null, 2));
+
+    const { 
+      bookingId, 
+      amount, 
+      paymentMethod, 
+      paymentType,
+      notes,
+      updateBookingStatus = false,
+      newBookingStatus = null,
+      isCheckoutPayment = false,
+      includesExtras = false,
+      transactionId = null,
+      paymentReference = null
+    } = req.body;
+
+    // ⭐ VALIDACIONES BÁSICAS
+    if (!bookingId || !amount || !paymentMethod) {
+      return res.status(400).json({
+        error: true,
+        message: 'Faltan campos requeridos: bookingId, amount, paymentMethod'
+      });
+    }
+
+    // ⭐ BUSCAR LA RESERVA CON DATOS COMPLETOS
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: Room,
+          as: 'room',
+          attributes: ['roomNumber', 'status', 'type']
+        },
+        {
+          model: Buyer,
+          as: 'guest',
+          attributes: ['scostumername', 'sdocno']
+        },
+        {
+          model: Payment,
+          as: 'payments',
+          attributes: [
+            'paymentId', 'amount', 'paymentStatus', 'paymentType', 
+            'isCheckoutPayment', 'includesExtras', 'isReservationPayment'
+          ]
+        },
+        {
+          model: ExtraCharge,
+          as: 'extraCharges',
+          attributes: ['id', 'amount', 'description', 'quantity']
+        }
+      ]
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        error: true,
+        message: 'Reserva no encontrada'
+      });
+    }
+
+    console.log("🏨 [REGISTER-LOCAL-PAYMENT] Reserva encontrada:", {
       bookingId,
-      amount,
-      paymentMethod,
-      paymentType: paymentTypeFromBody
+      currentStatus: booking.status,
+      totalAmount: booking.totalAmount,
+      roomNumber: booking.roomNumber,
+      existingPayments: booking.payments?.length || 0,
+      extraCharges: booking.extraCharges?.length || 0
     });
 
-    if (!req.user || !req.user.n_document) {
-      console.log('❌ [PAYMENT-CONTROLLER] Usuario no autenticado');
-      return res.status(401).json({ error: true, message: 'Usuario no autenticado o token inválido.' });
-    }
-    const staffUserNdocument = req.user.n_document;
-    console.log('👨‍💼 [PAYMENT-CONTROLLER] Staff user:', staffUserNdocument);
+    // ⭐ CALCULAR TOTALES FINANCIEROS
+    const paymentAmount = parseFloat(amount);
+    const reservationAmount = parseFloat(booking.totalAmount);
+    
+    // Calcular gastos extras
+    const extraChargesTotal = booking.extraCharges?.reduce((sum, charge) => {
+      const chargeAmount = parseFloat(charge.amount) || 0;
+      const quantity = parseInt(charge.quantity) || 1;
+      return sum + (chargeAmount * quantity);
+    }, 0) || 0;
+    
+    const grandTotal = reservationAmount + extraChargesTotal;
+    
+    // ⭐ CALCULAR PAGOS PREVIOS (solo authorized y completed)
+    const previousPayments = booking.payments?.filter(p => 
+      p.paymentStatus === 'authorized' || p.paymentStatus === 'completed'
+    ) || [];
+    
+    const totalPreviousPaid = previousPayments.reduce((sum, p) => 
+      sum + parseFloat(p.amount), 0
+    );
+    
+    const remainingAmount = grandTotal - totalPreviousPaid;
 
-    // ⭐ MAPEAR MÉTODO Y TIPO DE PAGO ANTES DE VALIDAR
+    console.log("💰 [REGISTER-LOCAL-PAYMENT] Cálculos financieros:", {
+      paymentAmount,
+      reservationAmount,
+      extraChargesTotal,
+      grandTotal,
+      totalPreviousPaid,
+      remainingAmount,
+      isCheckoutPayment,
+      includesExtras
+    });
+
+    // ⭐ VALIDAR MONTO
+    if (paymentAmount <= 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'El monto del pago debe ser mayor a 0'
+      });
+    }
+
+    if (paymentAmount > remainingAmount) {
+      return res.status(400).json({
+        error: true,
+        message: `El monto del pago ($${paymentAmount}) excede el monto pendiente ($${remainingAmount})`
+      });
+    }
+
+    // ⭐ DETERMINAR ESTADO DEL PAGO Y CONFIGURACIÓN
+    let paymentStatus = 'pending';
+    let finalPaymentType = mapPaymentType(paymentType);
+    let shouldUpdateBookingStatus = updateBookingStatus;
+    let targetBookingStatus = booking.status;
+    let isReservationPayment = true;
+    let isCheckoutPaymentFlag = isCheckoutPayment;
+
+    // ⭐ LÓGICA DE ESTADOS SEGÚN CONTEXTO - CORREGIDA
+    if (isCheckoutPayment) {
+      // ⭐ PAGO EN CHECKOUT - SIEMPRE COMPLETED
+      paymentStatus = 'completed';
+      finalPaymentType = 'final';
+      shouldUpdateBookingStatus = true;
+      targetBookingStatus = 'completed';
+      isReservationPayment = !includesExtras;
+      isCheckoutPaymentFlag = true;
+      
+      console.log("🏁 [REGISTER-LOCAL-PAYMENT] Pago de checkout detectado");
+      
+    } else if (booking.status === 'confirmed' || booking.status === 'pending') {
+      // ⭐ PAGO DE RESERVA INICIAL - CAMBIO PRINCIPAL AQUÍ
+      const isFullReservationPayment = paymentAmount >= reservationAmount;
+      
+      if (isFullReservationPayment) {
+        paymentStatus = 'authorized';
+        finalPaymentType = 'full';
+        shouldUpdateBookingStatus = true;
+        targetBookingStatus = 'paid'; // ⭐ CAMBIAR A 'paid' NO 'checked-in'
+        isReservationPayment = true;
+        
+        console.log("✅ [REGISTER-LOCAL-PAYMENT] Pago completo de reserva - Status: PAID (listo para check-in físico)");
+        
+      } else {
+        paymentStatus = 'authorized';
+        finalPaymentType = 'partial';
+        shouldUpdateBookingStatus = false; // ⭐ Mantener 'confirmed' hasta pago completo
+        isReservationPayment = true;
+        
+        console.log("📊 [REGISTER-LOCAL-PAYMENT] Pago parcial de reserva - Mantener CONFIRMED");
+      }
+      
+    } else if (booking.status === 'paid') {
+      // ⭐ NUEVO CASO: PAGO ADICIONAL EN RESERVA YA PAGADA
+      paymentStatus = 'authorized';
+      finalPaymentType = includesExtras ? 'extra_charge' : 'partial';
+      isReservationPayment = !includesExtras;
+      shouldUpdateBookingStatus = false; // ⭐ Mantener 'paid' hasta check-in físico
+      
+      console.log("💰 [REGISTER-LOCAL-PAYMENT] Pago adicional en reserva pagada - Mantener PAID");
+      
+    } else if (booking.status === 'checked-in') {
+      // ⭐ PAGO DURANTE LA ESTADÍA
+      if (includesExtras) {
+        paymentStatus = 'authorized';
+        finalPaymentType = 'extra_charge';
+        isReservationPayment = false;
+        
+        console.log("🏨 [REGISTER-LOCAL-PAYMENT] Pago de gastos extras durante estadía");
+      } else {
+        paymentStatus = 'authorized';
+        finalPaymentType = 'partial';
+        isReservationPayment = true;
+        
+        console.log("🏨 [REGISTER-LOCAL-PAYMENT] Pago complementario durante estadía");
+      }
+      shouldUpdateBookingStatus = false; // Mantener checked-in
+      
+    } else {
+      // ⭐ OTROS CASOS
+      paymentStatus = 'authorized';
+      shouldUpdateBookingStatus = false;
+      
+      console.log("ℹ️ [REGISTER-LOCAL-PAYMENT] Pago en estado:", booking.status);
+    }
+
+    // ⭐ MAPEAR MÉTODO DE PAGO
     const mappedPaymentMethod = mapPaymentMethod(paymentMethod);
-    const mappedPaymentType = mapPaymentType(paymentTypeFromBody);
-    
-    console.log('💳 [PAYMENT-CONTROLLER] Valores mapeados:', {
-      originalMethod: paymentMethod,
-      mappedMethod: mappedPaymentMethod,
-      originalType: paymentTypeFromBody,
-      mappedType: mappedPaymentType
+
+    // ⭐ CREAR EL REGISTRO DE PAGO
+    const paymentData = {
+      bookingId,
+      amount: paymentAmount,
+      paymentMethod: mappedPaymentMethod,
+      paymentType: finalPaymentType,
+      paymentStatus: paymentStatus,
+      paymentDate: getColombiaTime().toJSDate(),
+      transactionId: transactionId,
+      paymentReference: paymentReference,
+      notes: notes || `Pago local ${finalPaymentType} - ${mappedPaymentMethod}`,
+      processedBy: req.user?.n_document || 'staff',
+      // ⭐ CAMPOS SEGÚN NUEVO MODELO
+      includesExtras: includesExtras,
+      isReservationPayment: isReservationPayment,
+      isCheckoutPayment: isCheckoutPaymentFlag
+    };
+
+    console.log("💾 [REGISTER-LOCAL-PAYMENT] Creando pago:", paymentData);
+
+    const payment = await Payment.create(paymentData);
+
+    // ⭐ ACTUALIZAR ESTADO DE RESERVA SI ES NECESARIO
+    if (shouldUpdateBookingStatus) {
+      console.log("🔄 [REGISTER-LOCAL-PAYMENT] Actualizando estado de reserva:", {
+        from: booking.status,
+        to: targetBookingStatus,
+        reason: `Pago ${finalPaymentType} - ${mappedPaymentMethod}`
+      });
+
+      const updateData = {
+        status: targetBookingStatus,
+        statusUpdatedBy: req.user?.n_document || 'system',
+        statusUpdatedAt: getColombiaTime().toJSDate(),
+        statusReason: `Pago ${finalPaymentType} recibido - ${mappedPaymentMethod}`
+      };
+
+      // ⭐ AGREGAR TIMESTAMP DE PAGO COMPLETO SI CORRESPONDE
+      if (targetBookingStatus === 'paid') {
+        updateData.paymentCompletedAt = getColombiaTime().toJSDate();
+      }
+
+      await booking.update(updateData);
+
+      // ⭐ ACTUALIZAR HABITACIÓN SEGÚN NUEVO ESTADO
+      const room = await Room.findByPk(booking.roomNumber);
+      if (room) {
+        let newRoomStatus = room.status;
+        let newRoomAvailability = room.available;
+        
+        if (targetBookingStatus === 'paid') {
+          // ⭐ CUANDO ESTÁ PAGADO PERO NO CHECKED-IN, MANTENER RESERVADA
+          newRoomStatus = 'Reservada';
+          newRoomAvailability = false;
+        } else if (targetBookingStatus === 'checked-in') {
+          newRoomStatus = 'Ocupada';
+          newRoomAvailability = false;
+        } else if (targetBookingStatus === 'completed') {
+          newRoomStatus = 'Disponible';
+          newRoomAvailability = true;
+        }
+        
+        await room.update({
+          status: newRoomStatus,
+          available: newRoomAvailability
+        });
+        
+        console.log("🏨 [REGISTER-LOCAL-PAYMENT] Habitación actualizada:", {
+          roomNumber: booking.roomNumber,
+          status: newRoomStatus,
+          available: newRoomAvailability
+        });
+      }
+    }
+
+    // ⭐ OBTENER RESERVA ACTUALIZADA
+    const updatedBooking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: Room,
+          as: 'room',
+          attributes: ['roomNumber', 'status', 'type']
+        },
+        {
+          model: Buyer,
+          as: 'guest',
+          attributes: ['scostumername', 'sdocno']
+        },
+        {
+          model: Payment,
+          as: 'payments',
+          attributes: [
+            'paymentId', 'amount', 'paymentMethod', 'paymentStatus', 
+            'paymentType', 'paymentDate', 'includesExtras', 'isReservationPayment'
+          ]
+        },
+        {
+          model: ExtraCharge,
+          as: 'extraCharges',
+          attributes: ['id', 'amount', 'description', 'quantity']
+        }
+      ]
     });
 
-    // Validar el monto del pago
-    const paymentAmountFloat = parseFloat(amount);
-    if (isNaN(paymentAmountFloat) || paymentAmountFloat <= 0) {
-      console.log('❌ [PAYMENT-CONTROLLER] Monto inválido:', amount);
-      throw new CustomError(`Monto del pago inválido: '${amount}'. Debe ser un número positivo.`, 400);
-    }
-    console.log('✅ [PAYMENT-CONTROLLER] Monto válido:', paymentAmountFloat);
-
-    // ⭐ BUSCAR LA RESERVA CON TODOS LOS DATOS NECESARIOS
-    console.log('🔍 [PAYMENT-CONTROLLER] Buscando reserva con ID:', bookingId);
+    // ⭐ CALCULAR TOTALES ACTUALIZADOS
+    const authorizedPayments = updatedBooking.payments?.filter(p => 
+      p.paymentStatus === 'authorized' || p.paymentStatus === 'completed'
+    ) || [];
     
+    const totalPaid = authorizedPayments.reduce((sum, p) => 
+      sum + parseFloat(p.amount), 0
+    );
+    
+    const newRemainingAmount = grandTotal - totalPaid;
+    const isFullyPaid = newRemainingAmount <= 0;
+
+    console.log("✅ [REGISTER-LOCAL-PAYMENT] Pago registrado exitosamente:", {
+      paymentId: payment.paymentId,
+      amount: paymentAmount,
+      status: paymentStatus,
+      type: finalPaymentType,
+      bookingStatus: updatedBooking.status,
+      totalPaid,
+      remainingAmount: newRemainingAmount,
+      isFullyPaid,
+      readyForPhysicalCheckIn: updatedBooking.status === 'paid',
+      canCheckout: isFullyPaid && updatedBooking.status === 'checked-in'
+    });
+
+    // ⭐ DETERMINAR MENSAJE DE RESPUESTA - ACTUALIZADO
+    let responseMessage = '';
+    if (isCheckoutPayment) {
+      responseMessage = '🏁 Pago de checkout completado exitosamente. Reserva finalizada.';
+    } else if (paymentStatus === 'authorized' && targetBookingStatus === 'paid') {
+      responseMessage = '✅ Pago completo registrado. Reserva lista para check-in físico.';
+    } else if (paymentStatus === 'authorized' && targetBookingStatus === 'checked-in') {
+      responseMessage = '✅ Pago completo registrado. Check-in automático realizado.';
+    } else if (finalPaymentType === 'partial') {
+      responseMessage = `📊 Pago parcial registrado. Restante: $${newRemainingAmount.toFixed(2)}`;
+    } else if (finalPaymentType === 'extra_charge') {
+      responseMessage = '🏨 Pago de gastos extras registrado exitosamente.';
+    } else {
+      responseMessage = '💳 Pago registrado exitosamente.';
+    }
+
+    const responseData = {
+      payment,
+      booking: updatedBooking,
+      paymentSummary: {
+        reservationAmount,
+        extraChargesTotal,
+        grandTotal,
+        totalPaid,
+        remainingAmount: newRemainingAmount,
+        isFullyPaid,
+        readyForPhysicalCheckIn: updatedBooking.status === 'paid', // ⭐ NUEVO CAMPO
+        canCheckout: isFullyPaid && updatedBooking.status === 'checked-in',
+        paymentsCount: updatedBooking.payments?.length || 0
+      },
+      statusChanged: shouldUpdateBookingStatus,
+      newStatus: updatedBooking.status,
+      roomStatus: updatedBooking.room?.status
+    };
+
+    res.status(201).json({
+      error: false,
+      success: true,
+      message: responseMessage,
+      data: responseData,
+      timestamp: formatForLogs(getColombiaTime())
+    });
+
+  } catch (error) {
+    console.error("❌ [REGISTER-LOCAL-PAYMENT] Error:", error);
+    next(error);
+  }
+};
+
+// ⭐ FUNCIÓN PARA PROCESAR PAGO DE CHECKOUT
+const processCheckoutPayment = async (req, res, next) => {
+  try {
+    console.log("🏁 [CHECKOUT-PAYMENT] Iniciando pago de checkout");
+    console.log("📥 [CHECKOUT-PAYMENT] Request body:", JSON.stringify(req.body, null, 2));
+    
+    const { bookingId, extraChargesAmount = 0, paymentMethod, notes } = req.body;
+    
+    if (!bookingId || !paymentMethod) {
+      return res.status(400).json({
+        error: true,
+        message: 'Faltan campos requeridos: bookingId, paymentMethod'
+      });
+    }
+
+    // Buscar reserva con gastos extras
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: ExtraCharge,
+          as: 'extraCharges',
+          attributes: ['id', 'amount', 'description', 'quantity']
+        },
+        {
+          model: Payment,
+          as: 'payments',
+          attributes: ['paymentId', 'amount', 'paymentStatus']
+        }
+      ]
+    });
+    
+    if (!booking) {
+      return res.status(404).json({
+        error: true,
+        message: 'Reserva no encontrada'
+      });
+    }
+    
+    if (booking.status !== 'checked-in') {
+      return res.status(400).json({
+        error: true,
+        message: 'Solo se puede hacer checkout de reservas en estado checked-in'
+      });
+    }
+
+    // Calcular total de gastos extras
+    const calculatedExtrasAmount = booking.extraCharges?.reduce((sum, charge) => {
+      const chargeAmount = parseFloat(charge.amount) || 0;
+      const quantity = parseInt(charge.quantity) || 1;
+      return sum + (chargeAmount * quantity);
+    }, 0) || 0;
+
+    console.log("💰 [CHECKOUT-PAYMENT] Cálculos de checkout:", {
+      bookingId,
+      extraChargesAmount,
+      calculatedExtrasAmount,
+      hasExtras: calculatedExtrasAmount > 0
+    });
+    
+    // Procesar pago final si hay gastos extras
+    if (calculatedExtrasAmount > 0) {
+      const finalAmount = extraChargesAmount || calculatedExtrasAmount;
+      
+      const checkoutPaymentData = {
+        bookingId,
+        amount: finalAmount,
+        paymentMethod,
+        paymentType: 'final',
+        isCheckoutPayment: true,
+        includesExtras: true,
+        notes: notes || 'Pago final de checkout con gastos extras'
+      };
+      
+      console.log("🏁 [CHECKOUT-PAYMENT] Procesando pago con extras:", checkoutPaymentData);
+      
+      // Reutilizar la función de registro de pago
+      req.body = checkoutPaymentData;
+      return registerLocalPayment(req, res, next);
+      
+    } else {
+      // Checkout sin gastos extras - solo actualizar estado
+      console.log("🏁 [CHECKOUT-PAYMENT] Checkout sin gastos extras");
+      
+      await booking.update({
+        status: 'completed',
+        statusUpdatedBy: req.user?.n_document || 'system',
+        statusUpdatedAt: getColombiaTime().toJSDate(),
+        statusReason: 'Checkout completado sin gastos extras'
+      });
+
+      // Liberar habitación
+      const room = await Room.findByPk(booking.roomNumber);
+      if (room) {
+        await room.update({
+          status: 'Disponible',
+          available: true
+        });
+      }
+      
+      res.json({
+        error: false,
+        success: true,
+        message: 'Checkout completado exitosamente sin gastos extras',
+        data: { 
+          booking: await Booking.findByPk(bookingId, {
+            include: [
+              { model: Room, attributes: ['roomNumber', 'status'] },
+              { model: Buyer, as: 'guest', attributes: ['scostumername'] }
+            ]
+          })
+        },
+        timestamp: formatForLogs(getColombiaTime())
+      });
+    }
+    
+  } catch (error) {
+    console.error("❌ [CHECKOUT-PAYMENT] Error:", error);
+    next(error);
+  }
+};
+
+// ⭐ FUNCIÓN PARA OBTENER RESUMEN FINANCIERO DE UNA RESERVA
+const getBookingFinancialSummary = async (req, res, next) => {
+  try {
+    const { bookingId } = req.params;
+    
+    if (!bookingId) {
+      return res.status(400).json({
+        error: true,
+        message: 'bookingId es requerido'
+      });
+    }
+
     const booking = await Booking.findByPk(bookingId, {
       include: [
         { 
           model: Payment,
           as: 'payments',
-          where: { paymentStatus: ['completed', 'pending'] },
-          required: false
+          attributes: [
+            'paymentId', 'amount', 'paymentStatus', 'paymentType', 
+            'paymentDate', 'includesExtras', 'isReservationPayment'
+          ]
         },
         { 
           model: ExtraCharge,
           as: 'extraCharges',
-          required: false
+          attributes: ['id', 'amount', 'description', 'quantity']
         },
-        { 
+        {
           model: Room,
-          as: 'room',
-          required: false
-        },
-        { 
-          model: Buyer, 
-          as: "guest",
-          required: false
+          attributes: ['roomNumber', 'type']
         }
-      ],
+      ]
     });
 
     if (!booking) {
-      console.log('❌ [PAYMENT-CONTROLLER] Reserva no encontrada:', bookingId);
-      throw new CustomError(`Reserva con bookingId '${bookingId}' no encontrada.`, 404);
+      return res.status(404).json({
+        error: true,
+        message: 'Reserva no encontrada'
+      });
     }
-    
-    console.log('✅ [PAYMENT-CONTROLLER] Reserva encontrada:', {
-      bookingId: booking.bookingId,
-      totalAmount: booking.totalAmount,
-      status: booking.status,
-      existingPayments: booking.payments ? booking.payments.length : 0,
-      extraCharges: booking.extraCharges ? booking.extraCharges.length : 0
-    });
 
-    // 🔧 CALCULAR TOTAL REAL (RESERVA + EXTRAS)
-    console.log('💰 [PAYMENT-CONTROLLER] Calculando totales reales...');
-    
     const baseAmount = parseFloat(booking.totalAmount || 0);
     const extraCharges = booking.extraCharges || [];
-    
-    // ✅ INCLUIR CARGOS EXTRAS EN EL CÁLCULO TOTAL
+    const payments = booking.payments || [];
+
+    // Calcular gastos extras
     const totalExtras = extraCharges.reduce((sum, charge) => {
-      const amount = parseFloat(charge.amount || 0);
+      const chargeAmount = parseFloat(charge.amount || 0);
       const quantity = parseInt(charge.quantity || 1);
-      const chargeTotal = amount * quantity;
-      
-      console.log(`💰 [PAYMENT-CONTROLLER] Cargo extra: ${charge.description || 'Sin descripción'} - $${amount} x ${quantity} = $${chargeTotal}`);
-      
-      return sum + chargeTotal;
+      return sum + (chargeAmount * quantity);
     }, 0);
-    
-    const totalBookingWithExtras = baseAmount + totalExtras;
 
-    // ✅ CALCULAR TOTAL PAGADO CORRECTAMENTE
-    const totalSuccessfullyPaid = await Payment.sum('amount', {
-      where: { 
-        bookingId: booking.bookingId, 
-        paymentStatus: 'completed' 
+    // Calcular pagos válidos (authorized y completed)
+    const validPayments = payments.filter(p => 
+      p.paymentStatus === 'authorized' || p.paymentStatus === 'completed'
+    );
+
+    const totalPaid = validPayments.reduce((sum, payment) => {
+      return sum + parseFloat(payment.amount || 0);
+    }, 0);
+
+    const totalFinal = baseAmount + totalExtras;
+    const totalPending = Math.max(0, totalFinal - totalPaid);
+
+    // Desglose de pagos
+    const reservationPayments = validPayments.filter(p => p.isReservationPayment);
+    const extraPayments = validPayments.filter(p => p.includesExtras);
+    const checkoutPayments = validPayments.filter(p => p.isCheckoutPayment);
+
+    const summary = {
+      booking: {
+        bookingId: booking.bookingId,
+        status: booking.status,
+        roomNumber: booking.roomNumber,
+        roomType: booking.Room?.type
       },
-    }) || 0;
-    
-    const remainingAmount = totalBookingWithExtras - totalSuccessfullyPaid;
-
-    console.log('💰 [PAYMENT-CONTROLLER] Cálculos corregidos:', {
-      baseAmount,
-      totalExtras,
-      totalBookingWithExtras,
-      totalPaid: totalSuccessfullyPaid,
-      remaining: remainingAmount,
-      newPayment: paymentAmountFloat
-    });
-
-    // ✅ VALIDAR QUE EL PAGO NO EXCEDA EL MONTO PENDIENTE
-    if (paymentAmountFloat > remainingAmount) {
-      console.log('❌ [PAYMENT-CONTROLLER] Pago excede monto restante');
-      throw new CustomError(
-        `El monto del pago ($${paymentAmountFloat.toFixed(2)}) excede el monto pendiente ($${remainingAmount.toFixed(2)}). ` +
-        `Total reserva: $${baseAmount.toFixed(2)}, Extras: $${totalExtras.toFixed(2)}, Total final: $${totalBookingWithExtras.toFixed(2)}, Ya pagado: $${totalSuccessfullyPaid.toFixed(2)}.`, 
-        400
-      );
-    }
-
-    // ⭐ DETERMINAR EL TIPO DE PAGO FINAL BASADO EN EL MONTO
-    const isFullPayment = paymentAmountFloat >= remainingAmount;
-    const finalPaymentType = mappedPaymentType || (isFullPayment ? 'full' : 'partial');
-
-    console.log('💳 [PAYMENT-CONTROLLER] Determinando tipo de pago:', {
-      isFullPayment,
-      remainingAmount,
-      paymentAmount: paymentAmountFloat,
-      mappedType: mappedPaymentType,
-      finalType: finalPaymentType
-    });
-
-    // ⭐ REGISTRAR EL PAGO CON VALORES MAPEADOS
-    console.log('💾 [PAYMENT-CONTROLLER] Creando pago...');
-    
-    const newPayment = await Payment.create({
-      bookingId: booking.bookingId,
-      amount: paymentAmountFloat,
-      paymentMethod: mappedPaymentMethod,    // ✅ USAR MÉTODO MAPEADO
-      paymentStatus: 'completed',
-      paymentType: finalPaymentType,         // ✅ USAR TIPO MAPEADO
-      paymentDate: new Date(),
-      processedBy: staffUserNdocument,
-    });
-
-    console.log('✅ [PAYMENT-CONTROLLER] Pago creado exitosamente:', {
-      paymentId: newPayment.paymentId || newPayment.id,
-      amount: newPayment.amount,
-      method: newPayment.paymentMethod,
-      type: newPayment.paymentType,
-      status: newPayment.paymentStatus
-    });
-
-    // ⭐ ACTUALIZAR ESTADO DE LA RESERVA CON CÁLCULO CORRECTO
-    const newTotalPaidAfterThisPayment = totalSuccessfullyPaid + paymentAmountFloat;
-    const finalRemainingAmount = totalBookingWithExtras - newTotalPaidAfterThisPayment;
-    
-    console.log('💰 [PAYMENT-CONTROLLER] Total después del pago:', {
-      newTotalPaid: newTotalPaidAfterThisPayment,
-      totalFinal: totalBookingWithExtras,
-      stillPending: finalRemainingAmount
-    });
-    
-    if (newTotalPaidAfterThisPayment >= totalBookingWithExtras) {
-      console.log('✅ [PAYMENT-CONTROLLER] Reserva completamente pagada, actualizando estado...');
-      
-      await booking.update({ status: 'completed' });
-
-      // ⭐ GENERAR LA FACTURA CON TOTALES CORRECTOS
-      try {
-        console.log('📄 [PAYMENT-CONTROLLER] Generando factura...');
-        
-        const bill = await Bill.create({
-          bookingId: booking.bookingId,
-          reservationAmount: baseAmount,
-          extraChargesAmount: totalExtras,
-          totalAmount: totalBookingWithExtras,
-          status: 'paid',
-          paymentMethod: mappedPaymentMethod,   // ✅ USAR MÉTODO MAPEADO EN FACTURA
-          generatedBy: staffUserNdocument,
-          generatedAt: new Date(),
-          details: JSON.stringify({
-            roomCharge: calculateRoomCharge(booking),
-            extraCharges: extraCharges.map(charge => ({
-              id: charge.id,
-              description: charge.description,
-              amount: parseFloat(charge.amount || 0),
-              quantity: parseInt(charge.quantity || 1),
-              total: parseFloat(charge.amount || 0) * parseInt(charge.quantity || 1)
-            })),
-            totalExtras,
-            nights: getDaysDifference(booking.checkIn, booking.checkOut),
-            roomDetails: booking.room || {},
-            guestDetails: booking.guest || {},
-            generatedAt: formatForLogs(new Date())
-          }),
-        });
-
-        console.log('✅ [PAYMENT-CONTROLLER] Factura generada:', bill.idBill || bill.id);
-      } catch (billError) {
-        console.error('❌ [PAYMENT-CONTROLLER] Error generando factura:', billError);
-        // No fallar el pago por esto, solo loggear el error
+      amounts: {
+        reservationAmount: baseAmount,
+        extraChargesAmount: totalExtras,
+        totalAmount: totalFinal,
+        totalPaid,
+        remainingAmount: totalPending
+      },
+      status: {
+        isFullyPaid: totalPending === 0 && totalFinal > 0,
+        hasExtras: totalExtras > 0,
+        canCheckout: booking.status === 'checked-in' && totalPending === 0,
+        requiresPayment: totalPending > 0
+      },
+      counts: {
+        extraCharges: extraCharges.length,
+        totalPayments: payments.length,
+        validPayments: validPayments.length,
+        reservationPayments: reservationPayments.length,
+        extraPayments: extraPayments.length,
+        checkoutPayments: checkoutPayments.length
+      },
+      details: {
+        extraCharges: extraCharges.map(charge => ({
+          id: charge.id,
+          description: charge.description,
+          amount: parseFloat(charge.amount),
+          quantity: parseInt(charge.quantity || 1),
+          total: parseFloat(charge.amount) * parseInt(charge.quantity || 1)
+        })),
+        payments: validPayments.map(payment => ({
+          paymentId: payment.paymentId,
+          amount: parseFloat(payment.amount),
+          paymentType: payment.paymentType,
+          paymentStatus: payment.paymentStatus,
+          paymentDate: payment.paymentDate,
+          includesExtras: payment.includesExtras,
+          isReservationPayment: payment.isReservationPayment
+        }))
       }
-    }
-
-    // ⭐ PREPARAR RESPUESTA CON RESUMEN FINANCIERO COMPLETO
-    const financialSummary = {
-      totalReserva: baseAmount,
-      totalExtras: totalExtras,
-      totalFinal: totalBookingWithExtras,
-      totalPagado: newTotalPaidAfterThisPayment,
-      totalPendiente: Math.max(0, finalRemainingAmount),
-      isFullyPaid: newTotalPaidAfterThisPayment >= totalBookingWithExtras,
-      hasExtras: totalExtras > 0,
-      extraChargesCount: extraCharges.length,
-      paymentsCount: (booking.payments?.filter(p => p.paymentStatus === 'completed').length || 0) + 1,
-      // Campos formateados para la UI
-      totalReservaFormatted: `$${baseAmount.toLocaleString()}`,
-      totalExtrasFormatted: `$${totalExtras.toLocaleString()}`,
-      totalPagadoFormatted: `$${newTotalPaidAfterThisPayment.toLocaleString()}`,
-      totalFinalFormatted: `$${totalBookingWithExtras.toLocaleString()}`,
-      totalPendienteFormatted: `$${Math.max(0, finalRemainingAmount).toLocaleString()}`,
-      paymentPercentage: totalBookingWithExtras > 0 ? Math.round((newTotalPaidAfterThisPayment / totalBookingWithExtras) * 100) : 0
     };
 
-    const response = {
+    res.json({
       error: false,
-      message: 'Pago registrado exitosamente.',
-      data: {
-        payment: newPayment.toJSON(),
-        booking: {
-          ...booking.toJSON(),
-          financialSummary
-        },
-      },
-    };
-
-    console.log('✅ [PAYMENT-CONTROLLER] Proceso completado exitosamente:', {
-      paymentId: newPayment.paymentId || newPayment.id,
-      bookingStatus: booking.status,
-      isFullyPaid: financialSummary.isFullyPaid,
-      totalFinal: financialSummary.totalFinal,
-      totalPagado: financialSummary.totalPagado,
-      totalPendiente: financialSummary.totalPendiente,
-      completedAt: formatForLogs(new Date())
+      success: true,
+      message: 'Resumen financiero obtenido exitosamente',
+      data: summary,
+      timestamp: formatForLogs(getColombiaTime())
     });
 
-    res.status(201).json(response);
-    
   } catch (error) {
-    console.error("❌ [PAYMENT-CONTROLLER] Error en registerLocalPayment:", error);
-    console.error("❌ [PAYMENT-CONTROLLER] Error timestamp:", formatForDetailedLogs(new Date()));
+    console.error('❌ [FINANCIAL-SUMMARY] Error:', error);
+    next(error);
+  }
+};
+
+// ⭐ FUNCIÓN PARA OBTENER HISTORIAL DE PAGOS
+const getPaymentHistory = async (req, res, next) => {
+  try {
+    const { bookingId } = req.params;
+    
+    if (!bookingId) {
+      return res.status(400).json({
+        error: true,
+        message: 'bookingId es requerido'
+      });
+    }
+
+    const payments = await Payment.findAll({
+      where: { bookingId },
+      include: [
+        {
+          model: Booking,
+          attributes: ['bookingId', 'status', 'roomNumber'],
+          include: [
+            {
+              model: Room,
+              attributes: ['roomNumber', 'type']
+            }
+          ]
+        }
+      ],
+      order: [['paymentDate', 'DESC']]
+    });
+
+    const formattedPayments = payments.map(payment => ({
+      paymentId: payment.paymentId,
+      amount: parseFloat(payment.amount),
+      paymentMethod: payment.paymentMethod,
+      paymentStatus: payment.paymentStatus,
+      paymentType: payment.paymentType,
+      paymentDate: payment.paymentDate,
+      transactionId: payment.transactionId,
+      paymentReference: payment.paymentReference,
+      processedBy: payment.processedBy,
+      includesExtras: payment.includesExtras,
+      isReservationPayment: payment.isReservationPayment,
+      isCheckoutPayment: payment.isCheckoutPayment,
+      notes: payment.notes
+    }));
+
+    res.json({
+      error: false,
+      success: true,
+      message: 'Historial de pagos obtenido exitosamente',
+      data: {
+        bookingId,
+        payments: formattedPayments,
+        totalPayments: formattedPayments.length
+      },
+      timestamp: formatForLogs(getColombiaTime())
+    });
+
+  } catch (error) {
+    console.error('❌ [PAYMENT-HISTORY] Error:', error);
     next(error);
   }
 };
 
 // ⭐ FUNCIONES AUXILIARES
 const calculateRoomCharge = (booking) => {
-  if (!booking.room) {
+  if (!booking.Room) {
     return {
       nights: 0,
       baseCharge: 0,
-      roomType: 'Unknown'
+      roomType: 'Unknown',
+      roomNumber: 'N/A',
+      pricePerNight: 0
     };
   }
   
@@ -340,68 +776,81 @@ const calculateRoomCharge = (booking) => {
   return {
     nights,
     baseCharge,
-    roomType: booking.room.type || 'Unknown',
-    roomNumber: booking.room.roomNumber || 'N/A',
+    roomType: booking.Room.type || 'Unknown',
+    roomNumber: booking.Room.roomNumber || 'N/A',
     pricePerNight: nights > 0 ? (baseCharge / nights) : baseCharge
   };
 };
 
-// ⭐ FUNCIÓN PARA OBTENER RESUMEN FINANCIERO DE UNA RESERVA
-const getBookingFinancialSummary = async (bookingId) => {
+// ⭐ FUNCIÓN PARA PROCESAR REEMBOLSOS
+const processRefund = async (req, res, next) => {
   try {
-    const booking = await Booking.findByPk(bookingId, {
-      include: [
-        { 
-          model: Payment,
-          as: 'payments',
-          where: { paymentStatus: 'completed' },
-          required: false
-        },
-        { 
-          model: ExtraCharge,
-          as: 'extraCharges',
-          required: false
-        }
-      ],
-    });
-
-    if (!booking) {
-      throw new CustomError(`Reserva con ID ${bookingId} no encontrada.`, 404);
+    const { paymentId, refundAmount, reason } = req.body;
+    
+    if (!paymentId || !refundAmount || !reason) {
+      return res.status(400).json({
+        error: true,
+        message: 'Faltan campos requeridos: paymentId, refundAmount, reason'
+      });
     }
 
-    const baseAmount = parseFloat(booking.totalAmount || 0);
-    const extraCharges = booking.extraCharges || [];
-    const payments = booking.payments || [];
+    const payment = await Payment.findByPk(paymentId);
+    
+    if (!payment) {
+      return res.status(404).json({
+        error: true,
+        message: 'Pago no encontrado'
+      });
+    }
 
-    const totalExtras = extraCharges.reduce((sum, charge) => {
-      return sum + (parseFloat(charge.amount || 0) * parseInt(charge.quantity || 1));
-    }, 0);
+    if (payment.paymentStatus === 'refunded') {
+      return res.status(400).json({
+        error: true,
+        message: 'Este pago ya ha sido reembolsado'
+      });
+    }
 
-    const totalPaid = payments.reduce((sum, payment) => {
-      return sum + parseFloat(payment.amount || 0);
-    }, 0);
+    const refundAmountFloat = parseFloat(refundAmount);
+    const originalAmount = parseFloat(payment.amount);
 
-    const totalFinal = baseAmount + totalExtras;
-    const totalPending = Math.max(0, totalFinal - totalPaid);
+    if (refundAmountFloat > originalAmount) {
+      return res.status(400).json({
+        error: true,
+        message: 'El monto del reembolso no puede ser mayor al monto original'
+      });
+    }
 
-    return {
-      totalReserva: baseAmount,
-      totalExtras,
-      totalFinal,
-      totalPagado: totalPaid,
-      totalPendiente: totalPending,
-      isFullyPaid: totalPending === 0 && totalFinal > 0,
-      hasExtras: totalExtras > 0,
-      extraChargesCount: extraCharges.length,
-      paymentsCount: payments.length
-    };
+    // Actualizar estado del pago
+    await payment.update({
+      paymentStatus: 'refunded',
+      notes: `${payment.notes || ''} | REEMBOLSO: $${refundAmountFloat} - ${reason}`
+    });
+
+    res.json({
+      error: false,
+      success: true,
+      message: 'Reembolso procesado exitosamente',
+      data: {
+        payment,
+        refundAmount: refundAmountFloat,
+        reason
+      },
+      timestamp: formatForLogs(getColombiaTime())
+    });
+
   } catch (error) {
-    console.error('❌ [PAYMENT-CONTROLLER] Error obteniendo resumen financiero:', error);
-    throw error;
+    console.error('❌ [REFUND] Error:', error);
+    next(error);
   }
 };
 
 module.exports = {
   registerLocalPayment,
-  getBookingFinancialSummary
+  processCheckoutPayment,
+  getBookingFinancialSummary,
+  getPaymentHistory,
+  processRefund,
+  calculateRoomCharge,
+  mapPaymentMethod,
+  mapPaymentType
 };
