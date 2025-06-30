@@ -645,6 +645,7 @@ const createBooking = async (req, res, next) => {
         include: [
           {
             model: Room,
+            as: 'room',
             attributes: ['roomNumber', 'type', 'status', 'maxGuests']
           },
           {
@@ -2276,10 +2277,28 @@ const getBookingById = async (req, res) => {
           ],
           required: false
         },
-       {
+{
   model: RegistrationPass,
   as: "registrationPasses",
-  attributes: ['registrationNumber', 'checkInDate', 'name', 'nationality'], // agrega los que realmente existen
+  attributes: [
+    'registrationNumber',
+    'checkInDate',
+    'name',
+    'nationality',
+    'maritalStatus',
+    'profession',
+    'stayDuration',
+    'checkInTime',
+    'numberOfPeople',
+    'destination',
+    'idNumber',
+    'idIssuingPlace',
+    'foreignIdOrPassport',
+    'address',
+    'phoneNumber',
+    'bookingId',
+    'roomNumber'
+  ],
   required: false
 },
         {
@@ -2729,6 +2748,29 @@ const getAllBookings = async (req, res, next) => {
         },
         required: false
       },
+      {
+  model: RegistrationPass,
+  as: "registrationPasses",
+  attributes: [
+    'registrationNumber',
+    'checkInDate',
+    'name',
+    'nationality',
+    'maritalStatus',
+    'profession',
+    'stayDuration',
+    'checkInTime',
+    'numberOfPeople',
+    'destination',
+    'idNumber',
+    'idIssuingPlace',
+    'foreignIdOrPassport',
+    'address',
+    'phoneNumber',
+    'roomNumber'
+  ],
+  required: false
+},
       {
         model: ExtraCharge,
         as: 'extraCharges',

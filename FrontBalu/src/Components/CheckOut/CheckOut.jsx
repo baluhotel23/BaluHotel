@@ -62,6 +62,7 @@ const CheckOut = () => {
     
     let filteredBookings = allBookings.filter(booking => 
       booking.status === 'checked-in' || 
+      booking.status === 'paid' ||
       booking.status === 'confirmed' ||
       (booking.status === 'completed' && booking.financialSummary?.totalPendiente > 0)
     );

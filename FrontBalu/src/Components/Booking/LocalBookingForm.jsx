@@ -681,42 +681,41 @@ const handleCreateBooking = useCallback(async () => {
     try {
       const result = await dispatch(createBooking(bookingData));
       
-      if (result?.success?.data?.booking) {
-        const newBookingId = result.data.booking.bookingId;
-        toast.success(`Reserva creada: #${newBookingId}`);
-        
-        setBookingState(prev => ({ 
-          ...prev, 
-          createdBookingId: newBookingId 
-        }));
+      if (result?.success && result.data?.booking) {
+    const newBookingId = result.data.booking.bookingId;
+    toast.success(`Reserva creada: #${newBookingId}`);
+    setBookingState(prev => ({ 
+      ...prev, 
+      createdBookingId: newBookingId 
+    }));
 
-        const { confirmationOption, totalAmount } = bookingState;
-        
-        if (confirmationOption === 'payNow') {
-          setPaymentState(prev => ({ 
-            ...prev, 
-            amount: totalAmount, 
-            showPaymentForm: true 
-          }));
-          setUiState(prev => ({ ...prev, currentStep: 'payment' }));
-        } else if (confirmationOption === 'pay50Percent') {
-          setPaymentState(prev => ({ 
-            ...prev, 
-            amount: totalAmount * 0.5, 
-            showPaymentForm: true 
-          }));
-          setUiState(prev => ({ ...prev, currentStep: 'payment' }));
-        } else {
-          toast.info('Reserva confirmada. Pago pendiente para check-in.');
-          handleResetForm();
-        }
-      } else {
-        toast.error(result?.message || 'Error al crear la reserva.');
-      }
-    } catch (error) {
-      console.error('Error creating booking:', error);
-      toast.error('Error al crear la reserva.');
+    const { confirmationOption, totalAmount } = bookingState;
+    
+    if (confirmationOption === 'payNow') {
+      setPaymentState(prev => ({ 
+        ...prev, 
+        amount: totalAmount, 
+        showPaymentForm: true 
+      }));
+      setUiState(prev => ({ ...prev, currentStep: 'payment' }));
+    } else if (confirmationOption === 'pay50Percent') {
+      setPaymentState(prev => ({ 
+        ...prev, 
+        amount: totalAmount * 0.5, 
+        showPaymentForm: true 
+      }));
+      setUiState(prev => ({ ...prev, currentStep: 'payment' }));
+    } else {
+      toast.info('Reserva confirmada. Pago pendiente para check-in.');
+      handleResetForm();
     }
+  } else {
+    toast.error(result?.message || 'Error al crear la reserva.');
+  }
+} catch (error) {
+  console.error('Error creating booking:', error);
+  toast.error('Error al crear la reserva.');
+}
   }, [selectedRoom, guestInfo, bookingState, searchParams, totalGuests, dispatch]);
 
   const handleProcessPayment = useCallback(async () => {

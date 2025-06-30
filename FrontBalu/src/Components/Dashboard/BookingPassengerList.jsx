@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { getBookingById } from "../../Redux/Actions/bookingActions";
+import {
+  deleteRegistrationPass,
+  updateRegistrationPass,
+} from "../../Redux/Actions/registerActions";
 import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
@@ -11,6 +15,10 @@ const BookingPassengerList = () => {
   const [bookingIdInput, setBookingIdInput] = useState("");
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Edición de pasajero
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   const registrationPasses = useSelector(
     (state) => state.booking.bookingDetails?.registrationPasses || []
@@ -49,7 +57,7 @@ const BookingPassengerList = () => {
     }
 
     const img = new Image();
-    img.src = "/logo2.png"; // Make sure logo is in the public folder
+    img.src = "/logo2.png";
     img.onload = () => {
       const doc = new jsPDF({
         orientation: "landscape",
@@ -58,11 +66,9 @@ const BookingPassengerList = () => {
       });
 
       const pageWidth = doc.internal.pageSize.getWidth();
-      let currentY = 15; // Start higher
+      let currentY = 15;
 
-      // --- PAGE 1: ALL CONTENT ---
-      // 1. Logo
-      const logoWidth = 70; // Slightly smaller logo
+      const logoWidth = 70;
       const logoHeight = (img.height * logoWidth) / img.width;
       doc.addImage(
         img,
@@ -74,8 +80,7 @@ const BookingPassengerList = () => {
       );
       currentY += logoHeight + 5;
 
-      // 2. Document Title
-      doc.setFontSize(12); // Smaller title
+      doc.setFontSize(12);
       doc.text(
         `Listado de Pasajeros - Reserva #${selectedBooking.bookingId}`,
         pageWidth / 2,
@@ -84,13 +89,11 @@ const BookingPassengerList = () => {
       );
       currentY += 20;
 
-      // Add top separating line
-      doc.setDrawColor(200, 200, 200); // Light gray color
+      doc.setDrawColor(200, 200, 200);
       doc.line(40, currentY, pageWidth - 40, currentY);
       currentY += 15;
 
-      // 3. Booking Information
-      doc.setFontSize(8); // Smaller font
+      doc.setFontSize(8);
       doc.text(`Habitación: ${selectedBooking.roomNumber}`, 40, currentY);
       doc.text(
         `Check-in: ${new Date(selectedBooking.checkIn).toLocaleDateString()}`,
@@ -104,21 +107,18 @@ const BookingPassengerList = () => {
       );
       doc.text(
         `Titular: ${selectedBooking.guest?.scostumername}`,
-        pageWidth - 40, // Position at right margin
+        pageWidth - 40,
         currentY,
-        { align: "right" } // Align text to the right
+        { align: "right" }
       );
       doc.text(`Documento: ${selectedBooking.guestId}`, pageWidth - 40, currentY + 12, { align: "right" });
       doc.text(`Estado: ${selectedBooking.status}`, pageWidth - 40, currentY + 24, { align: "right" });
 
-      currentY += 24 + 10; // Move Y down past the text
-
-      // Add bottom separating line
+      currentY += 24 + 10;
       doc.line(40, currentY, pageWidth - 40, currentY);
 
-      const tableStartY = currentY + 15; // Add space before table
+      const tableStartY = currentY + 15;
 
-      // 4. Passenger Table
       const tableColumnHeaders = [
         "Nombre", "Documento", "País de Origen", "Nacionalidad", "Domicilio",
         "Estado Civil", "Profesión", "Fecha CheckIn", "Destino", "Teléfono", "Duración",
@@ -130,25 +130,22 @@ const BookingPassengerList = () => {
         passenger.destination, passenger.phoneNumber, `${passenger.stayDuration} días`,
       ]);
 
-      let finalY = tableStartY; // Initialize with a fallback value
+      let finalY = tableStartY;
 
       doc.autoTable({
         head: [tableColumnHeaders],
         body: tableRows,
         startY: tableStartY,
-        styles: { fontSize: 7, cellPadding: 3 }, // Smaller font and padding
+        styles: { fontSize: 7, cellPadding: 3 },
         headStyles: { fillColor: [22, 160, 133] },
         didDrawPage: (data) => {
-          finalY = data.cursor.y; // Use the hook to get the final Y position
+          finalY = data.cursor.y;
         },
       });
 
-      // --- Legal Authorization (on the same page) ---
-      // Get Y position after table and add some margin
-      currentY = finalY + 50; // Increased space from 15 to 25
+      currentY = finalY + 50;
 
-      // 5. Legal Title
-      doc.setFontSize(9); // Smaller legal title
+      doc.setFontSize(9);
       doc.setFont(undefined, "bold");
       const authTitle =
         "AUTORIZACIÓN PARA EL TRATAMIENTO DE DATOS PERSONALES Y DECLARACIÓN DE COMPROMISO PARA LA PROTECCIÓN DE MENORES DE EDAD";
@@ -156,21 +153,17 @@ const BookingPassengerList = () => {
       doc.text(splitAuthTitle, pageWidth / 2, currentY, { align: "center" });
       currentY += splitAuthTitle.length * 9 + 10;
 
-      // 6. Legal Text Block
-      doc.setFontSize(6); // Much smaller font for legal text
+      doc.setFontSize(6);
       doc.setFont(undefined, "normal");
       const legalText = `En cumplimiento de lo dispuesto por la Ley 1581 de 2012 y sus decretos reglamentarios, así como las normas vigentes relacionadas con la protección de menores en Colombia (Ley 1098 de 2006, Ley 679 de 2001 y Ley 704 de 2001), el Hotel BALÚ informa que los datos personales suministrados por usted serán recolectados, almacenados, usados, circulados y, en general, tratados conforme a las políticas de privacidad del hotel y para las siguientes finalidades: 1. Verificar la identidad del huésped y registrar su ingreso. 2. Garantizar la seguridad de los huéspedes, empleados y visitantes. 3. Dar cumplimiento a las obligaciones legales en materia de registro hotelero. 4. Enviar comunicaciones relacionadas con el servicio, promociones o eventos del hotel (siempre que exista consentimiento). 5. Realizar análisis estadísticos para el mejoramiento del servicio. 6. Cumplir con las exigencias de las autoridades competentes. Al firmar este documento, el huésped autoriza de manera libre, expresa e informada el tratamiento de sus datos personales conforme a las finalidades aquí descritas. El titular de los datos podrá ejercer sus derechos de consulta, actualización, corrección o supresión, contactando a servicioalcliente@hotelbalu.com.co o visitando nuestras oficinas en la Cl. 8 #8-57, Centro, Restrepo, Meta. COMPROMISO Y DECLARACIÓN SOBRE LA PROTECCIÓN DE MENORES DE EDAD: Declaro que: - No haré uso de los servicios del hotel con fines que atenten contra los derechos de niños, niñas y adolescentes. - Conozco que el Hotel BALÚ aplica protocolos de protección a menores y colabora activamente con las autoridades para prevenir cualquier tipo de explotación infantil, de acuerdo con la Ley 679 de 2001, la Ley 1098 de 2006 y la Ley 704 de 2001. - En caso de alojarme con menores de edad, presento los documentos legales que acreditan el vínculo o la autorización expresa de sus representantes legales, de acuerdo con lo establecido en la normativa colombiana. - Entiendo que cualquier sospecha o evidencia de abuso, explotación o trata de personas será reportada a las autoridades competentes. Al firmar este documento, autorizo el tratamiento de mis datos personales y declaro haber leído y comprendido el contenido de esta autorización y compromiso.`;
-      
       const lines = doc.splitTextToSize(legalText, pageWidth - 80);
       doc.text(lines, 40, currentY);
-      currentY += (lines.length * 6) + 30; // Increased space from 15 to 30
+      currentY += (lines.length * 6) + 30;
 
-      // 7. Signature Line
       doc.setFontSize(8);
       doc.text("Firma: ____________________________________", 40, currentY);
-      doc.text("Cedula: ____________________________________", pageWidth / 2, currentY); // Positioned at the horizontal center
+      doc.text("Cedula: ____________________________________", pageWidth / 2, currentY);
 
-      // 8. Save PDF
       doc.save(`Listado_Pasajeros_Reserva_${selectedBooking.bookingId}.pdf`);
     };
     img.onerror = () => {
@@ -178,6 +171,42 @@ const BookingPassengerList = () => {
         "No se pudo cargar el logo para el PDF. Por favor, asegúrese que /logo2.png exista en la carpeta public."
       );
     };
+  };
+
+  // Editar pasajero
+  const handleEditPassenger = (passenger) => {
+    setEditingId(passenger.registrationNumber);
+    setEditForm({ ...passenger });
+  };
+
+  // Guardar edición
+  const handleSaveEdit = async () => {
+    try {
+      await dispatch(updateRegistrationPass(editForm.registrationNumber, editForm));
+      toast.success("Pasajero actualizado");
+      setEditingId(null);
+      dispatch(getBookingById(selectedBooking.bookingId));
+    } catch (e) {
+      toast.error("Error al actualizar pasajero");
+    }
+  };
+
+  // Eliminar pasajero
+  const handleDeletePassenger = async (registrationNumber) => {
+    if (window.confirm("¿Seguro que deseas eliminar este pasajero de la reserva?")) {
+      try {
+        await dispatch(deleteRegistrationPass(registrationNumber));
+        toast.success("Pasajero eliminado");
+        dispatch(getBookingById(selectedBooking.bookingId));
+      } catch (e) {
+        toast.error("Error al eliminar pasajero");
+      }
+    }
+  };
+
+  // Cambios en el formulario de edición
+  const handleEditFormChange = (e) => {
+    setEditForm({ ...editForm, [e.target.name]: e.target.value });
   };
 
   return (
@@ -284,32 +313,148 @@ const BookingPassengerList = () => {
                         <th className="p-2 border">Destino</th>
                         <th className="p-2 border">Teléfono</th>
                         <th className="p-2 border">Duración</th>
+                        <th className="p-2 border">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {registrationPasses.map((passenger) => (
-                        <tr key={passenger.registrationNumber}>
-                          <td className="p-2 border">{passenger.name}</td>
-                          <td className="p-2 border">{passenger.idNumber}</td>
-                          <td className="p-2 border">
-                            {passenger.idIssuingPlace}
-                          </td>
-                          <td className="p-2 border">
-                            {passenger.nationality}
-                          </td>
-                          <td className="p-2 border">{passenger.address}</td>
-                          <td className="p-2 border">
-                            {passenger.maritalStatus}
-                          </td>
-                          <td className="p-2 border">{passenger.profession}</td>
-                          <td className="p-2 border">{passenger.checkInTime}</td>
-                          <td className="p-2 border">{passenger.destination}</td>
-                          <td className="p-2 border">{passenger.phoneNumber}</td>
-                          <td className="p-2 border">
-                            {passenger.stayDuration} días
-                          </td>
-                        </tr>
-                      ))}
+                      {registrationPasses.map((passenger) =>
+                        editingId === passenger.registrationNumber ? (
+                          <tr key={passenger.registrationNumber} className="bg-yellow-50">
+                            <td className="p-2 border">
+                              <input
+                                name="name"
+                                value={editForm.name || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <input
+                                name="idNumber"
+                                value={editForm.idNumber || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <input
+                                name="idIssuingPlace"
+                                value={editForm.idIssuingPlace || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <input
+                                name="nationality"
+                                value={editForm.nationality || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <input
+                                name="address"
+                                value={editForm.address || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <input
+                                name="maritalStatus"
+                                value={editForm.maritalStatus || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <input
+                                name="profession"
+                                value={editForm.profession || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <input
+                                name="checkInTime"
+                                value={editForm.checkInTime || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <input
+                                name="destination"
+                                value={editForm.destination || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <input
+                                name="phoneNumber"
+                                value={editForm.phoneNumber || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <input
+                                name="stayDuration"
+                                value={editForm.stayDuration || ""}
+                                onChange={handleEditFormChange}
+                                className="border rounded p-1 w-full"
+                              />
+                            </td>
+                            <td className="p-2 border">
+                              <button
+                                className="bg-blue-600 text-white px-2 py-1 rounded mr-2"
+                                onClick={handleSaveEdit}
+                              >
+                                Guardar
+                              </button>
+                              <button
+                                className="bg-gray-400 text-white px-2 py-1 rounded"
+                                onClick={() => setEditingId(null)}
+                              >
+                                Cancelar
+                              </button>
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr key={passenger.registrationNumber}>
+                            <td className="p-2 border">{passenger.name}</td>
+                            <td className="p-2 border">{passenger.idNumber}</td>
+                            <td className="p-2 border">{passenger.idIssuingPlace}</td>
+                            <td className="p-2 border">{passenger.nationality}</td>
+                            <td className="p-2 border">{passenger.address}</td>
+                            <td className="p-2 border">{passenger.maritalStatus}</td>
+                            <td className="p-2 border">{passenger.profession}</td>
+                            <td className="p-2 border">{passenger.checkInTime}</td>
+                            <td className="p-2 border">{passenger.destination}</td>
+                            <td className="p-2 border">{passenger.phoneNumber}</td>
+                            <td className="p-2 border">{passenger.stayDuration} días</td>
+                            <td className="p-2 border">
+                              <button
+                                className="text-blue-600 hover:underline mr-2"
+                                onClick={() => handleEditPassenger(passenger)}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                className="text-red-600 hover:underline"
+                                onClick={() =>
+                                  handleDeletePassenger(passenger.registrationNumber)
+                                }
+                              >
+                                Eliminar
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      )}
                     </tbody>
                   </table>
                 </div>

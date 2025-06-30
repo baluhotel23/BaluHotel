@@ -197,28 +197,27 @@ export const getRegistrationPassesByBooking = (bookingId) => async (dispatch) =>
     console.log("ℹ️ Información sobre pasajeros para booking", bookingId + ":");
     
     if (error.response?.status === 404) {
-      // ⭐ 404 ES NORMAL - NO ES ERROR PARA EL REDUCER
-      console.log("  📋 No hay pasajeros registrados (normal para reservas sin check-in)");
-      
-      const payload = { 
-        bookingId, 
-        passengers: [] 
-      };
-      
-      // ⭐ DISPATCH SUCCESS CON ARRAY VACÍO, NO ERROR
-      dispatch({ 
-        type: "GET_REGISTRATION_PASSES_BY_BOOKING_SUCCESS", 
-        payload 
-      });
-      
-      return { 
-        success: false, 
-        isNotFound: true, 
-        passengers: [],
-        message: 'No hay pasajeros registrados (normal para reservas nuevas)' 
-      };
-      
-    } else {
+  // ⭐ 404 ES NORMAL - NO ES ERROR PARA EL REDUCER
+  console.log("  📋 No hay pasajeros registrados (normal para reservas sin check-in)");
+  
+  const payload = { 
+    bookingId, 
+    passengers: [] 
+  };
+  
+  // ⭐ DISPATCH SUCCESS CON ARRAY VACÍO, NO ERROR
+  dispatch({ 
+    type: "GET_REGISTRATION_PASSES_BY_BOOKING_SUCCESS", 
+    payload 
+  });
+  
+  return { 
+    success: true, // <-- AHORA ES TRUE
+    isNotFound: true, 
+    passengers: [],
+    message: 'No hay pasajeros registrados (normal para reservas nuevas)' 
+  };
+} else {
       // ⭐ ERRORES REALES
       console.error("❌ Error real al obtener pasajeros:", error.message);
       
