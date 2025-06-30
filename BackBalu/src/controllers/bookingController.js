@@ -2730,24 +2730,21 @@ const getAllBookings = async (req, res, next) => {
       },
       // 🔧 INCLUIR PAGOS - CORREGIDO SIN 'notes'
       {
-        model: Payment,
-        as: 'payments',
-        attributes: [
-          'paymentId', 
-          'amount', 
-          'paymentMethod', 
-          'paymentStatus', 
-          'paymentDate', 
-          'paymentType', 
-          'transactionId',
-          'paymentReference',
-          'processedBy' // ✅ USAR CAMPO QUE SÍ EXISTE
-        ],
-        where: {
-          paymentStatus: ['completed', 'pending']
-        },
-        required: false
-      },
+         model: Payment,
+  as: 'payments',
+  attributes: [
+    'paymentId', 
+    'amount', 
+    'paymentMethod', 
+    'paymentStatus', 
+    'paymentDate', 
+    'paymentType', 
+    'transactionId',
+    'paymentReference',
+    'processedBy'
+  ],
+  required: false
+},
       {
   model: RegistrationPass,
   as: "registrationPasses",
