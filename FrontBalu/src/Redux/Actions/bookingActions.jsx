@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 
 
 
-// CHECK AVAILABILITY
+
 export const checkAvailability = (params) => async (dispatch) => {
   console.log('🚀 [ACTION] checkAvailability started with params:', params);
   
