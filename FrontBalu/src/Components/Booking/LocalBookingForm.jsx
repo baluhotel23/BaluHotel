@@ -55,11 +55,7 @@ const CONFIRMATION_OPTIONS = [
 
 
 
-// =============================
-// COMPONENTES AUXILIARES
-// =============================
 
-// Modal mejorado con mejor UX
 const Modal = ({ children, isOpen, onClose, title }) => {
   if (!isOpen) return null;
   
@@ -83,7 +79,7 @@ const Modal = ({ children, isOpen, onClose, title }) => {
   );
 };
 
-// Formulario de registro de huéspedes optimizado
+
 const BuyerRegistrationForm = ({
   isOpen,
   onClose,
@@ -451,9 +447,7 @@ const BuyerRegistrationForm = ({
 function isTodayAfterLimit() {
   return !canBookToday();
 }
-// =============================
-// COMPONENTE PRINCIPAL
-// =============================
+
 const LocalBookingForm = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -520,11 +514,12 @@ const LocalBookingForm = () => {
   const availabilityError = errors.availability;
   
   const availableRooms = useMemo(() => {
-    if (!Array.isArray(availability) || isLoadingAvailability || availabilityError) {
-      return [];
-    }
-    return availability;
-  }, [availability, isLoadingAvailability, availabilityError]);
+  if (!Array.isArray(availability) || isLoadingAvailability || availabilityError) {
+    return [];
+  }
+  // Solo habitaciones marcadas como disponibles
+  return availability.filter(room => room.isAvailable);
+}, [availability, isLoadingAvailability, availabilityError]);
 
   const totalGuests = guestInfo.adults + guestInfo.children;
   
@@ -584,16 +579,15 @@ const LocalBookingForm = () => {
   // ⭐ HANDLERS PRINCIPALES
   const handleSearchAvailability = () => {
   const params = {
-    checkIn: searchParams.checkIn ? format(searchParams.checkIn, "yyyy-MM-dd") : undefined,
-    checkOut: searchParams.checkOut ? format(searchParams.checkOut, "yyyy-MM-dd") : undefined,
+    // ⭐ ENVIAR FECHAS CON HORAS ESPECÍFICAS TAMBIÉN PARA DISPONIBILIDAD
+    checkIn: searchParams.checkIn ? format(searchParams.checkIn, "yyyy-MM-dd") + 'T15:30:00-05:00' : undefined,
+    checkOut: searchParams.checkOut ? format(searchParams.checkOut, "yyyy-MM-dd") + 'T12:00:00-05:00' : undefined,
     roomType: searchParams.roomType || undefined,
   };
 
-  // ⭐ LOG DE ENTRADA
-  console.log("[LocalBookingForm.jsx][checkAvailability] Params:", params);
+  console.log("[LocalBookingForm.jsx][checkAvailability] Params with times:", params);
 
   dispatch(checkAvailability(params)).then((res) => {
-    // ⭐ LOG DE RESPUESTA
     console.log("[LocalBookingForm.jsx][checkAvailability] Response:", res);
   });
 };
@@ -665,19 +659,19 @@ const handleCreateBooking = useCallback(async () => {
     }
 
     const bookingData = {
-      roomNumber: selectedRoom.roomNumber,
-      checkIn: format(searchParams.checkIn, 'yyyy-MM-dd'),
-      checkOut: format(searchParams.checkOut, 'yyyy-MM-dd'),
-      guestId: guestInfo.buyerSdocno,
-      guestName: guestInfo.buyerName,
-      guestCount: totalGuests,
-      adults: guestInfo.adults,
-      children: guestInfo.children,
-      totalAmount: bookingState.totalAmount,
-      status: 'confirmed',
-      pointOfSale: 'Local'
-    };
-
+    roomNumber: selectedRoom.roomNumber,
+    // ⭐ FORMATO ESPECÍFICO CON TIMEZONE DE COLOMBIA
+    checkIn: format(searchParams.checkIn, 'yyyy-MM-dd') + 'T15:30:00-05:00',
+    checkOut: format(searchParams.checkOut, 'yyyy-MM-dd') + 'T12:00:00-05:00',
+    guestId: guestInfo.buyerSdocno,
+    guestName: guestInfo.buyerName,
+    guestCount: totalGuests,
+    adults: guestInfo.adults,
+    children: guestInfo.children,
+    totalAmount: bookingState.totalAmount,
+    status: 'confirmed',
+    pointOfSale: 'Local'
+  };
     try {
       const result = await dispatch(createBooking(bookingData));
       

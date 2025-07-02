@@ -8,7 +8,11 @@ const initialState = {
     checkOut: false,
     inventory: false,
     reports: false,
-    bills: false
+    bills: false,
+     checkInStatus: false,
+    inventoryStatus: false,
+    passengersStatus: false,
+    checkInProgress: false
   },
   
   // ⭐ DATOS PRINCIPALES
@@ -36,9 +40,31 @@ const initialState = {
     inventoryAssigned: [],
     inventoryReturned: [],
     laundryItems: [],
-    warnings: []
+    warnings: [],
+    // ⭐ NUEVOS CAMPOS PARA TRACKING DE CHECK-IN
+    checkInStatus: null, // Estado completo de check-in
+    inventoryTracking: {
+      verified: false,
+      verifiedAt: null,
+      delivered: false,
+      deliveredAt: null,
+      deliveredBy: null
+    },
+    passengersTracking: {
+      completed: false,
+      completedAt: null,
+      registeredCount: 0,
+      requiredCount: 0
+    },
+    progressTracking: {
+      inProgress: false,
+      startedAt: null,
+      readyAt: null,
+      allRequirementsMet: false,
+      completedSteps: [],
+      pendingSteps: []
+    }
   },
-  
  // ⭐ FACTURACIÓN
   bill: null,
   bills: [],
@@ -78,7 +104,11 @@ const initialState = {
     checkOut: null,
     inventory: null,
     reports: null,
-    bills: null
+    bills: null,
+    checkInStatus: null,
+    inventoryStatus: null,
+    passengersStatus: null,
+    checkInProgress: null
   },
   
   // ⭐ ESTADOS DE ÉXITO
@@ -692,6 +722,300 @@ const bookingReducer = (state = initialState, action) => {
         ...state, 
         loading: { ...state.loading, booking: false }, 
         errors: { ...state.errors, booking: action.payload }
+      };
+
+case 'GET_CHECKIN_STATUS_REQUEST':
+      console.log('🔄 [REDUCER] Getting check-in status...');
+      return {
+        ...state,
+        loading: { ...state.loading, checkInStatus: true },
+        errors: { ...state.errors, checkInStatus: null }
+      };
+
+    case 'GET_CHECKIN_STATUS_SUCCESS':
+      console.log('✅ [REDUCER] Check-in status retrieved:', action.payload);
+      return {
+        ...state,
+        loading: { ...state.loading, checkInStatus: false },
+        checkInOut: {
+          ...state.checkInOut,
+          checkInStatus: action.payload,
+          inventoryTracking: {
+            verified: action.payload.inventoryVerified || false,
+            verifiedAt: action.payload.inventoryVerifiedAt,
+            delivered: action.payload.inventoryDelivered || false,
+            deliveredAt: action.payload.inventoryDeliveredAt,
+            deliveredBy: action.payload.inventoryDeliveredBy
+          },
+          passengersTracking: {
+            completed: action.payload.passengersCompleted || false,
+            completedAt: action.payload.passengersCompletedAt,
+            registeredCount: action.payload.registeredPassengers || 0,
+            requiredCount: action.payload.requiredPassengers || 0
+          },
+          progressTracking: {
+            inProgress: action.payload.checkInProgress || false,
+            readyAt: action.payload.checkInReadyAt,
+            allRequirementsMet: action.payload.allRequirementsMet || false,
+            completedSteps: action.payload.completedSteps || [],
+            pendingSteps: action.payload.pendingSteps || []
+          }
+        },
+        errors: { ...state.errors, checkInStatus: null }
+      };
+
+    case 'GET_CHECKIN_STATUS_FAILURE':
+      console.error('❌ [REDUCER] Error getting check-in status:', action.payload);
+      return {
+        ...state,
+        loading: { ...state.loading, checkInStatus: false },
+        errors: { ...state.errors, checkInStatus: action.payload }
+      };
+
+    // UPDATE INVENTORY STATUS
+    case 'UPDATE_INVENTORY_STATUS_REQUEST':
+      console.log('🔄 [REDUCER] Updating inventory status...');
+      return {
+        ...state,
+        loading: { ...state.loading, inventoryStatus: true },
+        errors: { ...state.errors, inventoryStatus: null }
+      };
+
+    case 'UPDATE_INVENTORY_STATUS_SUCCESS':
+      console.log('✅ [REDUCER] Inventory status updated:', action.payload);
+      return {
+        ...state,
+        loading: { ...state.loading, inventoryStatus: false },
+        checkInOut: {
+          ...state.checkInOut,
+          inventoryTracking: {
+            ...state.checkInOut.inventoryTracking,
+            verified: action.payload.inventoryVerified || state.checkInOut.inventoryTracking.verified,
+            verifiedAt: action.payload.inventoryVerifiedAt || state.checkInOut.inventoryTracking.verifiedAt,
+            delivered: action.payload.inventoryDelivered || state.checkInOut.inventoryTracking.delivered,
+            deliveredAt: action.payload.inventoryDeliveredAt || state.checkInOut.inventoryTracking.deliveredAt,
+            deliveredBy: action.payload.inventoryDeliveredBy || state.checkInOut.inventoryTracking.deliveredBy
+          }
+        },
+        success: { message: 'Estado de inventario actualizado', type: 'update' },
+        errors: { ...state.errors, inventoryStatus: null }
+      };
+
+    case 'UPDATE_INVENTORY_STATUS_FAILURE':
+      console.error('❌ [REDUCER] Error updating inventory status:', action.payload);
+      return {
+        ...state,
+        loading: { ...state.loading, inventoryStatus: false },
+        errors: { ...state.errors, inventoryStatus: action.payload }
+      };
+
+    // UPDATE PASSENGERS STATUS
+    case 'UPDATE_PASSENGERS_STATUS_REQUEST':
+      console.log('🔄 [REDUCER] Updating passengers status...');
+      return {
+        ...state,
+        loading: { ...state.loading, passengersStatus: true },
+        errors: { ...state.errors, passengersStatus: null }
+      };
+
+    case 'UPDATE_PASSENGERS_STATUS_SUCCESS':
+      console.log('✅ [REDUCER] Passengers status updated:', action.payload);
+      return {
+        ...state,
+        loading: { ...state.loading, passengersStatus: false },
+        checkInOut: {
+          ...state.checkInOut,
+          passengersTracking: {
+            completed: action.payload.passengersCompleted || false,
+            completedAt: action.payload.passengersCompletedAt,
+            registeredCount: action.payload.registeredCount || 0,
+            requiredCount: action.payload.requiredCount || 0
+          },
+          progressTracking: {
+            ...state.checkInOut.progressTracking,
+            allRequirementsMet: action.payload.isReadyForCheckIn || false,
+            readyAt: action.payload.checkInReadyAt || state.checkInOut.progressTracking.readyAt
+          }
+        },
+        success: { message: 'Estado de pasajeros actualizado', type: 'update' },
+        errors: { ...state.errors, passengersStatus: null }
+      };
+
+    case 'UPDATE_PASSENGERS_STATUS_FAILURE':
+      console.error('❌ [REDUCER] Error updating passengers status:', action.payload);
+      return {
+        ...state,
+        loading: { ...state.loading, passengersStatus: false },
+        errors: { ...state.errors, passengersStatus: action.payload }
+      };
+
+    // UPDATE CHECK-IN PROGRESS
+    case 'UPDATE_CHECKIN_PROGRESS_REQUEST':
+      console.log('🔄 [REDUCER] Updating check-in progress...');
+      return {
+        ...state,
+        loading: { ...state.loading, checkInProgress: true },
+        errors: { ...state.errors, checkInProgress: null }
+      };
+
+    case 'UPDATE_CHECKIN_PROGRESS_SUCCESS':
+      console.log('✅ [REDUCER] Check-in progress updated:', action.payload);
+      return {
+        ...state,
+        loading: { ...state.loading, checkInProgress: false },
+        checkInOut: {
+          ...state.checkInOut,
+          progressTracking: {
+            ...state.checkInOut.progressTracking,
+            inProgress: action.payload.checkInProgress || false,
+            startedAt: action.payload.checkInStartedAt || state.checkInOut.progressTracking.startedAt
+          },
+          currentOperation: action.payload.checkInProgress ? 'check-in' : null
+        },
+        success: { 
+          message: action.payload.checkInProgress ? 'Check-in iniciado' : 'Check-in detenido', 
+          type: 'update' 
+        },
+        errors: { ...state.errors, checkInProgress: null }
+      };
+
+    case 'UPDATE_CHECKIN_PROGRESS_FAILURE':
+      console.error('❌ [REDUCER] Error updating check-in progress:', action.payload);
+      return {
+        ...state,
+        loading: { ...state.loading, checkInProgress: false },
+        errors: { ...state.errors, checkInProgress: action.payload }
+      };
+
+    // CHECK ALL CHECK-IN REQUIREMENTS
+    case 'CHECK_CHECKIN_REQUIREMENTS_REQUEST':
+      console.log('🔄 [REDUCER] Checking all check-in requirements...');
+      return {
+        ...state,
+        loading: { ...state.loading, checkInStatus: true },
+        errors: { ...state.errors, checkInStatus: null }
+      };
+
+    case 'CHECK_CHECKIN_REQUIREMENTS_SUCCESS':
+      console.log('✅ [REDUCER] Check-in requirements checked:', action.payload);
+      return {
+        ...state,
+        loading: { ...state.loading, checkInStatus: false },
+        checkInOut: {
+          ...state.checkInOut,
+          progressTracking: {
+            ...state.checkInOut.progressTracking,
+            allRequirementsMet: action.payload.allRequirementsMet || false,
+            completedSteps: action.payload.completedSteps || [],
+            pendingSteps: action.payload.pendingSteps || []
+          }
+        },
+        success: { 
+          message: action.payload.allRequirementsMet 
+            ? 'Todos los requisitos completos' 
+            : `Faltan ${action.payload.pendingSteps?.length || 0} pasos`, 
+          type: 'update' 
+        },
+        errors: { ...state.errors, checkInStatus: null }
+      };
+
+    case 'CHECK_CHECKIN_REQUIREMENTS_FAILURE':
+      console.error('❌ [REDUCER] Error checking check-in requirements:', action.payload);
+      return {
+        ...state,
+        loading: { ...state.loading, checkInStatus: false },
+        errors: { ...state.errors, checkInStatus: action.payload }
+      };
+
+    // ⭐ HELPER ACTIONS PARA ACTUALIZAR BOOKING EN LA LISTA
+    case 'UPDATE_BOOKING_INVENTORY_TRACKING':
+      console.log('🔄 [REDUCER] Updating booking inventory tracking in list...');
+      return {
+        ...state,
+        bookings: state.bookings.map(booking => 
+          booking.bookingId === action.payload.bookingId
+            ? {
+                ...booking,
+                checkInTracking: {
+                  ...booking.checkInTracking,
+                  ...action.payload.inventoryData
+                }
+              }
+            : booking
+        )
+      };
+
+    case 'UPDATE_BOOKING_PASSENGERS_TRACKING':
+      console.log('🔄 [REDUCER] Updating booking passengers tracking in list...');
+      return {
+        ...state,
+        bookings: state.bookings.map(booking => 
+          booking.bookingId === action.payload.bookingId
+            ? {
+                ...booking,
+                checkInTracking: {
+                  ...booking.checkInTracking,
+                  ...action.payload.passengersData
+                }
+              }
+            : booking
+        )
+      };
+
+    case 'UPDATE_BOOKING_CHECKIN_PROGRESS':
+      console.log('🔄 [REDUCER] Updating booking check-in progress in list...');
+      return {
+        ...state,
+        bookings: state.bookings.map(booking => 
+          booking.bookingId === action.payload.bookingId
+            ? {
+                ...booking,
+                checkInTracking: {
+                  ...booking.checkInTracking,
+                  ...action.payload.progressData
+                }
+              }
+            : booking
+        )
+      };
+
+    // ⭐ RESET CHECK-IN TRACKING (útil para limpiar estado)
+    case 'RESET_CHECKIN_TRACKING':
+      console.log('🔄 [REDUCER] Resetting check-in tracking...');
+      return {
+        ...state,
+        checkInOut: {
+          ...state.checkInOut,
+          checkInStatus: null,
+          inventoryTracking: {
+            verified: false,
+            verifiedAt: null,
+            delivered: false,
+            deliveredAt: null,
+            deliveredBy: null
+          },
+          passengersTracking: {
+            completed: false,
+            completedAt: null,
+            registeredCount: 0,
+            requiredCount: 0
+          },
+          progressTracking: {
+            inProgress: false,
+            startedAt: null,
+            readyAt: null,
+            allRequirementsMet: false,
+            completedSteps: [],
+            pendingSteps: []
+          }
+        },
+        errors: {
+          ...state.errors,
+          checkInStatus: null,
+          inventoryStatus: null,
+          passengersStatus: null,
+          checkInProgress: null
+        }
       };
 
     default:

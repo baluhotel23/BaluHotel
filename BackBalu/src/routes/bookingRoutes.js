@@ -25,7 +25,11 @@ const {
     updateOnlinePayment,
     getAllBills,
     getBookingInventoryStatus,
-    getInventoryUsageReport
+    getInventoryUsageReport,
+      updateInventoryStatus,
+    updatePassengersStatus,
+    getCheckInStatus,
+    updateCheckInProgress
 } = require('../controllers/bookingController');
 
 // Rutas públicas (no requieren autenticación)
@@ -74,4 +78,9 @@ router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyRep
 router.get('/reports/revenue', allowRoles(['owner', 'admin']), getRevenueReport);
 router.get('/reports/inventory-usage', allowRoles(['owner', 'admin']), getInventoryUsageReport);
 
+
+router.get('/:bookingId/checkin-status', getCheckInStatus);
+router.put('/:bookingId/inventory-status', updateInventoryStatus);
+router.put('/:bookingId/passengers-status', updatePassengersStatus);
+router.put('/:bookingId/checkin-progress', updateCheckInProgress);
 module.exports = router;

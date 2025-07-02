@@ -18,7 +18,7 @@ module.exports = (sequelize) => {
     },
     status: {
       type: DataTypes.ENUM,
-      values: ['pending', 'confirmed', 'paid', 'checked-in', 'completed', 'advanced', 'cancelled', 'no_show_cancelled'], // ⭐ AGREGAR 'paid'
+      values: ['pending', 'confirmed', 'paid', 'checked-in', 'completed', 'advanced', 'cancelled', 'no_show_cancelled'],
       defaultValue: 'pending'
     },
     pointOfSale: {
@@ -51,7 +51,7 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
-    // ⭐ NUEVOS CAMPOS PARA DISTINGUIR PROCESOS
+    // ⭐ CAMPOS EXISTENTES PARA DISTINGUIR PROCESOS
     paymentCompletedAt: {
       type: DataTypes.DATE,
       allowNull: true,
@@ -66,6 +66,61 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true,
       comment: 'Timestamp real cuando se completó el check-out físico'
+    },
+    
+    // ⭐ NUEVOS CAMPOS PARA TRACKING DE ESTADOS DE CHECK-IN
+    inventoryVerified: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: 'Indica si el inventario básico fue verificado y cargado'
+    },
+    
+    inventoryVerifiedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Fecha y hora cuando se verificó el inventario'
+    },
+    
+    inventoryDelivered: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: 'Indica si el inventario básico fue entregado al huésped'
+    },
+    
+    inventoryDeliveredAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Fecha y hora cuando se entregó el inventario'
+    },
+    
+    inventoryDeliveredBy: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Usuario que entregó el inventario básico'
+    },
+    
+    passengersCompleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: 'Indica si todos los pasajeros requeridos están registrados'
+    },
+    
+    passengersCompletedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Fecha y hora cuando se completó el registro de todos los pasajeros'
+    },
+    
+    checkInReadyAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Fecha y hora cuando la reserva cumplió todos los requisitos para check-in'
+    },
+    
+    checkInProgress: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: 'Indica si la reserva está en proceso de check-in'
     }
   }, {
     timestamps: true,

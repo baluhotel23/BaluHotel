@@ -1,26 +1,25 @@
-
-const { 
-  Booking, 
-  Room, 
-  Buyer, 
-  ExtraCharge, 
+const {
+  Booking,
+  Room,
+  Buyer,
+  ExtraCharge,
   Service,
-  Bill, 
-  Payment, 
+  Bill,
+  Payment,
   RegistrationPass,
   BasicInventory,
   BookingInventoryUsage,
-  RoomBasics
-} = require('../data');
-const { Op } = require('sequelize');
-const { CustomError } = require('../middleware/error');
+  RoomBasics,
+} = require("../data");
+const { Op } = require("sequelize");
+const { CustomError } = require("../middleware/error");
 const jwt = require("jsonwebtoken");
 const PDFDocument = require("pdfkit");
 
-const { 
-  getColombiaTime, 
-  getColombiaDate, 
-  formatColombiaDate, 
+const {
+  getColombiaTime,
+  getColombiaDate,
+  formatColombiaDate,
   formatForLogs,
   formatForDetailedLogs,
   formatForDisplay,
@@ -31,15 +30,14 @@ const {
   validateCheckInTime,
   validateCheckOutTime,
   getHotelSchedule,
-  isValidDate
-} = require('../utils/dateUtils');
-
+  isValidDate,
+} = require("../utils/dateUtils");
 
 const getHotelScheduleEndpoint = async (req, res) => {
   try {
     const schedule = getHotelSchedule();
     const now = getColombiaTime();
-    
+
     res.json({
       error: false,
       message: "Horarios del hotel obtenidos exitosamente",
@@ -49,35 +47,35 @@ const getHotelScheduleEndpoint = async (req, res) => {
           hour: schedule.checkIn.hour,
           minute: schedule.checkIn.minute,
           description: "Horario de entrada a las habitaciones",
-          available: now >= schedule.checkIn.datetime
+          available: now >= schedule.checkIn.datetime,
         },
         checkOut: {
           time: schedule.checkOut.time,
           hour: schedule.checkOut.hour,
           minute: schedule.checkOut.minute,
           description: "Horario límite para salida de las habitaciones",
-          available: now <= schedule.checkOut.datetime
+          available: now <= schedule.checkOut.datetime,
         },
         currentTime: {
           formatted: formatForDisplay(now),
           time24h: formatForLogs(now),
           timezone: schedule.timezone,
-          isoString: now.toISO()
+          isoString: now.toISO(),
         },
         availability: {
           canCheckInNow: now >= schedule.checkIn.datetime,
           canCheckOutNow: now <= schedule.checkOut.datetime,
-          isBusinessHours: now.hour >= 6 && now.hour <= 22
-        }
+          isBusinessHours: now.hour >= 6 && now.hour <= 22,
+        },
       },
-      timestamp: now.toISO()
+      timestamp: now.toISO(),
     });
   } catch (error) {
-    console.error('❌ Error obteniendo horarios del hotel:', error);
+    console.error("❌ Error obteniendo horarios del hotel:", error);
     res.status(500).json({
       error: true,
-      message: 'Error al obtener horarios del hotel',
-      details: error.message
+      message: "Error al obtener horarios del hotel",
+      details: error.message,
     });
   }
 };
@@ -87,7 +85,15 @@ const getHotelScheduleEndpoint = async (req, res) => {
 const checkAvailability = async (req, res) => {
   try {
     const { checkIn, checkOut, roomType } = req.query;
-    console.log('🔍 checkAvailability called with:', { checkIn, checkOut, roomType });
+    console.log("🔍 checkAvailability called with:", {
+      checkIn,
+      checkOut,
+      roomType,
+    });
+
+    // ⭐ DECLARAR CONSTANTES AL INICIO
+    const CHECK_OUT_HOUR = 12, CHECK_OUT_MIN = 0;
+    const CHECK_IN_HOUR = 15, CHECK_IN_MIN = 30;
 
     const where = {};
     if (roomType) where.type = roomType;
@@ -97,25 +103,25 @@ const checkAvailability = async (req, res) => {
       include: [
         {
           model: Booking,
-          as: 'bookings',
+          as: "bookings",
           attributes: ["bookingId", "checkIn", "checkOut", "status"],
           required: false,
         },
         {
           model: Service,
-          as: 'Services',
+          as: "Services",
           through: { attributes: [] },
         },
         {
           model: BasicInventory,
-          as: 'BasicInventories',
-          attributes: ['id', 'name', 'inventoryType'],
-          through: { 
-            attributes: ['quantity'],
-            as: 'RoomBasics'
+          as: "BasicInventories",
+          attributes: ["id", "name", "inventoryType"],
+          through: {
+            attributes: ["quantity"],
+            as: "RoomBasics",
           },
-          required: false
-        }
+          required: false,
+        },
       ],
     });
 
@@ -134,49 +140,77 @@ const checkAvailability = async (req, res) => {
       // 1. Verificar estado de la habitación
       if (!room.isActive) {
         isAvailable = false;
-        unavailabilityReason = 'Room not active';
+        unavailabilityReason = "Room not active";
         console.log(`🚫 Room ${room.roomNumber}: Not active`);
       }
       // 2. Estados que impiden reservas
-      else if (['Mantenimiento'].includes(room.status)) {
+      else if (["Mantenimiento"].includes(room.status)) {
         isAvailable = false;
         unavailabilityReason = `Room status: ${room.status}`;
-        console.log(`🚫 Room ${room.roomNumber}: Status ${room.status} prevents booking`);
+        console.log(
+          `🚫 Room ${room.roomNumber}: Status ${room.status} prevents booking`
+        );
       }
       // 3. Verificar conflictos de fechas
-      else if (checkIn && checkOut && isValidDate(checkIn) && isValidDate(checkOut)) {
-        const requestStart = toColombiaTime(checkIn);
-        const requestEnd = toColombiaTime(checkOut);
+      else if (
+        checkIn &&
+        checkOut &&
+        isValidDate(checkIn) &&
+        isValidDate(checkOut)
+      ) {
+     const CHECK_OUT_HOUR = 12, CHECK_OUT_MIN = 0;
+const CHECK_IN_HOUR = 15, CHECK_IN_MIN = 30;
 
-        const hasDateConflict = activeBookings.some((booking) => {
-          const bookingStart = toColombiaTime(booking.checkIn);
-          const bookingEnd = toColombiaTime(booking.checkOut);
-          // Solo hay conflicto si los rangos se solapan
-          return (bookingStart < requestEnd && bookingEnd > requestStart);
-        });
+const hasDateConflict = activeBookings.some((booking) => {
+  const bookingStart = toColombiaTime(booking.checkIn).set({ hour: CHECK_IN_HOUR, minute: CHECK_IN_MIN, second: 0, millisecond: 0 });
+  const bookingEnd = toColombiaTime(booking.checkOut).set({ hour: CHECK_OUT_HOUR, minute: CHECK_OUT_MIN, second: 0, millisecond: 0 });
+
+  const requestedStart = toColombiaTime(checkIn).set({ hour: CHECK_IN_HOUR, minute: CHECK_IN_MIN, second: 0, millisecond: 0 });
+  const requestedEnd = toColombiaTime(checkOut).set({ hour: CHECK_OUT_HOUR, minute: CHECK_OUT_MIN, second: 0, millisecond: 0 });
+
+  // Solo hay conflicto si los rangos se solapan estrictamente
+  const conflict = (bookingStart < requestedEnd && bookingEnd > requestedStart);
+
+  if (conflict) {
+    console.log(
+      "⚠️ [CREATE-BOOKING] Date conflict detected with booking:",
+      {
+        conflictingBookingId: booking.bookingId,
+        existingCheckIn: formatColombiaDate(bookingStart),
+        existingCheckOut: formatColombiaDate(bookingEnd),
+        requestedCheckIn: formatColombiaDate(requestedStart),
+        requestedCheckOut: formatColombiaDate(requestedEnd),
+      }
+    );
+  }
+
+  return conflict;
+});
 
         if (hasDateConflict) {
           isAvailable = false;
-          unavailabilityReason = 'Date conflict with existing booking';
+          unavailabilityReason = "Date conflict with existing booking";
           console.log(`🚫 Room ${room.roomNumber}: Date conflict`);
         }
       }
 
       // ⭐ SOLO bloquear por "Ocupada" si la habitación está ocupada AHORA MISMO
       if (
-        room.status === 'Ocupada' &&
-        activeBookings.some(booking => {
+        room.status === "Ocupada" &&
+        activeBookings.some((booking) => {
           const bookingStart = toColombiaTime(booking.checkIn);
           const bookingEnd = toColombiaTime(booking.checkOut);
           return now >= bookingStart && now < bookingEnd;
         })
       ) {
         isAvailable = false;
-        unavailabilityReason = 'Room is currently occupied (now)';
+        unavailabilityReason = "Room is currently occupied (now)";
         console.log(`🚫 Room ${room.roomNumber}: Currently occupied (now)`);
       }
 
-      console.log(`🏨 Room ${room.roomNumber}: available=${room.available}, status=${room.status}, isAvailable=${isAvailable}`);
+      console.log(
+        `🏨 Room ${room.roomNumber}: available=${room.available}, status=${room.status}, isAvailable=${isAvailable}`
+      );
 
       const bookedDates = activeBookings.map((booking) => ({
         checkIn: booking.checkIn,
@@ -205,15 +239,27 @@ const checkAvailability = async (req, res) => {
         isAvailable,
         bookedDates,
         currentBookings: activeBookings.length,
-        availabilityReason: isAvailable ? 'Available for booking' : unavailabilityReason
+        availabilityReason: isAvailable
+          ? "Available for booking"
+          : unavailabilityReason,
       };
     });
 
-    console.log(`✅ Processed ${roomsWithAvailability.length} rooms with availability`);
-    console.log(`🏠 Available rooms: ${roomsWithAvailability.filter(r => r.isAvailable).length}`);
-    
-    roomsWithAvailability.forEach(room => {
-      console.log(`🏨 Room ${room.roomNumber}: ${room.isAvailable ? '✅ AVAILABLE' : '❌ NOT AVAILABLE'} - ${room.availabilityReason}`);
+    console.log(
+      `✅ Processed ${roomsWithAvailability.length} rooms with availability`
+    );
+    console.log(
+      `🏠 Available rooms: ${
+        roomsWithAvailability.filter((r) => r.isAvailable).length
+      }`
+    );
+
+    roomsWithAvailability.forEach((room) => {
+      console.log(
+        `🏨 Room ${room.roomNumber}: ${
+          room.isAvailable ? "✅ AVAILABLE" : "❌ NOT AVAILABLE"
+        } - ${room.availabilityReason}`
+      );
     });
 
     res.json({
@@ -222,7 +268,7 @@ const checkAvailability = async (req, res) => {
       data: roomsWithAvailability,
     });
   } catch (error) {
-    console.error('❌ Error in checkAvailability:', error);
+    console.error("❌ Error in checkAvailability:", error);
     res.status(500).json({
       error: true,
       message: "Error al consultar disponibilidad",
@@ -230,8 +276,6 @@ const checkAvailability = async (req, res) => {
     });
   }
 };
-
-
 
 const getRoomTypes = async (req, res) => {
   try {
@@ -245,7 +289,7 @@ const getRoomTypes = async (req, res) => {
       data: types,
     });
   } catch (error) {
-    console.error('❌ Error in getRoomTypes:', error);
+    console.error("❌ Error in getRoomTypes:", error);
     res.status(500).json({
       error: true,
       message: "Error al obtener tipos de habitación",
@@ -257,14 +301,25 @@ const getRoomTypes = async (req, res) => {
 // Client and staff endpoints
 const createBooking = async (req, res, next) => {
   try {
-    console.log('🚀 [CREATE-BOOKING] Starting createBooking process...');
-    console.log('🇨🇴 [CREATE-BOOKING] Server time Colombia:', formatForLogs(getColombiaTime()));
-    console.log('📥 [CREATE-BOOKING] Request body:', JSON.stringify(req.body, null, 2));
-    console.log('👤 [CREATE-BOOKING] Request user:', req.user ? {
-      n_document: req.user.n_document,
-      role: req.user.role,
-      email: req.user.email
-    } : 'No user');
+    console.log("🚀 [CREATE-BOOKING] Starting createBooking process...");
+    console.log(
+      "🇨🇴 [CREATE-BOOKING] Server time Colombia:",
+      formatForLogs(getColombiaTime())
+    );
+    console.log(
+      "📥 [CREATE-BOOKING] Request body:",
+      JSON.stringify(req.body, null, 2)
+    );
+    console.log(
+      "👤 [CREATE-BOOKING] Request user:",
+      req.user
+        ? {
+            n_document: req.user.n_document,
+            role: req.user.role,
+            email: req.user.email,
+          }
+        : "No user"
+    );
 
     const {
       guestId,
@@ -274,14 +329,14 @@ const createBooking = async (req, res, next) => {
       guestCount,
       totalPrice,
       totalAmount,
-      status = 'confirmed',
+      status = "confirmed",
       notes,
       verifyInventory = true,
       forceCreate = false,
-      pointOfSale = 'Online'
+      pointOfSale = "Online",
     } = req.body;
 
-    console.log('📋 [CREATE-BOOKING] Extracted fields:', {
+    console.log("📋 [CREATE-BOOKING] Extracted fields:", {
       guestId,
       roomNumber,
       checkIn,
@@ -292,281 +347,312 @@ const createBooking = async (req, res, next) => {
       status,
       pointOfSale,
       verifyInventory,
-      forceCreate
+      forceCreate,
     });
 
     // ⭐ VALIDACIONES BÁSICAS MEJORADAS CON LOGS
-    console.log('🔍 [CREATE-BOOKING] Starting validations...');
-    
+    console.log("🔍 [CREATE-BOOKING] Starting validations...");
+
     if (!guestId) {
-      console.log('❌ [CREATE-BOOKING] Missing guestId');
+      console.log("❌ [CREATE-BOOKING] Missing guestId");
       return res.status(400).json({
         error: true,
-        message: 'Campo requerido faltante: guestId'
-      });
-    }
-    
-    if (!roomNumber) {
-      console.log('❌ [CREATE-BOOKING] Missing roomNumber');
-      return res.status(400).json({
-        error: true,
-        message: 'Campo requerido faltante: roomNumber'
-      });
-    }
-    
-    if (!checkIn) {
-      console.log('❌ [CREATE-BOOKING] Missing checkIn');
-      return res.status(400).json({
-        error: true,
-        message: 'Campo requerido faltante: checkIn'
-      });
-    }
-    
-    if (!checkOut) {
-      console.log('❌ [CREATE-BOOKING] Missing checkOut');
-      return res.status(400).json({
-        error: true,
-        message: 'Campo requerido faltante: checkOut'
-      });
-    }
-    
-    if (!guestCount) {
-      console.log('❌ [CREATE-BOOKING] Missing guestCount');
-      return res.status(400).json({
-        error: true,
-        message: 'Campo requerido faltante: guestCount'
+        message: "Campo requerido faltante: guestId",
       });
     }
 
-    console.log('✅ [CREATE-BOOKING] Basic validations passed');
+    if (!roomNumber) {
+      console.log("❌ [CREATE-BOOKING] Missing roomNumber");
+      return res.status(400).json({
+        error: true,
+        message: "Campo requerido faltante: roomNumber",
+      });
+    }
+
+    if (!checkIn) {
+      console.log("❌ [CREATE-BOOKING] Missing checkIn");
+      return res.status(400).json({
+        error: true,
+        message: "Campo requerido faltante: checkIn",
+      });
+    }
+
+    if (!checkOut) {
+      console.log("❌ [CREATE-BOOKING] Missing checkOut");
+      return res.status(400).json({
+        error: true,
+        message: "Campo requerido faltante: checkOut",
+      });
+    }
+
+    if (!guestCount) {
+      console.log("❌ [CREATE-BOOKING] Missing guestCount");
+      return res.status(400).json({
+        error: true,
+        message: "Campo requerido faltante: guestCount",
+      });
+    }
+
+    console.log("✅ [CREATE-BOOKING] Basic validations passed");
 
     // ⭐ VALIDAR FECHAS CON UTILIDADES DE COLOMBIA - CORREGIDO
-    console.log('📅 [CREATE-BOOKING] Validating dates...');
-    
+    console.log("📅 [CREATE-BOOKING] Validating dates...");
+
     // 🔧 CONVERTIR A OBJETOS Date NATIVOS PARA EVITAR ERRORES
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
     const today = getColombiaTime(); // Esto retorna un DateTime de Luxon
 
-    console.log('📅 [CREATE-BOOKING] Date objects:', {
+    console.log("📅 [CREATE-BOOKING] Date objects:", {
       checkInDate: checkInDate.toISOString(),
       checkOutDate: checkOutDate.toISOString(),
       // 🔧 CORREGIR: Usar .toISO() para objetos DateTime de Luxon
       today: today.toISO(), // ✅ CORRECCIÓN
       todayFormatted: formatForLogs(today),
       checkInFormatted: formatColombiaDate(checkInDate),
-      checkOutFormatted: formatColombiaDate(checkOutDate)
+      checkOutFormatted: formatColombiaDate(checkOutDate),
     });
 
     if (checkInDate >= checkOutDate) {
-      console.log('❌ [CREATE-BOOKING] Invalid date range - checkIn >= checkOut');
+      console.log(
+        "❌ [CREATE-BOOKING] Invalid date range - checkIn >= checkOut"
+      );
       return res.status(400).json({
         error: true,
-        message: 'La fecha de check-out debe ser posterior al check-in'
+        message: "La fecha de check-out debe ser posterior al check-in",
       });
     }
 
     // ⭐ USAR UTILIDAD PARA COMPARAR FECHAS - CORREGIDO
     if (isBeforeToday(checkInDate)) {
-      console.log('❌ [CREATE-BOOKING] Invalid checkIn date - in the past');
-      console.log('📅 [CREATE-BOOKING] Date comparison Colombia:', {
+      console.log("❌ [CREATE-BOOKING] Invalid checkIn date - in the past");
+      console.log("📅 [CREATE-BOOKING] Date comparison Colombia:", {
         checkInFormatted: formatColombiaDate(checkInDate),
         todayFormatted: formatForLogs(today), // Ya está formateado correctamente
-        isPast: isBeforeToday(checkInDate)
+        isPast: isBeforeToday(checkInDate),
       });
       return res.status(400).json({
         error: true,
-        message: 'La fecha de check-in no puede ser anterior a hoy'
+        message: "La fecha de check-in no puede ser anterior a hoy",
       });
     }
 
-    console.log('✅ [CREATE-BOOKING] Date validations passed');
+    console.log("✅ [CREATE-BOOKING] Date validations passed");
 
     // ⭐ VERIFICAR QUE EL HUÉSPED EXISTE CON LOGS
-    console.log('👤 [CREATE-BOOKING] Looking for guest with ID:', guestId);
+    console.log("👤 [CREATE-BOOKING] Looking for guest with ID:", guestId);
     const guest = await Buyer.findByPk(guestId);
-    
+
     if (!guest) {
-      console.log('❌ [CREATE-BOOKING] Guest not found with ID:', guestId);
+      console.log("❌ [CREATE-BOOKING] Guest not found with ID:", guestId);
       return res.status(404).json({
         error: true,
-        message: `Huésped no encontrado con ID: ${guestId}`
+        message: `Huésped no encontrado con ID: ${guestId}`,
       });
     }
-    
-    console.log('✅ [CREATE-BOOKING] Guest found:', {
+
+    console.log("✅ [CREATE-BOOKING] Guest found:", {
       sdocno: guest.sdocno,
-      name: guest.scostumername
+      name: guest.scostumername,
     });
 
     // ⭐ VERIFICAR QUE LA HABITACIÓN EXISTE CON LOGS DETALLADOS
-    console.log('🏨 [CREATE-BOOKING] Looking for room:', roomNumber);
-    
+    console.log("🏨 [CREATE-BOOKING] Looking for room:", roomNumber);
+
     const room = await Room.findByPk(roomNumber, {
       include: [
         {
           model: BasicInventory,
-          as: 'BasicInventories',
-          attributes: ['id', 'name', 'inventoryType', 'currentStock', 'cleanStock', 'minStock'],
-          through: { 
-            attributes: ['quantity', 'isRequired'],
-            as: 'RoomBasics'
-          }
+          as: "BasicInventories",
+          attributes: [
+            "id",
+            "name",
+            "inventoryType",
+            "currentStock",
+            "cleanStock",
+            "minStock",
+          ],
+          through: {
+            attributes: ["quantity", "isRequired"],
+            as: "RoomBasics",
+          },
         },
         {
           model: Booking,
-          as: 'bookings',
-          attributes: ['bookingId', 'checkIn', 'checkOut', 'status'],
-          required: false
-        }
-      ]
+          as: "bookings",
+          attributes: ["bookingId", "checkIn", "checkOut", "status"],
+          required: false,
+        },
+      ],
     });
 
     if (!room) {
-      console.log('❌ [CREATE-BOOKING] Room not found:', roomNumber);
+      console.log("❌ [CREATE-BOOKING] Room not found:", roomNumber);
       return res.status(404).json({
         error: true,
-        message: `Habitación no encontrada: ${roomNumber}`
+        message: `Habitación no encontrada: ${roomNumber}`,
       });
     }
 
-    console.log('✅ [CREATE-BOOKING] Room found:', {
+    console.log("✅ [CREATE-BOOKING] Room found:", {
       roomNumber: room.roomNumber,
       type: room.type,
       status: room.status,
       isActive: room.isActive,
       available: room.available,
       maxGuests: room.maxGuests,
-      existingBookings: room.bookings ? room.bookings.length : 0
+      existingBookings: room.bookings ? room.bookings.length : 0,
     });
 
     // ⭐ VERIFICAR QUE LA HABITACIÓN ESTÉ ACTIVA
     if (!room.isActive) {
-      console.log('❌ [CREATE-BOOKING] Room is not active:', roomNumber);
+      console.log("❌ [CREATE-BOOKING] Room is not active:", roomNumber);
       return res.status(400).json({
         error: true,
-        message: `La habitación ${roomNumber} no está activa`
+        message: `La habitación ${roomNumber} no está activa`,
       });
     }
 
-    console.log('✅ [CREATE-BOOKING] Room is active');
+    console.log("✅ [CREATE-BOOKING] Room is active");
 
     // ⭐ VERIFICAR DISPONIBILIDAD DE FECHAS CON LOGS DETALLADOS
-    console.log('📅 [CREATE-BOOKING] Checking date conflicts...');
-    
+    console.log("📅 [CREATE-BOOKING] Checking date conflicts...");
+
     const activeBookings = (room.bookings || []).filter(
-      booking => booking.status !== 'cancelled'
+      (booking) => booking.status !== "cancelled"
     );
 
-    console.log('📅 [CREATE-BOOKING] Active bookings for room:', activeBookings.map(b => ({
-      bookingId: b.bookingId,
-      checkIn: formatColombiaDate(b.checkIn),
-      checkOut: formatColombiaDate(b.checkOut),
-      status: b.status
-    })));
+    console.log(
+      "📅 [CREATE-BOOKING] Active bookings for room:",
+      activeBookings.map((b) => ({
+        bookingId: b.bookingId,
+        checkIn: formatColombiaDate(b.checkIn),
+        checkOut: formatColombiaDate(b.checkOut),
+        status: b.status,
+      }))
+    );
 
-    const hasDateConflict = activeBookings.some(booking => {
+    const hasDateConflict = activeBookings.some((booking) => {
       const bookingStart = new Date(booking.checkIn);
       const bookingEnd = new Date(booking.checkOut);
-      
-      const conflict = (
+
+      const conflict =
         (bookingStart <= checkOutDate && bookingEnd >= checkInDate) ||
-        (checkInDate <= bookingEnd && checkOutDate >= bookingStart)
-      );
-      
+        (checkInDate <= bookingEnd && checkOutDate >= bookingStart);
+
+
       if (conflict) {
-        console.log('⚠️ [CREATE-BOOKING] Date conflict detected with booking:', {
-          conflictingBookingId: booking.bookingId,
-          existingCheckIn: formatColombiaDate(bookingStart),
-          existingCheckOut: formatColombiaDate(bookingEnd),
-          requestedCheckIn: formatColombiaDate(checkInDate),
-          requestedCheckOut: formatColombiaDate(checkOutDate)
-        });
+        console.log(
+          "⚠️ [CREATE-BOOKING] Date conflict detected with booking:",
+          {
+            conflictingBookingId: booking.bookingId,
+            existingCheckIn: formatColombiaDate(bookingStart),
+            existingCheckOut: formatColombiaDate(bookingEnd),
+            requestedCheckIn: formatColombiaDate(checkInDate),
+            requestedCheckOut: formatColombiaDate(checkOutDate),
+          }
+        );
       }
-      
+
       return conflict;
     });
 
     if (hasDateConflict) {
-      console.log('❌ [CREATE-BOOKING] Date conflict found');
+      console.log("❌ [CREATE-BOOKING] Date conflict found");
       return res.status(400).json({
         error: true,
-        message: 'La habitación no está disponible en las fechas seleccionadas',
+        message: "La habitación no está disponible en las fechas seleccionadas",
         data: {
-          conflictingBookings: activeBookings.map(b => ({
+          conflictingBookings: activeBookings.map((b) => ({
             bookingId: b.bookingId,
             checkIn: b.checkIn,
             checkOut: b.checkOut,
-            status: b.status
-          }))
-        }
+            status: b.status,
+          })),
+        },
       });
     }
 
-    console.log('✅ [CREATE-BOOKING] No date conflicts found');
+    console.log("✅ [CREATE-BOOKING] No date conflicts found");
 
     // ⭐ VERIFICAR CAPACIDAD DE LA HABITACIÓN
-    console.log('👥 [CREATE-BOOKING] Checking room capacity...');
-    console.log('👥 [CREATE-BOOKING] Guest count:', guestCount, 'Max guests:', room.maxGuests);
-    
+    console.log("👥 [CREATE-BOOKING] Checking room capacity...");
+    console.log(
+      "👥 [CREATE-BOOKING] Guest count:",
+      guestCount,
+      "Max guests:",
+      room.maxGuests
+    );
+
     if (guestCount > room.maxGuests) {
-      console.log('❌ [CREATE-BOOKING] Exceeds room capacity');
+      console.log("❌ [CREATE-BOOKING] Exceeds room capacity");
       return res.status(400).json({
         error: true,
-        message: `La habitación tiene capacidad máxima de ${room.maxGuests} huéspedes, solicitados: ${guestCount}`
+        message: `La habitación tiene capacidad máxima de ${room.maxGuests} huéspedes, solicitados: ${guestCount}`,
       });
     }
 
-    console.log('✅ [CREATE-BOOKING] Room capacity validation passed');
+    console.log("✅ [CREATE-BOOKING] Room capacity validation passed");
 
     // ⭐ CALCULAR PRECIO TOTAL CON LOGS DETALLADOS
-    console.log('💰 [CREATE-BOOKING] Calculating price...');
-    
+    console.log("💰 [CREATE-BOOKING] Calculating price...");
+
     let finalTotalPrice = totalAmount || totalPrice;
-    
+
     if (!finalTotalPrice) {
-      console.log('💰 [CREATE-BOOKING] No price provided, calculating...');
-      
+      console.log("💰 [CREATE-BOOKING] No price provided, calculating...");
+
       // ⭐ USAR UTILIDAD PARA CALCULAR NOCHES
       const nights = getDaysDifference(checkInDate, checkOutDate);
-      console.log('💰 [CREATE-BOOKING] Nights calculated:', nights);
-      
+      console.log("💰 [CREATE-BOOKING] Nights calculated:", nights);
+
       // Usar precio según cantidad de huéspedes
       let pricePerNight;
-      
+
       if (guestCount === 1) {
         pricePerNight = room.priceSingle || room.priceDouble;
-        console.log('💰 [CREATE-BOOKING] Using single price:', pricePerNight);
+        console.log("💰 [CREATE-BOOKING] Using single price:", pricePerNight);
       } else if (guestCount === 2) {
         pricePerNight = room.priceDouble;
-        console.log('💰 [CREATE-BOOKING] Using double price:', pricePerNight);
+        console.log("💰 [CREATE-BOOKING] Using double price:", pricePerNight);
       } else {
         pricePerNight = room.priceMultiple;
-        console.log('💰 [CREATE-BOOKING] Using multiple price:', pricePerNight);
-        
+        console.log("💰 [CREATE-BOOKING] Using multiple price:", pricePerNight);
+
         // Agregar costo por huéspedes extra
         if (guestCount > 3 && room.pricePerExtraGuest) {
           const extraCost = (guestCount - 3) * room.pricePerExtraGuest;
           pricePerNight += extraCost;
-          console.log('💰 [CREATE-BOOKING] Added extra guest cost:', extraCost, 'New price per night:', pricePerNight);
+          console.log(
+            "💰 [CREATE-BOOKING] Added extra guest cost:",
+            extraCost,
+            "New price per night:",
+            pricePerNight
+          );
         }
       }
 
       // Aplicar precio promocional si existe
       if (room.isPromo && room.promotionPrice) {
         pricePerNight = room.promotionPrice;
-        console.log('💰 [CREATE-BOOKING] Applied promotional price:', pricePerNight);
+        console.log(
+          "💰 [CREATE-BOOKING] Applied promotional price:",
+          pricePerNight
+        );
       }
 
       finalTotalPrice = pricePerNight * nights;
-      console.log('💰 [CREATE-BOOKING] Final calculated price:', finalTotalPrice);
+      console.log(
+        "💰 [CREATE-BOOKING] Final calculated price:",
+        finalTotalPrice
+      );
     } else {
-      console.log('💰 [CREATE-BOOKING] Using provided price:', finalTotalPrice);
+      console.log("💰 [CREATE-BOOKING] Using provided price:", finalTotalPrice);
     }
 
     // ⭐ PREPARAR DATOS PARA CREAR LA RESERVA CON LOGS
-    console.log('📝 [CREATE-BOOKING] Preparing booking data...');
-    
+    console.log("📝 [CREATE-BOOKING] Preparing booking data...");
+
     const bookingData = {
       guestId,
       roomNumber,
@@ -575,105 +661,124 @@ const createBooking = async (req, res, next) => {
       guestCount,
       totalAmount: finalTotalPrice,
       status,
-      notes: notes || '',
+      notes: notes || "",
       pointOfSale: pointOfSale,
-      createdBy: req.user?.n_document || null
+      createdBy: req.user?.n_document || null,
     };
 
-    console.log('📝 [CREATE-BOOKING] Booking data to create:', JSON.stringify(bookingData, null, 2));
+    console.log(
+      "📝 [CREATE-BOOKING] Booking data to create:",
+      JSON.stringify(bookingData, null, 2)
+    );
 
     // ⭐ CREAR LA RESERVA CON TRY-CATCH ESPECÍFICO
-    console.log('💾 [CREATE-BOOKING] Creating booking in database...');
-    if (pointOfSale === 'Local') {
+    console.log("💾 [CREATE-BOOKING] Creating booking in database...");
+    if (pointOfSale === "Local") {
       if (req.user?.n_document) {
-        console.log('✅ [CREATE-BOOKING] Reserva LOCAL creada por empleado:', req.user.n_document, req.user.role);
+        console.log(
+          "✅ [CREATE-BOOKING] Reserva LOCAL creada por empleado:",
+          req.user.n_document,
+          req.user.role
+        );
       } else {
-        console.log('⚠️ [CREATE-BOOKING] Reserva LOCAL pero SIN empleado logueado - esto podría ser un problema');
+        console.log(
+          "⚠️ [CREATE-BOOKING] Reserva LOCAL pero SIN empleado logueado - esto podría ser un problema"
+        );
       }
     } else {
-      console.log('🌐 [CREATE-BOOKING] Reserva ONLINE - puede no tener empleado asociado');
+      console.log(
+        "🌐 [CREATE-BOOKING] Reserva ONLINE - puede no tener empleado asociado"
+      );
     }
 
     let newBooking;
     try {
       newBooking = await Booking.create(bookingData);
-      console.log('✅ [CREATE-BOOKING] Booking created successfully:', {
+      console.log("✅ [CREATE-BOOKING] Booking created successfully:", {
         bookingId: newBooking.bookingId,
         id: newBooking.id,
-        createdAt: formatForLogs(newBooking.createdAt)
+        createdAt: formatForLogs(newBooking.createdAt),
       });
     } catch (createError) {
-      console.error('❌ [CREATE-BOOKING] Error creating booking at:', formatForLogs(getColombiaTime()));
-      console.error('❌ [CREATE-BOOKING] Error details:', {
+      console.error(
+        "❌ [CREATE-BOOKING] Error creating booking at:",
+        formatForLogs(getColombiaTime())
+      );
+      console.error("❌ [CREATE-BOOKING] Error details:", {
         name: createError.name,
         message: createError.message,
         sql: createError.sql,
-        parameters: createError.parameters
+        parameters: createError.parameters,
       });
-      
+
       return res.status(500).json({
         error: true,
-        message: 'Error al crear la reserva en la base de datos',
-        details: createError.message
+        message: "Error al crear la reserva en la base de datos",
+        details: createError.message,
       });
     }
 
     // ⭐ ACTUALIZAR ESTADO DE LA HABITACIÓN CON LOGS
-    console.log('🏨 [CREATE-BOOKING] Updating room status...');
-    
+    console.log("🏨 [CREATE-BOOKING] Updating room status...");
+
     const roomUpdateData = {
-      status: status === 'confirmed' ? 'Reservada' : 'Ocupada',
-      available: false
+      status: status === "confirmed" ? "Reservada" : "Ocupada",
+      available: false,
     };
 
-    console.log('🏨 [CREATE-BOOKING] Room update data:', roomUpdateData);
+    console.log("🏨 [CREATE-BOOKING] Room update data:", roomUpdateData);
 
     try {
       await room.update(roomUpdateData);
-      console.log('✅ [CREATE-BOOKING] Room status updated successfully');
+      console.log("✅ [CREATE-BOOKING] Room status updated successfully");
     } catch (updateError) {
-      console.error('❌ [CREATE-BOOKING] Error updating room status:', updateError);
+      console.error(
+        "❌ [CREATE-BOOKING] Error updating room status:",
+        updateError
+      );
       // No fallar la reserva por esto, solo log
     }
 
     // ⭐ OBTENER INFORMACIÓN COMPLETA DE LA RESERVA CREADA CON LOGS
-    console.log('🔍 [CREATE-BOOKING] Fetching complete booking data...');
-    
+    console.log("🔍 [CREATE-BOOKING] Fetching complete booking data...");
+
     let bookingWithDetails;
     try {
       bookingWithDetails = await Booking.findByPk(newBooking.bookingId, {
         include: [
           {
             model: Room,
-            as: 'room',
-            attributes: ['roomNumber', 'type', 'status', 'maxGuests']
+            as: "room",
+            attributes: ["roomNumber", "type", "status", "maxGuests"],
           },
           {
             model: Buyer,
             as: "guest",
-            attributes: ['sdocno', 'scostumername', 'selectronicmail']
-          }
-        ]
+            attributes: ["sdocno", "scostumername", "selectronicmail"],
+          },
+        ],
       });
-      
-      console.log('✅ [CREATE-BOOKING] Complete booking data fetched:', {
+
+      console.log("✅ [CREATE-BOOKING] Complete booking data fetched:", {
         bookingId: bookingWithDetails?.bookingId,
         hasRoom: !!bookingWithDetails?.Room,
-        hasGuest: !!bookingWithDetails?.guest
+        hasGuest: !!bookingWithDetails?.guest,
       });
-      
     } catch (fetchError) {
-      console.error('❌ [CREATE-BOOKING] Error fetching complete booking:', fetchError);
+      console.error(
+        "❌ [CREATE-BOOKING] Error fetching complete booking:",
+        fetchError
+      );
       // Usar la reserva básica si falla
       bookingWithDetails = newBooking;
     }
 
     // ⭐ PREPARAR RESPUESTA FINAL CON LOGS
-    console.log('📤 [CREATE-BOOKING] Preparing final response...');
-    
+    console.log("📤 [CREATE-BOOKING] Preparing final response...");
+
     const response = {
       error: false,
-      message: 'Reserva creada exitosamente',
+      message: "Reserva creada exitosamente",
       success: true,
       data: {
         booking: bookingWithDetails,
@@ -683,33 +788,43 @@ const createBooking = async (req, res, next) => {
         // ⭐ INFO ADICIONAL
         pointOfSale: pointOfSale,
         createdBy: bookingData.createdBy,
-        isLocalBooking: pointOfSale === 'Local'
-      }
+        isLocalBooking: pointOfSale === "Local",
+      },
     };
 
-    console.log('✅ [CREATE-BOOKING] Final response prepared:', {
+    console.log("✅ [CREATE-BOOKING] Final response prepared:", {
       success: response.success,
       bookingId: response.data.booking?.bookingId,
       calculatedPrice: response.data.calculatedPrice,
       pointOfSale: response.data.pointOfSale,
       createdBy: response.data.createdBy,
-      completedAt: formatForLogs(getColombiaTime())
+      completedAt: formatForLogs(getColombiaTime()),
     });
 
     res.status(201).json(response);
-
   } catch (error) {
-    console.error('❌ [CREATE-BOOKING] Unexpected error at:', formatForLogs(getColombiaTime()));
-    console.error('❌ [CREATE-BOOKING] Error details:', error);
+    console.error(
+      "❌ [CREATE-BOOKING] Unexpected error at:",
+      formatForLogs(getColombiaTime())
+    );
+    console.error("❌ [CREATE-BOOKING] Error details:", error);
     next(error);
   }
 };
 
 const updateOnlinePayment = async (req, res, next) => {
   try {
-    console.log("💳 [UPDATE-ONLINE-PAYMENT] Iniciando actualización de pago online");
-    console.log("🕐 [UPDATE-ONLINE-PAYMENT] Hora Colombia:", formatForLogs(getColombiaTime()));
-    console.log("📥 [UPDATE-ONLINE-PAYMENT] Request body:", JSON.stringify(req.body, null, 2));
+    console.log(
+      "💳 [UPDATE-ONLINE-PAYMENT] Iniciando actualización de pago online"
+    );
+    console.log(
+      "🕐 [UPDATE-ONLINE-PAYMENT] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
+    console.log(
+      "📥 [UPDATE-ONLINE-PAYMENT] Request body:",
+      JSON.stringify(req.body, null, 2)
+    );
 
     const {
       bookingId,
@@ -719,17 +834,17 @@ const updateOnlinePayment = async (req, res, next) => {
       paymentMethod,
       paymentStatus = "completed", // Por defecto completado
       wompiTransactionId,
-      wompiStatus
+      wompiStatus,
     } = req.body;
 
     // ⭐ VALIDACIONES MEJORADAS CON LOGS
     console.log("🔍 [UPDATE-ONLINE-PAYMENT] Validando datos...");
-    
+
     if (!bookingId) {
       console.log("❌ [UPDATE-ONLINE-PAYMENT] bookingId faltante");
       return res.status(400).json({
         error: true,
-        message: "bookingId es requerido"
+        message: "bookingId es requerido",
       });
     }
 
@@ -737,7 +852,7 @@ const updateOnlinePayment = async (req, res, next) => {
       console.log("❌ [UPDATE-ONLINE-PAYMENT] amount inválido:", amount);
       return res.status(400).json({
         error: true,
-        message: "amount es requerido y debe ser un número válido"
+        message: "amount es requerido y debe ser un número válido",
       });
     }
 
@@ -745,7 +860,7 @@ const updateOnlinePayment = async (req, res, next) => {
       console.log("❌ [UPDATE-ONLINE-PAYMENT] transactionId faltante");
       return res.status(400).json({
         error: true,
-        message: "transactionId o wompiTransactionId es requerido"
+        message: "transactionId o wompiTransactionId es requerido",
       });
     }
 
@@ -753,40 +868,48 @@ const updateOnlinePayment = async (req, res, next) => {
 
     // ⭐ BUSCAR LA RESERVA CON LOGS
     console.log("🔍 [UPDATE-ONLINE-PAYMENT] Buscando reserva:", bookingId);
-    
+
     const booking = await Booking.findByPk(bookingId, {
       include: [
         {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'status', 'type']
+          as: "room",
+          attributes: ["roomNumber", "status", "type"],
         },
         {
           model: Buyer,
-          as: 'guest',
-          attributes: ['scostumername', 'sdocno']
+          as: "guest",
+          attributes: ["scostumername", "sdocno"],
         },
         {
           model: Payment,
-          as: 'payments',
+          as: "payments",
           attributes: [
-            'paymentId', 'amount', 'paymentStatus', 'paymentType', 
-            'isCheckoutPayment', 'includesExtras', 'isReservationPayment'
-          ]
+            "paymentId",
+            "amount",
+            "paymentStatus",
+            "paymentType",
+            "isCheckoutPayment",
+            "includesExtras",
+            "isReservationPayment",
+          ],
         },
         {
           model: ExtraCharge,
-          as: 'extraCharges',
-          attributes: ['id', 'amount', 'description', 'quantity']
-        }
-      ]
+          as: "extraCharges",
+          attributes: ["id", "amount", "description", "quantity"],
+        },
+      ],
     });
 
     if (!booking) {
-      console.log("❌ [UPDATE-ONLINE-PAYMENT] Reserva no encontrada:", bookingId);
+      console.log(
+        "❌ [UPDATE-ONLINE-PAYMENT] Reserva no encontrada:",
+        bookingId
+      );
       return res.status(404).json({
         error: true,
-        message: "Reserva no encontrada"
+        message: "Reserva no encontrada",
       });
     }
 
@@ -795,15 +918,18 @@ const updateOnlinePayment = async (req, res, next) => {
       pointOfSale: booking.pointOfSale,
       status: booking.status,
       totalAmount: booking.totalAmount,
-      existingPayments: booking.payments ? booking.payments.length : 0
+      existingPayments: booking.payments ? booking.payments.length : 0,
     });
 
     // ⭐ VERIFICAR QUE SEA RESERVA ONLINE
     if (booking.pointOfSale !== "Online") {
-      console.log("❌ [UPDATE-ONLINE-PAYMENT] No es reserva online:", booking.pointOfSale);
+      console.log(
+        "❌ [UPDATE-ONLINE-PAYMENT] No es reserva online:",
+        booking.pointOfSale
+      );
       return res.status(400).json({
         error: true,
-        message: "Esta reserva no es de pago online"
+        message: "Esta reserva no es de pago online",
       });
     }
 
@@ -812,23 +938,27 @@ const updateOnlinePayment = async (req, res, next) => {
     // ⭐ CALCULAR TOTALES FINANCIEROS - IGUAL QUE EN registerLocalPayment
     const paymentAmount = parseFloat(amount);
     const reservationAmount = parseFloat(booking.totalAmount);
-    
+
     // Calcular gastos extras
-    const extraChargesTotal = booking.extraCharges?.reduce((sum, charge) => {
-      const chargeAmount = parseFloat(charge.amount) || 0;
-      const quantity = parseInt(charge.quantity) || 1;
-      return sum + (chargeAmount * quantity);
-    }, 0) || 0;
-    
+    const extraChargesTotal =
+      booking.extraCharges?.reduce((sum, charge) => {
+        const chargeAmount = parseFloat(charge.amount) || 0;
+        const quantity = parseInt(charge.quantity) || 1;
+        return sum + chargeAmount * quantity;
+      }, 0) || 0;
+
     const grandTotal = reservationAmount + extraChargesTotal;
-    
+
     // ⭐ CALCULAR PAGOS PREVIOS (solo authorized y completed)
-    const previousPayments = booking.payments?.filter(p => 
-      p.paymentStatus === 'authorized' || p.paymentStatus === 'completed'
-    ) || [];
-    
-    const totalPreviousPaid = previousPayments.reduce((sum, p) => 
-      sum + parseFloat(p.amount), 0
+    const previousPayments =
+      booking.payments?.filter(
+        (p) =>
+          p.paymentStatus === "authorized" || p.paymentStatus === "completed"
+      ) || [];
+
+    const totalPreviousPaid = previousPayments.reduce(
+      (sum, p) => sum + parseFloat(p.amount),
+      0
     );
 
     console.log("💰 [UPDATE-ONLINE-PAYMENT] Cálculo de pagos:", {
@@ -837,126 +967,153 @@ const updateOnlinePayment = async (req, res, next) => {
       extraChargesTotal,
       grandTotal,
       totalPreviousPaid,
-      remaining: grandTotal - totalPreviousPaid
+      remaining: grandTotal - totalPreviousPaid,
     });
 
     // ⭐ BUSCAR PAGO EXISTENTE O CREAR UNO NUEVO
     console.log("🔍 [UPDATE-ONLINE-PAYMENT] Buscando pago existente...");
-    
+
     let payment = await Payment.findOne({
-      where: { 
-        bookingId, 
+      where: {
+        bookingId,
         paymentType: "online",
         [Op.or]: [
           { paymentStatus: "pending" },
-          { transactionId: transactionId || wompiTransactionId }
-        ]
+          { transactionId: transactionId || wompiTransactionId },
+        ],
       },
       order: [["createdAt", "DESC"]],
     });
 
     if (!payment) {
-      console.log("📝 [UPDATE-ONLINE-PAYMENT] Creando nuevo registro de pago...");
-      
+      console.log(
+        "📝 [UPDATE-ONLINE-PAYMENT] Creando nuevo registro de pago..."
+      );
+
       try {
         payment = await Payment.create({
           bookingId,
           amount: paymentAmount,
-          paymentMethod: paymentMethod || 'wompi',
+          paymentMethod: paymentMethod || "wompi",
           paymentType: "online",
           paymentStatus: "pending", // Se actualizará después
           paymentDate: getColombiaTime(),
           transactionId: transactionId || wompiTransactionId,
           paymentReference: paymentReference,
-          processedBy: 'wompi_webhook',
+          processedBy: "wompi_webhook",
           // ⭐ CAMPOS SEGÚN NUEVO MODELO
           includesExtras: false, // Los pagos online son solo para reserva
           isReservationPayment: true,
-          isCheckoutPayment: false
+          isCheckoutPayment: false,
         });
-        
-        console.log("✅ [UPDATE-ONLINE-PAYMENT] Nuevo pago creado:", payment.paymentId);
+
+        console.log(
+          "✅ [UPDATE-ONLINE-PAYMENT] Nuevo pago creado:",
+          payment.paymentId
+        );
       } catch (createError) {
-        console.error("❌ [UPDATE-ONLINE-PAYMENT] Error al crear pago:", createError);
+        console.error(
+          "❌ [UPDATE-ONLINE-PAYMENT] Error al crear pago:",
+          createError
+        );
         return res.status(500).json({
           error: true,
           message: "Error al crear el registro de pago",
-          details: createError.message
+          details: createError.message,
         });
       }
     } else {
-      console.log("✅ [UPDATE-ONLINE-PAYMENT] Pago existente encontrado:", payment.paymentId);
+      console.log(
+        "✅ [UPDATE-ONLINE-PAYMENT] Pago existente encontrado:",
+        payment.paymentId
+      );
     }
 
     // ⭐ ACTUALIZAR EL REGISTRO DE PAGO CON LOGS
     console.log("💾 [UPDATE-ONLINE-PAYMENT] Actualizando registro de pago...");
-    
+
     const updateData = {
       amount: paymentAmount, // Monto confirmado por Wompi
       paymentMethod: paymentMethod || payment.paymentMethod,
-      transactionId: transactionId || wompiTransactionId || payment.transactionId,
+      transactionId:
+        transactionId || wompiTransactionId || payment.transactionId,
       paymentReference: paymentReference || payment.paymentReference,
       paymentStatus: paymentStatus,
       paymentDate: getColombiaTime(),
-      processedBy: 'wompi_webhook',
+      processedBy: "wompi_webhook",
       // ⭐ CAMPOS ADICIONALES PARA WOMPI
       wompiTransactionId: wompiTransactionId,
-      wompiStatus: wompiStatus
+      wompiStatus: wompiStatus,
     };
 
-    console.log("📝 [UPDATE-ONLINE-PAYMENT] Datos de actualización:", updateData);
+    console.log(
+      "📝 [UPDATE-ONLINE-PAYMENT] Datos de actualización:",
+      updateData
+    );
 
     try {
       await payment.update(updateData);
       console.log("✅ [UPDATE-ONLINE-PAYMENT] Pago actualizado exitosamente");
     } catch (updateError) {
-      console.error("❌ [UPDATE-ONLINE-PAYMENT] Error al actualizar pago:", updateError);
+      console.error(
+        "❌ [UPDATE-ONLINE-PAYMENT] Error al actualizar pago:",
+        updateError
+      );
       return res.status(500).json({
         error: true,
         message: "Error al actualizar el pago",
-        details: updateError.message
+        details: updateError.message,
       });
     }
 
     // ⭐ ACTUALIZAR ESTADO DE LA RESERVA BASADO EN PAGOS - NUEVA LÓGICA
     let newBookingStatus = booking.status;
     let shouldUpdateBookingStatus = false;
-    
+
     if (paymentStatus === "completed") {
       // ⭐ APLICAR MISMA LÓGICA QUE registerLocalPayment
       const totalPaid = totalPreviousPaid + paymentAmount;
-      
+
       if (totalPaid >= reservationAmount) {
         // ⭐ CAMBIO PRINCIPAL: Cambiar a 'paid' NO 'confirmed'
         newBookingStatus = "paid";
         shouldUpdateBookingStatus = true;
-        console.log("✅ [UPDATE-ONLINE-PAYMENT] Reserva completamente pagada - Status: PAID (listo para check-in físico)");
+        console.log(
+          "✅ [UPDATE-ONLINE-PAYMENT] Reserva completamente pagada - Status: PAID (listo para check-in físico)"
+        );
       } else if (totalPaid > 0) {
         newBookingStatus = "confirmed"; // Pago parcial pero confirmado
         shouldUpdateBookingStatus = true;
-        console.log("⚠️ [UPDATE-ONLINE-PAYMENT] Reserva parcialmente pagada - Status: CONFIRMED");
+        console.log(
+          "⚠️ [UPDATE-ONLINE-PAYMENT] Reserva parcialmente pagada - Status: CONFIRMED"
+        );
       }
     } else if (paymentStatus === "failed") {
       // Mantener estado actual si el pago falló
-      console.log("❌ [UPDATE-ONLINE-PAYMENT] Pago falló, manteniendo estado actual");
+      console.log(
+        "❌ [UPDATE-ONLINE-PAYMENT] Pago falló, manteniendo estado actual"
+      );
     }
 
     // ⭐ ACTUALIZAR RESERVA SI CAMBIÓ EL ESTADO
     if (shouldUpdateBookingStatus && newBookingStatus !== booking.status) {
-      console.log("🔄 [UPDATE-ONLINE-PAYMENT] Actualizando estado de reserva:", {
-        from: booking.status,
-        to: newBookingStatus
-      });
-      
+      console.log(
+        "🔄 [UPDATE-ONLINE-PAYMENT] Actualizando estado de reserva:",
+        {
+          from: booking.status,
+          to: newBookingStatus,
+        }
+      );
+
       try {
         const bookingUpdateData = {
           status: newBookingStatus,
           statusUpdatedAt: getColombiaTime(),
-          statusUpdatedBy: 'payment_system'
+          statusUpdatedBy: "payment_system",
         };
 
         // ⭐ AGREGAR TIMESTAMP DE PAGO COMPLETO SI CORRESPONDE
-        if (newBookingStatus === 'paid') {
+        if (newBookingStatus === "paid") {
           bookingUpdateData.paymentCompletedAt = getColombiaTime();
         }
 
@@ -968,30 +1125,32 @@ const updateOnlinePayment = async (req, res, next) => {
         if (room) {
           let newRoomStatus = room.status;
           let newRoomAvailability = room.available;
-          
-          if (newBookingStatus === 'paid') {
+
+          if (newBookingStatus === "paid") {
             // ⭐ CUANDO ESTÁ PAGADO PERO NO CHECKED-IN, MANTENER RESERVADA
-            newRoomStatus = 'Reservada';
+            newRoomStatus = "Reservada";
             newRoomAvailability = false;
-          } else if (newBookingStatus === 'confirmed') {
-            newRoomStatus = 'Reservada';
+          } else if (newBookingStatus === "confirmed") {
+            newRoomStatus = "Reservada";
             newRoomAvailability = false;
           }
-          
+
           await room.update({
             status: newRoomStatus,
-            available: newRoomAvailability
+            available: newRoomAvailability,
           });
-          
+
           console.log("🏨 [UPDATE-ONLINE-PAYMENT] Habitación actualizada:", {
             roomNumber: booking.roomNumber,
             status: newRoomStatus,
-            available: newRoomAvailability
+            available: newRoomAvailability,
           });
         }
-
       } catch (bookingUpdateError) {
-        console.error("❌ [UPDATE-ONLINE-PAYMENT] Error al actualizar reserva:", bookingUpdateError);
+        console.error(
+          "❌ [UPDATE-ONLINE-PAYMENT] Error al actualizar reserva:",
+          bookingUpdateError
+        );
         // No fallar por esto, solo log
       }
     }
@@ -1001,39 +1160,48 @@ const updateOnlinePayment = async (req, res, next) => {
       include: [
         {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'status', 'type']
+          as: "room",
+          attributes: ["roomNumber", "status", "type"],
         },
         {
           model: Buyer,
-          as: 'guest',
-          attributes: ['scostumername', 'sdocno']
+          as: "guest",
+          attributes: ["scostumername", "sdocno"],
         },
         {
           model: Payment,
-          as: 'payments',
+          as: "payments",
           attributes: [
-            'paymentId', 'amount', 'paymentMethod', 'paymentStatus', 
-            'paymentType', 'paymentDate', 'includesExtras', 'isReservationPayment'
-          ]
+            "paymentId",
+            "amount",
+            "paymentMethod",
+            "paymentStatus",
+            "paymentType",
+            "paymentDate",
+            "includesExtras",
+            "isReservationPayment",
+          ],
         },
         {
           model: ExtraCharge,
-          as: 'extraCharges',
-          attributes: ['id', 'amount', 'description', 'quantity']
-        }
-      ]
+          as: "extraCharges",
+          attributes: ["id", "amount", "description", "quantity"],
+        },
+      ],
     });
 
     // ⭐ CALCULAR TOTALES ACTUALIZADOS
-    const authorizedPayments = updatedBooking.payments?.filter(p => 
-      p.paymentStatus === 'authorized' || p.paymentStatus === 'completed'
-    ) || [];
-    
-    const totalPaid = authorizedPayments.reduce((sum, p) => 
-      sum + parseFloat(p.amount), 0
+    const authorizedPayments =
+      updatedBooking.payments?.filter(
+        (p) =>
+          p.paymentStatus === "authorized" || p.paymentStatus === "completed"
+      ) || [];
+
+    const totalPaid = authorizedPayments.reduce(
+      (sum, p) => sum + parseFloat(p.amount),
+      0
     );
-    
+
     const newRemainingAmount = grandTotal - totalPaid;
     const isFullyPaid = newRemainingAmount <= 0;
 
@@ -1045,24 +1213,26 @@ const updateOnlinePayment = async (req, res, next) => {
       totalPaid,
       remainingAmount: newRemainingAmount,
       isFullyPaid,
-      readyForPhysicalCheckIn: newBookingStatus === 'paid',
-      completedAt: formatForLogs(getColombiaTime())
+      readyForPhysicalCheckIn: newBookingStatus === "paid",
+      completedAt: formatForLogs(getColombiaTime()),
     });
 
     // ⭐ DETERMINAR MENSAJE DE RESPUESTA - ACTUALIZADO
-    let responseMessage = '';
+    let responseMessage = "";
     if (paymentStatus === "completed") {
-      if (newBookingStatus === 'paid') {
-        responseMessage = '✅ Pago online completado. Reserva lista para check-in físico.';
-      } else if (newBookingStatus === 'confirmed') {
-        responseMessage = '📊 Pago parcial completado. Reserva confirmada.';
+      if (newBookingStatus === "paid") {
+        responseMessage =
+          "✅ Pago online completado. Reserva lista para check-in físico.";
+      } else if (newBookingStatus === "confirmed") {
+        responseMessage = "📊 Pago parcial completado. Reserva confirmada.";
       } else {
-        responseMessage = '✅ Pago online registrado exitosamente.';
+        responseMessage = "✅ Pago online registrado exitosamente.";
       }
     } else if (paymentStatus === "failed") {
-      responseMessage = '❌ Pago online falló. Verificar con el proveedor de pagos.';
+      responseMessage =
+        "❌ Pago online falló. Verificar con el proveedor de pagos.";
     } else {
-      responseMessage = '💳 Pago online en proceso.';
+      responseMessage = "💳 Pago online en proceso.";
     }
 
     // ⭐ PREPARAR RESPUESTA COMPLETA
@@ -1070,13 +1240,13 @@ const updateOnlinePayment = async (req, res, next) => {
       payment: {
         ...payment.toJSON(),
         paymentDateFormatted: formatForLogs(payment.paymentDate),
-        amountFormatted: `$${parseFloat(payment.amount).toLocaleString()}`
+        amountFormatted: `$${parseFloat(payment.amount).toLocaleString()}`,
       },
       booking: {
         bookingId: booking.bookingId,
         status: newBookingStatus,
         totalAmount: reservationAmount,
-        totalAmountFormatted: `$${reservationAmount.toLocaleString()}`
+        totalAmountFormatted: `$${reservationAmount.toLocaleString()}`,
       },
       paymentSummary: {
         reservationAmount,
@@ -1085,36 +1255,44 @@ const updateOnlinePayment = async (req, res, next) => {
         totalPaid,
         remainingAmount: newRemainingAmount,
         isFullyPaid,
-        readyForPhysicalCheckIn: newBookingStatus === 'paid', // ⭐ NUEVO CAMPO
-        canCheckout: isFullyPaid && newBookingStatus === 'checked-in',
+        readyForPhysicalCheckIn: newBookingStatus === "paid", // ⭐ NUEVO CAMPO
+        canCheckout: isFullyPaid && newBookingStatus === "checked-in",
         paymentsCount: updatedBooking.payments?.length || 0,
         // Formateos
         totalPaidFormatted: `$${totalPaid.toLocaleString()}`,
-        remainingFormatted: `$${Math.max(0, newRemainingAmount).toLocaleString()}`,
+        remainingFormatted: `$${Math.max(
+          0,
+          newRemainingAmount
+        ).toLocaleString()}`,
         grandTotalFormatted: `$${grandTotal.toLocaleString()}`,
-        paymentPercentage: reservationAmount > 0 ? Math.round((totalPaid / reservationAmount) * 100) : 0
+        paymentPercentage:
+          reservationAmount > 0
+            ? Math.round((totalPaid / reservationAmount) * 100)
+            : 0,
       },
       statusChanged: shouldUpdateBookingStatus,
       newStatus: newBookingStatus,
-      roomStatus: updatedBooking.room?.status
+      roomStatus: updatedBooking.room?.status,
     };
 
     res.status(200).json({
       error: false,
       message: responseMessage,
       data: responseData,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [UPDATE-ONLINE-PAYMENT] Error general:", error);
-    console.error("🕐 [UPDATE-ONLINE-PAYMENT] Hora del error:", formatForLogs(getColombiaTime()));
-    
+    console.error(
+      "🕐 [UPDATE-ONLINE-PAYMENT] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
     res.status(500).json({
       error: true,
       message: "Error interno al procesar el pago online",
       details: error.message,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
   }
 };
@@ -1122,7 +1300,10 @@ const updateOnlinePayment = async (req, res, next) => {
 const downloadBookingPdf = async (req, res, next) => {
   try {
     console.log("📄 [DOWNLOAD-PDF] Iniciando generación de PDF de reserva");
-    console.log("🕐 [DOWNLOAD-PDF] Hora Colombia:", formatForLogs(getColombiaTime()));
+    console.log(
+      "🕐 [DOWNLOAD-PDF] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
     console.log("📥 [DOWNLOAD-PDF] trackingToken:", req.params.trackingToken);
 
     const { trackingToken } = req.params;
@@ -1132,7 +1313,7 @@ const downloadBookingPdf = async (req, res, next) => {
       console.log("❌ [DOWNLOAD-PDF] trackingToken faltante");
       return res.status(400).json({
         error: true,
-        message: "Token de seguimiento es requerido"
+        message: "Token de seguimiento es requerido",
       });
     }
 
@@ -1145,14 +1326,17 @@ const downloadBookingPdf = async (req, res, next) => {
       console.log("✅ [DOWNLOAD-PDF] Token verificado exitosamente:", {
         bookingId: decoded.bookingId,
         iat: decoded.iat,
-        exp: decoded.exp
+        exp: decoded.exp,
       });
     } catch (tokenError) {
-      console.error("❌ [DOWNLOAD-PDF] Error al verificar token:", tokenError.message);
+      console.error(
+        "❌ [DOWNLOAD-PDF] Error al verificar token:",
+        tokenError.message
+      );
       return res.status(401).json({
         error: true,
         message: "Token de seguimiento inválido o expirado",
-        details: tokenError.message
+        details: tokenError.message,
       });
     }
 
@@ -1162,7 +1346,7 @@ const downloadBookingPdf = async (req, res, next) => {
       console.log("❌ [DOWNLOAD-PDF] bookingId no encontrado en token");
       return res.status(400).json({
         error: true,
-        message: "Token no contiene un ID de reserva válido"
+        message: "Token no contiene un ID de reserva válido",
       });
     }
 
@@ -1172,29 +1356,39 @@ const downloadBookingPdf = async (req, res, next) => {
     const booking = await Booking.findOne({
       where: { bookingId },
       include: [
-        { 
+        {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'type', 'description', 'maxGuests']
+          as: "room",
+          attributes: ["roomNumber", "type", "description", "maxGuests"],
         },
         {
           model: Buyer,
-          as: 'guest',
-          attributes: ['sdocno', 'scostumername', 'selectronicmail', 'stelephone']
+          as: "guest",
+          attributes: [
+            "sdocno",
+            "scostumername",
+            "selectronicmail",
+            "stelephone",
+          ],
         },
         {
           model: ExtraCharge,
-          as: 'extraCharges',
-          attributes: ['description', 'amount', 'quantity', 'chargeDate'],
-          required: false
+          as: "extraCharges",
+          attributes: ["description", "amount", "quantity", "chargeDate"],
+          required: false,
         },
         {
           model: Payment,
-          as: 'payments',
-          attributes: ['amount', 'paymentMethod', 'paymentStatus', 'paymentDate'],
-          where: { paymentStatus: 'completed' },
-          required: false
-        }
+          as: "payments",
+          attributes: [
+            "amount",
+            "paymentMethod",
+            "paymentStatus",
+            "paymentDate",
+          ],
+          where: { paymentStatus: "completed" },
+          required: false,
+        },
       ],
     });
 
@@ -1202,7 +1396,7 @@ const downloadBookingPdf = async (req, res, next) => {
       console.log("❌ [DOWNLOAD-PDF] Reserva no encontrada:", bookingId);
       return res.status(404).json({
         error: true,
-        message: "Reserva no encontrada"
+        message: "Reserva no encontrada",
       });
     }
 
@@ -1210,18 +1404,23 @@ const downloadBookingPdf = async (req, res, next) => {
       bookingId: booking.bookingId,
       guestName: booking.guest?.scostumername,
       roomNumber: booking.room?.roomNumber || booking.roomNumber,
-      status: booking.status
+      status: booking.status,
     });
 
     // ⭐ CALCULAR INFORMACIÓN ADICIONAL PARA EL PDF
     const bookingData = booking.toJSON();
     const nights = calculateNights(booking.checkIn, booking.checkOut);
-    
+
     // Calcular totales
     const baseAmount = parseFloat(booking.totalAmount || 0);
-    const extraChargesTotal = (bookingData.extraCharges || []).reduce((sum, charge) => {
-      return sum + (parseFloat(charge.amount || 0) * parseInt(charge.quantity || 1));
-    }, 0);
+    const extraChargesTotal = (bookingData.extraCharges || []).reduce(
+      (sum, charge) => {
+        return (
+          sum + parseFloat(charge.amount || 0) * parseInt(charge.quantity || 1)
+        );
+      },
+      0
+    );
     const totalPaid = (bookingData.payments || []).reduce((sum, payment) => {
       return sum + parseFloat(payment.amount || 0);
     }, 0);
@@ -1232,39 +1431,47 @@ const downloadBookingPdf = async (req, res, next) => {
       extraChargesTotal,
       totalPaid,
       grandTotal,
-      nights
+      nights,
     });
 
     // ⭐ GENERAR PDF CON MANEJO MEJORADO DE ERRORES
     console.log("📝 [DOWNLOAD-PDF] Generando documento PDF...");
-    
+
     let doc;
     try {
       doc = new PDFDocument({ margin: 50 });
     } catch (pdfError) {
-      console.error("❌ [DOWNLOAD-PDF] Error al crear documento PDF:", pdfError);
+      console.error(
+        "❌ [DOWNLOAD-PDF] Error al crear documento PDF:",
+        pdfError
+      );
       return res.status(500).json({
         error: true,
         message: "Error al crear el documento PDF",
-        details: pdfError.message
+        details: pdfError.message,
       });
     }
 
     let buffers = [];
     doc.on("data", buffers.push.bind(buffers));
-    
+
     doc.on("end", () => {
       try {
         const pdfData = Buffer.concat(buffers);
-        console.log("✅ [DOWNLOAD-PDF] PDF generado exitosamente, tamaño:", pdfData.length);
-        
+        console.log(
+          "✅ [DOWNLOAD-PDF] PDF generado exitosamente, tamaño:",
+          pdfData.length
+        );
+
         res.writeHead(200, {
           "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment;filename=reserva_${bookingId}_${formatColombiaDate(new Date()).replace(/\//g, '-')}.pdf`,
+          "Content-Disposition": `attachment;filename=reserva_${bookingId}_${formatColombiaDate(
+            new Date()
+          ).replace(/\//g, "-")}.pdf`,
           "Content-Length": pdfData.length,
         });
         res.end(pdfData);
-        
+
         console.log("📤 [DOWNLOAD-PDF] PDF enviado al cliente exitosamente");
       } catch (responseError) {
         console.error("❌ [DOWNLOAD-PDF] Error al enviar PDF:", responseError);
@@ -1277,109 +1484,152 @@ const downloadBookingPdf = async (req, res, next) => {
         res.status(500).json({
           error: true,
           message: "Error al generar el PDF",
-          details: pdfError.message
+          details: pdfError.message,
         });
       }
     });
 
     try {
       // ⭐ ENCABEZADO DEL HOTEL
-      doc.fontSize(20).font('Helvetica-Bold').text("BALU HOTEL", { align: 'center' });
-      doc.fontSize(12).font('Helvetica').text("Comprobante de Reserva", { align: 'center' });
+      doc
+        .fontSize(20)
+        .font("Helvetica-Bold")
+        .text("BALU HOTEL", { align: "center" });
+      doc
+        .fontSize(12)
+        .font("Helvetica")
+        .text("Comprobante de Reserva", { align: "center" });
       doc.moveDown(1.5);
 
       // ⭐ INFORMACIÓN DE LA RESERVA
-      doc.fontSize(16).font('Helvetica-Bold').text("Información de la Reserva", { underline: true });
+      doc
+        .fontSize(16)
+        .font("Helvetica-Bold")
+        .text("Información de la Reserva", { underline: true });
       doc.moveDown(0.5);
-      
-      doc.fontSize(12).font('Helvetica');
+
+      doc.fontSize(12).font("Helvetica");
       doc.text(`ID de Reserva: ${booking.bookingId}`);
       doc.text(`Estado: ${booking.status.toUpperCase()}`);
       doc.text(`Fecha de Creación: ${formatColombiaDate(booking.createdAt)}`);
-      doc.text(`Punto de Venta: ${booking.pointOfSale || 'Online'}`);
+      doc.text(`Punto de Venta: ${booking.pointOfSale || "Online"}`);
       doc.moveDown();
 
       // ⭐ INFORMACIÓN DEL HUÉSPED
-      doc.fontSize(16).font('Helvetica-Bold').text("Información del Huésped", { underline: true });
+      doc
+        .fontSize(16)
+        .font("Helvetica-Bold")
+        .text("Información del Huésped", { underline: true });
       doc.moveDown(0.5);
-      
-      doc.fontSize(12).font('Helvetica');
-      doc.text(`Nombre: ${booking.guest?.scostumername || 'No disponible'}`);
+
+      doc.fontSize(12).font("Helvetica");
+      doc.text(`Nombre: ${booking.guest?.scostumername || "No disponible"}`);
       doc.text(`Documento: ${booking.guest?.sdocno || booking.guestId}`);
-      doc.text(`Email: ${booking.guest?.selectronicmail || 'No proporcionado'}`);
-      doc.text(`Teléfono: ${booking.guest?.stelephone || 'No proporcionado'}`);
+      doc.text(
+        `Email: ${booking.guest?.selectronicmail || "No proporcionado"}`
+      );
+      doc.text(`Teléfono: ${booking.guest?.stelephone || "No proporcionado"}`);
       doc.moveDown();
 
       // ⭐ INFORMACIÓN DE LA HABITACIÓN
-      doc.fontSize(16).font('Helvetica-Bold').text("Información de la Habitación", { underline: true });
+      doc
+        .fontSize(16)
+        .font("Helvetica-Bold")
+        .text("Información de la Habitación", { underline: true });
       doc.moveDown(0.5);
-      
-      doc.fontSize(12).font('Helvetica');
+
+      doc.fontSize(12).font("Helvetica");
       doc.text(`Habitación: ${booking.room?.roomNumber || booking.roomNumber}`);
-      doc.text(`Tipo: ${booking.room?.type || 'Standard'}`);
-      doc.text(`Capacidad Máxima: ${booking.room?.maxGuests || 'No especificada'} huéspedes`);
+      doc.text(`Tipo: ${booking.room?.type || "Standard"}`);
+      doc.text(
+        `Capacidad Máxima: ${
+          booking.room?.maxGuests || "No especificada"
+        } huéspedes`
+      );
       doc.text(`Huéspedes Registrados: ${booking.guestCount}`);
       doc.moveDown();
 
       // ⭐ FECHAS DE ESTADÍA
-      doc.fontSize(16).font('Helvetica-Bold').text("Fechas de Estadía", { underline: true });
+      doc
+        .fontSize(16)
+        .font("Helvetica-Bold")
+        .text("Fechas de Estadía", { underline: true });
       doc.moveDown(0.5);
-      
-      doc.fontSize(12).font('Helvetica');
+
+      doc.fontSize(12).font("Helvetica");
       doc.text(`Check-in: ${formatColombiaDate(booking.checkIn)}`);
       doc.text(`Check-out: ${formatColombiaDate(booking.checkOut)}`);
       doc.text(`Noches: ${nights}`);
       doc.moveDown();
 
       // ⭐ DESGLOSE FINANCIERO
-      doc.fontSize(16).font('Helvetica-Bold').text("Desglose Financiero", { underline: true });
+      doc
+        .fontSize(16)
+        .font("Helvetica-Bold")
+        .text("Desglose Financiero", { underline: true });
       doc.moveDown(0.5);
-      
-      doc.fontSize(12).font('Helvetica');
-      doc.text(`Tarifa Base (${nights} ${nights === 1 ? 'noche' : 'noches'}): $${baseAmount.toLocaleString()}`);
-      
+
+      doc.fontSize(12).font("Helvetica");
+      doc.text(
+        `Tarifa Base (${nights} ${
+          nights === 1 ? "noche" : "noches"
+        }): $${baseAmount.toLocaleString()}`
+      );
+
       // Mostrar cargos extras si existen
       if (bookingData.extraCharges && bookingData.extraCharges.length > 0) {
         doc.moveDown(0.3);
-        doc.font('Helvetica-Bold').text("Cargos Adicionales:");
-        doc.font('Helvetica');
-        
-        bookingData.extraCharges.forEach(charge => {
+        doc.font("Helvetica-Bold").text("Cargos Adicionales:");
+        doc.font("Helvetica");
+
+        bookingData.extraCharges.forEach((charge) => {
           const chargeAmount = parseFloat(charge.amount || 0);
           const quantity = parseInt(charge.quantity || 1);
           const lineTotal = chargeAmount * quantity;
-          doc.text(`  • ${charge.description}: $${chargeAmount.toLocaleString()} x ${quantity} = $${lineTotal.toLocaleString()}`);
+          doc.text(
+            `  • ${
+              charge.description
+            }: $${chargeAmount.toLocaleString()} x ${quantity} = $${lineTotal.toLocaleString()}`
+          );
         });
-        
+
         doc.moveDown(0.3);
         doc.text(`Subtotal Extras: $${extraChargesTotal.toLocaleString()}`);
       }
-      
+
       doc.moveDown(0.5);
-      doc.font('Helvetica-Bold').fontSize(14);
+      doc.font("Helvetica-Bold").fontSize(14);
       doc.text(`TOTAL: $${grandTotal.toLocaleString()}`);
-      doc.font('Helvetica').fontSize(12);
-      
+      doc.font("Helvetica").fontSize(12);
+
       // ⭐ INFORMACIÓN DE PAGOS
       if (bookingData.payments && bookingData.payments.length > 0) {
         doc.moveDown();
-        doc.font('Helvetica-Bold').text("Pagos Registrados:");
-        doc.font('Helvetica');
-        
+        doc.font("Helvetica-Bold").text("Pagos Registrados:");
+        doc.font("Helvetica");
+
         bookingData.payments.forEach((payment, index) => {
-          doc.text(`  ${index + 1}. $${parseFloat(payment.amount).toLocaleString()} - ${payment.paymentMethod} (${formatColombiaDate(payment.paymentDate)})`);
+          doc.text(
+            `  ${index + 1}. $${parseFloat(
+              payment.amount
+            ).toLocaleString()} - ${
+              payment.paymentMethod
+            } (${formatColombiaDate(payment.paymentDate)})`
+          );
         });
-        
+
         doc.moveDown(0.3);
         doc.text(`Total Pagado: $${totalPaid.toLocaleString()}`);
-        
+
         const balance = grandTotal - totalPaid;
         if (balance > 0) {
-          doc.font('Helvetica-Bold').text(`Saldo Pendiente: $${balance.toLocaleString()}`);
+          doc
+            .font("Helvetica-Bold")
+            .text(`Saldo Pendiente: $${balance.toLocaleString()}`);
         } else {
-          doc.font('Helvetica-Bold').text("✓ TOTALMENTE PAGADO");
+          doc.font("Helvetica-Bold").text("✓ TOTALMENTE PAGADO");
         }
-        doc.font('Helvetica');
+        doc.font("Helvetica");
       } else {
         doc.moveDown();
         doc.text("Estado de Pago: Pendiente");
@@ -1387,54 +1637,77 @@ const downloadBookingPdf = async (req, res, next) => {
 
       // ⭐ ENLACE DE SEGUIMIENTO
       doc.moveDown(2);
-      doc.fontSize(10).text("═".repeat(60), { align: 'center' });
+      doc.fontSize(10).text("═".repeat(60), { align: "center" });
       doc.moveDown(0.5);
-      doc.fontSize(12).font('Helvetica-Bold').text("Seguimiento de Reserva", { align: 'center' });
-      doc.fontSize(10).font('Helvetica');
-      doc.text(`Consulta el estado actualizado de tu reserva en:`, { align: 'center' });
-      doc.text(`${process.env.FRONT_URL}/booking-status/${trackingToken}`, { align: 'center', link: `${process.env.FRONT_URL}/booking-status/${trackingToken}` });
+      doc
+        .fontSize(12)
+        .font("Helvetica-Bold")
+        .text("Seguimiento de Reserva", { align: "center" });
+      doc.fontSize(10).font("Helvetica");
+      doc.text(`Consulta el estado actualizado de tu reserva en:`, {
+        align: "center",
+      });
+      doc.text(`${process.env.FRONT_URL}/booking-status/${trackingToken}`, {
+        align: "center",
+        link: `${process.env.FRONT_URL}/booking-status/${trackingToken}`,
+      });
 
       // ⭐ PIE DE PÁGINA
       doc.moveDown(1);
-      doc.fontSize(8).text("═".repeat(80), { align: 'center' });
-      doc.text(`Documento generado el ${formatForLogs(getColombiaTime())}`, { align: 'center' });
-      doc.text("Este es un documento oficial de Balu Hotel", { align: 'center' });
+      doc.fontSize(8).text("═".repeat(80), { align: "center" });
+      doc.text(`Documento generado el ${formatForLogs(getColombiaTime())}`, {
+        align: "center",
+      });
+      doc.text("Este es un documento oficial de Balu Hotel", {
+        align: "center",
+      });
 
       console.log("✅ [DOWNLOAD-PDF] Contenido del PDF escrito exitosamente");
       doc.end();
-
     } catch (contentError) {
-      console.error("❌ [DOWNLOAD-PDF] Error al escribir contenido del PDF:", contentError);
+      console.error(
+        "❌ [DOWNLOAD-PDF] Error al escribir contenido del PDF:",
+        contentError
+      );
       if (!res.headersSent) {
         res.status(500).json({
           error: true,
           message: "Error al generar el contenido del PDF",
-          details: contentError.message
+          details: contentError.message,
         });
       }
     }
-
   } catch (error) {
     console.error("❌ [DOWNLOAD-PDF] Error general:", error);
-    console.error("🕐 [DOWNLOAD-PDF] Hora del error:", formatForLogs(getColombiaTime()));
-    
+    console.error(
+      "🕐 [DOWNLOAD-PDF] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
     if (!res.headersSent) {
       res.status(500).json({
         error: true,
         message: "Error interno al generar el PDF",
         details: error.message,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
   }
 };
 
-
 const getBookingByToken = async (req, res, next) => {
   try {
-    console.log("🔍 [GET-BOOKING-BY-TOKEN] Iniciando consulta de reserva por token");
-    console.log("🕐 [GET-BOOKING-BY-TOKEN] Hora Colombia:", formatForLogs(getColombiaTime()));
-    console.log("📥 [GET-BOOKING-BY-TOKEN] trackingToken:", req.params.trackingToken);
+    console.log(
+      "🔍 [GET-BOOKING-BY-TOKEN] Iniciando consulta de reserva por token"
+    );
+    console.log(
+      "🕐 [GET-BOOKING-BY-TOKEN] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
+    console.log(
+      "📥 [GET-BOOKING-BY-TOKEN] trackingToken:",
+      req.params.trackingToken
+    );
 
     const { trackingToken } = req.params;
 
@@ -1443,7 +1716,7 @@ const getBookingByToken = async (req, res, next) => {
       console.log("❌ [GET-BOOKING-BY-TOKEN] trackingToken faltante");
       return res.status(400).json({
         error: true,
-        message: "Token de seguimiento es requerido"
+        message: "Token de seguimiento es requerido",
       });
     }
 
@@ -1458,23 +1731,26 @@ const getBookingByToken = async (req, res, next) => {
         iat: decoded.iat,
         exp: decoded.exp,
         issuedAt: formatForLogs(new Date(decoded.iat * 1000)),
-        expiresAt: formatForLogs(new Date(decoded.exp * 1000))
+        expiresAt: formatForLogs(new Date(decoded.exp * 1000)),
       });
     } catch (tokenError) {
-      console.error("❌ [GET-BOOKING-BY-TOKEN] Error al verificar token:", tokenError.message);
-      
+      console.error(
+        "❌ [GET-BOOKING-BY-TOKEN] Error al verificar token:",
+        tokenError.message
+      );
+
       let errorMessage = "Token de seguimiento inválido";
-      if (tokenError.name === 'TokenExpiredError') {
+      if (tokenError.name === "TokenExpiredError") {
         errorMessage = "Token de seguimiento expirado";
-      } else if (tokenError.name === 'JsonWebTokenError') {
+      } else if (tokenError.name === "JsonWebTokenError") {
         errorMessage = "Token de seguimiento malformado";
       }
-      
+
       return res.status(401).json({
         error: true,
         message: errorMessage,
         details: tokenError.message,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -1484,7 +1760,7 @@ const getBookingByToken = async (req, res, next) => {
       console.log("❌ [GET-BOOKING-BY-TOKEN] bookingId no encontrado en token");
       return res.status(400).json({
         error: true,
-        message: "Token no contiene un ID de reserva válido"
+        message: "Token no contiene un ID de reserva válido",
       });
     }
 
@@ -1494,76 +1770,103 @@ const getBookingByToken = async (req, res, next) => {
     const booking = await Booking.findOne({
       where: { bookingId },
       include: [
-        { 
+        {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'type', 'description', 'maxGuests', 'status'],
+          as: "room",
+          attributes: [
+            "roomNumber",
+            "type",
+            "description",
+            "maxGuests",
+            "status",
+          ],
           include: [
             {
               model: BasicInventory,
-              as: 'BasicInventories',
-              attributes: ['id', 'name', 'description', 'inventoryType'],
-              through: { 
-                attributes: ['quantity', 'isRequired'],
-                as: 'RoomBasics'
+              as: "BasicInventories",
+              attributes: ["id", "name", "description", "inventoryType"],
+              through: {
+                attributes: ["quantity", "isRequired"],
+                as: "RoomBasics",
               },
-              required: false
-            }
-          ]
+              required: false,
+            },
+          ],
         },
         {
           model: Buyer,
-          as: 'guest',
-          attributes: ['sdocno', 'scostumername', 'selectronicmail', 'stelephone']
+          as: "guest",
+          attributes: [
+            "sdocno",
+            "scostumername",
+            "selectronicmail",
+            "stelephone",
+          ],
         },
         {
           model: ExtraCharge,
-          as: 'extraCharges',
-          attributes: ['id', 'description', 'amount', 'quantity', 'chargeDate', 'chargeType'],
-          required: false
+          as: "extraCharges",
+          attributes: [
+            "id",
+            "description",
+            "amount",
+            "quantity",
+            "chargeDate",
+            "chargeType",
+          ],
+          required: false,
         },
         {
           model: Payment,
-          as: 'payments',
+          as: "payments",
           attributes: [
-            'paymentId', 
-            'amount', 
-            'paymentMethod', 
-            'paymentStatus', 
-            'paymentDate', 
-            'paymentType', 
-            'transactionId',
-            'paymentReference'
+            "paymentId",
+            "amount",
+            "paymentMethod",
+            "paymentStatus",
+            "paymentDate",
+            "paymentType",
+            "transactionId",
+            "paymentReference",
           ],
-          required: false
+          required: false,
         },
         {
           model: Bill,
-          as: 'bill',
-          attributes: ['idBill', 'totalAmount', 'status', 'createdAt', 'taxInvoiceId'],
-          required: false
+          as: "bill",
+          attributes: [
+            "idBill",
+            "totalAmount",
+            "status",
+            "createdAt",
+            "taxInvoiceId",
+          ],
+          required: false,
         },
         {
           model: BookingInventoryUsage,
-          as: 'inventoryUsages',
+          as: "inventoryUsages",
           include: [
             {
               model: BasicInventory,
-              as: 'inventory',
-              attributes: ['id', 'name', 'inventoryType', 'category']
-            }
+              as: "inventory",
+              attributes: ["id", "name", "inventoryType", "category"],
+            },
           ],
-          required: false
-        }
+          required: false,
+        },
       ],
     });
 
     if (!booking) {
-      console.log("❌ [GET-BOOKING-BY-TOKEN] Reserva no encontrada:", bookingId);
+      console.log(
+        "❌ [GET-BOOKING-BY-TOKEN] Reserva no encontrada:",
+        bookingId
+      );
       return res.status(404).json({
         error: true,
         message: "Reserva no encontrada",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -1574,40 +1877,40 @@ const getBookingByToken = async (req, res, next) => {
       roomNumber: booking.room?.roomNumber || booking.roomNumber,
       hasPayments: booking.payments?.length > 0,
       hasExtraCharges: booking.extraCharges?.length > 0,
-      hasBill: !!booking.bill
+      hasBill: !!booking.bill,
     });
 
     // ⭐ PROCESAR DATOS DE LA RESERVA CON INFORMACIÓN CALCULADA
     const bookingData = booking.toJSON();
-    
+
     // ⭐ CALCULAR INFORMACIÓN FINANCIERA
     const baseAmount = parseFloat(bookingData.totalAmount || 0);
     const extraCharges = bookingData.extraCharges || [];
     const payments = bookingData.payments || [];
-    
+
     const totalExtras = extraCharges.reduce((sum, charge) => {
       const amount = parseFloat(charge.amount || 0);
       const quantity = parseInt(charge.quantity || 1);
-      return sum + (amount * quantity);
+      return sum + amount * quantity;
     }, 0);
-    
+
     const totalPaid = payments
-      .filter(payment => payment.paymentStatus === 'completed')
+      .filter((payment) => payment.paymentStatus === "completed")
       .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
-    
+
     const totalPending = payments
-      .filter(payment => payment.paymentStatus === 'pending')
+      .filter((payment) => payment.paymentStatus === "pending")
       .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
-    
+
     const grandTotal = baseAmount + totalExtras;
     const balance = Math.max(0, grandTotal - totalPaid);
-    
+
     // ⭐ ESTADO DE PAGO
-    let paymentStatus = 'unpaid';
+    let paymentStatus = "unpaid";
     if (totalPaid >= grandTotal) {
-      paymentStatus = 'fully_paid';
+      paymentStatus = "fully_paid";
     } else if (totalPaid > 0) {
-      paymentStatus = 'partially_paid';
+      paymentStatus = "partially_paid";
     }
 
     // ⭐ INFORMACIÓN DE INVENTARIO
@@ -1615,58 +1918,73 @@ const getBookingByToken = async (req, res, next) => {
     const inventoryInfo = {
       hasInventory: inventoryUsages.length > 0,
       totalItems: inventoryUsages.length,
-      itemsAssigned: inventoryUsages.filter(u => u.status === 'assigned').length,
-      itemsReturned: inventoryUsages.filter(u => u.status === 'returned').length,
-      itemsConsumed: inventoryUsages.filter(u => u.status === 'consumed').length,
-      readyForCheckOut: inventoryUsages.length > 0 && 
-                       inventoryUsages.every(u => u.status === 'returned' || u.status === 'consumed')
+      itemsAssigned: inventoryUsages.filter((u) => u.status === "assigned")
+        .length,
+      itemsReturned: inventoryUsages.filter((u) => u.status === "returned")
+        .length,
+      itemsConsumed: inventoryUsages.filter((u) => u.status === "consumed")
+        .length,
+      readyForCheckOut:
+        inventoryUsages.length > 0 &&
+        inventoryUsages.every(
+          (u) => u.status === "returned" || u.status === "consumed"
+        ),
     };
 
     // ⭐ CALCULAR NOCHES DE ESTADÍA
     const nights = getDaysDifference(bookingData.checkIn, bookingData.checkOut);
-    
+
     // ⭐ ESTADO DE LA RESERVA
     const now = getColombiaTime();
     const checkInDate = new Date(bookingData.checkIn);
     const checkOutDate = new Date(bookingData.checkOut);
-    
+
     const bookingStatus = {
-      canCheckIn: bookingData.status === 'confirmed' && 
-                  checkInDate <= now && 
-                  paymentStatus !== 'unpaid',
-      canCheckOut: bookingData.status === 'checked-in' && 
-                   paymentStatus === 'fully_paid' && 
-                   inventoryInfo.readyForCheckOut,
-      isActive: ['confirmed', 'checked-in'].includes(bookingData.status),
-      isCompleted: bookingData.status === 'completed',
-      isCancelled: bookingData.status === 'cancelled',
-      isOverdue: bookingData.status === 'checked-in' && now > checkOutDate,
-      daysSinceCheckIn: bookingData.status === 'checked-in' && bookingData.actualCheckIn
-        ? Math.floor((now - new Date(bookingData.actualCheckIn)) / (1000 * 60 * 60 * 24))
-        : 0,
-      daysUntilCheckIn: bookingData.status === 'confirmed'
-        ? Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24))
-        : 0,
-      daysUntilCheckOut: ['confirmed', 'checked-in'].includes(bookingData.status)
+      canCheckIn:
+        bookingData.status === "confirmed" &&
+        checkInDate <= now &&
+        paymentStatus !== "unpaid",
+      canCheckOut:
+        bookingData.status === "checked-in" &&
+        paymentStatus === "fully_paid" &&
+        inventoryInfo.readyForCheckOut,
+      isActive: ["confirmed", "checked-in"].includes(bookingData.status),
+      isCompleted: bookingData.status === "completed",
+      isCancelled: bookingData.status === "cancelled",
+      isOverdue: bookingData.status === "checked-in" && now > checkOutDate,
+      daysSinceCheckIn:
+        bookingData.status === "checked-in" && bookingData.actualCheckIn
+          ? Math.floor(
+              (now - new Date(bookingData.actualCheckIn)) /
+                (1000 * 60 * 60 * 24)
+            )
+          : 0,
+      daysUntilCheckIn:
+        bookingData.status === "confirmed"
+          ? Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24))
+          : 0,
+      daysUntilCheckOut: ["confirmed", "checked-in"].includes(
+        bookingData.status
+      )
         ? Math.ceil((checkOutDate - now) / (1000 * 60 * 60 * 24))
-        : 0
+        : 0,
     };
 
     // ⭐ PREPARAR RESPUESTA ENRIQUECIDA
     const responseData = {
       ...bookingData,
-      
+
       // ⭐ FECHAS FORMATEADAS EN ZONA HORARIA DE COLOMBIA
       checkInFormatted: formatColombiaDate(bookingData.checkIn),
       checkOutFormatted: formatColombiaDate(bookingData.checkOut),
       createdAtFormatted: formatForLogs(bookingData.createdAt),
-      actualCheckInFormatted: bookingData.actualCheckIn 
-        ? formatForLogs(bookingData.actualCheckIn) 
+      actualCheckInFormatted: bookingData.actualCheckIn
+        ? formatForLogs(bookingData.actualCheckIn)
         : null,
-      actualCheckOutFormatted: bookingData.actualCheckOut 
-        ? formatForLogs(bookingData.actualCheckOut) 
+      actualCheckOutFormatted: bookingData.actualCheckOut
+        ? formatForLogs(bookingData.actualCheckOut)
         : null,
-      
+
       // ⭐ INFORMACIÓN FINANCIERA CALCULADA
       financialSummary: {
         baseAmount,
@@ -1676,80 +1994,94 @@ const getBookingByToken = async (req, res, next) => {
         totalPending,
         balance,
         paymentStatus,
-        isFullyPaid: paymentStatus === 'fully_paid',
+        isFullyPaid: paymentStatus === "fully_paid",
         hasExtraCharges: totalExtras > 0,
-        paymentsCount: payments.filter(p => p.paymentStatus === 'completed').length,
-        pendingPaymentsCount: payments.filter(p => p.paymentStatus === 'pending').length,
+        paymentsCount: payments.filter((p) => p.paymentStatus === "completed")
+          .length,
+        pendingPaymentsCount: payments.filter(
+          (p) => p.paymentStatus === "pending"
+        ).length,
         // Formateos para mostrar
         baseAmountFormatted: `$${baseAmount.toLocaleString()}`,
         totalExtrasFormatted: `$${totalExtras.toLocaleString()}`,
         grandTotalFormatted: `$${grandTotal.toLocaleString()}`,
         totalPaidFormatted: `$${totalPaid.toLocaleString()}`,
         balanceFormatted: `$${balance.toLocaleString()}`,
-        paymentPercentage: grandTotal > 0 ? Math.round((totalPaid / grandTotal) * 100) : 0
+        paymentPercentage:
+          grandTotal > 0 ? Math.round((totalPaid / grandTotal) * 100) : 0,
       },
-      
+
       // ⭐ INFORMACIÓN DE ESTADÍA
       stayInfo: {
         nights,
         guestCount: bookingData.guestCount,
-        pointOfSale: bookingData.pointOfSale || 'Online',
-        isOnlineBooking: (bookingData.pointOfSale || 'Online') === 'Online',
+        pointOfSale: bookingData.pointOfSale || "Online",
+        isOnlineBooking: (bookingData.pointOfSale || "Online") === "Online",
         checkInTime: formatForDisplay(checkInDate),
         checkOutTime: formatForDisplay(checkOutDate),
-        totalDuration: `${nights} ${nights === 1 ? 'noche' : 'noches'}`
+        totalDuration: `${nights} ${nights === 1 ? "noche" : "noches"}`,
       },
-      
+
       // ⭐ ESTADO DE LA RESERVA
       bookingStatus,
-      
+
       // ⭐ INFORMACIÓN DE INVENTARIO
       inventoryInfo,
-      
+
       // ⭐ INFORMACIÓN DE LA HABITACIÓN
-      roomInfo: bookingData.room ? {
-        number: bookingData.room.roomNumber,
-        type: bookingData.room.type,
-        description: bookingData.room.description,
-        maxGuests: bookingData.room.maxGuests,
-        currentStatus: bookingData.room.status,
-        hasBasicInventory: bookingData.room.BasicInventories && 
-                          bookingData.room.BasicInventories.length > 0
-      } : null,
-      
+      roomInfo: bookingData.room
+        ? {
+            number: bookingData.room.roomNumber,
+            type: bookingData.room.type,
+            description: bookingData.room.description,
+            maxGuests: bookingData.room.maxGuests,
+            currentStatus: bookingData.room.status,
+            hasBasicInventory:
+              bookingData.room.BasicInventories &&
+              bookingData.room.BasicInventories.length > 0,
+          }
+        : null,
+
       // ⭐ INFORMACIÓN DEL HUÉSPED
-      guestInfo: bookingData.guest ? {
-        name: bookingData.guest.scostumername,
-        document: bookingData.guest.sdocno,
-        email: bookingData.guest.selectronicmail,
-        phone: bookingData.guest.stelephone
-      } : null,
-      
+      guestInfo: bookingData.guest
+        ? {
+            name: bookingData.guest.scostumername,
+            document: bookingData.guest.sdocno,
+            email: bookingData.guest.selectronicmail,
+            phone: bookingData.guest.stelephone,
+          }
+        : null,
+
       // ⭐ INFORMACIÓN DE FACTURACIÓN
-      billInfo: bookingData.bill ? {
-        billId: bookingData.bill.idBill,
-        totalAmount: bookingData.bill.totalAmount,
-        status: bookingData.bill.status,
-        createdAt: formatForLogs(bookingData.bill.createdAt),
-        hasTaxInvoice: !!bookingData.bill.taxInvoiceId,
-        taxInvoiceId: bookingData.bill.taxInvoiceId
-      } : null,
-      
+      billInfo: bookingData.bill
+        ? {
+            billId: bookingData.bill.idBill,
+            totalAmount: bookingData.bill.totalAmount,
+            status: bookingData.bill.status,
+            createdAt: formatForLogs(bookingData.bill.createdAt),
+            hasTaxInvoice: !!bookingData.bill.taxInvoiceId,
+            taxInvoiceId: bookingData.bill.taxInvoiceId,
+          }
+        : null,
+
       // ⭐ ACCIONES DISPONIBLES
       availableActions: {
         canViewDetails: true,
         canDownloadPdf: true,
-        canModify: ['confirmed'].includes(bookingData.status) && 
-                  bookingStatus.daysUntilCheckIn > 1,
-        canCancel: ['confirmed'].includes(bookingData.status) && 
-                  bookingStatus.daysUntilCheckIn > 0,
+        canModify:
+          ["confirmed"].includes(bookingData.status) &&
+          bookingStatus.daysUntilCheckIn > 1,
+        canCancel:
+          ["confirmed"].includes(bookingData.status) &&
+          bookingStatus.daysUntilCheckIn > 0,
         canMakePayment: balance > 0 && !bookingStatus.isCancelled,
         canCheckIn: bookingStatus.canCheckIn,
         canCheckOut: bookingStatus.canCheckOut,
-        canGenerateBill: ['checked-in', 'completed'].includes(bookingData.status) && 
-                        !bookingData.bill
+        canGenerateBill:
+          ["checked-in", "completed"].includes(bookingData.status) &&
+          !bookingData.bill,
       },
-      
+
       // ⭐ METADATOS
       metadata: {
         lastUpdated: formatForLogs(bookingData.updatedAt),
@@ -1757,8 +2089,8 @@ const getBookingByToken = async (req, res, next) => {
         tokenExpiresAt: formatForLogs(new Date(decoded.exp * 1000)),
         consultedAt: formatForLogs(getColombiaTime()),
         trackingUrl: `${process.env.FRONT_URL}/booking-status/${trackingToken}`,
-        pdfDownloadUrl: `${process.env.API_URL}/bookings/download-pdf/${trackingToken}`
-      }
+        pdfDownloadUrl: `${process.env.API_URL}/bookings/download-pdf/${trackingToken}`,
+      },
     };
 
     console.log("📤 [GET-BOOKING-BY-TOKEN] Respuesta preparada:", {
@@ -1767,28 +2099,32 @@ const getBookingByToken = async (req, res, next) => {
       paymentStatus: responseData.financialSummary.paymentStatus,
       balance: responseData.financialSummary.balanceFormatted,
       nights: responseData.stayInfo.nights,
-      hasActions: Object.values(responseData.availableActions).some(action => action === true),
-      completedAt: formatForLogs(getColombiaTime())
+      hasActions: Object.values(responseData.availableActions).some(
+        (action) => action === true
+      ),
+      completedAt: formatForLogs(getColombiaTime()),
     });
 
     res.json({
       error: false,
       message: "Reserva obtenida exitosamente",
       data: responseData,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [GET-BOOKING-BY-TOKEN] Error general:", error);
-    console.error("🕐 [GET-BOOKING-BY-TOKEN] Hora del error:", formatForLogs(getColombiaTime()));
-    
+    console.error(
+      "🕐 [GET-BOOKING-BY-TOKEN] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
     // Si no se han enviado headers, enviar error JSON
     if (!res.headersSent) {
       res.status(500).json({
         error: true,
         message: "Error interno al obtener la reserva",
         details: error.message,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
   }
@@ -1796,24 +2132,31 @@ const getBookingByToken = async (req, res, next) => {
 
 const getUserBookings = async (req, res, next) => {
   try {
-    console.log("👤 [GET-USER-BOOKINGS] Iniciando consulta de reservas de usuario");
-    console.log("🕐 [GET-USER-BOOKINGS] Hora Colombia:", formatForLogs(getColombiaTime()));
+    console.log(
+      "👤 [GET-USER-BOOKINGS] Iniciando consulta de reservas de usuario"
+    );
+    console.log(
+      "🕐 [GET-USER-BOOKINGS] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
     console.log("📥 [GET-USER-BOOKINGS] Parámetros recibidos:", {
       paramsUserId: req.params.sdocno,
       buyerUserId: req.buyer?.sdocno,
       hasReqBuyer: !!req.buyer,
-      hasReqUser: !!req.user
+      hasReqUser: !!req.user,
     });
 
     // ⭐ OBTENER IDENTIFICADOR DE USUARIO CON VALIDACIÓN MEJORADA
     const userId = req.params.sdocno || req.buyer?.sdocno;
-    
+
     if (!userId) {
-      console.log("❌ [GET-USER-BOOKINGS] Identificador de usuario no encontrado");
+      console.log(
+        "❌ [GET-USER-BOOKINGS] Identificador de usuario no encontrado"
+      );
       return res.status(400).json({
         error: true,
         message: "Identificador de usuario no encontrado en el token",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -1824,11 +2167,11 @@ const getUserBookings = async (req, res, next) => {
       status,
       limit = 50,
       page = 1,
-      sortBy = 'createdAt',
-      sortOrder = 'DESC',
-      includeCompleted = 'true',
+      sortBy = "createdAt",
+      sortOrder = "DESC",
+      includeCompleted = "true",
       fromDate,
-      toDate
+      toDate,
     } = req.query;
 
     console.log("🔍 [GET-USER-BOOKINGS] Filtros aplicados:", {
@@ -1839,19 +2182,19 @@ const getUserBookings = async (req, res, next) => {
       sortOrder,
       includeCompleted,
       fromDate,
-      toDate
+      toDate,
     });
 
     // ⭐ CONSTRUIR FILTROS DE BÚSQUEDA
     const whereConditions = { guestId: userId };
-    
+
     if (status) {
       whereConditions.status = status;
     }
-    
-    if (includeCompleted === 'false') {
+
+    if (includeCompleted === "false") {
       whereConditions.status = {
-        [Op.not]: 'completed'
+        [Op.not]: "completed",
       };
     }
 
@@ -1872,71 +2215,93 @@ const getUserBookings = async (req, res, next) => {
     const { count, rows: bookings } = await Booking.findAndCountAll({
       where: whereConditions,
       include: [
-        { 
+        {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'type', 'description', 'maxGuests', 'status'],
+          as: "room",
+          attributes: [
+            "roomNumber",
+            "type",
+            "description",
+            "maxGuests",
+            "status",
+          ],
           include: [
             {
               model: BasicInventory,
-              as: 'BasicInventories',
-              attributes: ['id', 'name', 'inventoryType', 'description'],
-              through: { 
-                attributes: ['quantity', 'isRequired'],
-                as: 'RoomBasics'
+              as: "BasicInventories",
+              attributes: ["id", "name", "inventoryType", "description"],
+              through: {
+                attributes: ["quantity", "isRequired"],
+                as: "RoomBasics",
               },
-              required: false
-            }
-          ]
+              required: false,
+            },
+          ],
         },
         {
           model: ExtraCharge,
-          as: 'extraCharges',
-          attributes: ['id', 'description', 'amount', 'quantity', 'chargeDate', 'chargeType'],
-          required: false
+          as: "extraCharges",
+          attributes: [
+            "id",
+            "description",
+            "amount",
+            "quantity",
+            "chargeDate",
+            "chargeType",
+          ],
+          required: false,
         },
         {
           model: Payment,
-          as: 'payments',
+          as: "payments",
           attributes: [
-            'paymentId', 
-            'amount', 
-            'paymentMethod', 
-            'paymentStatus', 
-            'paymentDate', 
-            'paymentType', 
-            'transactionId',
-            'paymentReference'
+            "paymentId",
+            "amount",
+            "paymentMethod",
+            "paymentStatus",
+            "paymentDate",
+            "paymentType",
+            "transactionId",
+            "paymentReference",
           ],
-          required: false
+          required: false,
         },
         {
           model: Bill,
-          as: 'bill',
-          attributes: ['idBill', 'totalAmount', 'status', 'createdAt', 'taxInvoiceId'],
-          required: false
+          as: "bill",
+          attributes: [
+            "idBill",
+            "totalAmount",
+            "status",
+            "createdAt",
+            "taxInvoiceId",
+          ],
+          required: false,
         },
         {
           model: BookingInventoryUsage,
-          as: 'inventoryUsages',
+          as: "inventoryUsages",
           include: [
             {
               model: BasicInventory,
-              as: 'inventory',
-              attributes: ['id', 'name', 'inventoryType', 'category']
-            }
+              as: "inventory",
+              attributes: ["id", "name", "inventoryType", "category"],
+            },
           ],
-          required: false
-        }
+          required: false,
+        },
       ],
       order: [[sortBy, sortOrder.toUpperCase()]],
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit),
-      distinct: true
+      distinct: true,
     });
 
     if (!bookings || bookings.length === 0) {
-      console.log("📭 [GET-USER-BOOKINGS] No se encontraron reservas para el usuario:", userId);
+      console.log(
+        "📭 [GET-USER-BOOKINGS] No se encontraron reservas para el usuario:",
+        userId
+      );
       return res.json({
         error: false,
         message: "No se encontraron reservas para este usuario",
@@ -1946,79 +2311,86 @@ const getUserBookings = async (req, res, next) => {
             total: 0,
             page: parseInt(page),
             limit: parseInt(limit),
-            totalPages: 0
+            totalPages: 0,
           },
           summary: {
             totalBookings: 0,
             byStatus: {},
             upcomingBookings: 0,
-            completedBookings: 0
-          }
+            completedBookings: 0,
+          },
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     console.log("✅ [GET-USER-BOOKINGS] Reservas encontradas:", {
       count,
       bookingsReturned: bookings.length,
-      userId
+      userId,
     });
 
     // ⭐ PROCESAR DATOS DE RESERVAS CON INFORMACIÓN CALCULADA
     const now = getColombiaTime();
-    const processedBookings = bookings.map(booking => {
+    const processedBookings = bookings.map((booking) => {
       const bookingData = booking.toJSON();
-      
+
       // ⭐ CALCULAR INFORMACIÓN FINANCIERA
       const baseAmount = parseFloat(bookingData.totalAmount || 0);
       const extraCharges = bookingData.extraCharges || [];
       const payments = bookingData.payments || [];
-      
+
       const totalExtras = extraCharges.reduce((sum, charge) => {
         const amount = parseFloat(charge.amount || 0);
         const quantity = parseInt(charge.quantity || 1);
-        return sum + (amount * quantity);
+        return sum + amount * quantity;
       }, 0);
-      
+
       const totalPaid = payments
-        .filter(payment => payment.paymentStatus === 'completed')
+        .filter((payment) => payment.paymentStatus === "completed")
         .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
-      
+
       const grandTotal = baseAmount + totalExtras;
       const balance = Math.max(0, grandTotal - totalPaid);
-      
+
       // ⭐ ESTADO DE PAGO
-      let paymentStatus = 'unpaid';
+      let paymentStatus = "unpaid";
       if (totalPaid >= grandTotal) {
-        paymentStatus = 'fully_paid';
+        paymentStatus = "fully_paid";
       } else if (totalPaid > 0) {
-        paymentStatus = 'partially_paid';
+        paymentStatus = "partially_paid";
       }
 
       // ⭐ CALCULAR NOCHES DE ESTADÍA
-      const nights = getDaysDifference(bookingData.checkIn, bookingData.checkOut);
-      
+      const nights = getDaysDifference(
+        bookingData.checkIn,
+        bookingData.checkOut
+      );
+
       // ⭐ ESTADO DE LA RESERVA
       const checkInDate = toColombiaTime(bookingData.checkIn);
       const checkOutDate = toColombiaTime(bookingData.checkOut);
-      
+
       const bookingStatus = {
-        isUpcoming: bookingData.status === 'confirmed' && checkInDate > now,
-        isActive: ['confirmed', 'checked-in'].includes(bookingData.status),
-        isCompleted: bookingData.status === 'completed',
-        isCancelled: bookingData.status === 'cancelled',
-        canCancel: bookingData.status === 'confirmed' && checkInDate > now,
-        canModify: bookingData.status === 'confirmed' && checkInDate > now,
-        canCheckIn: bookingData.status === 'confirmed' && 
-                   checkInDate <= now && 
-                   paymentStatus !== 'unpaid',
-        daysUntilCheckIn: bookingData.status === 'confirmed'
-          ? Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24))
-          : 0,
-        daysUntilCheckOut: ['confirmed', 'checked-in'].includes(bookingData.status)
+        isUpcoming: bookingData.status === "confirmed" && checkInDate > now,
+        isActive: ["confirmed", "checked-in"].includes(bookingData.status),
+        isCompleted: bookingData.status === "completed",
+        isCancelled: bookingData.status === "cancelled",
+        canCancel: bookingData.status === "confirmed" && checkInDate > now,
+        canModify: bookingData.status === "confirmed" && checkInDate > now,
+        canCheckIn:
+          bookingData.status === "confirmed" &&
+          checkInDate <= now &&
+          paymentStatus !== "unpaid",
+        daysUntilCheckIn:
+          bookingData.status === "confirmed"
+            ? Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24))
+            : 0,
+        daysUntilCheckOut: ["confirmed", "checked-in"].includes(
+          bookingData.status
+        )
           ? Math.ceil((checkOutDate - now) / (1000 * 60 * 60 * 24))
-          : 0
+          : 0,
       };
 
       // ⭐ INFORMACIÓN DE INVENTARIO
@@ -2026,25 +2398,28 @@ const getUserBookings = async (req, res, next) => {
       const inventoryInfo = {
         hasInventory: inventoryUsages.length > 0,
         totalItems: inventoryUsages.length,
-        itemsAssigned: inventoryUsages.filter(u => u.status === 'assigned').length,
-        itemsReturned: inventoryUsages.filter(u => u.status === 'returned').length,
-        itemsConsumed: inventoryUsages.filter(u => u.status === 'consumed').length
+        itemsAssigned: inventoryUsages.filter((u) => u.status === "assigned")
+          .length,
+        itemsReturned: inventoryUsages.filter((u) => u.status === "returned")
+          .length,
+        itemsConsumed: inventoryUsages.filter((u) => u.status === "consumed")
+          .length,
       };
 
       return {
         ...bookingData,
-        
+
         // ⭐ FECHAS FORMATEADAS EN ZONA HORARIA DE COLOMBIA
         checkInFormatted: formatColombiaDate(bookingData.checkIn),
         checkOutFormatted: formatColombiaDate(bookingData.checkOut),
         createdAtFormatted: formatForLogs(bookingData.createdAt),
-        actualCheckInFormatted: bookingData.actualCheckIn 
-          ? formatForLogs(bookingData.actualCheckIn) 
+        actualCheckInFormatted: bookingData.actualCheckIn
+          ? formatForLogs(bookingData.actualCheckIn)
           : null,
-        actualCheckOutFormatted: bookingData.actualCheckOut 
-          ? formatForLogs(bookingData.actualCheckOut) 
+        actualCheckOutFormatted: bookingData.actualCheckOut
+          ? formatForLogs(bookingData.actualCheckOut)
           : null,
-        
+
         // ⭐ INFORMACIÓN FINANCIERA CALCULADA
         financialSummary: {
           baseAmount,
@@ -2053,57 +2428,66 @@ const getUserBookings = async (req, res, next) => {
           totalPaid,
           balance,
           paymentStatus,
-          isFullyPaid: paymentStatus === 'fully_paid',
+          isFullyPaid: paymentStatus === "fully_paid",
           hasExtraCharges: totalExtras > 0,
-          paymentsCount: payments.filter(p => p.paymentStatus === 'completed').length,
-          pendingPaymentsCount: payments.filter(p => p.paymentStatus === 'pending').length,
+          paymentsCount: payments.filter((p) => p.paymentStatus === "completed")
+            .length,
+          pendingPaymentsCount: payments.filter(
+            (p) => p.paymentStatus === "pending"
+          ).length,
           // Formateos para mostrar
           baseAmountFormatted: `$${baseAmount.toLocaleString()}`,
           totalExtrasFormatted: `$${totalExtras.toLocaleString()}`,
           grandTotalFormatted: `$${grandTotal.toLocaleString()}`,
           totalPaidFormatted: `$${totalPaid.toLocaleString()}`,
           balanceFormatted: `$${balance.toLocaleString()}`,
-          paymentPercentage: grandTotal > 0 ? Math.round((totalPaid / grandTotal) * 100) : 0
+          paymentPercentage:
+            grandTotal > 0 ? Math.round((totalPaid / grandTotal) * 100) : 0,
         },
-        
+
         // ⭐ INFORMACIÓN DE ESTADÍA
         stayInfo: {
           nights,
           guestCount: bookingData.guestCount,
-          pointOfSale: bookingData.pointOfSale || 'Online',
-          isOnlineBooking: (bookingData.pointOfSale || 'Online') === 'Online',
+          pointOfSale: bookingData.pointOfSale || "Online",
+          isOnlineBooking: (bookingData.pointOfSale || "Online") === "Online",
           checkInTime: formatForDisplay(checkInDate),
           checkOutTime: formatForDisplay(checkOutDate),
-          totalDuration: `${nights} ${nights === 1 ? 'noche' : 'noches'}`
+          totalDuration: `${nights} ${nights === 1 ? "noche" : "noches"}`,
         },
-        
+
         // ⭐ ESTADO DE LA RESERVA
         bookingStatus,
-        
+
         // ⭐ INFORMACIÓN DE INVENTARIO
         inventoryInfo,
-        
+
         // ⭐ INFORMACIÓN DE LA HABITACIÓN
-        roomInfo: bookingData.room ? {
-          number: bookingData.room.roomNumber,
-          type: bookingData.room.type,
-          description: bookingData.room.description,
-          maxGuests: bookingData.room.maxGuests,
-          currentStatus: bookingData.room.status,
-          hasBasicInventory: bookingData.room.BasicInventories && 
-                            bookingData.room.BasicInventories.length > 0
-        } : null,
-        
+        roomInfo: bookingData.room
+          ? {
+              number: bookingData.room.roomNumber,
+              type: bookingData.room.type,
+              description: bookingData.room.description,
+              maxGuests: bookingData.room.maxGuests,
+              currentStatus: bookingData.room.status,
+              hasBasicInventory:
+                bookingData.room.BasicInventories &&
+                bookingData.room.BasicInventories.length > 0,
+            }
+          : null,
+
         // ⭐ INFORMACIÓN DE FACTURACIÓN
-        billInfo: bookingData.bill ? {
-          billId: bookingData.bill.idBill,
-          totalAmount: bookingData.bill.totalAmount,
-          status: bookingData.bill.status,
-          createdAt: formatForLogs(bookingData.bill.createdAt),
-          hasTaxInvoice: !!bookingData.bill.taxInvoiceId,
-          taxInvoiceId: bookingData.bill.taxInvoiceId
-        } : null,
-        
+        billInfo: bookingData.bill
+          ? {
+              billId: bookingData.bill.idBill,
+              totalAmount: bookingData.bill.totalAmount,
+              status: bookingData.bill.status,
+              createdAt: formatForLogs(bookingData.bill.createdAt),
+              hasTaxInvoice: !!bookingData.bill.taxInvoiceId,
+              taxInvoiceId: bookingData.bill.taxInvoiceId,
+            }
+          : null,
+
         // ⭐ ACCIONES DISPONIBLES
         availableActions: {
           canViewDetails: true,
@@ -2111,9 +2495,10 @@ const getUserBookings = async (req, res, next) => {
           canCancel: bookingStatus.canCancel,
           canMakePayment: balance > 0 && !bookingStatus.isCancelled,
           canCheckIn: bookingStatus.canCheckIn,
-          canDownloadReceipt: bookingData.bill || paymentStatus === 'fully_paid',
-          canContactSupport: true
-        }
+          canDownloadReceipt:
+            bookingData.bill || paymentStatus === "fully_paid",
+          canContactSupport: true,
+        },
       };
     });
 
@@ -2121,29 +2506,38 @@ const getUserBookings = async (req, res, next) => {
     const summary = {
       totalBookings: count,
       bookingsByStatus: {
-        confirmed: processedBookings.filter(b => b.status === 'confirmed').length,
-        checkedIn: processedBookings.filter(b => b.status === 'checked-in').length,
-        completed: processedBookings.filter(b => b.status === 'completed').length,
-        cancelled: processedBookings.filter(b => b.status === 'cancelled').length
+        confirmed: processedBookings.filter((b) => b.status === "confirmed")
+          .length,
+        checkedIn: processedBookings.filter((b) => b.status === "checked-in")
+          .length,
+        completed: processedBookings.filter((b) => b.status === "completed")
+          .length,
+        cancelled: processedBookings.filter((b) => b.status === "cancelled")
+          .length,
       },
-      upcomingBookings: processedBookings.filter(b => b.bookingStatus.isUpcoming).length,
-      activeBookings: processedBookings.filter(b => b.bookingStatus.isActive).length,
-      completedBookings: processedBookings.filter(b => b.bookingStatus.isCompleted).length,
+      upcomingBookings: processedBookings.filter(
+        (b) => b.bookingStatus.isUpcoming
+      ).length,
+      activeBookings: processedBookings.filter((b) => b.bookingStatus.isActive)
+        .length,
+      completedBookings: processedBookings.filter(
+        (b) => b.bookingStatus.isCompleted
+      ).length,
       totalSpent: processedBookings
-        .filter(b => b.bookingStatus.isCompleted)
+        .filter((b) => b.bookingStatus.isCompleted)
         .reduce((sum, b) => sum + b.financialSummary.totalPaid, 0),
       totalPending: processedBookings
-        .filter(b => b.bookingStatus.isActive)
+        .filter((b) => b.bookingStatus.isActive)
         .reduce((sum, b) => sum + b.financialSummary.balance, 0),
       // Formateos
       totalSpentFormatted: `$${processedBookings
-        .filter(b => b.bookingStatus.isCompleted)
+        .filter((b) => b.bookingStatus.isCompleted)
         .reduce((sum, b) => sum + b.financialSummary.totalPaid, 0)
         .toLocaleString()}`,
       totalPendingFormatted: `$${processedBookings
-        .filter(b => b.bookingStatus.isActive)
+        .filter((b) => b.bookingStatus.isActive)
         .reduce((sum, b) => sum + b.financialSummary.balance, 0)
-        .toLocaleString()}`
+        .toLocaleString()}`,
     };
 
     console.log("📊 [GET-USER-BOOKINGS] Resumen generado:", {
@@ -2151,7 +2545,7 @@ const getUserBookings = async (req, res, next) => {
       upcoming: summary.upcomingBookings,
       active: summary.activeBookings,
       completed: summary.completedBookings,
-      totalSpent: summary.totalSpentFormatted
+      totalSpent: summary.totalSpentFormatted,
     });
 
     // ⭐ PREPARAR RESPUESTA ENRIQUECIDA
@@ -2162,16 +2556,16 @@ const getUserBookings = async (req, res, next) => {
         page: parseInt(page),
         limit: parseInt(limit),
         totalPages: Math.ceil(count / parseInt(limit)),
-        hasNext: (parseInt(page) * parseInt(limit)) < count,
-        hasPrev: parseInt(page) > 1
+        hasNext: parseInt(page) * parseInt(limit) < count,
+        hasPrev: parseInt(page) > 1,
       },
       summary,
       queryInfo: {
         userId,
         filters: { status, includeCompleted, fromDate, toDate },
         sorting: { sortBy, sortOrder },
-        timestamp: formatForLogs(getColombiaTime())
-      }
+        timestamp: formatForLogs(getColombiaTime()),
+      },
     };
 
     console.log("📤 [GET-USER-BOOKINGS] Respuesta preparada:", {
@@ -2179,36 +2573,42 @@ const getUserBookings = async (req, res, next) => {
       totalCount: responseData.pagination.total,
       currentPage: responseData.pagination.page,
       totalPages: responseData.pagination.totalPages,
-      completedAt: formatForLogs(getColombiaTime())
+      completedAt: formatForLogs(getColombiaTime()),
     });
 
     res.json({
       error: false,
       message: `${count} reserva(s) obtenida(s) exitosamente para el usuario`,
       data: responseData,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [GET-USER-BOOKINGS] Error general:", error);
-    console.error("🕐 [GET-USER-BOOKINGS] Hora del error:", formatForLogs(getColombiaTime()));
-    
+    console.error(
+      "🕐 [GET-USER-BOOKINGS] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
     res.status(500).json({
       error: true,
       message: "Error interno al obtener las reservas del usuario",
       details: error.message,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
   }
 };
 
-
-
 const getBookingById = async (req, res) => {
   try {
-    console.log("🔍 [GET-BOOKING-BY-ID] Iniciando búsqueda de reserva:", req.params.bookingId);
-    console.log("🕐 [GET-BOOKING-BY-ID] Hora Colombia:", formatForLogs(getColombiaTime()));
-    
+    console.log(
+      "🔍 [GET-BOOKING-BY-ID] Iniciando búsqueda de reserva:",
+      req.params.bookingId
+    );
+    console.log(
+      "🕐 [GET-BOOKING-BY-ID] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
+
     const { bookingId } = req.params;
 
     // ⭐ VALIDACIONES BÁSICAS CON LOGS
@@ -2216,8 +2616,8 @@ const getBookingById = async (req, res) => {
       console.log("❌ [GET-BOOKING-BY-ID] bookingId faltante");
       return res.status(400).json({
         error: true,
-        message: 'bookingId es requerido',
-        timestamp: formatForLogs(getColombiaTime())
+        message: "bookingId es requerido",
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -2227,93 +2627,142 @@ const getBookingById = async (req, res) => {
     const booking = await Booking.findOne({
       where: { bookingId },
       include: [
-        { 
+        {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'type', 'description', 'maxGuests', 'status', 'isActive'],
+          as: "room",
+          attributes: [
+            "roomNumber",
+            "type",
+            "description",
+            "maxGuests",
+            "status",
+            "isActive",
+          ],
           include: [
             {
               model: BasicInventory,
-              as: 'BasicInventories',
-              attributes: ['id', 'name', 'description', 'inventoryType', 'currentStock', 'cleanStock', 'category'],
-              through: { 
-                attributes: ['quantity', 'isRequired', 'priority'],
-                as: 'RoomBasics'
+              as: "BasicInventories",
+              attributes: [
+                "id",
+                "name",
+                "description",
+                "inventoryType",
+                "currentStock",
+                "cleanStock",
+                "category",
+              ],
+              through: {
+                attributes: ["quantity", "isRequired", "priority"],
+                as: "RoomBasics",
               },
-              required: false
-            }
-          ]
-        },
-        { 
-          model: ExtraCharge,
-          as: 'extraCharges',
-          attributes: ['id', 'description', 'amount', 'quantity', 'chargeDate', 'chargeType', 'notes'],
-          required: false
-        },
-        { 
-          model: Bill,
-          as: 'bill',
-          attributes: ['idBill', 'totalAmount', 'status', 'createdAt', 'taxInvoiceId', 'paymentMethod'],
-          required: false
-        },
-        { 
-          model: Buyer, 
-          as: "guest", 
-          attributes: ["sdocno", "scostumername", "selectronicmail", "stelephone"]
-        },
-        { 
-          model: Payment,
-          as: 'payments',
-          attributes: [
-            'paymentId', 
-            'amount', 
-            'paymentMethod', 
-            'paymentStatus', 
-            'paymentDate', 
-            'paymentType', 
-            'transactionId',
-            'paymentReference',
-            'processedBy'
+              required: false,
+            },
           ],
-          required: false
         },
-{
-  model: RegistrationPass,
-  as: "registrationPasses",
-  attributes: [
-    'registrationNumber',
-    'checkInDate',
-    'name',
-    'nationality',
-    'maritalStatus',
-    'profession',
-    'stayDuration',
-    'checkInTime',
-    'numberOfPeople',
-    'destination',
-    'idNumber',
-    'idIssuingPlace',
-    'foreignIdOrPassport',
-    'address',
-    'phoneNumber',
-    'bookingId',
-    'roomNumber'
-  ],
-  required: false
-},
+        {
+          model: ExtraCharge,
+          as: "extraCharges",
+          attributes: [
+            "id",
+            "description",
+            "amount",
+            "quantity",
+            "chargeDate",
+            "chargeType",
+            "notes",
+          ],
+          required: false,
+        },
+        {
+          model: Bill,
+          as: "bill",
+          attributes: [
+            "idBill",
+            "totalAmount",
+            "status",
+            "createdAt",
+            "taxInvoiceId",
+            "paymentMethod",
+          ],
+          required: false,
+        },
+        {
+          model: Buyer,
+          as: "guest",
+          attributes: [
+            "sdocno",
+            "scostumername",
+            "selectronicmail",
+            "stelephone",
+          ],
+        },
+        {
+          model: Payment,
+          as: "payments",
+          attributes: [
+            "paymentId",
+            "amount",
+            "paymentMethod",
+            "paymentStatus",
+            "paymentDate",
+            "paymentType",
+            "transactionId",
+            "paymentReference",
+            "processedBy",
+          ],
+          required: false,
+        },
+        {
+          model: RegistrationPass,
+          as: "registrationPasses",
+          attributes: [
+            "registrationNumber",
+            "checkInDate",
+            "name",
+            "nationality",
+            "maritalStatus",
+            "profession",
+            "stayDuration",
+            "checkInTime",
+            "numberOfPeople",
+            "destination",
+            "idNumber",
+            "idIssuingPlace",
+            "foreignIdOrPassport",
+            "address",
+            "phoneNumber",
+            "bookingId",
+            "roomNumber",
+          ],
+          required: false,
+        },
         {
           model: BookingInventoryUsage,
-          as: 'inventoryUsages',
-          attributes: ['quantityAssigned', 'quantityConsumed', 'quantityReturned', 'status', 'assignedAt', 'returnedAt', 'notes'],
+          as: "inventoryUsages",
+          attributes: [
+            "quantityAssigned",
+            "quantityConsumed",
+            "quantityReturned",
+            "status",
+            "assignedAt",
+            "returnedAt",
+            "notes",
+          ],
           include: [
             {
               model: BasicInventory,
-              as: 'inventory',
-              attributes: ['id', 'name', 'inventoryType', 'category', 'description']
-            }
+              as: "inventory",
+              attributes: [
+                "id",
+                "name",
+                "inventoryType",
+                "category",
+                "description",
+              ],
+            },
           ],
-          required: false
-        }
+          required: false,
+        },
       ],
     });
 
@@ -2321,8 +2770,8 @@ const getBookingById = async (req, res) => {
       console.log("❌ [GET-BOOKING-BY-ID] Reserva no encontrada:", bookingId);
       return res.status(404).json({
         error: true,
-        message: 'Reserva no encontrada',
-        timestamp: formatForLogs(getColombiaTime())
+        message: "Reserva no encontrada",
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -2336,40 +2785,40 @@ const getBookingById = async (req, res) => {
       hasExtraCharges: booking.extraCharges?.length > 0,
       hasBill: !!booking.bill,
       hasRegistrationPasses: booking.registrationPasses?.length > 0,
-      hasInventoryUsages: booking.inventoryUsages?.length > 0
+      hasInventoryUsages: booking.inventoryUsages?.length > 0,
     });
 
     // ⭐ PROCESAR DATOS DE LA RESERVA CON INFORMACIÓN CALCULADA
     const bookingData = booking.toJSON();
-    
+
     // ⭐ CALCULAR INFORMACIÓN FINANCIERA COMPLETA
     const baseAmount = parseFloat(bookingData.totalAmount || 0);
     const extraCharges = bookingData.extraCharges || [];
     const payments = bookingData.payments || [];
-    
+
     const totalExtras = extraCharges.reduce((sum, charge) => {
       const amount = parseFloat(charge.amount || 0);
       const quantity = parseInt(charge.quantity || 1);
-      return sum + (amount * quantity);
+      return sum + amount * quantity;
     }, 0);
-    
+
     const totalPaid = payments
-      .filter(payment => payment.paymentStatus === 'completed')
+      .filter((payment) => payment.paymentStatus === "completed")
       .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
-    
+
     const totalPending = payments
-      .filter(payment => payment.paymentStatus === 'pending')
+      .filter((payment) => payment.paymentStatus === "pending")
       .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
-    
+
     const grandTotal = baseAmount + totalExtras;
     const balance = Math.max(0, grandTotal - totalPaid);
-    
+
     // ⭐ ESTADO DE PAGO
-    let paymentStatus = 'unpaid';
+    let paymentStatus = "unpaid";
     if (totalPaid >= grandTotal) {
-      paymentStatus = 'fully_paid';
+      paymentStatus = "fully_paid";
     } else if (totalPaid > 0) {
-      paymentStatus = 'partially_paid';
+      paymentStatus = "partially_paid";
     }
 
     // ⭐ CALCULAR ESTADO DEL INVENTARIO CON MAYOR DETALLE
@@ -2377,13 +2826,20 @@ const getBookingById = async (req, res) => {
     const inventoryStatus = {
       hasInventoryAssigned: inventoryUsages.length > 0,
       totalItemsAssigned: inventoryUsages.length,
-      itemsReturned: inventoryUsages.filter(u => u.status === 'returned').length,
-      itemsConsumed: inventoryUsages.filter(u => u.status === 'consumed').length,
-      itemsPending: inventoryUsages.filter(u => u.status === 'assigned' || u.status === 'in_use').length,
-      canProceedCheckOut: bookingData.status === 'checked-in' && 
-                         inventoryUsages.length > 0 &&
-                         inventoryUsages.every(u => u.status === 'returned' || u.status === 'consumed'),
-      inventoryDetails: inventoryUsages.map(usage => ({
+      itemsReturned: inventoryUsages.filter((u) => u.status === "returned")
+        .length,
+      itemsConsumed: inventoryUsages.filter((u) => u.status === "consumed")
+        .length,
+      itemsPending: inventoryUsages.filter(
+        (u) => u.status === "assigned" || u.status === "in_use"
+      ).length,
+      canProceedCheckOut:
+        bookingData.status === "checked-in" &&
+        inventoryUsages.length > 0 &&
+        inventoryUsages.every(
+          (u) => u.status === "returned" || u.status === "consumed"
+        ),
+      inventoryDetails: inventoryUsages.map((usage) => ({
         id: usage.inventory?.id,
         name: usage.inventory?.name,
         type: usage.inventory?.inventoryType,
@@ -2394,8 +2850,8 @@ const getBookingById = async (req, res) => {
         status: usage.status,
         assignedAt: usage.assignedAt ? formatForLogs(usage.assignedAt) : null,
         returnedAt: usage.returnedAt ? formatForLogs(usage.returnedAt) : null,
-        notes: usage.notes
-      }))
+        notes: usage.notes,
+      })),
     };
 
     // ⭐ INFORMACIÓN DE CARGOS EXTRAS MEJORADA
@@ -2403,17 +2859,18 @@ const getBookingById = async (req, res) => {
       hasExtraCharges: extraCharges.length > 0,
       totalExtraCharges: totalExtras,
       extraChargesCount: extraCharges.length,
-      extraChargesDetails: extraCharges.map(charge => ({
+      extraChargesDetails: extraCharges.map((charge) => ({
         id: charge.id,
         description: charge.description,
         amount: parseFloat(charge.amount || 0),
         quantity: parseInt(charge.quantity || 1),
-        totalAmount: parseFloat(charge.amount || 0) * parseInt(charge.quantity || 1),
+        totalAmount:
+          parseFloat(charge.amount || 0) * parseInt(charge.quantity || 1),
         chargeType: charge.chargeType,
         chargeDate: formatForLogs(charge.chargeDate),
         notes: charge.notes,
-        amountFormatted: `$${parseFloat(charge.amount || 0).toLocaleString()}`
-      }))
+        amountFormatted: `$${parseFloat(charge.amount || 0).toLocaleString()}`,
+      })),
     };
 
     // ⭐ INFORMACIÓN DE PAGOS MEJORADA
@@ -2424,11 +2881,14 @@ const getBookingById = async (req, res) => {
       grandTotal,
       balance,
       paymentStatus,
-      isFullyPaid: paymentStatus === 'fully_paid',
-      paymentCount: payments.filter(p => p.paymentStatus === 'completed').length,
-      pendingPaymentsCount: payments.filter(p => p.paymentStatus === 'pending').length,
-      lastPayment: payments.find(p => p.paymentStatus === 'completed'),
-      allPayments: payments.map(payment => ({
+      isFullyPaid: paymentStatus === "fully_paid",
+      paymentCount: payments.filter((p) => p.paymentStatus === "completed")
+        .length,
+      pendingPaymentsCount: payments.filter(
+        (p) => p.paymentStatus === "pending"
+      ).length,
+      lastPayment: payments.find((p) => p.paymentStatus === "completed"),
+      allPayments: payments.map((payment) => ({
         paymentId: payment.paymentId,
         amount: parseFloat(payment.amount || 0),
         paymentMethod: payment.paymentMethod,
@@ -2438,127 +2898,157 @@ const getBookingById = async (req, res) => {
         transactionId: payment.transactionId,
         paymentReference: payment.paymentReference,
         processedBy: payment.processedBy,
-        amountFormatted: `$${parseFloat(payment.amount || 0).toLocaleString()}`
+        amountFormatted: `$${parseFloat(payment.amount || 0).toLocaleString()}`,
       })),
       // Formateos
       totalPaidFormatted: `$${totalPaid.toLocaleString()}`,
       balanceFormatted: `$${balance.toLocaleString()}`,
       grandTotalFormatted: `$${grandTotal.toLocaleString()}`,
-      paymentPercentage: grandTotal > 0 ? Math.round((totalPaid / grandTotal) * 100) : 0
+      paymentPercentage:
+        grandTotal > 0 ? Math.round((totalPaid / grandTotal) * 100) : 0,
     };
 
     // ⭐ INFORMACIÓN DE LA HABITACIÓN MEJORADA
-    const roomInfo = bookingData.room ? {
-      roomNumber: bookingData.room.roomNumber,
-      type: bookingData.room.type,
-      description: bookingData.room.description,
-      maxGuests: bookingData.room.maxGuests,
-      status: bookingData.room.status,
-      isActive: bookingData.room.isActive,
-      hasBasicInventory: bookingData.room.BasicInventories && bookingData.room.BasicInventories.length > 0,
-      basicInventoryCount: bookingData.room.BasicInventories ? bookingData.room.BasicInventories.length : 0,
-      basicInventoryDetails: bookingData.room.BasicInventories ? 
-        bookingData.room.BasicInventories.map(item => ({
-          id: item.id,
-          name: item.name,
-          type: item.inventoryType,
-          category: item.category,
-          currentStock: item.currentStock,
-          cleanStock: item.cleanStock,
-          requiredQuantity: item.RoomBasics?.quantity,
-          isRequired: item.RoomBasics?.isRequired,
-          priority: item.RoomBasics?.priority
-        })) : []
-    } : null;
+    const roomInfo = bookingData.room
+      ? {
+          roomNumber: bookingData.room.roomNumber,
+          type: bookingData.room.type,
+          description: bookingData.room.description,
+          maxGuests: bookingData.room.maxGuests,
+          status: bookingData.room.status,
+          isActive: bookingData.room.isActive,
+          hasBasicInventory:
+            bookingData.room.BasicInventories &&
+            bookingData.room.BasicInventories.length > 0,
+          basicInventoryCount: bookingData.room.BasicInventories
+            ? bookingData.room.BasicInventories.length
+            : 0,
+          basicInventoryDetails: bookingData.room.BasicInventories
+            ? bookingData.room.BasicInventories.map((item) => ({
+                id: item.id,
+                name: item.name,
+                type: item.inventoryType,
+                category: item.category,
+                currentStock: item.currentStock,
+                cleanStock: item.cleanStock,
+                requiredQuantity: item.RoomBasics?.quantity,
+                isRequired: item.RoomBasics?.isRequired,
+                priority: item.RoomBasics?.priority,
+              }))
+            : [],
+        }
+      : null;
 
     // ⭐ CALCULAR NOCHES DE ESTADÍA
     const nights = getDaysDifference(bookingData.checkIn, bookingData.checkOut);
-    
+
     // ⭐ ESTADO DE LA RESERVA CON LÓGICA MEJORADA
     const now = getColombiaTime();
     const checkInDate = toColombiaTime(bookingData.checkIn);
     const checkOutDate = toColombiaTime(bookingData.checkOut);
-    
+
     const bookingStatus = {
-      canCheckIn: bookingData.status === 'confirmed' && 
-                  checkInDate <= now && 
-                  paymentStatus !== 'unpaid',
-      canCheckOut: bookingData.status === 'checked-in' && 
-                   paymentStatus === 'fully_paid' && 
-                   inventoryStatus.canProceedCheckOut,
-      isActive: ['confirmed', 'checked-in'].includes(bookingData.status),
-      isCompleted: bookingData.status === 'completed',
-      isCancelled: bookingData.status === 'cancelled',
-      isOverdue: bookingData.status === 'checked-in' && now > checkOutDate,
-      canModify: bookingData.status === 'confirmed' && checkInDate > now,
-      canCancel: bookingData.status === 'confirmed' && checkInDate > now,
-      isReadyForCheckOut: bookingData.status === 'checked-in' && inventoryStatus.canProceedCheckOut,
-      canGenerateBill: ['checked-in', 'completed'].includes(bookingData.status),
-      daysSinceCheckIn: bookingData.status === 'checked-in' && bookingData.actualCheckIn
-        ? Math.floor((now - toColombiaTime(bookingData.actualCheckIn)) / (1000 * 60 * 60 * 24))
-        : 0,
-      daysUntilCheckIn: bookingData.status === 'confirmed'
-        ? Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24))
-        : 0,
-      daysUntilCheckOut: ['confirmed', 'checked-in'].includes(bookingData.status)
+      canCheckIn:
+        bookingData.status === "confirmed" &&
+        checkInDate <= now &&
+        paymentStatus !== "unpaid",
+      canCheckOut:
+        bookingData.status === "checked-in" &&
+        paymentStatus === "fully_paid" &&
+        inventoryStatus.canProceedCheckOut,
+      isActive: ["confirmed", "checked-in"].includes(bookingData.status),
+      isCompleted: bookingData.status === "completed",
+      isCancelled: bookingData.status === "cancelled",
+      isOverdue: bookingData.status === "checked-in" && now > checkOutDate,
+      canModify: bookingData.status === "confirmed" && checkInDate > now,
+      canCancel: bookingData.status === "confirmed" && checkInDate > now,
+      isReadyForCheckOut:
+        bookingData.status === "checked-in" &&
+        inventoryStatus.canProceedCheckOut,
+      canGenerateBill: ["checked-in", "completed"].includes(bookingData.status),
+      daysSinceCheckIn:
+        bookingData.status === "checked-in" && bookingData.actualCheckIn
+          ? Math.floor(
+              (now - toColombiaTime(bookingData.actualCheckIn)) /
+                (1000 * 60 * 60 * 24)
+            )
+          : 0,
+      daysUntilCheckIn:
+        bookingData.status === "confirmed"
+          ? Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24))
+          : 0,
+      daysUntilCheckOut: ["confirmed", "checked-in"].includes(
+        bookingData.status
+      )
         ? Math.ceil((checkOutDate - now) / (1000 * 60 * 60 * 24))
-        : 0
+        : 0,
     };
 
     // ⭐ INFORMACIÓN DEL HUÉSPED
-    const guestInfo = bookingData.guest ? {
-      name: bookingData.guest.scostumername,
-      document: bookingData.guest.sdocno,
-      email: bookingData.guest.selectronicmail,
-      phone: bookingData.guest.stelephone
-    } : {
-      name: 'Huésped no encontrado',
-      document: bookingData.guestId,
-      email: null,
-      phone: null
-    };
+    const guestInfo = bookingData.guest
+      ? {
+          name: bookingData.guest.scostumername,
+          document: bookingData.guest.sdocno,
+          email: bookingData.guest.selectronicmail,
+          phone: bookingData.guest.stelephone,
+        }
+      : {
+          name: "Huésped no encontrado",
+          document: bookingData.guestId,
+          email: null,
+          phone: null,
+        };
 
     // ⭐ INFORMACIÓN DE FACTURACIÓN
-    const billInfo = bookingData.bill ? {
-      billId: bookingData.bill.idBill,
-      totalAmount: parseFloat(bookingData.bill.totalAmount || 0),
-      status: bookingData.bill.status,
-      paymentMethod: bookingData.bill.paymentMethod,
-      createdAt: formatForLogs(bookingData.bill.createdAt),
-      hasTaxInvoice: !!bookingData.bill.taxInvoiceId,
-      taxInvoiceId: bookingData.bill.taxInvoiceId,
-      totalAmountFormatted: `$${parseFloat(bookingData.bill.totalAmount || 0).toLocaleString()}`
-    } : null;
+    const billInfo = bookingData.bill
+      ? {
+          billId: bookingData.bill.idBill,
+          totalAmount: parseFloat(bookingData.bill.totalAmount || 0),
+          status: bookingData.bill.status,
+          paymentMethod: bookingData.bill.paymentMethod,
+          createdAt: formatForLogs(bookingData.bill.createdAt),
+          hasTaxInvoice: !!bookingData.bill.taxInvoiceId,
+          taxInvoiceId: bookingData.bill.taxInvoiceId,
+          totalAmountFormatted: `$${parseFloat(
+            bookingData.bill.totalAmount || 0
+          ).toLocaleString()}`,
+        }
+      : null;
 
     // ⭐ INFORMACIÓN DE REGISTRO DE HUÉSPEDES
     const registrationInfo = {
-      hasRegistrationPasses: bookingData.registrationPasses && bookingData.registrationPasses.length > 0,
-      passesCount: bookingData.registrationPasses ? bookingData.registrationPasses.length : 0,
-      passes: bookingData.registrationPasses ? 
-        bookingData.registrationPasses.map(pass => ({
-          id: pass.id,
-          passNumber: pass.passNumber,
-          status: pass.status,
-          issuedAt: formatForLogs(pass.issuedAt)
-        })) : []
+      hasRegistrationPasses:
+        bookingData.registrationPasses &&
+        bookingData.registrationPasses.length > 0,
+      passesCount: bookingData.registrationPasses
+        ? bookingData.registrationPasses.length
+        : 0,
+      passes: bookingData.registrationPasses
+        ? bookingData.registrationPasses.map((pass) => ({
+            id: pass.id,
+            passNumber: pass.passNumber,
+            status: pass.status,
+            issuedAt: formatForLogs(pass.issuedAt),
+          }))
+        : [],
     };
 
     // ⭐ RESPUESTA ENRIQUECIDA CON TODA LA INFORMACIÓN
     const responseData = {
       ...bookingData,
-      
+
       // ⭐ FECHAS FORMATEADAS EN ZONA HORARIA DE COLOMBIA
       checkInFormatted: formatColombiaDate(bookingData.checkIn),
       checkOutFormatted: formatColombiaDate(bookingData.checkOut),
       createdAtFormatted: formatForLogs(bookingData.createdAt),
       updatedAtFormatted: formatForLogs(bookingData.updatedAt),
-      actualCheckInFormatted: bookingData.actualCheckIn 
-        ? formatForLogs(bookingData.actualCheckIn) 
+      actualCheckInFormatted: bookingData.actualCheckIn
+        ? formatForLogs(bookingData.actualCheckIn)
         : null,
-      actualCheckOutFormatted: bookingData.actualCheckOut 
-        ? formatForLogs(bookingData.actualCheckOut) 
+      actualCheckOutFormatted: bookingData.actualCheckOut
+        ? formatForLogs(bookingData.actualCheckOut)
         : null,
-      
+
       // ⭐ INFORMACIÓN FINANCIERA CALCULADA
       financialSummary: {
         baseAmount,
@@ -2568,7 +3058,7 @@ const getBookingById = async (req, res) => {
         totalPending,
         balance,
         paymentStatus,
-        isFullyPaid: paymentStatus === 'fully_paid',
+        isFullyPaid: paymentStatus === "fully_paid",
         hasExtraCharges: totalExtras > 0,
         paymentsCount: paymentInfo.paymentCount,
         pendingPaymentsCount: paymentInfo.pendingPaymentsCount,
@@ -2578,20 +3068,21 @@ const getBookingById = async (req, res) => {
         grandTotalFormatted: `$${grandTotal.toLocaleString()}`,
         totalPaidFormatted: `$${totalPaid.toLocaleString()}`,
         balanceFormatted: `$${balance.toLocaleString()}`,
-        paymentPercentage: grandTotal > 0 ? Math.round((totalPaid / grandTotal) * 100) : 0
+        paymentPercentage:
+          grandTotal > 0 ? Math.round((totalPaid / grandTotal) * 100) : 0,
       },
-      
+
       // ⭐ INFORMACIÓN DE ESTADÍA
       stayInfo: {
         nights,
         guestCount: bookingData.guestCount,
-        pointOfSale: bookingData.pointOfSale || 'Online',
-        isOnlineBooking: (bookingData.pointOfSale || 'Online') === 'Online',
+        pointOfSale: bookingData.pointOfSale || "Online",
+        isOnlineBooking: (bookingData.pointOfSale || "Online") === "Online",
         checkInTime: formatForDisplay(checkInDate),
         checkOutTime: formatForDisplay(checkOutDate),
-        totalDuration: `${nights} ${nights === 1 ? 'noche' : 'noches'}`
+        totalDuration: `${nights} ${nights === 1 ? "noche" : "noches"}`,
       },
-      
+
       // ⭐ INFORMACIÓN CALCULADA HEREDADA (para compatibilidad)
       inventoryStatus,
       paymentInfo,
@@ -2601,17 +3092,19 @@ const getBookingById = async (req, res) => {
       guestInfo,
       billInfo,
       registrationInfo,
-      
+
       // ⭐ MONTOS FORMATEADOS (para compatibilidad)
-      totalAmountFormatted: `$${parseFloat(bookingData.totalAmount || 0).toLocaleString()}`,
-      
+      totalAmountFormatted: `$${parseFloat(
+        bookingData.totalAmount || 0
+      ).toLocaleString()}`,
+
       // ⭐ ESTADO GENERAL (para compatibilidad)
       isReadyForCheckOut: bookingStatus.isReadyForCheckOut,
       canGenerateBill: bookingStatus.canGenerateBill,
-      
+
       // ⭐ NOCHES CALCULADAS (para compatibilidad)
       nights,
-      
+
       // ⭐ ACCIONES DISPONIBLES
       availableActions: {
         canViewDetails: true,
@@ -2621,24 +3114,28 @@ const getBookingById = async (req, res) => {
         canCheckIn: bookingStatus.canCheckIn,
         canCheckOut: bookingStatus.canCheckOut,
         canGenerateBill: bookingStatus.canGenerateBill,
-        canAddExtraCharges: ['confirmed', 'checked-in'].includes(bookingData.status),
-        canManageInventory: bookingData.status === 'checked-in',
+        canAddExtraCharges: ["confirmed", "checked-in"].includes(
+          bookingData.status
+        ),
+        canManageInventory: bookingData.status === "checked-in",
         canDownloadReceipt: billInfo !== null,
-        canIssueRegistrationPass: bookingData.status === 'checked-in'
+        canIssueRegistrationPass: bookingData.status === "checked-in",
       },
-      
+
       // ⭐ METADATOS ÚTILES
       metadata: {
         lastUpdated: formatForLogs(bookingData.updatedAt),
         consultedAt: formatForLogs(getColombiaTime()),
         processingFlags: {
-          needsAttention: balance > 0 && bookingData.status === 'checked-in',
+          needsAttention: balance > 0 && bookingData.status === "checked-in",
           hasUnprocessedExtras: totalExtras > 0 && balance > 0,
-          readyForBilling: bookingData.status === 'checked-in' && paymentStatus === 'fully_paid',
+          readyForBilling:
+            bookingData.status === "checked-in" &&
+            paymentStatus === "fully_paid",
           inventoryPending: inventoryStatus.itemsPending > 0,
-          isOverdue: bookingStatus.isOverdue
-        }
-      }
+          isOverdue: bookingStatus.isOverdue,
+        },
+      },
     };
 
     console.log("📤 [GET-BOOKING-BY-ID] Respuesta preparada:", {
@@ -2650,47 +3147,56 @@ const getBookingById = async (req, res) => {
       hasPaymentInfo: !!responseData.paymentInfo,
       isReadyForCheckOut: responseData.isReadyForCheckOut,
       canGenerateBill: responseData.canGenerateBill,
-      hasActions: Object.values(responseData.availableActions).some(action => action === true),
-      completedAt: formatForLogs(getColombiaTime())
+      hasActions: Object.values(responseData.availableActions).some(
+        (action) => action === true
+      ),
+      completedAt: formatForLogs(getColombiaTime()),
     });
 
     res.json({
       error: false,
-      message: 'Reserva obtenida exitosamente',
+      message: "Reserva obtenida exitosamente",
       data: responseData,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [GET-BOOKING-BY-ID] Error general:", error);
-    console.error("🕐 [GET-BOOKING-BY-ID] Hora del error:", formatForLogs(getColombiaTime()));
-    
+    console.error(
+      "🕐 [GET-BOOKING-BY-ID] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
     res.status(500).json({
       error: true,
-      message: 'Error al obtener la reserva',
+      message: "Error al obtener la reserva",
       details: error.message,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
   }
 };
 
-
 const getAllBookings = async (req, res, next) => {
   try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      status, 
-      roomNumber, 
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      roomNumber,
       guestId,
       includeInventory = false,
       fromDate,
-      toDate
+      toDate,
     } = req.query;
 
     console.log("🔍 [GET-ALL-BOOKINGS] Parámetros:", {
-      page, limit, status, roomNumber, guestId, 
-      includeInventory, fromDate, toDate
+      page,
+      limit,
+      status,
+      roomNumber,
+      guestId,
+      includeInventory,
+      fromDate,
+      toDate,
     });
 
     const where = {};
@@ -2702,116 +3208,138 @@ const getAllBookings = async (req, res, next) => {
     if (fromDate || toDate) {
       where.checkIn = {};
       if (fromDate) where.checkIn[Op.gte] = new Date(fromDate);
-      if (toDate) where.checkIn[Op.lte] = new Date(toDate + 'T23:59:59.999Z');
+      if (toDate) where.checkIn[Op.lte] = new Date(toDate + "T23:59:59.999Z");
     }
 
     const includeOptions = [
-      { 
+      {
         model: Room,
-        as: 'room',
-        attributes: ['roomNumber', 'type', 'status'],
+        as: "room",
+        attributes: ["roomNumber", "type", "status"],
         // ⭐ INCLUIR INVENTARIO BÁSICO DE LA HABITACIÓN
         include: [
           {
             model: BasicInventory,
-            as: 'BasicInventories',
-            attributes: ['id', 'name', 'description', 'currentStock'],
+            as: "BasicInventories",
+            attributes: ["id", "name", "description", "currentStock"],
             through: {
-              attributes: ['quantity'],
-              as: 'RoomBasics'
-            }
-          }
-        ]
+              attributes: ["quantity"],
+              as: "RoomBasics",
+            },
+          },
+        ],
       },
-      { 
-        model: Buyer, 
-        as: "guest", 
-        attributes: ["sdocno", "scostumername", "selectronicmail", "stelephone"]
+      {
+        model: Buyer,
+        as: "guest",
+        attributes: [
+          "sdocno",
+          "scostumername",
+          "selectronicmail",
+          "stelephone",
+        ],
       },
-      // 🔧 INCLUIR PAGOS - CORREGIDO SIN 'notes'
       {
-         model: Payment,
-  as: 'payments',
-  attributes: [
-    'paymentId', 
-    'amount', 
-    'paymentMethod', 
-    'paymentStatus', 
-    'paymentDate', 
-    'paymentType', 
-    'transactionId',
-    'paymentReference',
-    'processedBy'
-  ],
-  required: false
-},
+        model: Payment,
+        as: "payments",
+        attributes: [
+          "paymentId",
+          "amount",
+          "paymentMethod",
+          "paymentStatus",
+          "paymentDate",
+          "paymentType",
+          "transactionId",
+          "paymentReference",
+          "processedBy",
+        ],
+        required: false,
+      },
       {
-  model: RegistrationPass,
-  as: "registrationPasses",
-  attributes: [
-    'registrationNumber',
-    'checkInDate',
-    'name',
-    'nationality',
-    'maritalStatus',
-    'profession',
-    'stayDuration',
-    'checkInTime',
-    'numberOfPeople',
-    'destination',
-    'idNumber',
-    'idIssuingPlace',
-    'foreignIdOrPassport',
-    'address',
-    'phoneNumber',
-    'roomNumber'
-  ],
-  required: false
-},
+        model: RegistrationPass,
+        as: "registrationPasses",
+        attributes: [
+          "registrationNumber",
+          "checkInDate",
+          "name",
+          "nationality",
+          "maritalStatus",
+          "profession",
+          "stayDuration",
+          "checkInTime",
+          "numberOfPeople",
+          "destination",
+          "idNumber",
+          "idIssuingPlace",
+          "foreignIdOrPassport",
+          "address",
+          "phoneNumber",
+          "roomNumber",
+        ],
+        required: false,
+      },
       {
         model: ExtraCharge,
-        as: 'extraCharges',
+        as: "extraCharges",
         attributes: [
-          'id',
-          'description',
-          'amount',
-          'quantity',
-          'chargeType',
-          'chargeDate',
-          'notes'
+          "id",
+          "description",
+          "amount",
+          "quantity",
+          "chargeType",
+          "chargeDate",
+          "notes",
         ],
-        required: false
-      }
+        required: false,
+      },
     ];
 
     // ⭐ INCLUIR INVENTARIO SI SE SOLICITA
-    if (includeInventory === 'true') {
+    if (includeInventory === "true") {
       includeOptions.push({
         model: BookingInventoryUsage,
-        as: 'inventoryUsages',
-        attributes: ['quantityAssigned', 'quantityConsumed', 'quantityReturned', 'status'],
+        as: "inventoryUsages",
+        attributes: [
+          "quantityAssigned",
+          "quantityConsumed",
+          "quantityReturned",
+          "status",
+        ],
         include: [
           {
             model: BasicInventory,
-            as: 'inventory',
-            attributes: ['name', 'inventoryType']
-          }
+            as: "inventory",
+            attributes: ["name", "inventoryType"],
+          },
         ],
-        required: false
+        required: false,
       });
     }
 
+    // ⭐ MODIFICACIÓN PRINCIPAL: Agregar attributes para incluir los nuevos campos
     const { count, rows } = await Booking.findAndCountAll({
       where,
       include: includeOptions,
+      // ⭐ AGREGAR ATTRIBUTES CON LOS NUEVOS CAMPOS
+      attributes: [
+        'bookingId', 'checkIn', 'checkOut', 'status', 'pointOfSale',
+        'guestCount', 'totalAmount', 'guestId', 'roomNumber',
+        'trackingToken', 'createdBy', 'paymentCompletedAt',
+        'actualCheckIn', 'actualCheckOut', 'createdAt', 'updatedAt',
+        // ⭐ NUEVOS CAMPOS AGREGADOS EN LA MIGRACIÓN
+        'inventoryVerified', 'inventoryVerifiedAt', 
+        'inventoryDelivered', 'inventoryDeliveredAt', 'inventoryDeliveredBy',
+        'passengersCompleted', 'passengersCompletedAt', 
+        'checkInReadyAt', 'checkInProgress'
+      ],
       order: [
-        ['createdAt', 'DESC'],
-        [{ model: Payment, as: 'payments' }, 'paymentDate', 'DESC'],
-        [{ model: ExtraCharge, as: 'extraCharges' }, 'chargeDate', 'DESC']
+        ["createdAt", "DESC"],
+        [{ model: Payment, as: "payments" }, "paymentDate", "DESC"],
+        [{ model: ExtraCharge, as: "extraCharges" }, "chargeDate", "DESC"],
       ],
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit),
-      distinct: true
+      distinct: true,
     });
 
     // 🔧 FUNCIÓN HELPER PARA PROCESAR DATOS FINANCIEROS
@@ -2820,40 +3348,39 @@ const getAllBookings = async (req, res, next) => {
       const totalReserva = parseFloat(bookingData.totalAmount || 0);
       const extraCharges = bookingData.extraCharges || [];
       const payments = bookingData.payments || [];
-      
+
       // Calcular total de extras
       const totalExtras = extraCharges.reduce((sum, charge) => {
         const amount = parseFloat(charge.amount || 0);
         const quantity = parseInt(charge.quantity || 1);
-        return sum + (amount * quantity);
+        return sum + amount * quantity;
       }, 0);
-      
+
       // Calcular total pagado (solo pagos completados)
       const totalPagado = payments
-        .filter(payment => payment.paymentStatus === 'completed')
-        .reduce((sum, payment) => {
-          const amount = parseFloat(payment.amount || 0);
-          return sum + (isNaN(amount) ? 0 : amount);
-        }, 0);
-      
+  .filter((payment) => ["completed", "authorized"].includes(payment.paymentStatus))
+  .reduce((sum, payment) => {
+    const amount = parseFloat(payment.amount || 0);
+    return sum + (isNaN(amount) ? 0 : amount);
+  }, 0);
       // Calcular pagos pendientes
       const totalPendingPayments = payments
-        .filter(payment => payment.paymentStatus === 'pending')
+        .filter((payment) => payment.paymentStatus === "pending")
         .reduce((sum, payment) => {
           const amount = parseFloat(payment.amount || 0);
           return sum + (isNaN(amount) ? 0 : amount);
         }, 0);
-      
+
       // Totales finales
       const totalFinal = totalReserva + totalExtras;
       const totalPendiente = Math.max(0, totalFinal - totalPagado);
-      
+
       // Estado del pago
-      let paymentStatus = 'unpaid';
+      let paymentStatus = "unpaid";
       if (totalPagado >= totalFinal) {
-        paymentStatus = 'fully_paid';
+        paymentStatus = "fully_paid";
       } else if (totalPagado > 0) {
-        paymentStatus = 'partially_paid';
+        paymentStatus = "partially_paid";
       }
 
       return {
@@ -2867,8 +3394,11 @@ const getAllBookings = async (req, res, next) => {
         isFullyPaid: totalPendiente === 0,
         hasExtras: totalExtras > 0,
         extraChargesCount: extraCharges.length,
-        paymentsCount: payments.filter(p => p.paymentStatus === 'completed').length,
-        pendingPaymentsCount: payments.filter(p => p.paymentStatus === 'pending').length,
+        paymentsCount: payments.filter((p) => p.paymentStatus === "completed")
+          .length,
+        pendingPaymentsCount: payments.filter(
+          (p) => p.paymentStatus === "pending"
+        ).length,
         // ⭐ CAMPOS FORMATEADOS PARA EL FRONTEND
         totalReservaFormatted: `$${totalReserva.toLocaleString()}`,
         totalExtrasFormatted: `$${totalExtras.toLocaleString()}`,
@@ -2876,17 +3406,18 @@ const getAllBookings = async (req, res, next) => {
         totalFinalFormatted: `$${totalFinal.toLocaleString()}`,
         totalPendienteFormatted: `$${totalPendiente.toLocaleString()}`,
         // ⭐ PORCENTAJE DE PAGO
-        paymentPercentage: totalFinal > 0 ? Math.round((totalPagado / totalFinal) * 100) : 0
+        paymentPercentage:
+          totalFinal > 0 ? Math.round((totalPagado / totalFinal) * 100) : 0,
       };
     };
 
     // ⭐ PROCESAR DATOS CON INFORMACIÓN FINANCIERA MEJORADA
-    const bookingsWithAllInfo = rows.map(booking => {
+    const bookingsWithAllInfo = rows.map((booking) => {
       const bookingData = booking.toJSON();
-      
+
       // 🔧 AGREGAR CÁLCULOS FINANCIEROS MEJORADOS
       const financialSummary = processBookingFinancials(bookingData);
-      
+
       // ⭐ MANTENER LA ESTRUCTURA ORIGINAL DE paymentInfo PARA COMPATIBILIDAD
       bookingData.paymentInfo = {
         totalPaid: financialSummary.totalPagado,
@@ -2894,9 +3425,10 @@ const getAllBookings = async (req, res, next) => {
         balance: financialSummary.totalPendiente,
         paymentStatus: financialSummary.paymentStatus,
         paymentCount: financialSummary.paymentsCount,
-        lastPayment: bookingData.payments && bookingData.payments.length > 0 
-          ? bookingData.payments[0] 
-          : null
+        lastPayment:
+          bookingData.payments && bookingData.payments.length > 0
+            ? bookingData.payments[0]
+            : null,
       };
 
       // 🔧 AGREGAR NUEVA ESTRUCTURA FINANCIERA COMPLETA
@@ -2904,43 +3436,101 @@ const getAllBookings = async (req, res, next) => {
 
       // ⭐ INFORMACIÓN DE ESTADO DE LA RESERVA MEJORADA
       bookingData.bookingStatus = {
-        canCheckIn: booking.status === 'confirmed' && financialSummary.totalPagado >= (financialSummary.totalReserva * 0.5), // Al menos 50% pagado
-        canCheckOut: booking.status === 'checked-in' && financialSummary.isFullyPaid,
+        canCheckIn:
+          booking.status === "confirmed" &&
+          financialSummary.totalPagado >= financialSummary.totalReserva * 0.5, // Al menos 50% pagado
+        canCheckOut:
+          booking.status === "checked-in" && financialSummary.isFullyPaid,
         requiresPayment: financialSummary.totalPendiente > 0,
-        readyForCheckOut: booking.status === 'checked-in' && financialSummary.isFullyPaid,
-        isOverdue: booking.status === 'checked-in' && new Date() > new Date(booking.checkOut),
-        daysSinceCheckIn: booking.status === 'checked-in' 
-          ? Math.floor((new Date() - new Date(booking.checkIn)) / (1000 * 60 * 60 * 24))
-          : 0
+        readyForCheckOut:
+          booking.status === "checked-in" && financialSummary.isFullyPaid,
+        isOverdue:
+          booking.status === "checked-in" &&
+          new Date() > new Date(booking.checkOut),
+        daysSinceCheckIn:
+          booking.status === "checked-in"
+            ? Math.floor(
+                (new Date() - new Date(booking.checkIn)) / (1000 * 60 * 60 * 24)
+              )
+            : 0,
       };
-      
+
       // ⭐ INFORMACIÓN DE INVENTARIO SI SE SOLICITA
-      if (includeInventory === 'true' && bookingData.inventoryUsages) {
+      if (includeInventory === "true" && bookingData.inventoryUsages) {
         bookingData.inventoryStatus = {
           hasInventoryAssigned: bookingData.inventoryUsages.length > 0,
           totalItems: bookingData.inventoryUsages.length,
-          itemsReturned: bookingData.inventoryUsages.filter(u => u.status === 'returned').length,
-          itemsConsumed: bookingData.inventoryUsages.filter(u => u.status === 'consumed').length,
-          readyForCheckOut: booking.status === 'checked-in' && bookingData.inventoryUsages.length > 0
+          itemsReturned: bookingData.inventoryUsages.filter(
+            (u) => u.status === "returned"
+          ).length,
+          itemsConsumed: bookingData.inventoryUsages.filter(
+            (u) => u.status === "consumed"
+          ).length,
+          readyForCheckOut:
+            booking.status === "checked-in" &&
+            bookingData.inventoryUsages.length > 0,
         };
       }
+
+      // ⭐ AGREGAR INFORMACIÓN DE CHECK-IN TRACKING
+      bookingData.checkInTracking = {
+        inventoryVerified: bookingData.inventoryVerified || false,
+        inventoryVerifiedAt: bookingData.inventoryVerifiedAt,
+        inventoryDelivered: bookingData.inventoryDelivered || false,
+        inventoryDeliveredAt: bookingData.inventoryDeliveredAt,
+        inventoryDeliveredBy: bookingData.inventoryDeliveredBy,
+        passengersCompleted: bookingData.passengersCompleted || false,
+        passengersCompletedAt: bookingData.passengersCompletedAt,
+        checkInProgress: bookingData.checkInProgress || false,
+        checkInReadyAt: bookingData.checkInReadyAt,
+        // ⭐ ESTADO CALCULADO
+        allRequirementsMet: (
+          (bookingData.inventoryDelivered || false) &&
+          (bookingData.passengersCompleted || false) &&
+          booking.room?.status === 'Limpia'
+        ),
+        // ⭐ PASOS COMPLETADOS
+        completedSteps: [
+          ...((bookingData.inventoryVerified || false) ? ['Inventario verificado'] : []),
+          ...((bookingData.inventoryDelivered || false) ? ['Inventario entregado'] : []),
+          ...((bookingData.passengersCompleted || false) ? ['Pasajeros registrados'] : []),
+          ...(booking.room?.status === 'Limpia' ? ['Habitación limpia'] : [])
+        ],
+        // ⭐ PASOS PENDIENTES
+        pendingSteps: [
+          ...(!(bookingData.inventoryVerified || false) ? ['Verificar inventario'] : []),
+          ...(!(bookingData.inventoryDelivered || false) ? ['Entregar inventario'] : []),
+          ...(!((bookingData.passengersCompleted || false)) ? ['Completar registro de pasajeros'] : []),
+          ...(booking.room?.status !== 'Limpia' ? ['Limpiar habitación'] : [])
+        ]
+      };
 
       // ⭐ AGREGAR METADATOS ÚTILES
       bookingData.metadata = {
         lastUpdated: bookingData.updatedAt,
-        lastPaymentDate: financialSummary.paymentsCount > 0 
-          ? bookingData.payments[0]?.paymentDate 
-          : null,
-        lastExtraChargeDate: financialSummary.extraChargesCount > 0 
-          ? bookingData.extraCharges[0]?.chargeDate 
-          : null,
+        lastPaymentDate:
+          financialSummary.paymentsCount > 0
+            ? bookingData.payments[0]?.paymentDate
+            : null,
+        lastExtraChargeDate:
+          financialSummary.extraChargesCount > 0
+            ? bookingData.extraCharges[0]?.chargeDate
+            : null,
         processingFlags: {
-          needsAttention: financialSummary.totalPendiente > 0 && booking.status === 'checked-in',
-          hasUnprocessedExtras: financialSummary.hasExtras && financialSummary.totalPendiente > 0,
-          readyForBilling: booking.status === 'checked-in' && financialSummary.isFullyPaid
-        }
+          needsAttention:
+            financialSummary.totalPendiente > 0 &&
+            booking.status === "checked-in",
+          hasUnprocessedExtras:
+            financialSummary.hasExtras && financialSummary.totalPendiente > 0,
+          readyForBilling:
+            booking.status === "checked-in" && financialSummary.isFullyPaid,
+          // ⭐ NUEVAS FLAGS
+          hasInventoryTracking: !!(bookingData.inventoryVerified || bookingData.inventoryDelivered),
+          hasPassengerTracking: !!(bookingData.passengersCompleted),
+          isCheckInReady: bookingData.checkInTracking.allRequirementsMet
+        },
       };
-      
+
       return bookingData;
     });
 
@@ -2948,34 +3538,69 @@ const getAllBookings = async (req, res, next) => {
     const statistics = {
       totalBookings: count,
       bookingsByStatus: {
-        confirmed: bookingsWithAllInfo.filter(b => b.status === 'confirmed').length,
-        checkedIn: bookingsWithAllInfo.filter(b => b.status === 'checked-in').length,
-        completed: bookingsWithAllInfo.filter(b => b.status === 'completed').length,
-        cancelled: bookingsWithAllInfo.filter(b => b.status === 'cancelled').length
+        confirmed: bookingsWithAllInfo.filter((b) => b.status === "confirmed")
+          .length,
+        checkedIn: bookingsWithAllInfo.filter((b) => b.status === "checked-in")
+          .length,
+        completed: bookingsWithAllInfo.filter((b) => b.status === "completed")
+          .length,
+        cancelled: bookingsWithAllInfo.filter((b) => b.status === "cancelled")
+          .length,
       },
       financialStats: {
-        totalRevenue: bookingsWithAllInfo
-          .reduce((sum, b) => sum + b.financialSummary.totalPagado, 0),
-        totalPendingAmount: bookingsWithAllInfo
-          .reduce((sum, b) => sum + b.financialSummary.totalPendiente, 0),
-        totalExtraCharges: bookingsWithAllInfo
-          .reduce((sum, b) => sum + b.financialSummary.totalExtras, 0),
-        fullyPaidBookings: bookingsWithAllInfo.filter(b => b.financialSummary.isFullyPaid).length,
-        partiallyPaidBookings: bookingsWithAllInfo.filter(b => b.financialSummary.paymentStatus === 'partially_paid').length,
-        unpaidBookings: bookingsWithAllInfo.filter(b => b.financialSummary.paymentStatus === 'unpaid').length
+        totalRevenue: bookingsWithAllInfo.reduce(
+          (sum, b) => sum + b.financialSummary.totalPagado,
+          0
+        ),
+        totalPendingAmount: bookingsWithAllInfo.reduce(
+          (sum, b) => sum + b.financialSummary.totalPendiente,
+          0
+        ),
+        totalExtraCharges: bookingsWithAllInfo.reduce(
+          (sum, b) => sum + b.financialSummary.totalExtras,
+          0
+        ),
+        fullyPaidBookings: bookingsWithAllInfo.filter(
+          (b) => b.financialSummary.isFullyPaid
+        ).length,
+        partiallyPaidBookings: bookingsWithAllInfo.filter(
+          (b) => b.financialSummary.paymentStatus === "partially_paid"
+        ).length,
+        unpaidBookings: bookingsWithAllInfo.filter(
+          (b) => b.financialSummary.paymentStatus === "unpaid"
+        ).length,
       },
       operationalStats: {
-        bookingsNeedingAttention: bookingsWithAllInfo.filter(b => b.metadata.processingFlags.needsAttention).length,
-        readyForCheckOut: bookingsWithAllInfo.filter(b => b.bookingStatus.readyForCheckOut).length,
-        overdueCheckOuts: bookingsWithAllInfo.filter(b => b.bookingStatus.isOverdue).length
-      }
+        bookingsNeedingAttention: bookingsWithAllInfo.filter(
+          (b) => b.metadata.processingFlags.needsAttention
+        ).length,
+        readyForCheckOut: bookingsWithAllInfo.filter(
+          (b) => b.bookingStatus.readyForCheckOut
+        ).length,
+        overdueCheckOuts: bookingsWithAllInfo.filter(
+          (b) => b.bookingStatus.isOverdue
+        ).length,
+        // ⭐ NUEVAS ESTADÍSTICAS DE CHECK-IN TRACKING
+        withInventoryTracking: bookingsWithAllInfo.filter(
+          (b) => b.metadata.processingFlags.hasInventoryTracking
+        ).length,
+        withPassengerTracking: bookingsWithAllInfo.filter(
+          (b) => b.metadata.processingFlags.hasPassengerTracking
+        ).length,
+        readyForCheckIn: bookingsWithAllInfo.filter(
+          (b) => b.metadata.processingFlags.isCheckInReady
+        ).length,
+      },
     };
 
     console.log("📊 [GET-ALL-BOOKINGS] Estadísticas:", {
       total: statistics.totalBookings,
       byStatus: statistics.bookingsByStatus,
       revenue: `$${statistics.financialStats.totalRevenue.toLocaleString()}`,
-      pending: `$${statistics.financialStats.totalPendingAmount.toLocaleString()}`
+      pending: `$${statistics.financialStats.totalPendingAmount.toLocaleString()}`,
+      // ⭐ NUEVAS ESTADÍSTICAS
+      withTracking: statistics.operationalStats.withInventoryTracking,
+      readyForCheckIn: statistics.operationalStats.readyForCheckIn,
     });
 
     res.json({
@@ -2987,19 +3612,18 @@ const getAllBookings = async (req, res, next) => {
           total: count,
           page: parseInt(page),
           limit: parseInt(limit),
-          totalPages: Math.ceil(count / parseInt(limit))
+          totalPages: Math.ceil(count / parseInt(limit)),
         },
         statistics,
         queryInfo: {
           filters: { status, roomNumber, guestId, fromDate, toDate },
-          includeInventory: includeInventory === 'true',
-          timestamp: new Date().toISOString()
-        }
-      }
+          includeInventory: includeInventory === "true",
+          timestamp: new Date().toISOString(),
+        },
+      },
     });
-
   } catch (error) {
-    console.error('❌ [GET-ALL-BOOKINGS] Error:', error);
+    console.error("❌ [GET-ALL-BOOKINGS] Error:", error);
     next(error);
   }
 };
@@ -3007,18 +3631,21 @@ const getAllBookings = async (req, res, next) => {
 const checkInGuest = async (req, res, next) => {
   try {
     console.log("🏨 [CHECK-IN-GUEST] Iniciando proceso de check-in");
-    console.log("🕐 [CHECK-IN-GUEST] Hora Colombia:", formatForLogs(getColombiaTime()));
+    console.log(
+      "🕐 [CHECK-IN-GUEST] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
     console.log("📥 [CHECK-IN-GUEST] Parámetros recibidos:", {
       bookingId: req.params.bookingId,
-      body: req.body
+      body: req.body,
     });
 
     const { bookingId } = req.params;
-    const { 
-      assignInventory = true, 
+    const {
+      assignInventory = true,
       customItems = [],
       forceCheckIn = false,
-      notes = ''
+      notes = "",
     } = req.body;
 
     // ⭐ VALIDACIONES BÁSICAS CON LOGS
@@ -3026,8 +3653,8 @@ const checkInGuest = async (req, res, next) => {
       console.log("❌ [CHECK-IN-GUEST] bookingId faltante");
       return res.status(400).json({
         error: true,
-        message: 'bookingId es requerido',
-        timestamp: formatForLogs(getColombiaTime())
+        message: "bookingId es requerido",
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -3038,50 +3665,55 @@ const checkInGuest = async (req, res, next) => {
       include: [
         {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'type', 'status', 'isActive', 'maxGuests'],
+          as: "room",
+          attributes: ["roomNumber", "type", "status", "isActive", "maxGuests"],
           include: [
             {
               model: BasicInventory,
-              as: 'BasicInventories',
+              as: "BasicInventories",
               attributes: [
-                'id', 
-                'name', 
-                'inventoryType', 
-                'currentStock', 
-                'cleanStock', 
-                'minStock',
-                'category',
-                'description'
+                "id",
+                "name",
+                "inventoryType",
+                "currentStock",
+                "cleanStock",
+                "minStock",
+                "category",
+                "description",
               ],
-              through: { 
-                attributes: ['quantity', 'isRequired', 'priority'],
-                as: 'RoomBasics'
-              }
-            }
-          ]
+              through: {
+                attributes: ["quantity", "isRequired", "priority"],
+                as: "RoomBasics",
+              },
+            },
+          ],
         },
         {
           model: Buyer,
-          as: 'guest',
-          attributes: ['sdocno', 'scostumername', 'selectronicmail', 'stelephone']
+          as: "guest",
+          attributes: [
+            "sdocno",
+            "scostumername",
+            "selectronicmail",
+            "stelephone",
+          ],
         },
         {
           model: Payment,
-          as: 'payments',
-          attributes: ['paymentId', 'amount', 'paymentStatus', 'paymentMethod'],
-          where: { paymentStatus: 'completed' },
-          required: false
-        }
-      ]
+          as: "payments",
+          attributes: ["paymentId", "amount", "paymentStatus", "paymentMethod"],
+          where: { paymentStatus: "completed" },
+          required: false,
+        },
+      ],
     });
 
     if (!booking) {
       console.log("❌ [CHECK-IN-GUEST] Reserva no encontrada:", bookingId);
       return res.status(404).json({
         error: true,
-        message: 'Reserva no encontrada',
-        timestamp: formatForLogs(getColombiaTime())
+        message: "Reserva no encontrada",
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -3091,18 +3723,21 @@ const checkInGuest = async (req, res, next) => {
       roomNumber: booking.room?.roomNumber || booking.roomNumber,
       guestName: booking.guest?.scostumername,
       hasRoom: !!booking.room,
-      hasPayments: booking.payments?.length > 0
+      hasPayments: booking.payments?.length > 0,
     });
 
     // ⭐ VALIDACIONES DE ESTADO CON LOGS DETALLADOS
-    if (booking.status !== 'confirmed') {
-      console.log("❌ [CHECK-IN-GUEST] Estado de reserva inválido:", booking.status);
-      return res.status(400).json({
-        error: true,
-        message: `Solo se pueden hacer check-in a reservas confirmadas. Estado actual: ${booking.status}`,
-        timestamp: formatForLogs(getColombiaTime())
-      });
-    }
+   if (!["confirmed", "paid"].includes(booking.status)) {
+  console.log(
+    "❌ [CHECK-IN-GUEST] Estado de reserva inválido:",
+    booking.status
+  );
+  return res.status(400).json({
+    error: true,
+    message: `Solo se pueden hacer check-in a reservas confirmadas o pagadas. Estado actual: ${booking.status}`,
+    timestamp: formatForLogs(getColombiaTime()),
+  });
+}
 
     // ⭐ VALIDAR FECHAS DE CHECK-IN CON UTILIDADES DE COLOMBIA
     const now = getColombiaTime();
@@ -3114,22 +3749,30 @@ const checkInGuest = async (req, res, next) => {
       checkInDate: formatForLogs(checkInDate),
       checkOutDate: formatForLogs(checkOutDate),
       canCheckInToday: now >= checkInDate,
-      isNotExpired: now < checkOutDate
+      isNotExpired: now < checkOutDate,
     });
 
     // ⭐ VALIDAR QUE ES EL DÍA CORRECTO PARA CHECK-IN
     if (!forceCheckIn && now < checkInDate) {
-      const daysUntilCheckIn = Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24));
-      console.log("❌ [CHECK-IN-GUEST] Check-in anticipado:", daysUntilCheckIn, "días antes");
+      const daysUntilCheckIn = Math.ceil(
+        (checkInDate - now) / (1000 * 60 * 60 * 24)
+      );
+      console.log(
+        "❌ [CHECK-IN-GUEST] Check-in anticipado:",
+        daysUntilCheckIn,
+        "días antes"
+      );
       return res.status(400).json({
         error: true,
-        message: `El check-in no está disponible hasta ${formatColombiaDate(checkInDate)} (${daysUntilCheckIn} días)`,
+        message: `El check-in no está disponible hasta ${formatColombiaDate(
+          checkInDate
+        )} (${daysUntilCheckIn} días)`,
         data: {
           checkInDate: formatColombiaDate(checkInDate),
           daysUntilCheckIn,
-          currentTime: formatForLogs(now)
+          currentTime: formatForLogs(now),
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -3138,60 +3781,69 @@ const checkInGuest = async (req, res, next) => {
       console.log("❌ [CHECK-IN-GUEST] Reserva expirada");
       return res.status(400).json({
         error: true,
-        message: `La reserva ha expirado. Fecha de check-out era: ${formatColombiaDate(checkOutDate)}`,
+        message: `La reserva ha expirado. Fecha de check-out era: ${formatColombiaDate(
+          checkOutDate
+        )}`,
         data: {
           checkOutDate: formatColombiaDate(checkOutDate),
-          expired: true
+          expired: true,
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ VALIDAR ESTADO DE PAGOS
     const totalAmount = parseFloat(booking.totalAmount || 0);
-    const totalPaid = booking.payments ? 
-      booking.payments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0) : 0;
-    const paymentPercentage = totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
+    const totalPaid = booking.payments
+      ? booking.payments.reduce(
+          (sum, payment) => sum + parseFloat(payment.amount || 0),
+          0
+        )
+      : 0;
+    const paymentPercentage =
+      totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
 
     console.log("💰 [CHECK-IN-GUEST] Estado de pagos:", {
       totalAmount,
       totalPaid,
       paymentPercentage: Math.round(paymentPercentage),
-      hasMinimumPayment: paymentPercentage >= 50
+      hasMinimumPayment: paymentPercentage >= 50,
     });
 
     if (!forceCheckIn && paymentPercentage < 50) {
       console.log("❌ [CHECK-IN-GUEST] Pago insuficiente");
       return res.status(400).json({
         error: true,
-        message: 'Se requiere al menos 50% del pago total para realizar check-in',
+        message:
+          "Se requiere al menos 50% del pago total para realizar check-in",
         data: {
           totalAmount: `$${totalAmount.toLocaleString()}`,
           totalPaid: `$${totalPaid.toLocaleString()}`,
           paymentPercentage: Math.round(paymentPercentage),
-          minimumRequired: `$${(totalAmount * 0.5).toLocaleString()}`
+          minimumRequired: `$${(totalAmount * 0.5).toLocaleString()}`,
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ VERIFICAR SI YA TIENE INVENTARIO ASIGNADO
     console.log("📦 [CHECK-IN-GUEST] Verificando inventario existente...");
-    
+
     const existingInventory = await BookingInventoryUsage.findOne({
-      where: { bookingId }
+      where: { bookingId },
     });
 
     if (existingInventory) {
       console.log("⚠️ [CHECK-IN-GUEST] Ya tiene inventario asignado");
       return res.status(400).json({
         error: true,
-        message: 'Esta reserva ya tiene inventario asignado. Use el endpoint de gestión de inventario para modificaciones.',
+        message:
+          "Esta reserva ya tiene inventario asignado. Use el endpoint de gestión de inventario para modificaciones.",
         data: {
           hasInventory: true,
-          existingAssignmentId: existingInventory.id
+          existingAssignmentId: existingInventory.id,
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -3202,8 +3854,8 @@ const checkInGuest = async (req, res, next) => {
       console.log("❌ [CHECK-IN-GUEST] Habitación no encontrada");
       return res.status(400).json({
         error: true,
-        message: 'Información de habitación no disponible',
-        timestamp: formatForLogs(getColombiaTime())
+        message: "Información de habitación no disponible",
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -3211,18 +3863,21 @@ const checkInGuest = async (req, res, next) => {
       console.log("❌ [CHECK-IN-GUEST] Habitación inactiva");
       return res.status(400).json({
         error: true,
-        message: 'La habitación no está activa',
-        timestamp: formatForLogs(getColombiaTime())
+        message: "La habitación no está activa",
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ VALIDAR ESTADOS CORRECTOS SEGÚN TU MODELO ROOM
-    if (['Mantenimiento', 'Ocupada'].includes(booking.room.status)) {
-      console.log("❌ [CHECK-IN-GUEST] Estado de habitación impide check-in:", booking.room.status);
+    if (["Mantenimiento", "Ocupada"].includes(booking.room.status)) {
+      console.log(
+        "❌ [CHECK-IN-GUEST] Estado de habitación impide check-in:",
+        booking.room.status
+      );
       return res.status(400).json({
         error: true,
         message: `La habitación no está disponible para check-in. Estado actual: ${booking.room.status}`,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -3230,21 +3885,24 @@ const checkInGuest = async (req, res, next) => {
 
     // ⭐ PROCESAR INVENTARIO AUTOMÁTICO CON LOGS DETALLADOS
     console.log("📦 [CHECK-IN-GUEST] Iniciando asignación de inventario...");
-    
+
     const inventoryAssignments = [];
     const inventoryErrors = [];
     const inventoryWarnings = [];
 
     if (assignInventory && booking.room.BasicInventories) {
-      console.log("📦 [CHECK-IN-GUEST] Procesando inventario básico de habitación:", {
-        itemsCount: booking.room.BasicInventories.length
-      });
+      console.log(
+        "📦 [CHECK-IN-GUEST] Procesando inventario básico de habitación:",
+        {
+          itemsCount: booking.room.BasicInventories.length,
+        }
+      );
 
       for (const item of booking.room.BasicInventories) {
         const requiredQty = item.RoomBasics.quantity;
         let availableQty = 0;
-        
-        if (item.inventoryType === 'reusable') {
+
+        if (item.inventoryType === "reusable") {
           availableQty = item.cleanStock;
         } else {
           availableQty = item.currentStock;
@@ -3255,7 +3913,7 @@ const checkInGuest = async (req, res, next) => {
           type: item.inventoryType,
           required: requiredQty,
           available: availableQty,
-          isRequired: item.RoomBasics.isRequired
+          isRequired: item.RoomBasics.isRequired,
         });
 
         if (availableQty < requiredQty) {
@@ -3265,12 +3923,15 @@ const checkInGuest = async (req, res, next) => {
             required: requiredQty,
             available: availableQty,
             deficit: requiredQty - availableQty,
-            severity: item.RoomBasics.isRequired ? 'critical' : 'warning'
+            severity: item.RoomBasics.isRequired ? "critical" : "warning",
           };
 
           if (item.RoomBasics.isRequired) {
             inventoryErrors.push(error);
-            console.log("❌ [CHECK-IN-GUEST] Error crítico de inventario:", error);
+            console.log(
+              "❌ [CHECK-IN-GUEST] Error crítico de inventario:",
+              error
+            );
           } else {
             inventoryWarnings.push(error);
             console.log("⚠️ [CHECK-IN-GUEST] Warning de inventario:", error);
@@ -3284,20 +3945,20 @@ const checkInGuest = async (req, res, next) => {
             bookingId,
             basicInventoryId: item.id,
             quantityAssigned: requiredQty,
-            status: 'assigned',
+            status: "assigned",
             assignedAt: getColombiaTime(),
-            assignedBy: req.user?.n_document || 'system',
-            notes: `Asignación automática durante check-in`
+            assignedBy: req.user?.n_document || "system",
+            notes: `Asignación automática durante check-in`,
           });
 
           // ⭐ ACTUALIZAR STOCK SEGÚN TIPO
-          if (item.inventoryType === 'reusable') {
+          if (item.inventoryType === "reusable") {
             await item.update({
-              cleanStock: item.cleanStock - requiredQty
+              cleanStock: item.cleanStock - requiredQty,
             });
           } else {
             await item.update({
-              currentStock: item.currentStock - requiredQty
+              currentStock: item.currentStock - requiredQty,
             });
           }
 
@@ -3309,20 +3970,26 @@ const checkInGuest = async (req, res, next) => {
             assigned: requiredQty,
             isRequired: item.RoomBasics.isRequired,
             priority: item.RoomBasics.priority,
-            assignedAt: formatForLogs(assignment.assignedAt)
+            assignedAt: formatForLogs(assignment.assignedAt),
           });
 
-          console.log("✅ [CHECK-IN-GUEST] Item asignado exitosamente:", item.name);
-
+          console.log(
+            "✅ [CHECK-IN-GUEST] Item asignado exitosamente:",
+            item.name
+          );
         } catch (assignError) {
-          console.error("❌ [CHECK-IN-GUEST] Error al asignar item:", item.name, assignError);
+          console.error(
+            "❌ [CHECK-IN-GUEST] Error al asignar item:",
+            item.name,
+            assignError
+          );
           inventoryErrors.push({
             item: item.name,
             type: item.inventoryType,
             required: requiredQty,
             available: availableQty,
-            severity: 'critical',
-            error: 'Error en base de datos'
+            severity: "critical",
+            error: "Error en base de datos",
           });
         }
       }
@@ -3330,29 +3997,41 @@ const checkInGuest = async (req, res, next) => {
 
     // ⭐ PROCESAR ITEMS PERSONALIZADOS CON LOGS
     if (customItems && customItems.length > 0) {
-      console.log("📦 [CHECK-IN-GUEST] Procesando items personalizados:", customItems.length);
+      console.log(
+        "📦 [CHECK-IN-GUEST] Procesando items personalizados:",
+        customItems.length
+      );
 
       for (const customItem of customItems) {
         const { basicInventoryId, quantity, notes: itemNotes } = customItem;
-        
+
         if (!basicInventoryId || !quantity) {
-          console.log("⚠️ [CHECK-IN-GUEST] Item personalizado inválido:", customItem);
+          console.log(
+            "⚠️ [CHECK-IN-GUEST] Item personalizado inválido:",
+            customItem
+          );
           continue;
         }
 
         try {
           const item = await BasicInventory.findByPk(basicInventoryId);
           if (!item) {
-            console.log("❌ [CHECK-IN-GUEST] Item personalizado no encontrado:", basicInventoryId);
+            console.log(
+              "❌ [CHECK-IN-GUEST] Item personalizado no encontrado:",
+              basicInventoryId
+            );
             continue;
           }
 
-          const availableQty = item.inventoryType === 'reusable' ? item.cleanStock : item.currentStock;
-          
+          const availableQty =
+            item.inventoryType === "reusable"
+              ? item.cleanStock
+              : item.currentStock;
+
           console.log("📦 [CHECK-IN-GUEST] Procesando item personalizado:", {
             name: item.name,
             requested: quantity,
-            available: availableQty
+            available: availableQty,
           });
 
           if (availableQty >= quantity) {
@@ -3360,20 +4039,21 @@ const checkInGuest = async (req, res, next) => {
               bookingId,
               basicInventoryId,
               quantityAssigned: quantity,
-              status: 'assigned',
+              status: "assigned",
               assignedAt: getColombiaTime(),
-              assignedBy: req.user?.n_document || 'system',
-              notes: itemNotes || 'Item personalizado agregado durante check-in'
+              assignedBy: req.user?.n_document || "system",
+              notes:
+                itemNotes || "Item personalizado agregado durante check-in",
             });
 
             // ⭐ ACTUALIZAR STOCK
-            if (item.inventoryType === 'reusable') {
+            if (item.inventoryType === "reusable") {
               await item.update({
-                cleanStock: item.cleanStock - quantity
+                cleanStock: item.cleanStock - quantity,
               });
             } else {
               await item.update({
-                currentStock: item.currentStock - quantity
+                currentStock: item.currentStock - quantity,
               });
             }
 
@@ -3385,43 +4065,57 @@ const checkInGuest = async (req, res, next) => {
               assigned: quantity,
               isCustom: true,
               notes: itemNotes,
-              assignedAt: formatForLogs(assignment.assignedAt)
+              assignedAt: formatForLogs(assignment.assignedAt),
             });
 
-            console.log("✅ [CHECK-IN-GUEST] Item personalizado asignado:", item.name);
-
+            console.log(
+              "✅ [CHECK-IN-GUEST] Item personalizado asignado:",
+              item.name
+            );
           } else {
             inventoryWarnings.push({
               item: item.name,
               type: item.inventoryType,
               required: quantity,
               available: availableQty,
-              severity: 'warning',
-              isCustom: true
+              severity: "warning",
+              isCustom: true,
             });
-            console.log("⚠️ [CHECK-IN-GUEST] Stock insuficiente para item personalizado:", item.name);
+            console.log(
+              "⚠️ [CHECK-IN-GUEST] Stock insuficiente para item personalizado:",
+              item.name
+            );
           }
-
         } catch (customError) {
-          console.error("❌ [CHECK-IN-GUEST] Error procesando item personalizado:", customError);
+          console.error(
+            "❌ [CHECK-IN-GUEST] Error procesando item personalizado:",
+            customError
+          );
         }
       }
     }
 
     // ⭐ EVALUAR ERRORES CRÍTICOS
-    const criticalErrors = inventoryErrors.filter(e => e.severity === 'critical');
+    const criticalErrors = inventoryErrors.filter(
+      (e) => e.severity === "critical"
+    );
     if (criticalErrors.length > 0 && !forceCheckIn) {
-      console.log("❌ [CHECK-IN-GUEST] Errores críticos de inventario:", criticalErrors.length);
+      console.log(
+        "❌ [CHECK-IN-GUEST] Errores críticos de inventario:",
+        criticalErrors.length
+      );
       return res.status(400).json({
         error: true,
-        message: 'No se puede completar el check-in debido a falta de inventario crítico',
+        message:
+          "No se puede completar el check-in debido a falta de inventario crítico",
         data: {
           criticalErrors,
           warnings: inventoryWarnings,
           canForceCheckIn: true,
-          suggestion: 'Use forceCheckIn: true para proceder sin inventario crítico'
+          suggestion:
+            "Use forceCheckIn: true para proceder sin inventario crítico",
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -3429,16 +4123,16 @@ const checkInGuest = async (req, res, next) => {
       assigned: inventoryAssignments.length,
       criticalErrors: criticalErrors.length,
       warnings: inventoryWarnings.length,
-      forceCheckIn
+      forceCheckIn,
     });
 
     // ⭐ ACTUALIZAR ESTADO DE LA RESERVA - SOLO CAMPOS QUE EXISTEN EN TU MODELO BOOKING
     console.log("🔄 [CHECK-IN-GUEST] Actualizando estado de reserva...");
-    
+
     try {
       // 🔧 ACTUALIZAR SOLO CAMPOS EXISTENTES EN TU MODELO BOOKING
       const updateData = {
-        status: 'checked-in'
+        status: "checked-in",
       };
 
       // ⭐ AGREGAR CAMPOS ADICIONALES SOLO SI EXISTEN EN TU MODELO
@@ -3451,23 +4145,26 @@ const checkInGuest = async (req, res, next) => {
       await booking.update(updateData);
       console.log("✅ [CHECK-IN-GUEST] Estado de reserva actualizado");
     } catch (bookingUpdateError) {
-      console.error("❌ [CHECK-IN-GUEST] Error al actualizar reserva:", bookingUpdateError);
+      console.error(
+        "❌ [CHECK-IN-GUEST] Error al actualizar reserva:",
+        bookingUpdateError
+      );
       return res.status(500).json({
         error: true,
-        message: 'Error al actualizar el estado de la reserva',
+        message: "Error al actualizar el estado de la reserva",
         details: bookingUpdateError.message,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ ACTUALIZAR ESTADO DE LA HABITACIÓN - SOLO CAMPOS QUE EXISTEN EN TU MODELO ROOM
     console.log("🏨 [CHECK-IN-GUEST] Actualizando estado de habitación...");
-    
+
     try {
       // 🔧 ACTUALIZAR SOLO CAMPOS EXISTENTES EN TU MODELO ROOM
       const roomUpdateData = {
-        status: 'Ocupada', // ✅ ESTADO CORRECTO SEGÚN TU MODELO
-        available: false   // ✅ CAMPO QUE SÍ EXISTE
+        status: "Ocupada", // ✅ ESTADO CORRECTO SEGÚN TU MODELO
+        available: false, // ✅ CAMPO QUE SÍ EXISTE
       };
 
       // ⭐ AGREGAR CAMPOS ADICIONALES SOLO SI EXISTEN EN TU MODELO ROOM
@@ -3478,37 +4175,41 @@ const checkInGuest = async (req, res, next) => {
       await booking.room.update(roomUpdateData);
       console.log("✅ [CHECK-IN-GUEST] Estado de habitación actualizado");
     } catch (roomUpdateError) {
-      console.error("❌ [CHECK-IN-GUEST] Error al actualizar habitación:", roomUpdateError);
+      console.error(
+        "❌ [CHECK-IN-GUEST] Error al actualizar habitación:",
+        roomUpdateError
+      );
       // No fallar el check-in por esto, solo log
     }
 
     // ⭐ PREPARAR RESPUESTA COMPLETA
     console.log("📤 [CHECK-IN-GUEST] Preparando respuesta final...");
-    
+
     const responseData = {
       booking: {
         bookingId: booking.bookingId,
-        status: 'checked-in',
+        status: "checked-in",
         // 🔧 USAR FECHA ACTUAL YA QUE NO TENEMOS actualCheckIn EN EL MODELO
         actualCheckIn: formatForLogs(getColombiaTime()),
         roomNumber: booking.room?.roomNumber || booking.roomNumber,
         guestName: booking.guest?.scostumername,
         checkInTime: formatForDisplay(getColombiaTime()),
-        checkedInBy: req.user?.n_document || 'system'
+        checkedInBy: req.user?.n_document || "system",
       },
       room: {
         roomNumber: booking.room.roomNumber,
         type: booking.room.type,
-        status: 'Ocupada',
+        status: "Ocupada",
         maxGuests: booking.room.maxGuests,
-        currentGuests: booking.guestCount
+        currentGuests: booking.guestCount,
       },
       inventory: {
         hasInventoryAssigned: inventoryAssignments.length > 0,
         totalItemsAssigned: inventoryAssignments.length,
         inventoryAssigned: inventoryAssignments,
         inventoryWarnings: inventoryWarnings,
-        criticalErrorsOverridden: criticalErrors.length > 0 && forceCheckIn ? criticalErrors : []
+        criticalErrorsOverridden:
+          criticalErrors.length > 0 && forceCheckIn ? criticalErrors : [],
       },
       checkInSummary: {
         checkInDate: formatColombiaDate(booking.checkIn),
@@ -3519,17 +4220,20 @@ const checkInGuest = async (req, res, next) => {
           totalAmount: `$${totalAmount.toLocaleString()}`,
           totalPaid: `$${totalPaid.toLocaleString()}`,
           paymentPercentage: Math.round(paymentPercentage),
-          isFullyPaid: paymentPercentage >= 100
-        }
+          isFullyPaid: paymentPercentage >= 100,
+        },
       },
       nextActions: {
         canAddExtraCharges: true,
         canManageInventory: true,
-        canCheckOut: inventoryAssignments.length === 0 || 
-                    inventoryAssignments.every(item => !item.isRequired),
-        requiresInventoryReturn: inventoryAssignments.some(item => item.type === 'reusable'),
-        estimatedCheckOutDate: formatColombiaDate(booking.checkOut)
-      }
+        canCheckOut:
+          inventoryAssignments.length === 0 ||
+          inventoryAssignments.every((item) => !item.isRequired),
+        requiresInventoryReturn: inventoryAssignments.some(
+          (item) => item.type === "reusable"
+        ),
+        estimatedCheckOutDate: formatColombiaDate(booking.checkOut),
+      },
     };
 
     console.log("✅ [CHECK-IN-GUEST] Check-in completado exitosamente:", {
@@ -3537,25 +4241,27 @@ const checkInGuest = async (req, res, next) => {
       guestName: booking.guest?.scostumername,
       roomNumber: booking.room?.roomNumber,
       inventoryItems: inventoryAssignments.length,
-      completedAt: formatForLogs(getColombiaTime())
+      completedAt: formatForLogs(getColombiaTime()),
     });
 
     res.json({
       error: false,
-      message: 'Check-in realizado exitosamente',
+      message: "Check-in realizado exitosamente",
       data: responseData,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [CHECK-IN-GUEST] Error general:", error);
-    console.error("🕐 [CHECK-IN-GUEST] Hora del error:", formatForLogs(getColombiaTime()));
-    
+    console.error(
+      "🕐 [CHECK-IN-GUEST] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
     res.status(500).json({
       error: true,
-      message: 'Error interno durante el proceso de check-in',
+      message: "Error interno durante el proceso de check-in",
       details: error.message,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
   }
 };
@@ -3563,19 +4269,22 @@ const checkInGuest = async (req, res, next) => {
 const checkOut = async (req, res, next) => {
   try {
     console.log("🏁 [CHECK-OUT] Iniciando proceso de check-out");
-    console.log("🕐 [CHECK-OUT] Hora Colombia:", formatForLogs(getColombiaTime()));
+    console.log(
+      "🕐 [CHECK-OUT] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
     console.log("📥 [CHECK-OUT] Parámetros recibidos:", {
       bookingId: req.params.bookingId,
-      body: req.body
+      body: req.body,
     });
 
     const { bookingId } = req.params;
-    const { 
-      inventoryReturns = [], 
+    const {
+      inventoryReturns = [],
       forceCheckOut = false,
-      notes = '',
-      roomCondition = 'good',
-      skipInventoryValidation = false
+      notes = "",
+      roomCondition = "good",
+      skipInventoryValidation = false,
     } = req.body;
 
     // ⭐ VALIDACIONES BÁSICAS CON LOGS
@@ -3583,8 +4292,8 @@ const checkOut = async (req, res, next) => {
       console.log("❌ [CHECK-OUT] bookingId faltante");
       return res.status(400).json({
         error: true,
-        message: 'bookingId es requerido',
-        timestamp: formatForLogs(getColombiaTime())
+        message: "bookingId es requerido",
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -3593,50 +4302,67 @@ const checkOut = async (req, res, next) => {
     // ⭐ OBTENER DATOS COMPLETOS DE LA RESERVA CON INCLUDES MEJORADOS
     const booking = await Booking.findByPk(bookingId, {
       include: [
-        { 
+        {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'type', 'status', 'isActive', 'maxGuests']
+          as: "room",
+          attributes: ["roomNumber", "type", "status", "isActive", "maxGuests"],
         },
         {
           model: BookingInventoryUsage,
-          as: 'inventoryUsages',
-          attributes: ['id', 'basicInventoryId', 'quantityAssigned', 'quantityConsumed', 'quantityReturned', 'status', 'assignedAt', 'notes'],
+          as: "inventoryUsages",
+          attributes: [
+            "id",
+            "basicInventoryId",
+            "quantityAssigned",
+            "quantityConsumed",
+            "quantityReturned",
+            "status",
+            "assignedAt",
+            "notes",
+          ],
           include: [
             {
               model: BasicInventory,
-              as: 'inventory',
-              attributes: ['id', 'name', 'inventoryType', 'category', 'currentStock', 'cleanStock', 'dirtyStock']
-            }
-          ]
+              as: "inventory",
+              attributes: [
+                "id",
+                "name",
+                "inventoryType",
+                "category",
+                "currentStock",
+                "cleanStock",
+                "dirtyStock",
+              ],
+            },
+          ],
         },
         {
           model: Buyer,
-          as: 'guest',
-          attributes: ['sdocno', 'scostumername', 'selectronicmail']
+          as: "guest",
+          attributes: ["sdocno", "scostumername", "selectronicmail"],
         },
         {
           model: ExtraCharge,
-          as: 'extraCharges',
-          attributes: ['id', 'description', 'amount', 'quantity'],
-          required: false
+          as: "extraCharges",
+          attributes: ["id", "description", "amount", "quantity"],
+          required: false,
         },
         {
           model: Payment,
-          as: 'payments',
-          attributes: ['paymentId', 'amount', 'paymentStatus'],
-          where: { paymentStatus: 'completed' },
-          required: false
-        }
-      ]
+          as: "payments",
+          attributes: ["paymentId", "amount", "paymentStatus"],
+          where: { paymentStatus: "completed" },
+          required: false,
+        },
+      ],
     });
 
     if (!booking) {
       console.log("❌ [CHECK-OUT] Reserva no encontrada:", bookingId);
       return res.status(404).json({
         error: true,
-        message: 'Reserva no encontrada',
-        timestamp: formatForLogs(getColombiaTime())
+        message: "Reserva no encontrada",
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -3646,16 +4372,16 @@ const checkOut = async (req, res, next) => {
       roomNumber: booking.room?.roomNumber || booking.roomNumber,
       guestName: booking.guest?.scostumername,
       hasRoom: !!booking.room,
-      hasInventoryUsages: booking.inventoryUsages?.length > 0
+      hasInventoryUsages: booking.inventoryUsages?.length > 0,
     });
 
     // ⭐ VALIDACIONES DE ESTADO CON LOGS DETALLADOS
-    if (booking.status !== 'checked-in') {
+    if (booking.status !== "checked-in") {
       console.log("❌ [CHECK-OUT] Estado de reserva inválido:", booking.status);
       return res.status(400).json({
         error: true,
         message: `Solo se puede hacer check-out de reservas con check-in activo. Estado actual: ${booking.status}`,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -3670,20 +4396,29 @@ const checkOut = async (req, res, next) => {
       checkOutDate: formatForLogs(checkOutDate),
       isOnTime: now <= checkOutDate,
       isLate: now > checkOutDate,
-      hoursLate: now > checkOutDate ? Math.ceil((now - checkOutDate) / (1000 * 60 * 60)) : 0
+      hoursLate:
+        now > checkOutDate
+          ? Math.ceil((now - checkOutDate) / (1000 * 60 * 60))
+          : 0,
     });
 
     // ⭐ VERIFICAR SI HAY PAGOS PENDIENTES
     const totalAmount = parseFloat(booking.totalAmount || 0);
     const extraCharges = booking.extraCharges || [];
     const totalExtras = extraCharges.reduce((sum, charge) => {
-      return sum + (parseFloat(charge.amount || 0) * parseInt(charge.quantity || 1));
+      return (
+        sum + parseFloat(charge.amount || 0) * parseInt(charge.quantity || 1)
+      );
     }, 0);
     const grandTotal = totalAmount + totalExtras;
-    
-    const totalPaid = booking.payments ? 
-      booking.payments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0) : 0;
-    
+
+    const totalPaid = booking.payments
+      ? booking.payments.reduce(
+          (sum, payment) => sum + parseFloat(payment.amount || 0),
+          0
+        )
+      : 0;
+
     const balance = Math.max(0, grandTotal - totalPaid);
 
     console.log("💰 [CHECK-OUT] Estado financiero:", {
@@ -3692,28 +4427,29 @@ const checkOut = async (req, res, next) => {
       grandTotal,
       totalPaid,
       balance,
-      isFullyPaid: balance === 0
+      isFullyPaid: balance === 0,
     });
 
     if (!forceCheckOut && balance > 0) {
       console.log("❌ [CHECK-OUT] Pagos pendientes");
       return res.status(400).json({
         error: true,
-        message: 'No se puede hacer check-out con pagos pendientes',
+        message: "No se puede hacer check-out con pagos pendientes",
         data: {
           grandTotal: `$${grandTotal.toLocaleString()}`,
           totalPaid: `$${totalPaid.toLocaleString()}`,
           balance: `$${balance.toLocaleString()}`,
           canForceCheckOut: true,
-          suggestion: 'Use forceCheckOut: true para proceder con pagos pendientes'
+          suggestion:
+            "Use forceCheckOut: true para proceder con pagos pendientes",
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ PROCESAR DEVOLUCIONES DE INVENTARIO CON LOGS DETALLADOS
     console.log("📦 [CHECK-OUT] Iniciando procesamiento de inventario...");
-    
+
     const processedReturns = [];
     const laundryItems = [];
     const inventoryErrors = [];
@@ -3721,18 +4457,25 @@ const checkOut = async (req, res, next) => {
 
     console.log("📦 [CHECK-OUT] Items de inventario a procesar:", {
       totalUsages: inventoryUsages.length,
-      returnsProvided: inventoryReturns.length
+      returnsProvided: inventoryReturns.length,
     });
 
     if (inventoryUsages.length > 0) {
       for (const usage of inventoryUsages) {
-        const returnData = inventoryReturns.find(r => r.basicInventoryId === usage.basicInventoryId) || {};
-        const { quantityReturned = 0, quantityConsumed = 0, notes: itemNotes = '' } = returnData;
+        const returnData =
+          inventoryReturns.find(
+            (r) => r.basicInventoryId === usage.basicInventoryId
+          ) || {};
+        const {
+          quantityReturned = 0,
+          quantityConsumed = 0,
+          notes: itemNotes = "",
+        } = returnData;
 
         console.log("📦 [CHECK-OUT] Procesando item:", {
           itemName: usage.inventory.name,
           assigned: usage.quantityAssigned,
-          returnData: { quantityReturned, quantityConsumed }
+          returnData: { quantityReturned, quantityConsumed },
         });
 
         // ⭐ VALIDAR CANTIDADES
@@ -3740,12 +4483,12 @@ const checkOut = async (req, res, next) => {
         if (totalProcessed > usage.quantityAssigned) {
           const error = `Cantidad total procesada (${totalProcessed}) excede la asignada (${usage.quantityAssigned}) para ${usage.inventory.name}`;
           console.log("❌ [CHECK-OUT] Error de cantidad:", error);
-          
+
           if (!skipInventoryValidation) {
             return res.status(400).json({
               error: true,
               message: error,
-              timestamp: formatForLogs(getColombiaTime())
+              timestamp: formatForLogs(getColombiaTime()),
             });
           } else {
             inventoryErrors.push(error);
@@ -3757,17 +4500,19 @@ const checkOut = async (req, res, next) => {
         if (unprocessed > 0 && !forceCheckOut) {
           const error = `${unprocessed} unidad(es) de ${usage.inventory.name} sin procesar (devolver o marcar como consumido)`;
           console.log("❌ [CHECK-OUT] Inventario sin procesar:", error);
-          
+
           if (!skipInventoryValidation) {
             return res.status(400).json({
               error: true,
-              message: 'Todo el inventario asignado debe ser devuelto o marcado como consumido',
+              message:
+                "Todo el inventario asignado debe ser devuelto o marcado como consumido",
               data: {
                 unprocessedItems: [error],
                 canForceCheckOut: true,
-                suggestion: 'Use forceCheckOut: true para proceder con inventario sin procesar'
+                suggestion:
+                  "Use forceCheckOut: true para proceder con inventario sin procesar",
               },
-              timestamp: formatForLogs(getColombiaTime())
+              timestamp: formatForLogs(getColombiaTime()),
             });
           } else {
             inventoryErrors.push(error);
@@ -3779,30 +4524,39 @@ const checkOut = async (req, res, next) => {
           const updateData = {
             quantityReturned,
             quantityConsumed,
-            status: quantityReturned > 0 ? 'returned' : 'consumed',
+            status: quantityReturned > 0 ? "returned" : "consumed",
             returnedAt: getColombiaTime(),
-            returnedBy: req.user?.n_document || 'system',
+            returnedBy: req.user?.n_document || "system",
             notes: itemNotes || usage.notes,
-            checkOutNotes: itemNotes
+            checkOutNotes: itemNotes,
           };
 
           // Si hay items sin procesar en modo forzado, marcarlos como perdidos
           if (unprocessed > 0 && forceCheckOut) {
             updateData.quantityConsumed = quantityConsumed + unprocessed;
-            updateData.status = 'consumed';
-            updateData.notes = `${updateData.notes || ''} - ${unprocessed} unidades marcadas como consumidas en check-out forzado`;
+            updateData.status = "consumed";
+            updateData.notes = `${
+              updateData.notes || ""
+            } - ${unprocessed} unidades marcadas como consumidas en check-out forzado`;
           }
 
           await usage.update(updateData);
-          console.log("✅ [CHECK-OUT] Registro de uso actualizado:", usage.inventory.name);
+          console.log(
+            "✅ [CHECK-OUT] Registro de uso actualizado:",
+            usage.inventory.name
+          );
 
           // ⭐ PROCESAR SEGÚN TIPO DE INVENTARIO
-          if (usage.inventory.inventoryType === 'reusable' && quantityReturned > 0) {
+          if (
+            usage.inventory.inventoryType === "reusable" &&
+            quantityReturned > 0
+          ) {
             // Items reutilizables van a stock sucio para lavado
-            const newDirtyStock = (usage.inventory.dirtyStock || 0) + quantityReturned;
-            
+            const newDirtyStock =
+              (usage.inventory.dirtyStock || 0) + quantityReturned;
+
             await usage.inventory.update({
-              dirtyStock: newDirtyStock
+              dirtyStock: newDirtyStock,
             });
 
             laundryItems.push({
@@ -3812,10 +4566,14 @@ const checkOut = async (req, res, next) => {
               quantity: quantityReturned,
               fromRoom: booking.room?.roomNumber || booking.roomNumber,
               processedAt: formatForLogs(getColombiaTime()),
-              priority: usage.inventory.category === 'bedding' ? 'high' : 'normal'
+              priority:
+                usage.inventory.category === "bedding" ? "high" : "normal",
             });
 
-            console.log("🧺 [CHECK-OUT] Item enviado a lavandería:", usage.inventory.name);
+            console.log(
+              "🧺 [CHECK-OUT] Item enviado a lavandería:",
+              usage.inventory.name
+            );
           }
 
           // ⭐ AGREGAR A ITEMS PROCESADOS
@@ -3827,16 +4585,23 @@ const checkOut = async (req, res, next) => {
             category: usage.inventory.category,
             assigned: usage.quantityAssigned,
             returned: quantityReturned,
-            consumed: quantityConsumed + (unprocessed > 0 && forceCheckOut ? unprocessed : 0),
+            consumed:
+              quantityConsumed +
+              (unprocessed > 0 && forceCheckOut ? unprocessed : 0),
             unprocessed: forceCheckOut ? 0 : unprocessed,
             status: updateData.status,
             processedAt: formatForLogs(updateData.returnedAt),
-            notes: updateData.notes
+            notes: updateData.notes,
           });
-
         } catch (inventoryError) {
-          console.error("❌ [CHECK-OUT] Error procesando inventario:", usage.inventory.name, inventoryError);
-          inventoryErrors.push(`Error procesando ${usage.inventory.name}: ${inventoryError.message}`);
+          console.error(
+            "❌ [CHECK-OUT] Error procesando inventario:",
+            usage.inventory.name,
+            inventoryError
+          );
+          inventoryErrors.push(
+            `Error procesando ${usage.inventory.name}: ${inventoryError.message}`
+          );
         }
       }
     } else {
@@ -3846,16 +4611,16 @@ const checkOut = async (req, res, next) => {
     console.log("📦 [CHECK-OUT] Resumen de inventario procesado:", {
       processed: processedReturns.length,
       laundryItems: laundryItems.length,
-      errors: inventoryErrors.length
+      errors: inventoryErrors.length,
     });
 
     // ⭐ ACTUALIZAR ESTADO DE LA RESERVA CON FECHA DE COLOMBIA
     console.log("🔄 [CHECK-OUT] Actualizando estado de reserva...");
-    
+
     try {
       // 🔧 ACTUALIZAR SOLO CAMPOS EXISTENTES EN TU MODELO BOOKING
       const updateData = {
-        status: 'completed'
+        status: "completed",
       };
 
       // ⭐ AGREGAR CAMPOS ADICIONALES SOLO SI EXISTEN EN TU MODELO
@@ -3876,25 +4641,27 @@ const checkOut = async (req, res, next) => {
 
       await booking.update(updateData);
       console.log("✅ [CHECK-OUT] Estado de reserva actualizado a 'completed'");
-      
     } catch (bookingUpdateError) {
-      console.error("❌ [CHECK-OUT] Error al actualizar reserva:", bookingUpdateError);
+      console.error(
+        "❌ [CHECK-OUT] Error al actualizar reserva:",
+        bookingUpdateError
+      );
       return res.status(500).json({
         error: true,
-        message: 'Error al actualizar el estado de la reserva',
+        message: "Error al actualizar el estado de la reserva",
         details: bookingUpdateError.message,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ ACTUALIZAR ESTADO DE LA HABITACIÓN - SEGÚN TU MODELO ROOM
     console.log("🏨 [CHECK-OUT] Actualizando estado de habitación...");
-    
+
     try {
       // 🔧 USAR ESTADO CORRECTO SEGÚN TU MODELO
       const roomUpdateData = {
-        status: 'Para Limpiar', // ✅ ESTADO CORRECTO SEGÚN TU MODELO
-        available: false // No disponible hasta que se complete la limpieza
+        status: "Para Limpiar", // ✅ ESTADO CORRECTO SEGÚN TU MODELO
+        available: false, // No disponible hasta que se complete la limpieza
       };
 
       // ⭐ AGREGAR CAMPOS ADICIONALES SOLO SI EXISTEN EN TU MODELO ROOM
@@ -3907,10 +4674,14 @@ const checkOut = async (req, res, next) => {
       // roomUpdateData.cleaningRequired = laundryItems.length > 0 ? 'deep' : 'standard';
 
       await booking.room.update(roomUpdateData);
-      console.log("✅ [CHECK-OUT] Estado de habitación actualizado a 'Para Limpiar'");
-      
+      console.log(
+        "✅ [CHECK-OUT] Estado de habitación actualizado a 'Para Limpiar'"
+      );
     } catch (roomUpdateError) {
-      console.error("❌ [CHECK-OUT] Error al actualizar habitación:", roomUpdateError);
+      console.error(
+        "❌ [CHECK-OUT] Error al actualizar habitación:",
+        roomUpdateError
+      );
       // No fallar el check-out por esto, solo log
     }
 
@@ -3918,34 +4689,37 @@ const checkOut = async (req, res, next) => {
     const stayDuration = getDaysDifference(booking.checkIn, now);
     const nightsBooked = getDaysDifference(booking.checkIn, booking.checkOut);
     const isLateCheckOut = now > checkOutDate;
-    const lateHours = isLateCheckOut ? Math.ceil((now - checkOutDate) / (1000 * 60 * 60)) : 0;
+    const lateHours = isLateCheckOut
+      ? Math.ceil((now - checkOutDate) / (1000 * 60 * 60))
+      : 0;
 
     // ⭐ PREPARAR RESPUESTA COMPLETA
     console.log("📤 [CHECK-OUT] Preparando respuesta final...");
-    
+
     const responseData = {
       booking: {
         bookingId: booking.bookingId,
-        status: 'completed',
+        status: "completed",
         // 🔧 USAR FECHA ACTUAL YA QUE NO TENEMOS actualCheckOut EN EL MODELO
         actualCheckOut: formatForLogs(getColombiaTime()),
         roomNumber: booking.room?.roomNumber || booking.roomNumber,
         guestName: booking.guest?.scostumername,
         checkOutTime: formatForDisplay(getColombiaTime()),
-        checkedOutBy: req.user?.n_document || 'system',
-        roomCondition: roomCondition
+        checkedOutBy: req.user?.n_document || "system",
+        roomCondition: roomCondition,
       },
-      
+
       room: {
         roomNumber: booking.room?.roomNumber || booking.roomNumber,
         type: booking.room?.type,
-        status: 'Para Limpiar',
+        status: "Para Limpiar",
         needsCleaning: true,
-        cleaningType: laundryItems.length > 0 ? 'deep' : 'standard',
+        cleaningType: laundryItems.length > 0 ? "deep" : "standard",
         lastCondition: roomCondition,
-        estimatedCleaningTime: laundryItems.length > 0 ? '2-3 horas' : '1-2 horas'
+        estimatedCleaningTime:
+          laundryItems.length > 0 ? "2-3 horas" : "1-2 horas",
       },
-      
+
       inventory: {
         hasInventoryProcessed: processedReturns.length > 0,
         totalItemsProcessed: processedReturns.length,
@@ -3953,13 +4727,19 @@ const checkOut = async (req, res, next) => {
         laundryItems: laundryItems.length > 0 ? laundryItems : null,
         inventoryErrors: inventoryErrors.length > 0 ? inventoryErrors : null,
         summary: {
-          totalReturned: processedReturns.reduce((sum, item) => sum + item.returned, 0),
-          totalConsumed: processedReturns.reduce((sum, item) => sum + item.consumed, 0),
+          totalReturned: processedReturns.reduce(
+            (sum, item) => sum + item.returned,
+            0
+          ),
+          totalConsumed: processedReturns.reduce(
+            (sum, item) => sum + item.consumed,
+            0
+          ),
           itemsToLaundry: laundryItems.length,
-          hasErrors: inventoryErrors.length > 0
-        }
+          hasErrors: inventoryErrors.length > 0,
+        },
       },
-      
+
       financial: {
         totalAmount: `$${totalAmount.toLocaleString()}`,
         extraCharges: `$${totalExtras.toLocaleString()}`,
@@ -3968,44 +4748,56 @@ const checkOut = async (req, res, next) => {
         balance: `$${balance.toLocaleString()}`,
         isFullyPaid: balance === 0,
         hasOutstandingBalance: balance > 0,
-        paymentStatus: balance === 0 ? 'fully_paid' : 'outstanding_balance'
+        paymentStatus: balance === 0 ? "fully_paid" : "outstanding_balance",
       },
-      
+
       stayInfo: {
         checkInDate: formatColombiaDate(booking.checkIn),
         checkOutDate: formatColombiaDate(booking.checkOut),
-        actualCheckInTime: booking.actualCheckIn ? formatForLogs(booking.actualCheckIn) : null,
+        actualCheckInTime: booking.actualCheckIn
+          ? formatForLogs(booking.actualCheckIn)
+          : null,
         actualCheckOutTime: formatForLogs(getColombiaTime()),
         nightsBooked,
         actualStayDuration: stayDuration,
         guestCount: booking.guestCount,
         isLateCheckOut,
         lateHours: lateHours > 0 ? lateHours : 0,
-        totalDuration: `${nightsBooked} ${nightsBooked === 1 ? 'noche' : 'noches'}`
+        totalDuration: `${nightsBooked} ${
+          nightsBooked === 1 ? "noche" : "noches"
+        }`,
       },
-      
+
       nextActions: {
         roomNeedsCleaning: true,
         laundryRequired: laundryItems.length > 0,
         paymentFollowUp: balance > 0,
         canGenerateFinalBill: balance === 0,
-        estimatedRoomReady: `${1 + (laundryItems.length > 0 ? 1 : 0)}-${2 + (laundryItems.length > 0 ? 1 : 0)} horas`,
+        estimatedRoomReady: `${1 + (laundryItems.length > 0 ? 1 : 0)}-${
+          2 + (laundryItems.length > 0 ? 1 : 0)
+        } horas`,
         actions: [
-          roomCondition !== 'good' ? 'Inspeccionar daños en habitación' : null,
-          laundryItems.length > 0 ? 'Procesar items de lavandería' : null,
-          'Realizar limpieza de habitación',
-          balance > 0 ? 'Hacer seguimiento a pagos pendientes' : 'Generar factura final',
-          'Activar habitación para nuevas reservas'
-        ].filter(Boolean)
+          roomCondition !== "good" ? "Inspeccionar daños en habitación" : null,
+          laundryItems.length > 0 ? "Procesar items de lavandería" : null,
+          "Realizar limpieza de habitación",
+          balance > 0
+            ? "Hacer seguimiento a pagos pendientes"
+            : "Generar factura final",
+          "Activar habitación para nuevas reservas",
+        ].filter(Boolean),
       },
-      
+
       validation: {
         wasForced: forceCheckOut,
         hadInventoryErrors: inventoryErrors.length > 0,
         hadPaymentIssues: balance > 0,
         wasLate: isLateCheckOut,
-        validationsPassed: !forceCheckOut && inventoryErrors.length === 0 && balance === 0 && !isLateCheckOut
-      }
+        validationsPassed:
+          !forceCheckOut &&
+          inventoryErrors.length === 0 &&
+          balance === 0 &&
+          !isLateCheckOut,
+      },
     };
 
     console.log("✅ [CHECK-OUT] Check-out completado exitosamente:", {
@@ -4014,27 +4806,29 @@ const checkOut = async (req, res, next) => {
       roomNumber: booking.room?.roomNumber,
       inventoryProcessed: processedReturns.length,
       laundryItems: laundryItems.length,
-      balance: balance > 0 ? `$${balance.toLocaleString()}` : '$0',
+      balance: balance > 0 ? `$${balance.toLocaleString()}` : "$0",
       wasForced: forceCheckOut,
-      completedAt: formatForLogs(getColombiaTime())
+      completedAt: formatForLogs(getColombiaTime()),
     });
 
     res.json({
       error: false,
-      message: 'Check-out realizado exitosamente',
+      message: "Check-out realizado exitosamente",
       data: responseData,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [CHECK-OUT] Error general:", error);
-    console.error("🕐 [CHECK-OUT] Hora del error:", formatForLogs(getColombiaTime()));
-    
+    console.error(
+      "🕐 [CHECK-OUT] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
     res.status(500).json({
       error: true,
-      message: 'Error interno durante el proceso de check-out',
+      message: "Error interno durante el proceso de check-out",
       details: error.message,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
   }
 };
@@ -4043,80 +4837,94 @@ const checkOut = async (req, res, next) => {
 const calculateTotalAmount = (booking) => {
   const roomCharge = calculateRoomCharge(booking);
   // 🔧 CORRECCIÓN: Usar 'extraCharges' en lugar de 'ExtraCharges' y 'amount' en lugar de 'price'
-  const extraCharges = (booking.extraCharges || booking.ExtraCharges || []).reduce(
-    (total, charge) => {
-      // ✅ USAR 'amount' QUE ES EL CAMPO CORRECTO EN TU MODELO ExtraCharge
-      const chargeAmount = parseFloat(charge.amount || 0);
-      const quantity = parseInt(charge.quantity || 1);
-      return total + (chargeAmount * quantity);
-    },
-    0
-  );
+  const extraCharges = (
+    booking.extraCharges ||
+    booking.ExtraCharges ||
+    []
+  ).reduce((total, charge) => {
+    // ✅ USAR 'amount' QUE ES EL CAMPO CORRECTO EN TU MODELO ExtraCharge
+    const chargeAmount = parseFloat(charge.amount || 0);
+    const quantity = parseInt(charge.quantity || 1);
+    return total + chargeAmount * quantity;
+  }, 0);
   return roomCharge + extraCharges;
 };
-
-
 
 const addExtraCharge = async (req, res) => {
   try {
     console.log("📤 [ADD-EXTRA-CHARGE] Recibiendo datos completos:");
     console.log("🔍 [ADD-EXTRA-CHARGE] req.params:", req.params);
-    console.log("🔍 [ADD-EXTRA-CHARGE] req.body:", JSON.stringify(req.body, null, 2));
-    console.log("🕐 [ADD-EXTRA-CHARGE] Hora de procesamiento:", formatForLogs(getColombiaTime()));
+    console.log(
+      "🔍 [ADD-EXTRA-CHARGE] req.body:",
+      JSON.stringify(req.body, null, 2)
+    );
+    console.log(
+      "🕐 [ADD-EXTRA-CHARGE] Hora de procesamiento:",
+      formatForLogs(getColombiaTime())
+    );
 
     const { bookingId } = req.params;
     const { extraCharge } = req.body;
 
     console.log("📋 [ADD-EXTRA-CHARGE] Datos extraídos:", {
       bookingId: bookingId,
-      extraCharge: extraCharge
+      extraCharge: extraCharge,
     });
 
     // ⭐ VALIDACIONES BÁSICAS CON LOGS
     if (!bookingId) {
       console.error("❌ [ADD-EXTRA-CHARGE] bookingId faltante en params");
-      return res.status(400).json({ 
-        error: true, 
+      return res.status(400).json({
+        error: true,
         message: "bookingId es requerido en la URL",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     if (!extraCharge) {
       console.error("❌ [ADD-EXTRA-CHARGE] extraCharge faltante en body");
-      return res.status(400).json({ 
-        error: true, 
+      return res.status(400).json({
+        error: true,
         message: "extraCharge es requerido en el body",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
-    if (!extraCharge.description || extraCharge.description.trim() === '') {
-      console.error("❌ [ADD-EXTRA-CHARGE] description faltante o vacía:", extraCharge.description);
-      return res.status(400).json({ 
-        error: true, 
+    if (!extraCharge.description || extraCharge.description.trim() === "") {
+      console.error(
+        "❌ [ADD-EXTRA-CHARGE] description faltante o vacía:",
+        extraCharge.description
+      );
+      return res.status(400).json({
+        error: true,
         message: "description es requerida y no puede estar vacía",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ✅ VALIDACIÓN CORRECTA: Usar 'amount' según tu modelo ExtraCharge
     if (!extraCharge.amount || isNaN(parseFloat(extraCharge.amount))) {
-      console.error("❌ [ADD-EXTRA-CHARGE] amount inválido:", extraCharge.amount);
-      return res.status(400).json({ 
-        error: true, 
+      console.error(
+        "❌ [ADD-EXTRA-CHARGE] amount inválido:",
+        extraCharge.amount
+      );
+      return res.status(400).json({
+        error: true,
         message: "amount es requerido y debe ser un número válido",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     const amountValue = parseFloat(extraCharge.amount);
     if (amountValue <= 0) {
-      console.error("❌ [ADD-EXTRA-CHARGE] amount debe ser mayor a cero:", amountValue);
-      return res.status(400).json({ 
-        error: true, 
+      console.error(
+        "❌ [ADD-EXTRA-CHARGE] amount debe ser mayor a cero:",
+        amountValue
+      );
+      return res.status(400).json({
+        error: true,
         message: "El monto debe ser mayor a cero",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -4126,26 +4934,29 @@ const addExtraCharge = async (req, res) => {
     const booking = await Booking.findByPk(bookingId);
     if (!booking) {
       console.error("❌ [ADD-EXTRA-CHARGE] Reserva no encontrada:", bookingId);
-      return res.status(404).json({ 
-        error: true, 
+      return res.status(404).json({
+        error: true,
         message: "Reserva no encontrada",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     console.log("✅ [ADD-EXTRA-CHARGE] Reserva encontrada:", {
       bookingId: booking.bookingId,
       status: booking.status,
-      roomNumber: booking.roomNumber
+      roomNumber: booking.roomNumber,
     });
 
     // ⭐ VALIDAR ESTADO DE LA RESERVA
-    if (!['confirmed', 'checked-in'].includes(booking.status)) {
-      console.error("❌ [ADD-EXTRA-CHARGE] Estado de reserva no permite cargos extra:", booking.status);
-      return res.status(400).json({ 
-        error: true, 
+    if (!["confirmed", "checked-in", "paid"].includes(booking.status)) {
+      console.error(
+        "❌ [ADD-EXTRA-CHARGE] Estado de reserva no permite cargos extra:",
+        booking.status
+      );
+      return res.status(400).json({
+        error: true,
         message: `No se pueden agregar cargos extra a reservas en estado '${booking.status}'. Solo se permite en 'confirmed' o 'checked-in'`,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -4155,9 +4966,9 @@ const addExtraCharge = async (req, res) => {
       description: extraCharge.description.trim(),
       amount: amountValue, // ✅ CAMPO CORRECTO
       quantity: parseInt(extraCharge.quantity) || 1,
-      chargeType: extraCharge.chargeType || 'service',
+      chargeType: extraCharge.chargeType || "service",
       chargeDate: getColombiaTime(),
-      chargedBy: req.user?.n_document || 'system',
+      chargedBy: req.user?.n_document || "system",
       notes: extraCharge.notes || null,
       // ⭐ CAMPOS ADICIONALES SI EXISTEN EN TU MODELO
       // basicId: extraCharge.basicId || null,
@@ -4166,7 +4977,10 @@ const addExtraCharge = async (req, res) => {
       // approvedBy: req.user?.n_document || 'system'
     };
 
-    console.log("📝 [ADD-EXTRA-CHARGE] Datos para crear cargo:", JSON.stringify(chargeData, null, 2));
+    console.log(
+      "📝 [ADD-EXTRA-CHARGE] Datos para crear cargo:",
+      JSON.stringify(chargeData, null, 2)
+    );
 
     // ⭐ CREAR CON MANEJO DE ERRORES MEJORADO
     let newExtraCharge;
@@ -4177,28 +4991,31 @@ const addExtraCharge = async (req, res) => {
         description: newExtraCharge.description,
         amount: newExtraCharge.amount,
         quantity: newExtraCharge.quantity,
-        totalAmount: newExtraCharge.amount * newExtraCharge.quantity
+        totalAmount: newExtraCharge.amount * newExtraCharge.quantity,
       });
     } catch (createError) {
-      console.error("❌ [ADD-EXTRA-CHARGE] Error específico al crear:", createError);
+      console.error(
+        "❌ [ADD-EXTRA-CHARGE] Error específico al crear:",
+        createError
+      );
       console.error("❌ [ADD-EXTRA-CHARGE] Error details:", {
         name: createError.name,
         message: createError.message,
-        errors: createError.errors
+        errors: createError.errors,
       });
-      
+
       return res.status(500).json({
         error: true,
         message: "Error al crear el cargo extra en la base de datos",
         details: createError.message,
         validationErrors: createError.errors,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ FORMATEAR RESPUESTA CONSISTENTE
     const totalAmount = newExtraCharge.amount * newExtraCharge.quantity;
-    
+
     const responseData = {
       ...newExtraCharge.toJSON(),
       // ✅ CAMPOS CALCULADOS
@@ -4210,7 +5027,7 @@ const addExtraCharge = async (req, res) => {
       chargeDate: formatForLogs(newExtraCharge.chargeDate),
       createdAt: formatForLogs(newExtraCharge.createdAt),
       chargeDateFormatted: formatForDisplay(newExtraCharge.chargeDate),
-      amountFormatted: `$${newExtraCharge.amount.toLocaleString()}`
+      amountFormatted: `$${newExtraCharge.amount.toLocaleString()}`,
     };
 
     console.log("📤 [ADD-EXTRA-CHARGE] Respuesta preparada:", {
@@ -4219,30 +5036,30 @@ const addExtraCharge = async (req, res) => {
       amount: responseData.amount,
       quantity: responseData.quantity,
       totalAmount: responseData.totalAmount,
-      totalAmountFormatted: responseData.totalAmountFormatted
+      totalAmountFormatted: responseData.totalAmountFormatted,
     });
 
     res.status(201).json({
       error: false,
       message: "Cargo extra agregado exitosamente",
       data: responseData,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [ADD-EXTRA-CHARGE] Error general:", error);
-    console.error("🕐 [ADD-EXTRA-CHARGE] Hora del error:", formatForLogs(getColombiaTime()));
-    
+    console.error(
+      "🕐 [ADD-EXTRA-CHARGE] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
     res.status(500).json({
       error: true,
       message: "Error interno del servidor",
       details: error.message,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
   }
 };
-
-
 
 const getBookingInventoryStatus = async (req, res, next) => {
   try {
@@ -4253,25 +5070,25 @@ const getBookingInventoryStatus = async (req, res, next) => {
       include: [
         {
           model: BasicInventory,
-          as: 'inventory',
-          attributes: ['id', 'name', 'inventoryType', 'category']
-        }
-      ]
+          as: "inventory",
+          attributes: ["id", "name", "inventoryType", "category"],
+        },
+      ],
     });
 
     if (inventoryUsage.length === 0) {
       return res.json({
         error: false,
-        message: 'No hay inventario asignado a esta reserva',
+        message: "No hay inventario asignado a esta reserva",
         data: {
           hasInventory: false,
-          items: []
-        }
+          items: [],
+        },
       });
     }
 
     // Procesar estado del inventario
-    const inventoryItems = inventoryUsage.map(usage => ({
+    const inventoryItems = inventoryUsage.map((usage) => ({
       id: usage.inventory.id,
       name: usage.inventory.name,
       type: usage.inventory.inventoryType,
@@ -4282,17 +5099,30 @@ const getBookingInventoryStatus = async (req, res, next) => {
       status: usage.status,
       assignedAt: usage.assignedAt,
       returnedAt: usage.returnedAt,
-      notes: usage.notes
+      notes: usage.notes,
     }));
 
     const summary = {
       hasInventory: true,
       totalItems: inventoryItems.length,
-      totalAssigned: inventoryItems.reduce((sum, item) => sum + item.quantityAssigned, 0),
-      totalConsumed: inventoryItems.reduce((sum, item) => sum + item.quantityConsumed, 0),
-      totalReturned: inventoryItems.reduce((sum, item) => sum + item.quantityReturned, 0),
-      pendingReturn: inventoryItems.filter(item => item.status === 'assigned' || item.status === 'in_use').length,
-      readyForCheckOut: inventoryItems.every(item => item.status === 'returned' || item.status === 'consumed')
+      totalAssigned: inventoryItems.reduce(
+        (sum, item) => sum + item.quantityAssigned,
+        0
+      ),
+      totalConsumed: inventoryItems.reduce(
+        (sum, item) => sum + item.quantityConsumed,
+        0
+      ),
+      totalReturned: inventoryItems.reduce(
+        (sum, item) => sum + item.quantityReturned,
+        0
+      ),
+      pendingReturn: inventoryItems.filter(
+        (item) => item.status === "assigned" || item.status === "in_use"
+      ).length,
+      readyForCheckOut: inventoryItems.every(
+        (item) => item.status === "returned" || item.status === "consumed"
+      ),
     };
 
     res.json({
@@ -4300,14 +5130,13 @@ const getBookingInventoryStatus = async (req, res, next) => {
       data: {
         bookingId,
         summary,
-        items: inventoryItems
-      }
+        items: inventoryItems,
+      },
     });
   } catch (error) {
     next(error);
   }
 };
-
 
 const getInventoryUsageReport = async (req, res, next) => {
   try {
@@ -4316,29 +5145,29 @@ const getInventoryUsageReport = async (req, res, next) => {
     const whereClause = {};
     if (startDate && endDate) {
       whereClause.assignedAt = {
-        [Op.between]: [new Date(startDate), new Date(endDate)]
+        [Op.between]: [new Date(startDate), new Date(endDate)],
       };
     }
 
     const includeClause = [
       {
         model: BasicInventory,
-        as: 'inventory',
-        attributes: ['name', 'inventoryType', 'category'],
-        where: inventoryType ? { inventoryType } : {}
+        as: "inventory",
+        attributes: ["name", "inventoryType", "category"],
+        where: inventoryType ? { inventoryType } : {},
       },
       {
         model: Booking,
-        as: 'booking',
-        attributes: ['bookingId', 'roomNumber', 'checkIn', 'checkOut'],
-        where: roomNumber ? { roomNumber } : {}
-      }
+        as: "booking",
+        attributes: ["bookingId", "roomNumber", "checkIn", "checkOut"],
+        where: roomNumber ? { roomNumber } : {},
+      },
     ];
 
     const usageData = await BookingInventoryUsage.findAll({
       where: whereClause,
       include: includeClause,
-      order: [['assignedAt', 'DESC']]
+      order: [["assignedAt", "DESC"]],
     });
 
     // Procesar estadísticas
@@ -4346,10 +5175,10 @@ const getInventoryUsageReport = async (req, res, next) => {
       totalUsages: usageData.length,
       itemStats: {},
       roomStats: {},
-      typeStats: {}
+      typeStats: {},
     };
 
-    usageData.forEach(usage => {
+    usageData.forEach((usage) => {
       const itemName = usage.inventory.name;
       const roomNum = usage.booking.roomNumber;
       const itemType = usage.inventory.inventoryType;
@@ -4362,7 +5191,7 @@ const getInventoryUsageReport = async (req, res, next) => {
           totalAssigned: 0,
           totalConsumed: 0,
           totalReturned: 0,
-          usageCount: 0
+          usageCount: 0,
         };
       }
       stats.itemStats[itemName].totalAssigned += usage.quantityAssigned;
@@ -4375,7 +5204,7 @@ const getInventoryUsageReport = async (req, res, next) => {
         stats.roomStats[roomNum] = {
           roomNumber: roomNum,
           totalAssignments: 0,
-          uniqueItems: new Set()
+          uniqueItems: new Set(),
         };
       }
       stats.roomStats[roomNum].totalAssignments += 1;
@@ -4387,7 +5216,7 @@ const getInventoryUsageReport = async (req, res, next) => {
           type: itemType,
           totalAssigned: 0,
           totalConsumed: 0,
-          totalReturned: 0
+          totalReturned: 0,
         };
       }
       stats.typeStats[itemType].totalAssigned += usage.quantityAssigned;
@@ -4396,8 +5225,9 @@ const getInventoryUsageReport = async (req, res, next) => {
     });
 
     // Convertir Sets a números
-    Object.keys(stats.roomStats).forEach(room => {
-      stats.roomStats[room].uniqueItems = stats.roomStats[room].uniqueItems.size;
+    Object.keys(stats.roomStats).forEach((room) => {
+      stats.roomStats[room].uniqueItems =
+        stats.roomStats[room].uniqueItems.size;
     });
 
     res.json({
@@ -4409,35 +5239,37 @@ const getInventoryUsageReport = async (req, res, next) => {
           ...stats,
           itemStats: Object.values(stats.itemStats),
           roomStats: Object.values(stats.roomStats),
-          typeStats: Object.values(stats.typeStats)
+          typeStats: Object.values(stats.typeStats),
         },
-        usageDetails: usageData
-      }
+        usageDetails: usageData,
+      },
     });
   } catch (error) {
     next(error);
   }
 };
 
-
 const generateBill = async (req, res, next) => {
   try {
     console.log("🧾 [GENERATE-BILL] Iniciando generación de factura");
-    console.log("🕐 [GENERATE-BILL] Hora Colombia:", formatForLogs(getColombiaTime()));
+    console.log(
+      "🕐 [GENERATE-BILL] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
     console.log("📥 [GENERATE-BILL] Parámetros:", {
       bookingId: req.params.bookingId,
-      user: req.user ? req.user.n_document : 'No user'
+      user: req.user ? req.user.n_document : "No user",
     });
-    
+
     const { bookingId } = req.params;
 
     // ⭐ VALIDACIONES BÁSICAS CON LOGS
     if (!bookingId) {
       console.log("❌ [GENERATE-BILL] bookingId faltante");
-      return res.status(400).json({ 
-        error: true, 
+      return res.status(400).json({
+        error: true,
         message: "bookingId es requerido",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -4445,27 +5277,36 @@ const generateBill = async (req, res, next) => {
 
     // ⭐ VERIFICAR SI YA EXISTE UNA FACTURA PARA ESTA RESERVA
     const existingBill = await Bill.findOne({
-      where: { bookingId: bookingId }
+      where: { bookingId: bookingId },
     });
 
     if (existingBill) {
-      console.log("⚠️ [GENERATE-BILL] Ya existe una factura para esta reserva:", existingBill.idBill);
-      
+      console.log(
+        "⚠️ [GENERATE-BILL] Ya existe una factura para esta reserva:",
+        existingBill.idBill
+      );
+
       // ⭐ ENRIQUECER DATOS DE FACTURA EXISTENTE
       const enrichedBill = {
         ...existingBill.toJSON(),
         createdAtFormatted: formatForLogs(existingBill.createdAt),
         updatedAtFormatted: formatForLogs(existingBill.updatedAt),
-        totalAmountFormatted: `$${parseFloat(existingBill.totalAmount || 0).toLocaleString()}`,
-        statusLabel: existingBill.status === 'paid' ? 'Pagada' : 
-                    existingBill.status === 'pending' ? 'Pendiente' : 'Cancelada'
+        totalAmountFormatted: `$${parseFloat(
+          existingBill.totalAmount || 0
+        ).toLocaleString()}`,
+        statusLabel:
+          existingBill.status === "paid"
+            ? "Pagada"
+            : existingBill.status === "pending"
+            ? "Pendiente"
+            : "Cancelada",
       };
 
       return res.status(200).json({
         error: false,
         message: "Factura ya existe para esta reserva",
         data: enrichedBill,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -4473,41 +5314,67 @@ const generateBill = async (req, res, next) => {
 
     // ⭐ OBTENER DATOS COMPLETOS DE LA RESERVA
     console.log("🔍 [GENERATE-BILL] Obteniendo datos de la reserva...");
-    
+
     const booking = await Booking.findByPk(bookingId, {
       include: [
-        { 
-          model: Room, 
-          as: 'room',
-          attributes: ['roomNumber', 'type', 'price', 'priceSingle', 'priceDouble', 'priceMultiple']
+        {
+          model: Room,
+          as: "room",
+          attributes: [
+            "roomNumber",
+            "type",
+            "price",
+            "priceSingle",
+            "priceDouble",
+            "priceMultiple",
+          ],
         },
         {
           model: Buyer,
-          as: 'guest',
-          attributes: ["scostumername", "selectronicmail", "sdocno", "stelephone"]
+          as: "guest",
+          attributes: [
+            "scostumername",
+            "selectronicmail",
+            "sdocno",
+            "stelephone",
+          ],
         },
         {
           model: Payment,
-          as: 'payments',
-          attributes: ['paymentId', 'amount', 'paymentStatus', 'paymentMethod', 'paymentDate', 'paymentType'],
-          where: { paymentStatus: 'completed' },
-          required: false
+          as: "payments",
+          attributes: [
+            "paymentId",
+            "amount",
+            "paymentStatus",
+            "paymentMethod",
+            "paymentDate",
+            "paymentType",
+          ],
+          where: { paymentStatus: "completed" },
+          required: false,
         },
         {
           model: ExtraCharge,
-          as: 'extraCharges',
-          attributes: ['id', 'description', 'amount', 'quantity', 'chargeType', 'chargeDate'],
-          required: false
-        }
+          as: "extraCharges",
+          attributes: [
+            "id",
+            "description",
+            "amount",
+            "quantity",
+            "chargeType",
+            "chargeDate",
+          ],
+          required: false,
+        },
       ],
     });
 
     if (!booking) {
       console.log("❌ [GENERATE-BILL] Reserva no encontrada:", bookingId);
-      return res.status(404).json({ 
-        error: true, 
+      return res.status(404).json({
+        error: true,
         message: "Reserva no encontrada",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -4517,46 +5384,54 @@ const generateBill = async (req, res, next) => {
       guestName: booking.guest?.scostumername,
       status: booking.status,
       hasPayments: booking.payments?.length > 0,
-      hasExtraCharges: booking.extraCharges?.length > 0
+      hasExtraCharges: booking.extraCharges?.length > 0,
     });
 
     // ⭐ VERIFICAR QUE LA RESERVA ESTÉ EN ESTADO ADECUADO
-    if (!['checked-in', 'completed'].includes(booking.status)) {
-      console.log("❌ [GENERATE-BILL] Estado de reserva inválido:", booking.status);
-      return res.status(400).json({ 
-        error: true, 
-        message: "La reserva debe estar en estado 'checked-in' o 'completed' para generar factura",
+    if (!["checked-in", "completed"].includes(booking.status)) {
+      console.log(
+        "❌ [GENERATE-BILL] Estado de reserva inválido:",
+        booking.status
+      );
+      return res.status(400).json({
+        error: true,
+        message:
+          "La reserva debe estar en estado 'checked-in' o 'completed' para generar factura",
         data: {
           currentStatus: booking.status,
-          validStatuses: ['checked-in', 'completed']
+          validStatuses: ["checked-in", "completed"],
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ CALCULAR TOTALES CON VALIDACIÓN MEJORADA
     console.log("💰 [GENERATE-BILL] Calculando totales...");
-    
+
     const baseAmount = parseFloat(booking.totalAmount) || 0;
     const extraCharges = booking.extraCharges || [];
     const payments = booking.payments || [];
-    
+
     // ⭐ USAR 'amount' EN LUGAR DE 'price' SEGÚN TU MODELO ExtraCharge
     const totalExtras = extraCharges.reduce((sum, charge) => {
       const chargeAmount = parseFloat(charge.amount || 0);
       const quantity = parseInt(charge.quantity || 1);
       const lineTotal = chargeAmount * quantity;
-      console.log(`💰 [GENERATE-BILL] Cargo extra: ${charge.description} = $${chargeAmount} x ${quantity} = $${lineTotal}`);
+      console.log(
+        `💰 [GENERATE-BILL] Cargo extra: ${charge.description} = $${chargeAmount} x ${quantity} = $${lineTotal}`
+      );
       return sum + lineTotal;
     }, 0);
-    
+
     // ⭐ CALCULAR TOTAL PAGADO
     const totalPaid = payments.reduce((sum, payment) => {
       const amount = parseFloat(payment.amount || 0);
-      console.log(`💳 [GENERATE-BILL] Pago: ${payment.paymentMethod} = $${amount}`);
+      console.log(
+        `💳 [GENERATE-BILL] Pago: ${payment.paymentMethod} = $${amount}`
+      );
       return sum + amount;
     }, 0);
-    
+
     const totalAmount = baseAmount + totalExtras;
     const balance = Math.max(0, totalAmount - totalPaid);
 
@@ -4567,7 +5442,7 @@ const generateBill = async (req, res, next) => {
       totalPaid,
       balance,
       extraChargesCount: extraCharges.length,
-      paymentsCount: payments.length
+      paymentsCount: payments.length,
     });
 
     // ⭐ VERIFICAR QUE EL MONTO TOTAL SEA VÁLIDO
@@ -4576,22 +5451,29 @@ const generateBill = async (req, res, next) => {
       return res.status(400).json({
         error: true,
         message: "El monto total de la factura debe ser mayor a cero",
-        data: { 
-          baseAmount, 
-          totalExtras, 
-          totalAmount 
+        data: {
+          baseAmount,
+          totalExtras,
+          totalAmount,
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ DETERMINAR MÉTODO DE PAGO PRINCIPAL
-    const primaryPaymentMethod = payments.length > 0 ? 
-      payments.reduce((prev, current) => 
-        parseFloat(prev.amount) > parseFloat(current.amount) ? prev : current
-      ).paymentMethod : 'cash';
+    const primaryPaymentMethod =
+      payments.length > 0
+        ? payments.reduce((prev, current) =>
+            parseFloat(prev.amount) > parseFloat(current.amount)
+              ? prev
+              : current
+          ).paymentMethod
+        : "cash";
 
-    console.log("💳 [GENERATE-BILL] Método de pago principal:", primaryPaymentMethod);
+    console.log(
+      "💳 [GENERATE-BILL] Método de pago principal:",
+      primaryPaymentMethod
+    );
 
     // ⭐ CREAR LA FACTURA CON CAMPOS EXISTENTES EN TU MODELO
     const billData = {
@@ -4601,7 +5483,7 @@ const generateBill = async (req, res, next) => {
       taxAmount: 0, // Por ahora 0, se puede calcular después
       totalAmount: totalAmount,
       taxInvoiceId: null,
-      status: balance === 0 ? 'paid' : 'pending', // ✅ ESTADO BASADO EN BALANCE
+      status: balance === 0 ? "paid" : "pending", // ✅ ESTADO BASADO EN BALANCE
       paymentMethod: primaryPaymentMethod,
       // ⭐ CAMPOS ADICIONALES SI EXISTEN EN TU MODELO
       // taxxaStatus: 'not_sent',
@@ -4617,51 +5499,61 @@ const generateBill = async (req, res, next) => {
 
     // ⭐ CREAR REGISTRO EN LA BASE DE DATOS CON MANEJO DE ERRORES MEJORADO
     console.log("💾 [GENERATE-BILL] Creando factura en base de datos...");
-    
+
     let savedBill = null;
     try {
       savedBill = await Bill.create(billData);
       console.log("✅ [GENERATE-BILL] Factura guardada en BD:", {
         idBill: savedBill.idBill,
         totalAmount: savedBill.totalAmount,
-        status: savedBill.status
+        status: savedBill.status,
       });
     } catch (billError) {
-      console.error("❌ [GENERATE-BILL] Error al guardar factura:", billError.message);
+      console.error(
+        "❌ [GENERATE-BILL] Error al guardar factura:",
+        billError.message
+      );
       console.error("❌ [GENERATE-BILL] Detalles del error:", {
         name: billError.name,
         message: billError.message,
         errors: billError.errors,
-        sql: billError.sql
+        sql: billError.sql,
       });
-      
+
       return res.status(500).json({
         error: true,
         message: "Error al crear la factura en la base de datos",
         details: billError.message,
         validationErrors: billError.errors,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ ACTUALIZAR ESTADO DE LA RESERVA SOLO SI ESTÁ COMPLETAMENTE PAGADA
-    if (balance === 0 && booking.status === 'checked-in') {
-      console.log("🔄 [GENERATE-BILL] Actualizando estado de reserva a completed...");
+    if (balance === 0 && booking.status === "checked-in") {
+      console.log(
+        "🔄 [GENERATE-BILL] Actualizando estado de reserva a completed..."
+      );
       try {
-        await booking.update({ 
-          status: 'completed',
+        await booking.update({
+          status: "completed",
           // completedAt: getColombiaTime() // Si tienes este campo
         });
-        console.log("✅ [GENERATE-BILL] Estado de reserva actualizado a 'completed'");
+        console.log(
+          "✅ [GENERATE-BILL] Estado de reserva actualizado a 'completed'"
+        );
       } catch (updateError) {
-        console.warn("⚠️ [GENERATE-BILL] Error al actualizar estado de reserva:", updateError.message);
+        console.warn(
+          "⚠️ [GENERATE-BILL] Error al actualizar estado de reserva:",
+          updateError.message
+        );
         // No fallar la factura por esto
       }
     } else {
       console.log("📝 [GENERATE-BILL] No se actualiza estado de reserva:", {
         balance,
         currentStatus: booking.status,
-        reason: balance > 0 ? 'Balance pendiente' : 'Estado no es checked-in'
+        reason: balance > 0 ? "Balance pendiente" : "Estado no es checked-in",
       });
     }
 
@@ -4670,103 +5562,113 @@ const generateBill = async (req, res, next) => {
 
     // ⭐ CREAR RESPUESTA ENRIQUECIDA CON INFORMACIÓN ADICIONAL
     console.log("📤 [GENERATE-BILL] Preparando respuesta enriquecida...");
-    
+
     const responseData = {
       ...savedBill.toJSON(),
-      
+
       // ⭐ INFORMACIÓN DEL HUÉSPED
       guestInfo: {
-        name: booking.guest?.scostumername || 'Huésped',
+        name: booking.guest?.scostumername || "Huésped",
         document: booking.guest?.sdocno || booking.guestId,
         email: booking.guest?.selectronicmail || null,
-        phone: booking.guest?.stelephone || null
+        phone: booking.guest?.stelephone || null,
       },
-      
+
       // ⭐ INFORMACIÓN DE LA HABITACIÓN
       roomInfo: {
         number: booking.room?.roomNumber || booking.roomNumber,
-        type: booking.room?.type || 'Standard',
+        type: booking.room?.type || "Standard",
         checkIn: formatForLogs(booking.checkIn),
         checkOut: formatForLogs(booking.checkOut),
         checkInFormatted: formatColombiaDate(booking.checkIn),
-        checkOutFormatted: formatColombiaDate(booking.checkOut)
+        checkOutFormatted: formatColombiaDate(booking.checkOut),
       },
-      
+
       // ⭐ DETALLES DE LA RESERVA
       bookingDetails: {
         bookingId: booking.bookingId,
         roomCharge: baseAmount,
-        extraCharges: extraCharges.map(charge => ({
+        extraCharges: extraCharges.map((charge) => ({
           id: charge.id,
           description: charge.description,
           amount: parseFloat(charge.amount || 0),
           quantity: parseInt(charge.quantity || 1),
-          totalAmount: parseFloat(charge.amount || 0) * parseInt(charge.quantity || 1),
+          totalAmount:
+            parseFloat(charge.amount || 0) * parseInt(charge.quantity || 1),
           chargeType: charge.chargeType,
           chargeDate: formatForLogs(charge.chargeDate),
-          amountFormatted: `$${parseFloat(charge.amount || 0).toLocaleString()}`
+          amountFormatted: `$${parseFloat(
+            charge.amount || 0
+          ).toLocaleString()}`,
         })),
         nights,
         guestCount: booking.guestCount,
-        pointOfSale: booking.pointOfSale || 'Local'
+        pointOfSale: booking.pointOfSale || "Local",
       },
-      
+
       // ⭐ INFORMACIÓN DE PAGOS
       paymentsInfo: {
         totalPaid,
         balance,
         paymentCount: payments.length,
         isFullyPaid: balance === 0,
-        payments: payments.map(payment => ({
+        payments: payments.map((payment) => ({
           paymentId: payment.paymentId,
           amount: parseFloat(payment.amount || 0),
           paymentMethod: payment.paymentMethod,
           paymentType: payment.paymentType,
           paymentDate: formatForLogs(payment.paymentDate),
-          amountFormatted: `$${parseFloat(payment.amount || 0).toLocaleString()}`
+          amountFormatted: `$${parseFloat(
+            payment.amount || 0
+          ).toLocaleString()}`,
         })),
         totalPaidFormatted: `$${totalPaid.toLocaleString()}`,
-        balanceFormatted: `$${balance.toLocaleString()}`
+        balanceFormatted: `$${balance.toLocaleString()}`,
       },
-      
+
       // ⭐ FECHAS FORMATEADAS
       createdAtFormatted: formatForLogs(savedBill.createdAt),
       createdAtDisplay: formatForDisplay(savedBill.createdAt),
       totalAmountFormatted: `$${totalAmount.toLocaleString()}`,
       reservationAmountFormatted: `$${baseAmount.toLocaleString()}`,
       extraChargesAmountFormatted: `$${totalExtras.toLocaleString()}`,
-      
+
       // ⭐ INFORMACIÓN DE ESTADO
       statusInfo: {
         status: savedBill.status,
-        statusLabel: savedBill.status === 'paid' ? 'Pagada' : 
-                    savedBill.status === 'pending' ? 'Pendiente' : 'Cancelada',
-        isPaid: savedBill.status === 'paid',
-        isPending: savedBill.status === 'pending',
+        statusLabel:
+          savedBill.status === "paid"
+            ? "Pagada"
+            : savedBill.status === "pending"
+            ? "Pendiente"
+            : "Cancelada",
+        isPaid: savedBill.status === "paid",
+        isPending: savedBill.status === "pending",
         needsPayment: balance > 0,
-        paymentPercentage: totalAmount > 0 ? Math.round((totalPaid / totalAmount) * 100) : 0
+        paymentPercentage:
+          totalAmount > 0 ? Math.round((totalPaid / totalAmount) * 100) : 0,
       },
-      
+
       // ⭐ ACCIONES DISPONIBLES
       availableActions: {
-        canSendToTaxxa: savedBill.status === 'paid' && !savedBill.taxInvoiceId,
-        canGenerateTaxInvoice: savedBill.status === 'paid',
-        canCancelBill: savedBill.status === 'pending',
+        canSendToTaxxa: savedBill.status === "paid" && !savedBill.taxInvoiceId,
+        canGenerateTaxInvoice: savedBill.status === "paid",
+        canCancelBill: savedBill.status === "pending",
         canMakeAdditionalPayment: balance > 0,
         canDownloadPdf: true,
-        canEmailToGuest: !!booking.guest?.selectronicmail
+        canEmailToGuest: !!booking.guest?.selectronicmail,
       },
-      
+
       // ⭐ METADATOS
       metadata: {
         generatedAt: formatForLogs(getColombiaTime()),
-        generatedBy: req.user?.n_document || 'system',
-        timezone: 'America/Bogota',
-        currency: 'COP',
+        generatedBy: req.user?.n_document || "system",
+        timezone: "America/Bogota",
+        currency: "COP",
         hasExtraCharges: totalExtras > 0,
         hasTaxes: parseFloat(savedBill.taxAmount || 0) > 0,
-        nightsStayed: nights
-      }
+        nightsStayed: nights,
+      },
     };
 
     console.log("✅ [GENERATE-BILL] Factura generada exitosamente:", {
@@ -4775,35 +5677,38 @@ const generateBill = async (req, res, next) => {
       status: savedBill.status,
       balance: balance,
       isFullyPaid: balance === 0,
-      generatedAt: formatForLogs(getColombiaTime())
+      generatedAt: formatForLogs(getColombiaTime()),
     });
 
     res.status(201).json({
       error: false,
       message: "Factura generada exitosamente",
       data: responseData,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [GENERATE-BILL] Error general:", error);
-    console.error("🕐 [GENERATE-BILL] Hora del error:", formatForLogs(getColombiaTime()));
-    
-    res.status(500).json({ 
-      error: true, 
-      message: "Error interno al generar la factura", 
+    console.error(
+      "🕐 [GENERATE-BILL] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
+    res.status(500).json({
+      error: true,
+      message: "Error interno al generar la factura",
       details: error.message,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
   }
 };
 
-
-
 const getAllBills = async (req, res) => {
   try {
     console.log("🧾 [GET-ALL-BILLS] Iniciando consulta de facturas");
-    console.log("🕐 [GET-ALL-BILLS] Hora Colombia:", formatForLogs(getColombiaTime()));
+    console.log(
+      "🕐 [GET-ALL-BILLS] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
     console.log("📥 [GET-ALL-BILLS] Parámetros de consulta:", req.query);
 
     // ⭐ PARÁMETROS DE CONSULTA OPCIONALES
@@ -4811,18 +5716,18 @@ const getAllBills = async (req, res) => {
       status,
       limit = 50,
       page = 1,
-      sortBy = 'createdAt',
-      sortOrder = 'DESC',
+      sortBy = "createdAt",
+      sortOrder = "DESC",
       fromDate,
       toDate,
       roomNumber,
       guestDocument,
-      includeDetails = 'true'
+      includeDetails = "true",
     } = req.query;
 
     // ⭐ CONSTRUIR FILTROS DE BÚSQUEDA
     const whereConditions = {};
-    
+
     if (status) {
       whereConditions.status = status;
       console.log("🔍 [GET-ALL-BILLS] Filtro por estado:", status);
@@ -4837,45 +5742,53 @@ const getAllBills = async (req, res) => {
       if (toDate) {
         whereConditions.createdAt[Op.lte] = toColombiaTime(toDate);
       }
-      console.log("📅 [GET-ALL-BILLS] Filtro por fechas:", { fromDate, toDate });
+      console.log("📅 [GET-ALL-BILLS] Filtro por fechas:", {
+        fromDate,
+        toDate,
+      });
     }
 
     // ⭐ CONSTRUIR INCLUDES CON FILTROS OPCIONALES
     const includeOptions = [
-      { 
-        model: Booking, 
-        as: 'booking',
+      {
+        model: Booking,
+        as: "booking",
         attributes: [
-          'bookingId', 
-          'roomNumber', 
-          'checkIn', 
-          'checkOut', 
-          'guestCount', 
-          'status',
-          'pointOfSale',
-          'totalAmount'
+          "bookingId",
+          "roomNumber",
+          "checkIn",
+          "checkOut",
+          "guestCount",
+          "status",
+          "pointOfSale",
+          "totalAmount",
         ],
         where: {
           ...(roomNumber && { roomNumber }),
         },
         include: [
-          { 
-            model: Buyer, 
+          {
+            model: Buyer,
             as: "guest",
-            attributes: ["sdocno", "scostumername", "selectronicmail", "stelephone"],
+            attributes: [
+              "sdocno",
+              "scostumername",
+              "selectronicmail",
+              "stelephone",
+            ],
             where: {
               ...(guestDocument && { sdocno: guestDocument }),
             },
-            required: !!guestDocument
+            required: !!guestDocument,
           },
           {
             model: Room,
-            as: 'room',
-            attributes: ['roomNumber', 'type', 'maxGuests'],
-            required: false
-          }
+            as: "room",
+            attributes: ["roomNumber", "type", "maxGuests"],
+            required: false,
+          },
         ],
-        required: !!(roomNumber || guestDocument)
+        required: !!(roomNumber || guestDocument),
       },
     ];
 
@@ -4888,7 +5801,7 @@ const getAllBills = async (req, res) => {
       order: [[sortBy, sortOrder.toUpperCase()]],
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit),
-      distinct: true
+      distinct: true,
     });
 
     if (!bills || bills.length === 0) {
@@ -4901,184 +5814,225 @@ const getAllBills = async (req, res) => {
           total: 0,
           page: parseInt(page),
           limit: parseInt(limit),
-          totalPages: 0
+          totalPages: 0,
         },
         summary: {
           totalBills: 0,
           byStatus: {},
           totalRevenue: 0,
-          totalPending: 0
+          totalPending: 0,
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
-    console.log(`✅ [GET-ALL-BILLS] Encontradas ${bills.length} facturas de ${count} totales`);
+    console.log(
+      `✅ [GET-ALL-BILLS] Encontradas ${bills.length} facturas de ${count} totales`
+    );
 
     // ⭐ PROCESAR DATOS CON INFORMACIÓN ENRIQUECIDA
     console.log("🔄 [GET-ALL-BILLS] Procesando datos de facturas...");
-    
-    const billsWithDetails = bills.map(bill => {
+
+    const billsWithDetails = bills.map((bill) => {
       const billData = bill.toJSON();
-      
+
       // ⭐ CALCULAR INFORMACIÓN ADICIONAL
       const totalAmount = parseFloat(billData.totalAmount || 0);
       const reservationAmount = parseFloat(billData.reservationAmount || 0);
       const extraChargesAmount = parseFloat(billData.extraChargesAmount || 0);
       const taxAmount = parseFloat(billData.taxAmount || 0);
-      
+
       return {
         ...billData,
-        
+
         // ⭐ INFORMACIÓN FORMATEADA DE FECHAS
         createdAtFormatted: formatForLogs(billData.createdAt),
         updatedAtFormatted: formatForLogs(billData.updatedAt),
         createdAtDisplay: formatForDisplay(billData.createdAt),
-        
+
         // ⭐ INFORMACIÓN DEL HUÉSPED
-        guestName: billData.booking?.guest?.scostumername || 'N/A',
-        guestDocument: billData.booking?.guest?.sdocno || 'N/A',
-        guestEmail: billData.booking?.guest?.selectronicmail || 'N/A',
-        guestPhone: billData.booking?.guest?.stelephone || 'N/A',
-        
+        guestName: billData.booking?.guest?.scostumername || "N/A",
+        guestDocument: billData.booking?.guest?.sdocno || "N/A",
+        guestEmail: billData.booking?.guest?.selectronicmail || "N/A",
+        guestPhone: billData.booking?.guest?.stelephone || "N/A",
+
         // ⭐ INFORMACIÓN DE LA HABITACIÓN
-        roomNumber: billData.booking?.room?.roomNumber || billData.booking?.roomNumber || 'N/A',
-        roomType: billData.booking?.room?.type || 'N/A',
-        
+        roomNumber:
+          billData.booking?.room?.roomNumber ||
+          billData.booking?.roomNumber ||
+          "N/A",
+        roomType: billData.booking?.room?.type || "N/A",
+
         // ⭐ INFORMACIÓN DE LA RESERVA
         bookingId: billData.booking?.bookingId || billData.bookingId,
-        checkIn: billData.booking?.checkIn ? formatForLogs(billData.booking.checkIn) : null,
-        checkOut: billData.booking?.checkOut ? formatForLogs(billData.booking.checkOut) : null,
-        checkInFormatted: billData.booking?.checkIn ? formatColombiaDate(billData.booking.checkIn) : null,
-        checkOutFormatted: billData.booking?.checkOut ? formatColombiaDate(billData.booking.checkOut) : null,
+        checkIn: billData.booking?.checkIn
+          ? formatForLogs(billData.booking.checkIn)
+          : null,
+        checkOut: billData.booking?.checkOut
+          ? formatForLogs(billData.booking.checkOut)
+          : null,
+        checkInFormatted: billData.booking?.checkIn
+          ? formatColombiaDate(billData.booking.checkIn)
+          : null,
+        checkOutFormatted: billData.booking?.checkOut
+          ? formatColombiaDate(billData.booking.checkOut)
+          : null,
         guestCount: billData.booking?.guestCount || 0,
-        bookingStatus: billData.booking?.status || 'unknown',
-        pointOfSale: billData.booking?.pointOfSale || 'Local',
-        
+        bookingStatus: billData.booking?.status || "unknown",
+        pointOfSale: billData.booking?.pointOfSale || "Local",
+
         // ⭐ ESTADO DE PAGO
-        isPaid: billData.status === 'paid',
-        isPending: billData.status === 'pending',
-        isCancelled: billData.status === 'cancelled',
-        statusLabel: billData.status === 'paid' ? 'Pagada' : 
-                    billData.status === 'pending' ? 'Pendiente' : 'Cancelada',
-        
+        isPaid: billData.status === "paid",
+        isPending: billData.status === "pending",
+        isCancelled: billData.status === "cancelled",
+        statusLabel:
+          billData.status === "paid"
+            ? "Pagada"
+            : billData.status === "pending"
+            ? "Pendiente"
+            : "Cancelada",
+
         // ⭐ TOTALES FORMATEADOS
         totalAmountFormatted: `$${totalAmount.toLocaleString()}`,
         reservationAmountFormatted: `$${reservationAmount.toLocaleString()}`,
         extraChargesAmountFormatted: `$${extraChargesAmount.toLocaleString()}`,
         taxAmountFormatted: `$${taxAmount.toLocaleString()}`,
-        
+
         // ⭐ INFORMACIÓN DE PAGO
-        paymentMethodLabel: billData.paymentMethod ? 
-          getPaymentMethodLabel(billData.paymentMethod) : 'No especificado',
-        
+        paymentMethodLabel: billData.paymentMethod
+          ? getPaymentMethodLabel(billData.paymentMethod)
+          : "No especificado",
+
         // ⭐ CÁLCULOS ADICIONALES
         hasExtraCharges: extraChargesAmount > 0,
         hasTaxes: taxAmount > 0,
-        nightsStayed: billData.booking?.checkIn && billData.booking?.checkOut ? 
-          getDaysDifference(billData.booking.checkIn, billData.booking.checkOut) : 0,
-        
+        nightsStayed:
+          billData.booking?.checkIn && billData.booking?.checkOut
+            ? getDaysDifference(
+                billData.booking.checkIn,
+                billData.booking.checkOut
+              )
+            : 0,
+
         // ⭐ IDENTIFICADOR DE FACTURA FISCAL
         hasTaxInvoice: !!billData.taxInvoiceId,
-        taxInvoiceDisplay: billData.taxInvoiceId || 'No generada',
-        
+        taxInvoiceDisplay: billData.taxInvoiceId || "No generada",
+
         // ⭐ INFORMACIÓN DE ESTADO FINANCIERO
         financialStatus: {
-          isPaid: billData.status === 'paid',
-          isPending: billData.status === 'pending',
+          isPaid: billData.status === "paid",
+          isPending: billData.status === "pending",
           totalAmount,
           reservationAmount,
           extraChargesAmount,
           taxAmount,
-          percentageExtras: reservationAmount > 0 ? 
-            Math.round((extraChargesAmount / reservationAmount) * 100) : 0
+          percentageExtras:
+            reservationAmount > 0
+              ? Math.round((extraChargesAmount / reservationAmount) * 100)
+              : 0,
         },
-        
+
         // ⭐ ACCIONES DISPONIBLES
         availableActions: {
-          canCancel: billData.status === 'pending',
-          canSendToTaxxa: billData.status === 'paid' && !billData.taxInvoiceId,
+          canCancel: billData.status === "pending",
+          canSendToTaxxa: billData.status === "paid" && !billData.taxInvoiceId,
           canDownload: true,
-          canResend: !!billData.booking?.guest?.selectronicmail
-        }
+          canResend: !!billData.booking?.guest?.selectronicmail,
+        },
       };
     });
 
     // ⭐ CREAR RESUMEN ESTADÍSTICO
     console.log("📊 [GET-ALL-BILLS] Calculando estadísticas...");
-    
+
     const summary = {
       totalBills: count,
       billsByStatus: {
-        paid: billsWithDetails.filter(b => b.isPaid).length,
-        pending: billsWithDetails.filter(b => b.isPending).length,
-        cancelled: billsWithDetails.filter(b => b.isCancelled).length
+        paid: billsWithDetails.filter((b) => b.isPaid).length,
+        pending: billsWithDetails.filter((b) => b.isPending).length,
+        cancelled: billsWithDetails.filter((b) => b.isCancelled).length,
       },
       financialSummary: {
         totalRevenue: billsWithDetails
-          .filter(b => b.isPaid)
+          .filter((b) => b.isPaid)
           .reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0),
         totalPendingAmount: billsWithDetails
-          .filter(b => b.isPending)
+          .filter((b) => b.isPending)
           .reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0),
-        totalExtraCharges: billsWithDetails
-          .reduce((sum, bill) => sum + parseFloat(bill.extraChargesAmount || 0), 0),
-        totalTaxes: billsWithDetails
-          .reduce((sum, bill) => sum + parseFloat(bill.taxAmount || 0), 0),
-        averageBillAmount: count > 0 ? 
-          billsWithDetails.reduce((sum, bill) => sum + parseFloat(bill.totalAmount || 0), 0) / count : 0
+        totalExtraCharges: billsWithDetails.reduce(
+          (sum, bill) => sum + parseFloat(bill.extraChargesAmount || 0),
+          0
+        ),
+        totalTaxes: billsWithDetails.reduce(
+          (sum, bill) => sum + parseFloat(bill.taxAmount || 0),
+          0
+        ),
+        averageBillAmount:
+          count > 0
+            ? billsWithDetails.reduce(
+                (sum, bill) => sum + parseFloat(bill.totalAmount || 0),
+                0
+              ) / count
+            : 0,
       },
       operationalStats: {
-        billsWithExtraCharges: billsWithDetails.filter(b => b.hasExtraCharges).length,
-        billsWithTaxes: billsWithDetails.filter(b => b.hasTaxes).length,
-        billsWithTaxInvoice: billsWithDetails.filter(b => b.hasTaxInvoice).length,
-        onlineBookings: billsWithDetails.filter(b => b.pointOfSale === 'Online').length,
-        localBookings: billsWithDetails.filter(b => b.pointOfSale === 'Local').length
-      }
+        billsWithExtraCharges: billsWithDetails.filter((b) => b.hasExtraCharges)
+          .length,
+        billsWithTaxes: billsWithDetails.filter((b) => b.hasTaxes).length,
+        billsWithTaxInvoice: billsWithDetails.filter((b) => b.hasTaxInvoice)
+          .length,
+        onlineBookings: billsWithDetails.filter(
+          (b) => b.pointOfSale === "Online"
+        ).length,
+        localBookings: billsWithDetails.filter((b) => b.pointOfSale === "Local")
+          .length,
+      },
     };
 
     // ⭐ FORMATEAR TOTALES EN RESUMEN
-    summary.financialSummary.totalRevenueFormatted = 
-      `$${summary.financialSummary.totalRevenue.toLocaleString()}`;
-    summary.financialSummary.totalPendingFormatted = 
-      `$${summary.financialSummary.totalPendingAmount.toLocaleString()}`;
-    summary.financialSummary.averageBillAmountFormatted = 
-      `$${Math.round(summary.financialSummary.averageBillAmount).toLocaleString()}`;
+    summary.financialSummary.totalRevenueFormatted = `$${summary.financialSummary.totalRevenue.toLocaleString()}`;
+    summary.financialSummary.totalPendingFormatted = `$${summary.financialSummary.totalPendingAmount.toLocaleString()}`;
+    summary.financialSummary.averageBillAmountFormatted = `$${Math.round(
+      summary.financialSummary.averageBillAmount
+    ).toLocaleString()}`;
 
     console.log("📊 [GET-ALL-BILLS] Resumen calculado:", {
       total: summary.totalBills,
       paid: summary.billsByStatus.paid,
       pending: summary.billsByStatus.pending,
       revenue: summary.financialSummary.totalRevenueFormatted,
-      pending: summary.financialSummary.totalPendingFormatted
+      pending: summary.financialSummary.totalPendingFormatted,
     });
 
     // ⭐ PREPARAR RESPUESTA FINAL
     const responseData = {
-      bills: includeDetails === 'true' ? billsWithDetails : billsWithDetails.map(bill => ({
-        idBill: bill.idBill,
-        bookingId: bill.bookingId,
-        guestName: bill.guestName,
-        roomNumber: bill.roomNumber,
-        totalAmountFormatted: bill.totalAmountFormatted,
-        statusLabel: bill.statusLabel,
-        createdAtFormatted: bill.createdAtFormatted
-      })),
+      bills:
+        includeDetails === "true"
+          ? billsWithDetails
+          : billsWithDetails.map((bill) => ({
+              idBill: bill.idBill,
+              bookingId: bill.bookingId,
+              guestName: bill.guestName,
+              roomNumber: bill.roomNumber,
+              totalAmountFormatted: bill.totalAmountFormatted,
+              statusLabel: bill.statusLabel,
+              createdAtFormatted: bill.createdAtFormatted,
+            })),
       pagination: {
         total: count,
         page: parseInt(page),
         limit: parseInt(limit),
         totalPages: Math.ceil(count / parseInt(limit)),
-        hasNext: (parseInt(page) * parseInt(limit)) < count,
-        hasPrev: parseInt(page) > 1
+        hasNext: parseInt(page) * parseInt(limit) < count,
+        hasPrev: parseInt(page) > 1,
       },
       summary,
       queryInfo: {
         filters: { status, fromDate, toDate, roomNumber, guestDocument },
         sorting: { sortBy, sortOrder },
-        includeDetails: includeDetails === 'true',
-        timestamp: formatForLogs(getColombiaTime())
-      }
+        includeDetails: includeDetails === "true",
+        timestamp: formatForLogs(getColombiaTime()),
+      },
     };
 
     console.log("📤 [GET-ALL-BILLS] Respuesta preparada:", {
@@ -5086,7 +6040,7 @@ const getAllBills = async (req, res) => {
       totalCount: responseData.pagination.total,
       currentPage: responseData.pagination.page,
       totalPages: responseData.pagination.totalPages,
-      completedAt: formatForLogs(getColombiaTime())
+      completedAt: formatForLogs(getColombiaTime()),
     });
 
     res.json({
@@ -5096,18 +6050,20 @@ const getAllBills = async (req, res) => {
       pagination: responseData.pagination,
       summary: responseData.summary,
       queryInfo: responseData.queryInfo,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [GET-ALL-BILLS] Error general:", error);
-    console.error("🕐 [GET-ALL-BILLS] Hora del error:", formatForLogs(getColombiaTime()));
-    
+    console.error(
+      "🕐 [GET-ALL-BILLS] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
     res.status(500).json({
       error: true,
       message: "Error interno al obtener las facturas",
       details: error.message,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
   }
 };
@@ -5115,15 +6071,15 @@ const getAllBills = async (req, res) => {
 // ⭐ FUNCIÓN HELPER PARA ETIQUETAS DE MÉTODOS DE PAGO
 const getPaymentMethodLabel = (method) => {
   const labels = {
-    'cash': 'Efectivo',
-    'credit_card': 'Tarjeta de Crédito',
-    'debit_card': 'Tarjeta de Débito',
-    'transfer': 'Transferencia',
-    'online': 'Pago Online',
-    'wompi': 'Wompi',
-    'pse': 'PSE',
-    'nequi': 'Nequi',
-    'daviplata': 'Daviplata'
+    cash: "Efectivo",
+    credit_card: "Tarjeta de Crédito",
+    debit_card: "Tarjeta de Débito",
+    transfer: "Transferencia",
+    online: "Pago Online",
+    wompi: "Wompi",
+    pse: "PSE",
+    nequi: "Nequi",
+    daviplata: "Daviplata",
   };
   return labels[method] || method;
 };
@@ -5131,12 +6087,15 @@ const getPaymentMethodLabel = (method) => {
 const updateBookingStatus = async (req, res) => {
   try {
     console.log("🔄 [UPDATE-BOOKING-STATUS] Iniciando actualización de estado");
-    console.log("🕐 [UPDATE-BOOKING-STATUS] Hora Colombia:", formatForLogs(getColombiaTime()));
+    console.log(
+      "🕐 [UPDATE-BOOKING-STATUS] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
     console.log("📥 [UPDATE-BOOKING-STATUS] Parámetros:", {
       bookingId: req.params.bookingId,
       body: req.body,
-      user: req.user ? req.user.n_document : 'No user',
-      buyer: req.buyer ? req.buyer.sdocno : 'No buyer'
+      user: req.user ? req.user.n_document : "No user",
+      buyer: req.buyer ? req.buyer.sdocno : "No buyer",
     });
 
     const { bookingId } = req.params;
@@ -5148,7 +6107,7 @@ const updateBookingStatus = async (req, res) => {
       return res.status(400).json({
         error: true,
         message: "bookingId es requerido",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -5157,7 +6116,7 @@ const updateBookingStatus = async (req, res) => {
       return res.status(400).json({
         error: true,
         message: "status es requerido",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -5168,7 +6127,7 @@ const updateBookingStatus = async (req, res) => {
       "checked-in",
       "completed",
     ];
-    
+
     if (!validStatuses.includes(status)) {
       console.log("❌ [UPDATE-BOOKING-STATUS] Estado inválido:", status);
       return res.status(400).json({
@@ -5176,9 +6135,9 @@ const updateBookingStatus = async (req, res) => {
         message: "Estado de reserva inválido",
         data: {
           providedStatus: status,
-          validStatuses
+          validStatuses,
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -5189,23 +6148,26 @@ const updateBookingStatus = async (req, res) => {
       include: [
         {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'type', 'status']
+          as: "room",
+          attributes: ["roomNumber", "type", "status"],
         },
         {
           model: Buyer,
-          as: 'guest',
-          attributes: ['sdocno', 'scostumername']
-        }
-      ]
+          as: "guest",
+          attributes: ["sdocno", "scostumername"],
+        },
+      ],
     });
 
     if (!booking) {
-      console.log("❌ [UPDATE-BOOKING-STATUS] Reserva no encontrada:", bookingId);
+      console.log(
+        "❌ [UPDATE-BOOKING-STATUS] Reserva no encontrada:",
+        bookingId
+      );
       return res.status(404).json({
         error: true,
         message: "Reserva no encontrada",
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -5214,36 +6176,37 @@ const updateBookingStatus = async (req, res) => {
       currentStatus: booking.status,
       newStatus: status,
       guestName: booking.guest?.scostumername,
-      roomNumber: booking.room?.roomNumber || booking.roomNumber
+      roomNumber: booking.room?.roomNumber || booking.roomNumber,
     });
 
     // ⭐ VALIDAR TRANSICIONES DE ESTADO VÁLIDAS
     const validTransitions = {
-      'pending': ['confirmed', 'cancelled'],
-      'confirmed': ['checked-in', 'cancelled'],
-      'checked-in': ['completed', 'cancelled'],
-      'completed': [], // No se puede cambiar desde completed
-      'cancelled': ['confirmed'] // Solo se puede reactivar a confirmed
-    };
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["checked-in", "cancelled", "paid"], // ⭐ AGREGAR 'paid'
+  paid: ["checked-in", "cancelled"], // ⭐ NUEVA TRANSICIÓN
+  "checked-in": ["completed", "cancelled"],
+  completed: [], // No se puede cambiar desde completed
+  cancelled: ["confirmed"], // Solo se puede reactivar a confirmed
+};
 
     const allowedNextStates = validTransitions[booking.status] || [];
-    
+
     if (!allowedNextStates.includes(status)) {
       console.log("❌ [UPDATE-BOOKING-STATUS] Transición de estado inválida:", {
         from: booking.status,
         to: status,
-        allowed: allowedNextStates
+        allowed: allowedNextStates,
       });
-      
+
       return res.status(400).json({
         error: true,
         message: `No se puede cambiar de '${booking.status}' a '${status}'`,
         data: {
           currentStatus: booking.status,
           requestedStatus: status,
-          allowedTransitions: allowedNextStates
+          allowedTransitions: allowedNextStates,
         },
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
@@ -5252,20 +6215,28 @@ const updateBookingStatus = async (req, res) => {
     const checkInDate = toColombiaTime(booking.checkIn);
     const checkOutDate = toColombiaTime(booking.checkOut);
 
-    if (status === 'checked-in') {
+    if (status === "checked-in") {
       // Validar que sea el día correcto para check-in
       if (now < checkInDate) {
-        const daysUntil = Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24));
-        console.log("❌ [UPDATE-BOOKING-STATUS] Check-in anticipado:", daysUntil, "días");
-        
+        const daysUntil = Math.ceil(
+          (checkInDate - now) / (1000 * 60 * 60 * 24)
+        );
+        console.log(
+          "❌ [UPDATE-BOOKING-STATUS] Check-in anticipado:",
+          daysUntil,
+          "días"
+        );
+
         return res.status(400).json({
           error: true,
-          message: `El check-in no está disponible hasta ${formatColombiaDate(checkInDate)}`,
+          message: `El check-in no está disponible hasta ${formatColombiaDate(
+            checkInDate
+          )}`,
           data: {
             checkInDate: formatColombiaDate(checkInDate),
-            daysUntilCheckIn: daysUntil
+            daysUntilCheckIn: daysUntil,
           },
-          timestamp: formatForLogs(getColombiaTime())
+          timestamp: formatForLogs(getColombiaTime()),
         });
       }
 
@@ -5277,9 +6248,9 @@ const updateBookingStatus = async (req, res) => {
           message: `La reserva expiró el ${formatColombiaDate(checkOutDate)}`,
           data: {
             checkOutDate: formatColombiaDate(checkOutDate),
-            expired: true
+            expired: true,
           },
-          timestamp: formatForLogs(getColombiaTime())
+          timestamp: formatForLogs(getColombiaTime()),
         });
       }
     }
@@ -5297,76 +6268,92 @@ const updateBookingStatus = async (req, res) => {
     };
 
     // ⭐ CAMPOS ADICIONALES SEGÚN EL ESTADO
-    if (status === 'cancelled') {
+    if (status === "cancelled") {
       updateData.cancelledBy = updatedBy;
       updateData.cancelledAt = getColombiaTime();
       // updateData.cancellationReason = reason; // Si tienes este campo
-    } else if (status === 'completed') {
+    } else if (status === "completed") {
       // updateData.completedAt = getColombiaTime(); // Si tienes este campo
       // updateData.completedBy = updatedBy; // Si tienes este campo
     }
 
-    console.log("📝 [UPDATE-BOOKING-STATUS] Datos de actualización:", updateData);
+    console.log(
+      "📝 [UPDATE-BOOKING-STATUS] Datos de actualización:",
+      updateData
+    );
 
     // ⭐ ACTUALIZAR RESERVA CON MANEJO DE ERRORES
     try {
       await booking.update(updateData);
-      console.log("✅ [UPDATE-BOOKING-STATUS] Reserva actualizada exitosamente");
+      console.log(
+        "✅ [UPDATE-BOOKING-STATUS] Reserva actualizada exitosamente"
+      );
     } catch (updateError) {
-      console.error("❌ [UPDATE-BOOKING-STATUS] Error al actualizar reserva:", updateError);
+      console.error(
+        "❌ [UPDATE-BOOKING-STATUS] Error al actualizar reserva:",
+        updateError
+      );
       return res.status(500).json({
         error: true,
         message: "Error al actualizar el estado de la reserva",
         details: updateError.message,
-        timestamp: formatForLogs(getColombiaTime())
+        timestamp: formatForLogs(getColombiaTime()),
       });
     }
 
     // ⭐ ACTUALIZAR ESTADO DE LA HABITACIÓN SI ES NECESARIO
-    if (booking.room && ['cancelled', 'completed'].includes(status)) {
-      console.log("🏨 [UPDATE-BOOKING-STATUS] Actualizando estado de habitación...");
-      
+    if (booking.room && ["cancelled", "completed"].includes(status)) {
+      console.log(
+        "🏨 [UPDATE-BOOKING-STATUS] Actualizando estado de habitación..."
+      );
+
       try {
         const roomUpdateData = {
-          status: status === 'cancelled' ? 'Limpia' : 'Para Limpiar',
-          available: status === 'cancelled' ? true : false
+          status: status === "cancelled" ? "Limpia" : "Para Limpiar",
+          available: status === "cancelled" ? true : false,
         };
 
         await booking.room.update(roomUpdateData);
-        console.log("✅ [UPDATE-BOOKING-STATUS] Estado de habitación actualizado:", roomUpdateData);
+        console.log(
+          "✅ [UPDATE-BOOKING-STATUS] Estado de habitación actualizado:",
+          roomUpdateData
+        );
       } catch (roomUpdateError) {
-        console.warn("⚠️ [UPDATE-BOOKING-STATUS] Error al actualizar habitación:", roomUpdateError.message);
+        console.warn(
+          "⚠️ [UPDATE-BOOKING-STATUS] Error al actualizar habitación:",
+          roomUpdateError.message
+        );
         // No fallar por esto
       }
     }
 
     // ⭐ OBTENER DATOS ACTUALIZADOS PARA LA RESPUESTA
     console.log("🔄 [UPDATE-BOOKING-STATUS] Obteniendo datos actualizados...");
-    
+
     const updatedBooking = await Booking.findByPk(bookingId, {
       include: [
         {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'type', 'status', 'available']
+          as: "room",
+          attributes: ["roomNumber", "type", "status", "available"],
         },
         {
           model: Buyer,
-          as: 'guest',
-          attributes: ['sdocno', 'scostumername', 'selectronicmail']
-        }
-      ]
+          as: "guest",
+          attributes: ["sdocno", "scostumername", "selectronicmail"],
+        },
+      ],
     });
 
     // ⭐ PREPARAR RESPUESTA ENRIQUECIDA
     const responseData = {
       ...updatedBooking.toJSON(),
-      
+
       // ⭐ FECHAS FORMATEADAS
       checkInFormatted: formatColombiaDate(updatedBooking.checkIn),
       checkOutFormatted: formatColombiaDate(updatedBooking.checkOut),
       statusUpdatedAtFormatted: formatForLogs(updatedBooking.statusUpdatedAt),
-      
+
       // ⭐ INFORMACIÓN DE LA ACTUALIZACIÓN
       updateInfo: {
         previousStatus: booking.status,
@@ -5374,65 +6361,71 @@ const updateBookingStatus = async (req, res) => {
         updatedBy,
         updatedAt: formatForLogs(updatedBooking.statusUpdatedAt),
         reason: reason || null,
-        notes: notes || null
+        notes: notes || null,
       },
-      
+
       // ⭐ INFORMACIÓN DE ESTADO
       statusInfo: {
-        canCheckIn: updatedBooking.status === 'confirmed',
-        canCheckOut: updatedBooking.status === 'checked-in',
-        isActive: ['confirmed', 'checked-in'].includes(updatedBooking.status),
-        isCompleted: updatedBooking.status === 'completed',
-        isCancelled: updatedBooking.status === 'cancelled',
-        allowedNextStates: validTransitions[updatedBooking.status] || []
+        canCheckIn: updatedBooking.status === "confirmed",
+        canCheckOut: updatedBooking.status === "checked-in",
+        isActive: ["confirmed", "checked-in"].includes(updatedBooking.status),
+        isCompleted: updatedBooking.status === "completed",
+        isCancelled: updatedBooking.status === "cancelled",
+        allowedNextStates: validTransitions[updatedBooking.status] || [],
       },
-      
+
       // ⭐ INFORMACIÓN DE LA HABITACIÓN
-      roomInfo: updatedBooking.room ? {
-        roomNumber: updatedBooking.room.roomNumber,
-        type: updatedBooking.room.type,
-        status: updatedBooking.room.status,
-        available: updatedBooking.room.available
-      } : null,
-      
+      roomInfo: updatedBooking.room
+        ? {
+            roomNumber: updatedBooking.room.roomNumber,
+            type: updatedBooking.room.type,
+            status: updatedBooking.room.status,
+            available: updatedBooking.room.available,
+          }
+        : null,
+
       // ⭐ INFORMACIÓN DEL HUÉSPED
-      guestInfo: updatedBooking.guest ? {
-        name: updatedBooking.guest.scostumername,
-        document: updatedBooking.guest.sdocno,
-        email: updatedBooking.guest.selectronicmail
-      } : null
+      guestInfo: updatedBooking.guest
+        ? {
+            name: updatedBooking.guest.scostumername,
+            document: updatedBooking.guest.sdocno,
+            email: updatedBooking.guest.selectronicmail,
+          }
+        : null,
     };
 
-    console.log("✅ [UPDATE-BOOKING-STATUS] Actualización completada exitosamente:", {
-      bookingId: updatedBooking.bookingId,
-      previousStatus: booking.status,
-      newStatus: updatedBooking.status,
-      updatedBy,
-      completedAt: formatForLogs(getColombiaTime())
-    });
+    console.log(
+      "✅ [UPDATE-BOOKING-STATUS] Actualización completada exitosamente:",
+      {
+        bookingId: updatedBooking.bookingId,
+        previousStatus: booking.status,
+        newStatus: updatedBooking.status,
+        updatedBy,
+        completedAt: formatForLogs(getColombiaTime()),
+      }
+    );
 
     res.json({
       error: false,
       message: "Estado de reserva actualizado exitosamente",
       data: responseData,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [UPDATE-BOOKING-STATUS] Error general:", error);
-    console.error("🕐 [UPDATE-BOOKING-STATUS] Hora del error:", formatForLogs(getColombiaTime()));
-    
+    console.error(
+      "🕐 [UPDATE-BOOKING-STATUS] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
     res.status(500).json({
       error: true,
       message: "Error interno al actualizar el estado de la reserva",
       details: error.message,
-      timestamp: formatForLogs(getColombiaTime())
+      timestamp: formatForLogs(getColombiaTime()),
     });
   }
 };
-
-
-
 
 const cancelBooking = async (req, res) => {
   const { bookingId } = req.params;
@@ -5554,6 +6547,289 @@ const calculateOccupiedRoomDays = (bookings) => {
   }, 0);
 };
 
+const updateInventoryStatus = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { inventoryVerified, inventoryDelivered } = req.body;
+    
+    console.log(`📦 [INVENTORY-STATUS] Updating for booking: ${bookingId}`, {
+      inventoryVerified,
+      inventoryDelivered
+    });
+    
+    const booking = await Booking.findByPk(bookingId);
+    if (!booking) {
+      return res.status(404).json({
+        error: true,
+        message: 'Reserva no encontrada'
+      });
+    }
+    
+    const updateData = {};
+    if (inventoryVerified !== undefined) {
+      updateData.inventoryVerified = inventoryVerified;
+      updateData.inventoryVerifiedAt = inventoryVerified ? getColombiaTime() : null;
+    }
+    if (inventoryDelivered !== undefined) {
+      updateData.inventoryDelivered = inventoryDelivered;
+      updateData.inventoryDeliveredAt = inventoryDelivered ? getColombiaTime() : null;
+      updateData.inventoryDeliveredBy = inventoryDelivered ? (req.user?.n_document || 'system') : null;
+    }
+    
+    await booking.update(updateData);
+    
+    console.log(`✅ [INVENTORY-STATUS] Updated booking ${bookingId}:`, updateData);
+    
+    res.json({
+      error: false,
+      message: 'Estado de inventario actualizado exitosamente',
+      data: {
+        bookingId,
+        inventoryVerified: booking.inventoryVerified,
+        inventoryDelivered: booking.inventoryDelivered,
+        inventoryVerifiedAt: booking.inventoryVerifiedAt ? formatForLogs(booking.inventoryVerifiedAt) : null,
+        inventoryDeliveredAt: booking.inventoryDeliveredAt ? formatForLogs(booking.inventoryDeliveredAt) : null,
+        inventoryDeliveredBy: booking.inventoryDeliveredBy
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ [INVENTORY-STATUS] Error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Error al actualizar estado de inventario',
+      details: error.message
+    });
+  }
+};
+
+// ⭐ NUEVO ENDPOINT: Verificar y actualizar estado de pasajeros
+const updatePassengersStatus = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    
+    console.log(`👥 [PASSENGERS-STATUS] Checking for booking: ${bookingId}`);
+    
+    // Obtener la reserva
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: Room,
+          as: 'room',
+          attributes: ['roomNumber', 'status']
+        }
+      ]
+    });
+    
+    if (!booking) {
+      return res.status(404).json({
+        error: true,
+        message: 'Reserva no encontrada'
+      });
+    }
+    
+    // Contar pasajeros registrados
+    const registeredCount = await RegistrationPass.count({
+      where: { bookingId }
+    });
+    
+    const requiredCount = parseInt(booking.guestCount) || 1;
+    const passengersCompleted = registeredCount >= requiredCount;
+    
+    // Actualizar estado si cambió
+    if (booking.passengersCompleted !== passengersCompleted) {
+      await booking.update({
+        passengersCompleted,
+        passengersCompletedAt: passengersCompleted ? getColombiaTime() : null
+      });
+    }
+    
+    // Verificar si está listo para check-in completo
+    const isReadyForCheckIn = booking.inventoryDelivered && 
+                              passengersCompleted && 
+                              booking.room?.status === 'Limpia';
+    
+    if (isReadyForCheckIn && !booking.checkInReadyAt) {
+      await booking.update({
+        checkInReadyAt: getColombiaTime()
+      });
+    }
+    
+    console.log(`✅ [PASSENGERS-STATUS] Updated booking ${bookingId}: ${passengersCompleted} (${registeredCount}/${requiredCount})`);
+    
+    res.json({
+      error: false,
+      message: 'Estado de pasajeros actualizado exitosamente',
+      data: {
+        bookingId,
+        registeredCount,
+        requiredCount,
+        passengersCompleted,
+        passengersCompletedAt: booking.passengersCompletedAt ? formatForLogs(booking.passengersCompletedAt) : null,
+        isReadyForCheckIn,
+        checkInReadyAt: booking.checkInReadyAt ? formatForLogs(booking.checkInReadyAt) : null
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ [PASSENGERS-STATUS] Error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Error al actualizar estado de pasajeros',
+      details: error.message
+    });
+  }
+};
+
+// ⭐ NUEVO ENDPOINT: Obtener estado completo de check-in
+const getCheckInStatus = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    
+    console.log(`🔍 [CHECKIN-STATUS] Getting status for booking: ${bookingId}`);
+    
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: Room,
+          as: 'room',
+          attributes: ['roomNumber', 'status', 'type']
+        },
+        {
+          model: RegistrationPass,
+          as: 'registrationPasses',
+          attributes: ['registrationNumber', 'name']
+        }
+      ]
+    });
+    
+    if (!booking) {
+      return res.status(404).json({
+        error: true,
+        message: 'Reserva no encontrada'
+      });
+    }
+    
+    const registeredCount = booking.registrationPasses?.length || 0;
+    const requiredCount = parseInt(booking.guestCount) || 1;
+    
+    const checkInStatus = {
+      bookingId,
+      currentStatus: booking.status,
+      
+      // Estados de inventario
+      inventoryVerified: booking.inventoryVerified || false,
+      inventoryVerifiedAt: booking.inventoryVerifiedAt ? formatForLogs(booking.inventoryVerifiedAt) : null,
+      inventoryDelivered: booking.inventoryDelivered || false,
+      inventoryDeliveredAt: booking.inventoryDeliveredAt ? formatForLogs(booking.inventoryDeliveredAt) : null,
+      inventoryDeliveredBy: booking.inventoryDeliveredBy,
+      
+      // Estados de pasajeros
+      passengersCompleted: booking.passengersCompleted || false,
+      passengersCompletedAt: booking.passengersCompletedAt ? formatForLogs(booking.passengersCompletedAt) : null,
+      registeredPassengers: registeredCount,
+      requiredPassengers: requiredCount,
+      passengersProgress: `${registeredCount}/${requiredCount}`,
+      
+      // Estado de habitación
+      roomStatus: booking.room?.status || 'unknown',
+      roomClean: booking.room?.status === 'Limpia',
+      
+      // Estado general
+      checkInProgress: booking.checkInProgress || false,
+      checkInReadyAt: booking.checkInReadyAt ? formatForLogs(booking.checkInReadyAt) : null,
+      
+      // Verificaciones
+      allRequirementsMet: (
+        (booking.inventoryDelivered || false) &&
+        (booking.passengersCompleted || false) &&
+        booking.room?.status === 'Limpia'
+      ),
+      
+      // Pasos pendientes
+      pendingSteps: [
+        ...(!(booking.inventoryVerified || false) ? ['Verificar inventario'] : []),
+        ...(!(booking.inventoryDelivered || false) ? ['Entregar inventario'] : []),
+        ...(!((booking.passengersCompleted || false)) ? ['Completar registro de pasajeros'] : []),
+        ...(booking.room?.status !== 'Limpia' ? ['Limpiar habitación'] : [])
+      ],
+      
+      // Pasos completados
+      completedSteps: [
+        ...((booking.inventoryVerified || false) ? ['Inventario verificado'] : []),
+        ...((booking.inventoryDelivered || false) ? ['Inventario entregado'] : []),
+        ...((booking.passengersCompleted || false) ? ['Pasajeros registrados'] : []),
+        ...(booking.room?.status === 'Limpia' ? ['Habitación limpia'] : [])
+      ]
+    };
+    
+    console.log(`✅ [CHECKIN-STATUS] Status retrieved for booking ${bookingId}`, {
+      allRequirementsMet: checkInStatus.allRequirementsMet,
+      pendingSteps: checkInStatus.pendingSteps.length,
+      completedSteps: checkInStatus.completedSteps.length
+    });
+    
+    res.json({
+      error: false,
+      message: 'Estado de check-in obtenido exitosamente',
+      data: checkInStatus
+    });
+    
+  } catch (error) {
+    console.error('❌ [CHECKIN-STATUS] Error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Error al obtener estado de check-in',
+      details: error.message
+    });
+  }
+};
+
+
+
+// ⭐ AGREGAR AL FINAL DEL ARCHIVO, ANTES DEL module.exports:
+const updateCheckInProgress = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { checkInProgress } = req.body;
+    
+    console.log(`🚀 [CHECKIN-PROGRESS] Updating progress for booking: ${bookingId}`, { checkInProgress });
+    
+    const booking = await Booking.findByPk(bookingId);
+    if (!booking) {
+      return res.status(404).json({
+        error: true,
+        message: 'Reserva no encontrada'
+      });
+    }
+    
+    await booking.update({ 
+      checkInProgress,
+      ...(checkInProgress && { checkInStartedAt: getColombiaTime() })
+    });
+    
+    console.log(`✅ [CHECKIN-PROGRESS] Updated booking ${bookingId} progress: ${checkInProgress}`);
+    
+    res.json({
+      error: false,
+      message: `Proceso de check-in ${checkInProgress ? 'iniciado' : 'detenido'} exitosamente`,
+      data: {
+        bookingId,
+        checkInProgress: booking.checkInProgress,
+        checkInStartedAt: booking.checkInStartedAt ? formatForLogs(booking.checkInStartedAt) : null
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ [CHECKIN-PROGRESS] Error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Error al actualizar progreso de check-in',
+      details: error.message
+    });
+  }
+};
+
 module.exports = {
   checkAvailability,
   getRoomTypes,
@@ -5576,5 +6852,8 @@ module.exports = {
   updateOnlinePayment,
   getBookingInventoryStatus,
   getInventoryUsageReport,
-
+   updateInventoryStatus,
+  updatePassengersStatus,
+  getCheckInStatus,
+  updateCheckInProgress
 };

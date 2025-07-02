@@ -227,28 +227,58 @@ export const getAllBookings = (queryParams) => async (dispatch) => {
 };
 
 // CHECK-IN (PUT /bookings/:id/checkin)
-export const checkIn = (bookingId) => async (dispatch) => {
+// CHECK-IN ACTION (asegurar que esté bien implementada)
+// ⭐ CORREGIR LAS RUTAS PARA QUE COINCIDAN CON EL BACKEND
+export const checkIn = (bookingId, checkInData) => async (dispatch) => {
   dispatch({ type: 'CHECKIN_REQUEST' });
   try {
-    const { data } = await api.put(`/bookings/${bookingId}/checkin`);
+    console.log(`🏨 [CHECKIN] Iniciando check-in para reserva: ${bookingId}`, checkInData);
+    
+    if (!bookingId) {
+      throw new Error('bookingId es requerido');
+    }
+    
+    const validBookingId = parseInt(bookingId) || bookingId;
+    
+    // ⭐ CORREGIR LA RUTA: usar 'check-in' con guión
+    const { data } = await api.put(`/bookings/${validBookingId}/check-in`, checkInData);
+    
     dispatch({ type: 'CHECKIN_SUCCESS', payload: data.data });
+    console.log('✅ [CHECKIN] Check-in exitoso:', data.data);
+    
+    return { success: true, data: data.data };
   } catch (error) {
-    const errorMessage =
-      error.response?.data?.message || 'Error al realizar el check-in';
+    const errorMessage = error.response?.data?.message || 'Error al realizar check-in';
+    console.error('❌ [CHECKIN] Error:', errorMessage);
     dispatch({ type: 'CHECKIN_FAILURE', payload: errorMessage });
+    return { success: false, error: errorMessage };
   }
 };
 
-// CHECK-OUT (PUT /bookings/:id/checkout)
-export const checkOut = (bookingId) => async (dispatch) => {
+// ⭐ CORREGIR LA RUTA DE CHECK-OUT TAMBIÉN
+export const checkOut = (bookingId, checkOutData) => async (dispatch) => {
   dispatch({ type: 'CHECKOUT_REQUEST' });
   try {
-    const { data } = await api.put(`/bookings/${bookingId}/checkout`);
+    console.log(`🏁 [CHECKOUT] Iniciando check-out para reserva: ${bookingId}`, checkOutData);
+    
+    if (!bookingId) {
+      throw new Error('bookingId es requerido');
+    }
+    
+    const validBookingId = parseInt(bookingId) || bookingId;
+    
+    // ⭐ CORREGIR LA RUTA: usar 'check-out' con guión
+    const { data } = await api.put(`/bookings/${validBookingId}/check-out`, checkOutData);
+    
     dispatch({ type: 'CHECKOUT_SUCCESS', payload: data.data });
+    console.log('✅ [CHECKOUT] Check-out exitoso:', data.data);
+    
+    return { success: true, data: data.data };
   } catch (error) {
-    const errorMessage =
-      error.response?.data?.message || 'Error al realizar el check-out';
-    dispatch({ type: 'CHECKOUTFAILURE', payload: errorMessage });
+    const errorMessage = error.response?.data?.message || 'Error al realizar check-out';
+    console.error('❌ [CHECKOUT] Error:', errorMessage);
+    dispatch({ type: 'CHECKOUT_FAILURE', payload: errorMessage });
+    return { success: false, error: errorMessage };
   }
 };
 
@@ -394,12 +424,25 @@ export const sendBillToTaxxa = (idBill) => async (dispatch) => {
 export const updateBookingStatus = (bookingId, statusData) => async (dispatch) => {
   dispatch({ type: 'UPDATE_BOOKING_STATUS_REQUEST' });
   try {
-    const { data } = await api.put(`/bookings/${bookingId}/status`, statusData);
+    // ⭐ CORRECCIÓN: Asegurar que bookingId sea válido
+    console.log('🔄 [UPDATE-BOOKING-STATUS] bookingId:', bookingId, 'statusData:', statusData);
+    
+    if (!bookingId) {
+      throw new Error('bookingId es requerido');
+    }
+    
+    // ⭐ ASEGURAR QUE SEA UN NÚMERO O STRING VÁLIDO
+    const validBookingId = parseInt(bookingId) || bookingId;
+    
+    const { data } = await api.put(`/bookings/${validBookingId}/status`, statusData);
+    
     dispatch({ type: 'UPDATE_BOOKING_STATUS_SUCCESS', payload: data.data });
+    return { success: true, data: data.data };
   } catch (error) {
     const errorMessage =
       error.response?.data?.message || 'Error al actualizar el estado de la reserva';
     dispatch({ type: 'UPDATE_BOOKING_STATUS_FAILURE', payload: errorMessage });
+    return { success: false, error: errorMessage };
   }
 };
 
@@ -554,3 +597,489 @@ export const getInventoryUsageReport = (queryParams = {}) => async (dispatch) =>
   }
 };
 
+export const getCheckInStatus = (bookingId) => async (dispatch) => {
+  dispatch({ type: 'GET_CHECKIN_STATUS_REQUEST' });
+  
+  try {
+    console.log(`🔍 [CHECKIN-STATUS] Obteniendo estado para reserva: ${bookingId}`);
+    
+    const { data } = await api.get(`/bookings/${bookingId}/checkin-status`);
+    
+    console.log('✅ [CHECKIN-STATUS] Estado obtenido:', data.data);
+    
+    dispatch({ 
+      type: 'GET_CHECKIN_STATUS_SUCCESS', 
+      payload: data.data 
+    });
+    
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [CHECKIN-STATUS] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al obtener estado de check-in';
+    
+    dispatch({ 
+      type: 'GET_CHECKIN_STATUS_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    return { success: false, error: errorMessage };
+  }
+};
+
+// ACTUALIZAR ESTADO DE INVENTARIO (PUT /bookings/:id/inventory-status)
+export const updateInventoryStatus = (bookingId, inventoryData) => async (dispatch) => {
+  dispatch({ type: 'UPDATE_INVENTORY_STATUS_REQUEST' });
+  
+  try {
+    console.log(`📦 [INVENTORY-STATUS] Actualizando inventario para reserva: ${bookingId}`, inventoryData);
+    
+    // ⭐ VALIDACIÓN DE DATOS DE ENTRADA
+    if (!bookingId) {
+      throw new Error('bookingId es requerido');
+    }
+    
+    if (!inventoryData || Object.keys(inventoryData).length === 0) {
+      throw new Error('inventoryData es requerido');
+    }
+    
+    // ⭐ VALIDAR CAMPOS PERMITIDOS
+    const allowedFields = ['inventoryVerified', 'inventoryDelivered', 'inventoryVerifiedAt', 'inventoryDeliveredAt', 'inventoryDeliveredBy'];
+    const validData = {};
+    
+    Object.keys(inventoryData).forEach(key => {
+      if (allowedFields.includes(key)) {
+        validData[key] = inventoryData[key];
+      }
+    });
+    
+    // ⭐ AGREGAR TIMESTAMPS AUTOMÁTICOS
+    if (validData.inventoryVerified === true && !validData.inventoryVerifiedAt) {
+      validData.inventoryVerifiedAt = new Date().toISOString();
+    }
+    
+    if (validData.inventoryDelivered === true && !validData.inventoryDeliveredAt) {
+      validData.inventoryDeliveredAt = new Date().toISOString();
+    }
+    
+    console.log('📦 [INVENTORY-STATUS] Datos validados a enviar:', validData);
+    
+    const { data } = await api.put(`/bookings/${bookingId}/inventory-status`, validData);
+    
+    console.log('✅ [INVENTORY-STATUS] Estado actualizado:', data.data);
+    
+    dispatch({ 
+      type: 'UPDATE_INVENTORY_STATUS_SUCCESS', 
+      payload: { 
+        bookingId, 
+        inventoryData: data.data,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    // ⭐ ACTUALIZAR EL ESTADO DE LA RESERVA EN EL STORE
+    dispatch({ 
+      type: 'UPDATE_BOOKING_INVENTORY_IN_LIST', 
+      payload: { 
+        bookingId, 
+        inventoryUpdates: data.data 
+      }
+    });
+    
+    // ⭐ MENSAJE ESPECÍFICO SEGÚN LA ACCIÓN
+    let successMessage = 'Estado de inventario actualizado exitosamente';
+    if (validData.inventoryVerified && validData.inventoryDelivered) {
+      successMessage = '📦✅ Inventario verificado y entregado exitosamente';
+    } else if (validData.inventoryVerified) {
+      successMessage = '✅ Inventario verificado exitosamente';
+    } else if (validData.inventoryDelivered) {
+      successMessage = '📦 Inventario entregado exitosamente';
+    }
+    
+    toast.success(successMessage);
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [INVENTORY-STATUS] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Error al actualizar estado de inventario';
+    
+    dispatch({ 
+      type: 'UPDATE_INVENTORY_STATUS_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    toast.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+};
+
+// ACTUALIZAR ESTADO DE PASAJEROS (PUT /bookings/:id/passengers-status)
+export const updatePassengersStatus = (bookingId, passengersData = {}) => async (dispatch) => {
+  dispatch({ type: 'UPDATE_PASSENGERS_STATUS_REQUEST' });
+  
+  try {
+    console.log(`👥 [PASSENGERS-STATUS] Actualizando pasajeros para reserva: ${bookingId}`, passengersData);
+    
+    // ⭐ VALIDACIÓN DE DATOS DE ENTRADA
+    if (!bookingId) {
+      throw new Error('bookingId es requerido');
+    }
+    
+    // ⭐ VALIDAR CAMPOS PERMITIDOS
+    const allowedFields = ['passengersCompleted', 'passengersCompletedAt', 'numberOfPassengers', 'passengersData'];
+    const validData = {};
+    
+    Object.keys(passengersData).forEach(key => {
+      if (allowedFields.includes(key)) {
+        validData[key] = passengersData[key];
+      }
+    });
+    
+    // ⭐ AGREGAR TIMESTAMP AUTOMÁTICO SI SE MARCA COMO COMPLETADO
+    if (validData.passengersCompleted === true && !validData.passengersCompletedAt) {
+      validData.passengersCompletedAt = new Date().toISOString();
+    }
+    
+    // ⭐ SI NO HAY DATOS ESPECÍFICOS, SOLO MARCAR COMO COMPLETADO
+    if (Object.keys(validData).length === 0) {
+      validData.passengersCompleted = true;
+      validData.passengersCompletedAt = new Date().toISOString();
+    }
+    
+    console.log('👥 [PASSENGERS-STATUS] Datos validados a enviar:', validData);
+    
+    const { data } = await api.put(`/bookings/${bookingId}/passengers-status`, validData);
+    
+    console.log('✅ [PASSENGERS-STATUS] Estado actualizado:', data.data);
+    
+    dispatch({ 
+      type: 'UPDATE_PASSENGERS_STATUS_SUCCESS', 
+      payload: { 
+        bookingId, 
+        passengersData: data.data,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    // ⭐ ACTUALIZAR EL ESTADO DE LA RESERVA EN EL STORE
+    dispatch({ 
+      type: 'UPDATE_BOOKING_PASSENGERS_IN_LIST', 
+      payload: { 
+        bookingId, 
+        passengersUpdates: data.data 
+      }
+    });
+    
+    // ⭐ MENSAJE ESPECÍFICO SEGÚN LA ACCIÓN
+    let successMessage = 'Estado de pasajeros actualizado exitosamente';
+    if (validData.passengersCompleted === true) {
+      successMessage = '👥✅ Registro de pasajeros completado exitosamente';
+    }
+    
+    toast.success(successMessage);
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [PASSENGERS-STATUS] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Error al actualizar estado de pasajeros';
+    
+    dispatch({ 
+      type: 'UPDATE_PASSENGERS_STATUS_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    toast.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+};
+
+// ACTUALIZAR PROGRESO DE CHECK-IN (PUT /bookings/:id/checkin-progress)
+export const updateCheckInProgress = (bookingId, progressData) => async (dispatch) => {
+  dispatch({ type: 'UPDATE_CHECKIN_PROGRESS_REQUEST' });
+  
+  try {
+    console.log(`🚀 [CHECKIN-PROGRESS] Actualizando progreso para reserva: ${bookingId}`, progressData);
+    
+    const { data } = await api.put(`/bookings/${bookingId}/checkin-progress`, progressData);
+    
+    console.log('✅ [CHECKIN-PROGRESS] Progreso actualizado:', data.data);
+    
+    dispatch({ 
+      type: 'UPDATE_CHECKIN_PROGRESS_SUCCESS', 
+      payload: { bookingId, ...data.data }
+    });
+    
+    // Actualizar también el estado general si está cargado
+    dispatch({ 
+      type: 'UPDATE_BOOKING_CHECKIN_PROGRESS', 
+      payload: { bookingId, progressData: data.data }
+    });
+    
+    const message = progressData.checkInProgress 
+      ? 'Proceso de check-in iniciado' 
+      : 'Proceso de check-in detenido';
+      
+    toast.success(data.message || message);
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [CHECKIN-PROGRESS] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al actualizar progreso de check-in';
+    
+    dispatch({ 
+      type: 'UPDATE_CHECKIN_PROGRESS_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    toast.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+};
+
+// ⭐ ACTION HELPER: VERIFICAR TODOS LOS REQUISITOS DE CHECK-IN
+// ⭐ VERIFICAR TODOS LOS REQUISITOS DE CHECK-IN - VERSIÓN OPTIMIZADA
+export const checkAllCheckInRequirements = (bookingId, bookingData = null) => async (dispatch) => {
+  dispatch({ type: 'CHECK_CHECKIN_REQUIREMENTS_REQUEST' });
+  
+  try {
+    console.log(`✅ [CHECKIN-REQUIREMENTS] Verificando requisitos para reserva: ${bookingId}`);
+    
+    let booking = bookingData;
+    
+    // ⭐ OBTENER DATOS DE RESERVA SOLO SI NO SE PROPORCIONAN
+    if (!booking) {
+      console.log('📥 [CHECKIN-REQUIREMENTS] Obteniendo datos de reserva...');
+      const bookingResult = await dispatch(getBookingById(bookingId));
+      
+      if (!bookingResult.success) {
+        throw new Error('No se pudo obtener información de la reserva');
+      }
+      
+      booking = bookingResult.data;
+    }
+    
+    console.log('🔍 [CHECKIN-REQUIREMENTS] Analizando reserva:', {
+      bookingId: booking.bookingId,
+      status: booking.status,
+      roomStatus: booking.room?.status || booking.Room?.status,
+      inventoryVerified: booking.inventoryVerified,
+      inventoryDelivered: booking.inventoryDelivered,
+      passengersCompleted: booking.passengersCompleted
+    });
+    
+    // ⭐ VERIFICAR CADA REQUISITO INDIVIDUALMENTE
+    const requirements = {
+      // 1. Habitación debe estar limpia
+      roomClean: {
+        status: (booking.room?.status || booking.Room?.status) === 'Limpia',
+        name: 'Habitación limpia',
+        priority: 1
+      },
+      
+      // 2. Inventario verificado
+      inventoryVerified: {
+        status: booking.inventoryVerified === true,
+        name: 'Verificar inventario',
+        priority: 2
+      },
+      
+      // 3. Inventario entregado
+      inventoryDelivered: {
+        status: booking.inventoryDelivered === true,
+        name: 'Entregar inventario',
+        priority: 3
+      },
+      
+      // 4. Registro de pasajeros completado
+      passengersCompleted: {
+        status: booking.passengersCompleted === true,
+        name: 'Completar registro de pasajeros',
+        priority: 4
+      },
+      
+      // 5. Reserva debe estar pagada (nuevo requisito)
+      paymentCompleted: {
+        status: ['paid', 'checked-in'].includes(booking.status),
+        name: 'Pago completado',
+        priority: 0
+      }
+    };
+    
+    // ⭐ CALCULAR PASOS COMPLETADOS Y PENDIENTES
+    const completedSteps = [];
+    const pendingSteps = [];
+    
+    Object.entries(requirements).forEach(([key, requirement]) => {
+      if (requirement.status) {
+        completedSteps.push(requirement.name);
+      } else {
+        pendingSteps.push(requirement.name);
+      }
+    });
+    
+    // ⭐ ORDENAR PASOS PENDIENTES POR PRIORIDAD
+    const orderedPendingSteps = Object.entries(requirements)
+      .filter(([key, req]) => !req.status)
+      .sort(([, a], [, b]) => a.priority - b.priority)
+      .map(([key, req]) => req.name);
+    
+    // ⭐ DETERMINAR SI TODOS LOS REQUISITOS ESTÁN COMPLETOS
+    const allRequirementsMet = pendingSteps.length === 0;
+    
+    // ⭐ CALCULAR PROGRESO
+    const totalSteps = Object.keys(requirements).length;
+    const completedCount = completedSteps.length;
+    const progressPercentage = Math.round((completedCount / totalSteps) * 100);
+    
+    // ⭐ DETERMINAR ESTADO GENERAL
+    let checkInReadiness = 'not_ready';
+    let readinessMessage = 'No está listo para check-in';
+    
+    if (allRequirementsMet) {
+      checkInReadiness = 'ready';
+      readinessMessage = '¡Listo para check-in!';
+    } else if (completedCount > 0) {
+      checkInReadiness = 'in_progress';
+      readinessMessage = `En progreso (${completedCount}/${totalSteps} completados)`;
+    }
+    
+    // ⭐ CREAR RESULTADO COMPLETO
+    const result = {
+      bookingId: parseInt(bookingId),
+      allRequirementsMet,
+      checkInReadiness,
+      readinessMessage,
+      progressPercentage,
+      totalSteps,
+      completedSteps,
+      pendingSteps: orderedPendingSteps,
+      requirements,
+      // ⭐ INFORMACIÓN ADICIONAL ÚTIL
+      nextSteps: orderedPendingSteps.slice(0, 2), // Próximos 2 pasos
+      canStartCheckIn: requirements.paymentCompleted.status && requirements.roomClean.status,
+      estimatedTimeToComplete: orderedPendingSteps.length * 5, // 5 min por paso estimado
+      lastUpdated: new Date().toISOString()
+    };
+    
+    console.log('📊 [CHECKIN-REQUIREMENTS] Análisis completo:', {
+      bookingId,
+      allRequirementsMet,
+      progressPercentage,
+      completedCount,
+      pendingCount: orderedPendingSteps.length,
+      nextSteps: result.nextSteps
+    });
+    
+    dispatch({ 
+      type: 'CHECK_CHECKIN_REQUIREMENTS_SUCCESS', 
+      payload: result
+    });
+    
+    // ⭐ MENSAJES CONTEXTUALES
+    if (allRequirementsMet) {
+      toast.success('🎉 ¡Todos los requisitos de check-in están completos!');
+    } else if (completedCount === 0) {
+      toast.info('📋 Inicie el proceso de check-in completando los requisitos');
+    } else {
+      toast.info(`📊 Progreso: ${completedCount}/${totalSteps} pasos completados (${progressPercentage}%)`);
+    }
+    
+    return { 
+      success: true, 
+      allRequirementsMet,
+      missingSteps: orderedPendingSteps,
+      data: result
+    };
+    
+  } catch (error) {
+    console.error('❌ [CHECKIN-REQUIREMENTS] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Error al verificar requisitos de check-in';
+    
+    dispatch({ 
+      type: 'CHECK_CHECKIN_REQUIREMENTS_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    toast.error(`❌ Error al verificar requisitos: ${errorMessage}`);
+    return { success: false, error: errorMessage };
+  }
+};
+
+// ⭐ ACTION HELPER: COMPLETAR PASO DE INVENTARIO (VERIFICAR + ENTREGAR)
+export const completeInventoryStep = (bookingId, stepType = 'both') => async (dispatch) => {
+  try {
+    console.log(`📦 [COMPLETE-INVENTORY] Completando paso de inventario: ${stepType}`);
+    
+    let updateData = {};
+    
+    switch (stepType) {
+      case 'verify':
+        updateData = { inventoryVerified: true };
+        break;
+      case 'deliver':
+        updateData = { inventoryDelivered: true };
+        break;
+      case 'both':
+      default:
+        updateData = { 
+          inventoryVerified: true, 
+          inventoryDelivered: true 
+        };
+        break;
+    }
+    
+    const result = await dispatch(updateInventoryStatus(bookingId, updateData));
+    
+    if (result.success) {
+      // Verificar si ahora están completos todos los requisitos
+      await dispatch(checkAllCheckInRequirements(bookingId));
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.error('❌ [COMPLETE-INVENTORY] Error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// ⭐ ACTION HELPER: INICIAR PROCESO COMPLETO DE CHECK-IN
+export const startCheckInProcess = (bookingId) => async (dispatch) => {
+  try {
+    console.log(`🚀 [START-CHECKIN] Iniciando proceso completo para reserva: ${bookingId}`);
+    
+    // 1. Marcar como en progreso
+    const progressResult = await dispatch(updateCheckInProgress(bookingId, { checkInProgress: true }));
+    
+    if (!progressResult.success) {
+      throw new Error(progressResult.error);
+    }
+    
+    // 2. Verificar estado actual
+    const requirementsResult = await dispatch(checkAllCheckInRequirements(bookingId));
+    
+    if (!requirementsResult.success) {
+      throw new Error(requirementsResult.error);
+    }
+    
+    console.log('✅ [START-CHECKIN] Proceso iniciado exitosamente');
+    
+    toast.success('🚀 Proceso de check-in iniciado');
+    
+    return { 
+      success: true, 
+      checkInStarted: true,
+      requirements: requirementsResult 
+    };
+    
+  } catch (error) {
+    console.error('❌ [START-CHECKIN] Error:', error);
+    toast.error(`Error al iniciar check-in: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
