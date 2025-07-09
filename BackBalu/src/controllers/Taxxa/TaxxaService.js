@@ -906,6 +906,6 @@ const createCreditNote = async (req, res) => {
 // 🔧 ACTUALIZAR EXPORTS
 module.exports = {
   createInvoice,
-  createCreditNote,
+  createCreditNote
  
 };
