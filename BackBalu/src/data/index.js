@@ -79,6 +79,7 @@ const {
   RegistrationPass,
   RoomCategory,
   LaundryMovement,
+  CreditNote,
   HotelSettings,
   RoomService, // ⭐ CORREGIDO: RoomService en lugar de RoomServices
   Expense
@@ -471,33 +472,6 @@ if (hasModel('Purchase') && hasModel('PurchaseItem')) {
   }
 }
 
-// ===== RELACIONES DE INVOICE =====
-if (hasModel('Invoice')) {
-  if (hasModel('Booking')) {
-    const bookingPK = getPrimaryKey(Booking);
-    Invoice.belongsTo(Booking, {
-      foreignKey: 'bookingId',
-      targetKey: bookingPK,
-      as: 'booking'
-    });
-    Booking.hasOne(Invoice, {
-      foreignKey: 'bookingId',
-      sourceKey: bookingPK,
-      as: 'invoice'
-    });
-  }
-
-  if (hasModel('SellerData')) {
-    Invoice.belongsTo(SellerData, {
-      foreignKey: 'sellerId',
-      as: 'seller'
-    });
-    SellerData.hasMany(Invoice, {
-      foreignKey: 'sellerId',
-      as: 'invoices'
-    });
-  }
-}
 
 // ===== RELACIONES DE EXPENSE =====
 if (hasModel('Expense')) {
@@ -540,7 +514,267 @@ if (hasModel('Token') && hasModel('User')) {
   });
 }
 
-// ⭐ VALIDAR ASOCIACIONES CREADAS
+// ===== NUEVAS RELACIONES DE INVOICE Y BILL =====
+if (hasModel('Invoice') && hasModel('Bill')) {
+  // 🔗 Invoice pertenece a un Bill
+  Invoice.belongsTo(Bill, {
+    foreignKey: 'billId',
+    targetKey: 'idBill', // ⭐ La primary key de Bill es idBill
+    as: 'bill'
+  });
+
+  // 🔗 Bill puede tener múltiples facturas (Invoice + CreditNotes)
+  Bill.hasMany(Invoice, {
+    foreignKey: 'billId',
+    sourceKey: 'idBill',
+    as: 'invoices'
+  });
+
+  console.log('✅ Asociaciones Invoice <-> Bill creadas');
+}
+
+// ===== RELACIONES DE INVOICE ACTUALIZADAS =====
+if (hasModel('Invoice')) {
+  // 🔧 CORREGIR: Invoice NO se relaciona directamente con Booking
+  // La relación es: Invoice -> Bill -> Booking
+  
+  // Invoice - SellerData
+  if (hasModel('SellerData')) {
+    Invoice.belongsTo(SellerData, {
+      foreignKey: 'sellerId',
+      targetKey: 'sdocno', // ⭐ La PK de SellerData es sdocno
+      as: 'seller'
+    });
+    SellerData.hasMany(Invoice, {
+      foreignKey: 'sellerId',
+      sourceKey: 'sdocno',
+      as: 'invoices'
+    });
+  }
+
+  // Invoice - Buyer
+  if (hasModel('Buyer')) {
+    Invoice.belongsTo(Buyer, {
+      foreignKey: 'buyerId',
+      targetKey: 'sdocno', // ⭐ La PK de Buyer es sdocno
+      as: 'buyer'
+    });
+    Buyer.hasMany(Invoice, {
+      foreignKey: 'buyerId',
+      sourceKey: 'sdocno',
+      as: 'invoices'
+    });
+  }
+
+  console.log('✅ Asociaciones de Invoice actualizadas');
+}
+
+// ===== RELACIONES DE CREDIT NOTES (SI TIENES EL MODELO) =====
+if (hasModel('CreditNote')) {
+  // CreditNote - Invoice (factura original)
+  if (hasModel('Invoice')) {
+    CreditNote.belongsTo(Invoice, {
+      foreignKey: 'originalInvoiceId',
+      targetKey: 'id',
+      as: 'originalInvoice'
+    });
+    Invoice.hasMany(CreditNote, {
+      foreignKey: 'originalInvoiceId',
+      sourceKey: 'id',
+      as: 'creditNotes'
+    });
+  }
+
+  // CreditNote - Bill
+  if (hasModel('Bill')) {
+    CreditNote.belongsTo(Bill, {
+      foreignKey: 'billId',
+      targetKey: 'idBill',
+      as: 'bill'
+    });
+    Bill.hasMany(CreditNote, {
+      foreignKey: 'billId',
+      sourceKey: 'idBill',
+      as: 'creditNotes'
+    });
+  }
+
+  // CreditNote - SellerData
+  if (hasModel('SellerData')) {
+    CreditNote.belongsTo(SellerData, {
+      foreignKey: 'sellerId',
+      targetKey: 'sdocno',
+      as: 'seller'
+    });
+    SellerData.hasMany(CreditNote, {
+      foreignKey: 'sellerId',
+      sourceKey: 'sdocno',
+      as: 'creditNotes'
+    });
+  }
+
+  // CreditNote - Buyer
+  if (hasModel('Buyer')) {
+    CreditNote.belongsTo(Buyer, {
+      foreignKey: 'buyerId',
+      targetKey: 'sdocno',
+      as: 'buyer'
+    });
+    Buyer.hasMany(CreditNote, {
+      foreignKey: 'buyerId',
+      sourceKey: 'sdocno',
+      as: 'creditNotes'
+    });
+  }
+
+  console.log('✅ Asociaciones de CreditNote creadas');
+}
+
+// ===== MEJORAR RELACIONES EXISTENTES DE BILL =====
+if (hasModel('Bill')) {
+  // Bill - Booking (verificar que existe)
+  if (hasModel('Booking')) {
+    const bookingPK = getPrimaryKey(Booking);
+    
+    // ⭐ VERIFICAR QUE LA ASOCIACIÓN NO EXISTA YA
+    if (!Bill.associations.booking) {
+      Bill.belongsTo(Booking, { 
+        foreignKey: 'bookingId',
+        targetKey: bookingPK,
+        as: 'booking'
+      });
+      console.log('✅ Asociación Bill -> Booking creada');
+    }
+    
+    if (!Booking.associations.bill) {
+      Booking.hasOne(Bill, { 
+        foreignKey: 'bookingId',
+        sourceKey: bookingPK,
+        as: 'bill'
+      });
+      console.log('✅ Asociación Booking -> Bill creada');
+    }
+  }
+
+  console.log('✅ Asociaciones de Bill verificadas');
+}
+
+// ===== FUNCIONES HELPER ADICIONALES =====
+
+// ⭐ FUNCIÓN PARA VERIFICAR ASOCIACIONES ESPECÍFICAS
+function checkAssociation(modelName, associationName) {
+  try {
+    const model = sequelize.models[modelName];
+    if (!model) {
+      console.log(`⚠️ Modelo ${modelName} no encontrado`);
+      return false;
+    }
+    
+    const hasAssociation = model.associations && model.associations[associationName];
+    console.log(`🔍 ${modelName}.${associationName}: ${hasAssociation ? '✅' : '❌'}`);
+    return !!hasAssociation;
+  } catch (error) {
+    console.error(`❌ Error verificando asociación ${modelName}.${associationName}:`, error.message);
+    return false;
+  }
+}
+
+// ⭐ FUNCIÓN PARA VERIFICAR TODAS LAS ASOCIACIONES CRÍTICAS
+function validateCriticalAssociations() {
+  console.log('\n🔍 Verificando asociaciones críticas para Taxxa:');
+  
+  const criticalAssociations = [
+    // ⭐ ASOCIACIONES CRÍTICAS PARA TAXXA
+    ['Invoice', 'bill'],
+    ['Bill', 'invoices'],
+    ['Bill', 'booking'],
+    ['Booking', 'bill'],
+    ['Invoice', 'seller'],
+    ['Invoice', 'buyer'],
+    ['Booking', 'guest'],
+    
+    // ⭐ ASOCIACIONES PARA NOTAS DE CRÉDITO
+    ['CreditNote', 'originalInvoice'],
+    ['CreditNote', 'bill'],
+    ['Invoice', 'creditNotes'],
+    
+    // ⭐ ASOCIACIONES EXISTENTES IMPORTANTES
+    ['Booking', 'room'],
+    ['Room', 'bookings'],
+    ['Booking', 'extraCharges'],
+    ['User', 'createdBookings']
+  ];
+
+  let allValid = true;
+  let validCount = 0;
+  let totalCount = criticalAssociations.length;
+  
+  criticalAssociations.forEach(([model, association]) => {
+    const isValid = checkAssociation(model, association);
+    if (isValid) {
+      validCount++;
+    } else {
+      allValid = false;
+    }
+  });
+
+  console.log(`\n📊 Resultado: ${validCount}/${totalCount} asociaciones críticas válidas`);
+  
+  if (allValid) {
+    console.log('✅ Todas las asociaciones críticas están configuradas correctamente');
+  } else {
+    console.log(`⚠️ ${totalCount - validCount} asociaciones críticas faltan o tienen problemas`);
+  }
+
+  return { allValid, validCount, totalCount };
+}
+
+// ⭐ FUNCIÓN PARA LIMPIAR ASOCIACIONES DUPLICADAS
+function cleanDuplicateAssociations() {
+  try {
+    console.log('🧹 Limpiando asociaciones duplicadas...');
+    
+    Object.keys(sequelize.models).forEach(modelName => {
+      const model = sequelize.models[modelName];
+      const associations = model.associations || {};
+      
+      // Verificar si hay asociaciones duplicadas por alias
+      const aliasCount = {};
+      Object.keys(associations).forEach(alias => {
+        aliasCount[alias] = (aliasCount[alias] || 0) + 1;
+      });
+      
+      const duplicates = Object.keys(aliasCount).filter(alias => aliasCount[alias] > 1);
+      if (duplicates.length > 0) {
+        console.warn(`⚠️ ${modelName} tiene asociaciones duplicadas:`, duplicates);
+      }
+    });
+    
+    console.log('✅ Limpieza de asociaciones completada');
+  } catch (error) {
+    console.error('❌ Error limpiando asociaciones:', error.message);
+  }
+}
+
+// ⭐ FUNCIÓN PARA MOSTRAR RESUMEN DE ASOCIACIONES POR MODELO
+function showAssociationsSummary() {
+  console.log('\n📋 Resumen de asociaciones por modelo:');
+  
+  const models = Object.keys(sequelize.models).sort();
+  
+  models.forEach(modelName => {
+    const model = sequelize.models[modelName];
+    const associations = Object.keys(model.associations || {});
+    
+    if (associations.length > 0) {
+      console.log(`📊 ${modelName} (${associations.length}):`, associations.join(', '));
+    } else {
+      console.log(`📊 ${modelName}: Sin asociaciones`);
+    }
+  });
+}
+
+// ⭐ ACTUALIZAR LA FUNCIÓN validateAssociations EXISTENTE
 function validateAssociations() {
   try {
     const models = Object.keys(sequelize.models);
@@ -550,28 +784,65 @@ function validateAssociations() {
       return count + modelAssociations;
     }, 0);
 
-    console.log('✅ Asociaciones creadas exitosamente');
+    console.log('\n✅ Asociaciones creadas exitosamente');
     console.log(`📋 Total de modelos: ${models.length}`);
     console.log(`🔗 Total de asociaciones: ${associationsCount}`);
     
-    // Log de modelos con sus asociaciones
-    models.forEach(modelName => {
-      const model = sequelize.models[modelName];
-      const associations = Object.keys(model.associations || {});
-      if (associations.length > 0) {
-        console.log(`📊 ${modelName}: ${associations.join(', ')}`);
-      }
-    });
+    // ⭐ MOSTRAR RESUMEN DETALLADO
+    showAssociationsSummary();
 
-    return true;
+    // ⭐ VERIFICAR ASOCIACIONES CRÍTICAS
+    const criticalResult = validateCriticalAssociations();
+    
+    // ⭐ LIMPIAR DUPLICADOS
+    cleanDuplicateAssociations();
+
+    return {
+      success: true,
+      totalModels: models.length,
+      totalAssociations: associationsCount,
+      criticalAssociations: criticalResult
+    };
   } catch (error) {
     console.error('❌ Error validando asociaciones:', error.message);
-    return false;
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
 
-// ⭐ EJECUTAR VALIDACIÓN
-validateAssociations();
+// ===== REMOVER ASOCIACIÓN DUPLICADA DE INVOICE =====
+// ⭐ COMENTAR O REMOVER ESTA SECCIÓN QUE ESTÁ DUPLICADA
+/*
+// ===== RELACIONES DE INVOICE ===== (DUPLICADA - REMOVER)
+if (hasModel('Invoice')) {
+  if (hasModel('Booking')) {
+    const bookingPK = getPrimaryKey(Booking);
+    Invoice.belongsTo(Booking, {
+      foreignKey: 'bookingId',
+      targetKey: bookingPK,
+      as: 'booking'
+    });
+    Booking.hasOne(Invoice, {
+      foreignKey: 'bookingId',
+      sourceKey: bookingPK,
+      as: 'invoice'
+    });
+  }
+
+  if (hasModel('SellerData')) {
+    Invoice.belongsTo(SellerData, {
+      foreignKey: 'sellerId',
+      as: 'seller'
+    });
+    SellerData.hasMany(Invoice, {
+      foreignKey: 'sellerId',
+      as: 'invoices'
+    });
+  }
+}
+*/
 
 //---------------------------------------------------------------------------------//
 module.exports = {
@@ -579,8 +850,12 @@ module.exports = {
   conn: sequelize, // para importart la conexión { conn } = require('./db.js');
   sequelize, // exportar sequelize directamente también
   
-  // ⭐ FUNCIONES HELPER EXPORTADAS
+  // ⭐ FUNCIONES HELPER EXPORTADAS (ACTUALIZADA)
   hasModel,
   getPrimaryKey,
-  validateAssociations
+  validateAssociations,
+  checkAssociation,
+  validateCriticalAssociations,
+  cleanDuplicateAssociations,
+  showAssociationsSummary
 };
