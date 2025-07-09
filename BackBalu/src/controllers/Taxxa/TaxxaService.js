@@ -1,4 +1,4 @@
-const { SellerData, User, Buyer, Booking, Bill, Invoice } = require('../../data');
+const { SellerData, User, Buyer, Booking, Bill, Invoice, HotelSettings } = require('../../data');
 const { generateToken, sendDocument } = require('./taxxaUtils');
 const { createInvoiceWithNumber, cancelInvoice } = require('./invoiceNumberController');
 
@@ -550,7 +550,7 @@ const createCreditNote = async (req, res) => {
       if (!setting) {
         setting = await HotelSettings.create({
           key: settingKey,
-          value: '1',
+          value: '8',
           description: `Número secuencial de notas de crédito para ${currentYear}`,
           category: 'invoicing'
         });
