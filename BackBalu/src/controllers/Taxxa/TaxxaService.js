@@ -538,32 +538,60 @@ const createCreditNote = async (req, res) => {
     }
 
     // 🔧 CREAR NOTA DE CRÉDITO CON NUMERACIÓN ESPECÍFICA PARA NC
-    try {
-      // Obtener próximo número para notas de crédito
+     try {
+      // Obtener próximo número para notas de crédito (INDEPENDIENTE de facturas)
       const currentYear = new Date().getFullYear();
-      const settingKey = `credit_note_sequential_number_${currentYear}`;
+      const settingKey = `credit_note_sequential_number_${currentYear}`; // ⭐ CLAVE DIFERENTE
       
       let setting = await HotelSettings.findOne({
         where: { key: settingKey }
       });
 
       if (!setting) {
+        console.log('📝 Creando nueva secuencia para notas de crédito...');
         setting = await HotelSettings.create({
           key: settingKey,
-          value: '1',
+          value: '1', // ⭐ EMPEZAR DESDE 1 PARA NOTAS DE CRÉDITO
           description: `Número secuencial de notas de crédito para ${currentYear}`,
           category: 'invoicing'
         });
+        console.log(`✅ Nueva secuencia NC creada: NC1`);
       }
 
       const nextNumber = parseInt(setting.value);
+      console.log(`🔢 Próximo número NC: ${nextNumber}`);
+
+      // Verificar que el número NC no exista (seguridad extra)
+      const existingNCWithNumber = await Invoice.findOne({
+        where: {
+          prefix: 'NC',
+          invoiceSequentialNumber: nextNumber.toString()
+        }
+      });
+
+      if (existingNCWithNumber) {
+        console.log(`⚠️ NC${nextNumber} ya existe, buscando siguiente disponible...`);
+        // Buscar el próximo número disponible
+        const lastNC = await Invoice.findOne({
+          where: { prefix: 'NC' },
+          order: [['invoiceSequentialNumber', 'DESC']]
+        });
+        
+        const nextAvailable = lastNC ? parseInt(lastNC.invoiceSequentialNumber) + 1 : 1;
+        
+        // Actualizar configuración
+        await setting.update({ value: nextAvailable.toString() });
+        nextNumber = nextAvailable;
+        
+        console.log(`📊 Número NC corregido a: ${nextNumber}`);
+      }
 
       // Crear la nota de crédito directamente
       createdCreditNote = await Invoice.create({
         billId: bill.idBill,
         invoiceSequentialNumber: nextNumber.toString(),
         invoiceNumber: `NC${nextNumber}`,
-        prefix: 'NC',
+        prefix: 'NC', // ⭐ PREFIJO DIFERENTE: 'NC' vs 'FVK'
         buyerId: buyer.sdocno,
         buyerName: buyer.scostumername,
         buyerEmail: buyer.selectronicmail,
@@ -576,12 +604,13 @@ const createCreditNote = async (req, res) => {
         status: 'pending'
       });
 
-      // Actualizar contador
+      // Actualizar contador SOLO para notas de crédito
       await setting.update({
         value: (nextNumber + 1).toString()
       });
 
       console.log(`✅ Nota de crédito creada: ${createdCreditNote.getFullInvoiceNumber()}`);
+      console.log(`📊 Próxima nota de crédito será: NC${nextNumber + 1}`);
       
     } catch (creditNoteError) {
       console.error('❌ Error creando nota de crédito:', creditNoteError.message);
