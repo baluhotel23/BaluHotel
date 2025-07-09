@@ -866,5 +866,5 @@ const createCreditNote = async (req, res) => {
 module.exports = {
   createInvoice,
   createCreditNote,
-  getNextInvoiceNumber
+ 
 };
