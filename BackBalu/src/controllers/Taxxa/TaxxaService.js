@@ -417,14 +417,14 @@ const createCreditNote = async (req, res) => {
     console.log('Body:', JSON.stringify(req.body, null, 2));
 
     const { 
-      originalInvoiceId, // ID de la factura original a referenciar
-      creditReason,      // Motivo de la nota de crédito (1-6)
-      amount,           // Monto de la nota de crédito
-      description,      // Descripción del motivo
-      isPartial = false // Si es parcial o total
+      originalInvoiceId,
+      creditReason,
+      amount,
+      description,
+      isPartial = false
     } = req.body;
 
-    // ⭐ VALIDACIONES REQUERIDAS
+    // ✅ VALIDACIONES (CORRECTO)
     if (!originalInvoiceId) {
       return res.status(400).json({
         message: 'El ID de la factura original es obligatorio',
@@ -454,30 +454,12 @@ const createCreditNote = async (req, res) => {
       });
     }
 
-    // 🔧 BUSCAR LA FACTURA FISCAL ORIGINAL
+    // 🔧 BUSCAR FACTURA ORIGINAL SIN INCLUDES COMPLEJOS PRIMERO
     const originalInvoice = await Invoice.findOne({
       where: { 
         id: originalInvoiceId,
-        status: 'sent' // Solo facturas enviadas pueden tener notas de crédito
-      },
-      include: [
-        {
-          model: Bill,
-          as: 'bill',
-          include: [
-            {
-              model: Booking,
-              as: 'booking',
-              include: [
-                {
-                  model: Buyer,
-                  as: 'guest',
-                },
-              ],
-            },
-          ],
-        },
-      ],
+        status: 'sent'
+      }
     });
 
     if (!originalInvoice) {
@@ -487,19 +469,50 @@ const createCreditNote = async (req, res) => {
       });
     }
 
-    const bill = originalInvoice.bill;
-    const booking = bill?.booking;
-    const buyer = booking?.guest;
+    // 🔧 BUSCAR DATOS RELACIONADOS POR SEPARADO
+    const bill = await Bill.findOne({
+      where: { idBill: originalInvoice.billId }
+    });
 
-    if (!booking || !buyer) {
-      return res.status(400).json({
-        message: 'Datos incompletos de la factura original',
+    if (!bill) {
+      return res.status(404).json({
+        message: 'Factura interna no encontrada',
         success: false,
       });
     }
 
-    // 🔧 VERIFICAR SI YA EXISTE UNA NOTA DE CRÉDITO PARA ESTA FACTURA
-       if (existingCreditNote) {
+    const booking = await Booking.findOne({
+      where: { bookingId: bill.bookingId }
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        message: 'Reserva no encontrada',
+        success: false,
+      });
+    }
+
+    const buyer = await Buyer.findOne({
+      where: { sdocno: booking.guestId }
+    });
+
+    if (!buyer) {
+      return res.status(404).json({
+        message: 'Datos del huésped no encontrados',
+        success: false,
+      });
+    }
+
+    // 🔧 VERIFICAR SI YA EXISTE UNA NOTA DE CRÉDITO
+    const existingCreditNote = await Invoice.findOne({
+      where: { 
+        billId: bill.idBill,
+        prefix: 'NC',
+        status: 'sent'
+      }
+    });
+
+    if (existingCreditNote) {
       console.log('⚠️ Ya existe una nota de crédito para esta factura');
       return res.status(400).json({
         message: 'Ya existe una nota de crédito enviada para esta factura',
@@ -524,24 +537,52 @@ const createCreditNote = async (req, res) => {
       });
     }
 
-    // 🔧 CREAR NOTA DE CRÉDITO CON NUMERACIÓN SECUENCIAL
+    // 🔧 CREAR NOTA DE CRÉDITO CON NUMERACIÓN ESPECÍFICA PARA NC
     try {
-      createdCreditNote = await createInvoiceWithNumber({
+      // Obtener próximo número para notas de crédito
+      const currentYear = new Date().getFullYear();
+      const settingKey = `credit_note_sequential_number_${currentYear}`;
+      
+      let setting = await HotelSettings.findOne({
+        where: { key: settingKey }
+      });
+
+      if (!setting) {
+        setting = await HotelSettings.create({
+          key: settingKey,
+          value: '1',
+          description: `Número secuencial de notas de crédito para ${currentYear}`,
+          category: 'invoicing'
+        });
+      }
+
+      const nextNumber = parseInt(setting.value);
+
+      // Crear la nota de crédito directamente
+      createdCreditNote = await Invoice.create({
         billId: bill.idBill,
+        invoiceSequentialNumber: nextNumber.toString(),
+        invoiceNumber: `NC${nextNumber}`,
+        prefix: 'NC',
         buyerId: buyer.sdocno,
         buyerName: buyer.scostumername,
         buyerEmail: buyer.selectronicmail,
         sellerId: sellerData.sdocno,
         sellerName: sellerData.scostumername,
         totalAmount: amount,
-        taxAmount: amount * 0.19, // IVA 19%
+        taxAmount: amount * 0.19,
         netAmount: amount,
         orderReference: `CREDIT-${booking.bookingId}-${originalInvoice.invoiceSequentialNumber}`,
-        documentType: 'CreditNote',
-        prefix: 'NC' // Prefijo para notas de crédito
+        status: 'pending'
+      });
+
+      // Actualizar contador
+      await setting.update({
+        value: (nextNumber + 1).toString()
       });
 
       console.log(`✅ Nota de crédito creada: ${createdCreditNote.getFullInvoiceNumber()}`);
+      
     } catch (creditNoteError) {
       console.error('❌ Error creando nota de crédito:', creditNoteError.message);
       return res.status(500).json({
@@ -551,15 +592,14 @@ const createCreditNote = async (req, res) => {
       });
     }
 
-    // 🔧 CONSTRUIR DOCUMENTO PARA TAXXA - NOTA DE CRÉDITO
+    // 🔧 CONSTRUIR DOCUMENTO PARA TAXXA
     console.log('=== Construyendo nota de crédito para Taxxa ===');
 
-    // 🔧 CALCULAR TOTALES
     const creditAmount = parseFloat(amount);
-    const taxAmount = creditAmount * 0.19; // IVA 19%
+    const taxAmount = creditAmount * 0.19;
     const totalWithTax = creditAmount + taxAmount;
 
-    // 🔧 MAPEAR TIPOS DE DOCUMENTO
+    // 🔧 FUNCIONES UTILITARIAS
     const mapDocTypeToText = (code) => {
       const mapping = {
         11: "RC", 12: "TI", 13: "CC", 21: "CE", 22: "CD", 
@@ -568,7 +608,6 @@ const createCreditNote = async (req, res) => {
       return mapping[code] || "CC";
     };
 
-    // 🆕 FUNCIÓN PARA CONVERTIR NÚMERO A PALABRAS
     const numberToWords = (num) => {
       const numbers = {
         140000: "ciento cuarenta mil",
@@ -584,17 +623,6 @@ const createCreditNote = async (req, res) => {
       return `${num.toLocaleString()} pesos`;
     };
 
-    const currentDate = new Date().toISOString().split('T')[0];
-    const currentDateTime = new Date().toISOString().replace('T', ' ').split('.')[0];
-    
-    // 🔧 FECHAS DEL PERÍODO (mes actual)
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
-    
-    const periodStartDate = startOfMonth.toISOString().split('T')[0];
-    const periodEndDate = endOfMonth.toISOString().split('T')[0];
-
-    // 🔧 MAPEAR DESCRIPCIÓN DEL MOTIVO
     const creditReasonDescriptions = {
       '1': 'Devolución parcial de los bienes y/o no aceptación parcial del servicio',
       '2': 'Anulación de factura electrónica',
@@ -604,45 +632,48 @@ const createCreditNote = async (req, res) => {
       '6': 'Descuento comercial por volumen de ventas'
     };
 
-    // 🆕 ESTRUCTURA DE NOTA DE CRÉDITO SEGÚN DOCUMENTACIÓN TAXXA
+    const currentDate = new Date().toISOString().split('T')[0];
+    const currentDateTime = new Date().toISOString().replace('T', ' ').split('.')[0];
+    
+    // 🔧 FECHAS DEL PERÍODO
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+    
+    const periodStartDate = startOfMonth.toISOString().split('T')[0];
+    const periodEndDate = endOfMonth.toISOString().split('T')[0];
+
+    // 🔧 ESTRUCTURA DE NOTA DE CRÉDITO
     const creditNoteBody = {
       sMethod: 'classTaxxa.fjDocumentAdd',
       jParams: {
         wVersionUBL: "2.1",
         wenvironment: process.env.NODE_ENV === 'production' ? "prod" : "test",
         jDocument: {
-          // ⭐ CAMPOS ESPECÍFICOS PARA NOTA DE CRÉDITO
           wdocumenttype: "CreditNote",
           wdocumenttypecode: "91",
-          woperationtype: "20", // Nota Crédito que referencia una factura electrónica
+          woperationtype: "20",
           sdocsubtype: creditReason.toString(),
           wcurrency: "COP",
           
-          // 🔧 NUMERACIÓN DE NOTA DE CRÉDITO
           sdocumentprefix: createdCreditNote.prefix,
           sdocumentsuffix: parseInt(createdCreditNote.invoiceSequentialNumber),
           
-          // 🔧 PERÍODO QUE AFECTA (REQUERIDO PARA NC)
           sinvoiceperiodstartdate: periodStartDate,
           sinvoiceperiodstarttime: "00:00:00",
           sinvoiceperiodenddate: periodEndDate,
           sinvoiceperiodendtime: "23:59:59",
           
-          // 🔧 FECHAS
           tissuedate: currentDateTime,
           tduedate: currentDate,
           
-          // 🔧 INFORMACIÓN DE PAGO
           wpaymentmeans: 1,
           wpaymentmethod: "10",
           
-          // 🔧 TOTALES
           nlineextensionamount: creditAmount,
           ntaxexclusiveamount: creditAmount,
           ntaxinclusiveamount: totalWithTax,
           npayableamount: totalWithTax,
           
-          // 🔧 REFERENCIAS A LA FACTURA ORIGINAL
           sorderreference: createdCreditNote.orderReference,
           tdatereference: originalInvoice.sentToTaxxaAt?.toISOString().split('T')[0] || currentDate,
           jbillingreference: {
@@ -651,18 +682,15 @@ const createCreditNote = async (req, res) => {
             sbillingreferenceuuid: originalInvoice.cufe
           },
           
-          // 🔧 NOTAS
           snotes: description || creditReasonDescriptions[creditReason],
           snotetop: "Nota de Crédito - " + creditReasonDescriptions[creditReason],
           
-          // 🆕 INFORMACIÓN EXTRA
           jextrainfo: {
             ntotalinvoicepayment: totalWithTax,
             stotalinvoicewords: numberToWords(totalWithTax),
             iitemscount: "1"
           },
           
-          // 🔧 ITEMS DE LA NOTA DE CRÉDITO
           jdocumentitems: {
             "0": {
               jextrainfo: {
@@ -698,7 +726,6 @@ const createCreditNote = async (req, res) => {
             }
           },
           
-          // 🔧 COMPRADOR (IGUAL QUE LA FACTURA ORIGINAL)
           jbuyer: {
             wlegalorganizationtype: buyer.wlegalorganizationtype || "person",
             scostumername: buyer.scostumername,
@@ -728,7 +755,6 @@ const createCreditNote = async (req, res) => {
             }
           },
           
-          // 🔧 VENDEDOR (IGUAL QUE LA FACTURA ORIGINAL)
           jseller: {
             wlegalorganizationtype: sellerData.wlegalorganizationtype === "person" ? "person" : "company",
             sfiscalresponsibilities: sellerData.sfiscalresponsibilities,
@@ -760,24 +786,20 @@ const createCreditNote = async (req, res) => {
 
     console.log('📄 Nota de crédito construida:', JSON.stringify(creditNoteBody, null, 2));
 
-    // 🔧 GENERAR TOKEN
+    // 🔧 GENERAR TOKEN Y ENVIAR
     console.log('=== Generando token para Taxxa ===');
     const token = await generateToken();
     if (!token) {
-      await cancelInvoice(createdCreditNote.id);
+      await createdCreditNote.destroy();
       throw new Error('No se pudo generar el token de autenticación');
     }
 
-    // 🔧 PREPARAR PAYLOAD FINAL
     const taxxaPayload = {
       stoken: token,
       jApi: creditNoteBody
     };
 
     console.log('=== Enviando nota de crédito a Taxxa ===');
-    console.log('Payload a enviar:', JSON.stringify(taxxaPayload, null, 2));
-
-    // 🔧 ENVIAR DOCUMENTO
     const taxxaResponse = await sendDocument(taxxaPayload);
     console.log('Respuesta de Taxxa:', JSON.stringify(taxxaResponse, null, 2));
 
@@ -785,15 +807,7 @@ const createCreditNote = async (req, res) => {
     if (taxxaResponse && taxxaResponse.rerror === 0) {
       console.log('=== Nota de crédito enviada exitosamente ===');
       
-      // 🔧 MARCAR NOTA DE CRÉDITO COMO ENVIADA
       await createdCreditNote.markAsSent(taxxaResponse);
-      
-      // 🔧 ACTUALIZAR FACTURA ORIGINAL CON REFERENCIA A LA NOTA DE CRÉDITO
-      await originalInvoice.update({
-        hasCreditNote: true,
-        creditNoteId: createdCreditNote.id,
-        creditNoteAmount: creditAmount
-      });
 
       return res.status(200).json({
         message: 'Nota de crédito enviada a Taxxa con éxito',
@@ -812,10 +826,7 @@ const createCreditNote = async (req, res) => {
       
     } else {
       console.error('Error en respuesta de Taxxa:', taxxaResponse);
-      
-      // 🔧 MARCAR NOTA DE CRÉDITO COMO FALLIDA
       await createdCreditNote.markAsFailed(new Error(taxxaResponse?.smessage || 'Error desconocido'));
-      
       throw new Error(`Error en la respuesta de Taxxa: ${taxxaResponse?.smessage || JSON.stringify(taxxaResponse)}`);
     }
 
@@ -824,10 +835,9 @@ const createCreditNote = async (req, res) => {
     console.error('Error:', error.message);
     console.error('Stack:', error.stack);
     
-    // 🔧 CANCELAR NOTA DE CRÉDITO SI SE CREÓ
     if (createdCreditNote) {
       try {
-        await cancelInvoice(createdCreditNote.id);
+        await createdCreditNote.destroy();
       } catch (cancelError) {
         console.error('Error cancelando nota de crédito:', cancelError.message);
       }
@@ -844,5 +854,5 @@ const createCreditNote = async (req, res) => {
 // 🔧 ACTUALIZAR EXPORTS
 module.exports = {
   createInvoice,
-  createCreditNote, // ⭐ NUEVA FUNCIÓN EXPORTADA
+  createCreditNote, 
 };
