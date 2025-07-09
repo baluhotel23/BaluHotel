@@ -550,7 +550,7 @@ const createCreditNote = async (req, res) => {
       if (!setting) {
         setting = await HotelSettings.create({
           key: settingKey,
-          value: '8',
+          value: '1',
           description: `Número secuencial de notas de crédito para ${currentYear}`,
           category: 'invoicing'
         });
