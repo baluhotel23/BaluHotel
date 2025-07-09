@@ -424,7 +424,7 @@ const createCreditNote = async (req, res) => {
       isPartial = false
     } = req.body;
 
-    // ✅ VALIDACIONES (CORRECTO)
+    // ✅ VALIDACIONES (mantener las existentes)
     if (!originalInvoiceId) {
       return res.status(400).json({
         message: 'El ID de la factura original es obligatorio',
@@ -454,7 +454,7 @@ const createCreditNote = async (req, res) => {
       });
     }
 
-    // 🔧 BUSCAR FACTURA ORIGINAL SIN INCLUDES COMPLEJOS PRIMERO
+    // 🔧 BUSCAR DATOS (mantener la lógica existente)
     const originalInvoice = await Invoice.findOne({
       where: { 
         id: originalInvoiceId,
@@ -469,7 +469,6 @@ const createCreditNote = async (req, res) => {
       });
     }
 
-    // 🔧 BUSCAR DATOS RELACIONADOS POR SEPARADO
     const bill = await Bill.findOne({
       where: { idBill: originalInvoice.billId }
     });
@@ -503,11 +502,10 @@ const createCreditNote = async (req, res) => {
       });
     }
 
-    // 🔧 VERIFICAR SI YA EXISTE UNA NOTA DE CRÉDITO
-    const existingCreditNote = await Invoice.findOne({
+    // 🔧 VERIFICAR SI YA EXISTE UNA NOTA DE CRÉDITO USANDO EL MODELO CREDITNOTE
+    const existingCreditNote = await CreditNote.findOne({
       where: { 
-        billId: bill.idBill,
-        prefix: 'NC',
+        originalInvoiceId: originalInvoiceId,
         status: 'sent'
       }
     });
@@ -519,7 +517,7 @@ const createCreditNote = async (req, res) => {
         success: false,
         data: {
           creditNoteId: existingCreditNote.id,
-          creditNoteNumber: existingCreditNote.getFullInvoiceNumber()
+          creditNoteNumber: existingCreditNote.getFullNumber()
         }
       });
     }
@@ -537,91 +535,79 @@ const createCreditNote = async (req, res) => {
       });
     }
 
-    // 🔧 CREAR NOTA DE CRÉDITO CON NUMERACIÓN ESPECÍFICA PARA NC
-     try {
-      // Obtener próximo número para notas de crédito (INDEPENDIENTE de facturas)
-      const currentYear = new Date().getFullYear();
-      const settingKey = `credit_note_sequential_number_${currentYear}`; // ⭐ CLAVE DIFERENTE
+    // 🔧 CREAR NOTA DE CRÉDITO CON NUMERACIÓN INDEPENDIENTE
+    try {
+      console.log('📝 Obteniendo próximo número para nota de crédito...');
       
-      let setting = await HotelSettings.findOne({
-        where: { key: settingKey }
+      // Buscar la última nota de crédito para determinar el siguiente número
+      const lastCreditNote = await CreditNote.findOne({
+        where: { 
+          deletedAt: null // Asegurar que no esté eliminada
+        },
+        order: [['creditNoteSequentialNumber', 'DESC']]
       });
-
-      if (!setting) {
-        console.log('📝 Creando nueva secuencia para notas de crédito...');
-        setting = await HotelSettings.create({
-          key: settingKey,
-          value: '1', // ⭐ EMPEZAR DESDE 1 PARA NOTAS DE CRÉDITO
-          description: `Número secuencial de notas de crédito para ${currentYear}`,
-          category: 'invoicing'
-        });
-        console.log(`✅ Nueva secuencia NC creada: NC1`);
+      
+      let nextNumber = 1;
+      if (lastCreditNote) {
+        const lastNumber = parseInt(lastCreditNote.creditNoteSequentialNumber) || 0;
+        nextNumber = lastNumber + 1;
       }
-
-      const nextNumber = parseInt(setting.value);
+      
       console.log(`🔢 Próximo número NC: ${nextNumber}`);
-
-      // Verificar que el número NC no exista (seguridad extra)
-      const existingNCWithNumber = await Invoice.findOne({
+      
+      // Verificar que el número no esté en uso
+      const existingNCWithNumber = await CreditNote.findOne({
         where: {
-          prefix: 'NC',
-          invoiceSequentialNumber: nextNumber.toString()
+          creditNoteSequentialNumber: nextNumber.toString(),
+          deletedAt: null
         }
       });
-
+      
       if (existingNCWithNumber) {
-        console.log(`⚠️ NC${nextNumber} ya existe, buscando siguiente disponible...`);
-        // Buscar el próximo número disponible
-        const lastNC = await Invoice.findOne({
-          where: { prefix: 'NC' },
-          order: [['invoiceSequentialNumber', 'DESC']]
-        });
-        
-        const nextAvailable = lastNC ? parseInt(lastNC.invoiceSequentialNumber) + 1 : 1;
-        
-        // Actualizar configuración
-        await setting.update({ value: nextAvailable.toString() });
-        nextNumber = nextAvailable;
-        
-        console.log(`📊 Número NC corregido a: ${nextNumber}`);
+        console.log(`⚠️ NC${nextNumber} ya existe, buscando siguiente...`);
+        nextNumber = parseInt(existingNCWithNumber.creditNoteSequentialNumber) + 1;
       }
 
-      // Crear la nota de crédito directamente
-      createdCreditNote = await Invoice.create({
+      // Calcular montos
+      const creditAmount = parseFloat(amount);
+      const taxAmount = creditAmount * 0.19;
+      const totalAmount = creditAmount + taxAmount;
+
+      // Crear la nota de crédito usando el modelo CreditNote
+      createdCreditNote = await CreditNote.create({
+        originalInvoiceId: originalInvoice.id,
         billId: bill.idBill,
-        invoiceSequentialNumber: nextNumber.toString(),
-        invoiceNumber: `NC${nextNumber}`,
-        prefix: 'NC', // ⭐ PREFIJO DIFERENTE: 'NC' vs 'FVK'
+        creditNoteSequentialNumber: nextNumber.toString(),
+        creditNoteNumber: `NC${nextNumber}`,
+        prefix: 'NC',
         buyerId: buyer.sdocno,
         buyerName: buyer.scostumername,
         buyerEmail: buyer.selectronicmail,
         sellerId: sellerData.sdocno,
         sellerName: sellerData.scostumername,
-        totalAmount: amount,
-        taxAmount: amount * 0.19,
-        netAmount: amount,
+        creditReason: creditReason.toString(),
+        creditAmount: creditAmount,
+        taxAmount: taxAmount,
+        totalAmount: totalAmount,
+        description: description,
         orderReference: `CREDIT-${booking.bookingId}-${originalInvoice.invoiceSequentialNumber}`,
+        isPartial: isPartial,
         status: 'pending'
       });
 
-      // Actualizar contador SOLO para notas de crédito
-      await setting.update({
-        value: (nextNumber + 1).toString()
-      });
-
-      console.log(`✅ Nota de crédito creada: ${createdCreditNote.getFullInvoiceNumber()}`);
-      console.log(`📊 Próxima nota de crédito será: NC${nextNumber + 1}`);
+      console.log(`✅ Nota de crédito creada: ${createdCreditNote.getFullNumber()}`);
       
     } catch (creditNoteError) {
       console.error('❌ Error creando nota de crédito:', creditNoteError.message);
+      console.error('❌ Stack:', creditNoteError.stack);
       return res.status(500).json({
-        message: 'Error en la numeración de notas de crédito',
+        message: 'Error creando la nota de crédito',
         success: false,
         error: creditNoteError.message
       });
     }
 
-    // 🔧 CONSTRUIR DOCUMENTO PARA TAXXA
+    // 🔧 CONSTRUIR DOCUMENTO PARA TAXXA (mantener la lógica existente)
     console.log('=== Construyendo nota de crédito para Taxxa ===');
 
     const creditAmount = parseFloat(amount);
@@ -828,11 +814,8 @@ const createCreditNote = async (req, res) => {
       jApi: creditNoteBody
     };
 
-    console.log('=== Enviando nota de crédito a Taxxa ===');
     const taxxaResponse = await sendDocument(taxxaPayload);
-    console.log('Respuesta de Taxxa:', JSON.stringify(taxxaResponse, null, 2));
 
-    // 🔧 PROCESAR RESPUESTA
     if (taxxaResponse && taxxaResponse.rerror === 0) {
       console.log('=== Nota de crédito enviada exitosamente ===');
       
@@ -843,10 +826,10 @@ const createCreditNote = async (req, res) => {
         success: true,
         data: {
           creditNoteId: createdCreditNote.id,
-          creditNoteNumber: createdCreditNote.getFullInvoiceNumber(),
+          creditNoteNumber: createdCreditNote.getFullNumber(),
           originalInvoiceNumber: originalInvoice.getFullInvoiceNumber(),
           creditAmount: creditAmount,
-          creditReason: creditReasonDescriptions[creditReason],
+          creditReason: description,
           cufe: taxxaResponse.jApiResponse?.cufe || taxxaResponse.scufe,
           sentAt: createdCreditNote.sentToTaxxaAt,
           taxxaResponse: taxxaResponse
@@ -862,7 +845,6 @@ const createCreditNote = async (req, res) => {
   } catch (error) {
     console.error('=== Error en el proceso de nota de crédito ===');
     console.error('Error:', error.message);
-    console.error('Stack:', error.stack);
     
     if (createdCreditNote) {
       try {
@@ -883,5 +865,6 @@ const createCreditNote = async (req, res) => {
 // 🔧 ACTUALIZAR EXPORTS
 module.exports = {
   createInvoice,
-  createCreditNote, 
+  createCreditNote,
+  getNextInvoiceNumber
 };
