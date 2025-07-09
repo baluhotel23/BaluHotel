@@ -1,85 +1,39 @@
-const { Invoice, Bill, Booking, Buyer } = require('../../data')
+const { Invoice, Bill, Booking, Buyer, SellerData } = require('../../data');
 const { Op } = require('sequelize');
 
-// 📋 OBTENER TODAS LAS FACTURAS FISCALES
-const getAllInvoices = async (req, res) => {
+// 📋 VERSIÓN SIMPLIFICADA PARA DEBUGGING
+const getAllInvoicesSimple = async (req, res) => {
   try {
-    console.log('📋 [INVOICE-CONTROLLER] Obteniendo todas las facturas fiscales');
+    console.log('📋 [INVOICE-CONTROLLER] Obteniendo facturas (versión simple)');
     
     const {
       page = 1,
       limit = 10,
-      status,
-      startDate,
-      endDate,
-      search,
-      documentType = 'Invoice' // Por defecto solo facturas, no notas de crédito
+      status = 'sent'
     } = req.query;
 
     const offset = (page - 1) * limit;
     
-    // 🔧 CONSTRUIR FILTROS
-    const where = {
-      status: 'sent', // Solo facturas enviadas exitosamente
-    };
-
-    // Filtro por tipo de documento
-    if (documentType) {
-      where.documentType = documentType;
-    }
-
-    // Filtro por estado específico
-    if (status) {
-      where.status = status;
-    }
-
-    // Filtro por rango de fechas
-    if (startDate && endDate) {
-      where.sentToTaxxaAt = {
-        [Op.between]: [new Date(startDate), new Date(endDate)]
-      };
-    }
-
-    // Filtro de búsqueda por nombre del comprador o número de factura
-    let includeWhere = {};
-    if (search) {
-      includeWhere = {
-        [Op.or]: [
-          { buyerName: { [Op.iLike]: `%${search}%` } },
-          { invoiceSequentialNumber: { [Op.iLike]: `%${search}%` } }
-        ]
-      };
-    }
-
+    // 🔧 CONSULTA SIN INCLUDES PRIMERO
     const { count, rows: invoices } = await Invoice.findAndCountAll({
-      where: search ? { ...where, ...includeWhere } : where,
-      include: [
-        {
-          model: Bill,
-          as: 'bill',
-          include: [
-            {
-              model: Booking,
-              as: 'booking',
-              attributes: ['bookingId', 'roomNumber', 'checkInDate', 'checkOutDate'],
-            }
-          ]
-        }
-      ],
+      where: {
+        status: status
+      },
       order: [['sentToTaxxaAt', 'DESC']],
       limit: parseInt(limit),
-      offset: parseInt(offset),
-      distinct: true
+      offset: parseInt(offset)
     });
 
-    // 🔧 FORMATEAR RESPUESTA CON MÉTODOS DE INSTANCIA
+    console.log(`✅ [INVOICE-CONTROLLER] ${invoices.length} facturas encontradas (sin relaciones)`);
+
+    // 🔧 FORMATEAR RESPUESTA BÁSICA
     const formattedInvoices = invoices.map(invoice => ({
       id: invoice.id,
       billId: invoice.billId,
       documentType: invoice.documentType,
       prefix: invoice.prefix,
       invoiceSequentialNumber: invoice.invoiceSequentialNumber,
-      fullInvoiceNumber: invoice.getFullInvoiceNumber(),
+      fullInvoiceNumber: `${invoice.prefix}${invoice.invoiceSequentialNumber}`,
       buyerName: invoice.buyerName,
       buyerEmail: invoice.buyerEmail,
       totalAmount: invoice.totalAmount,
@@ -91,19 +45,159 @@ const getAllInvoices = async (req, res) => {
       orderReference: invoice.orderReference,
       hasCreditNote: invoice.hasCreditNote || false,
       creditNoteAmount: invoice.creditNoteAmount || 0,
-      booking: invoice.bill?.booking ? {
-        bookingId: invoice.bill.booking.bookingId,
-        roomNumber: invoice.bill.booking.roomNumber,
-        checkInDate: invoice.bill.booking.checkInDate,
-        checkOutDate: invoice.bill.booking.checkOutDate
-      } : null,
       createdAt: invoice.createdAt,
       updatedAt: invoice.updatedAt
     }));
 
     const totalPages = Math.ceil(count / limit);
 
-    console.log(`✅ [INVOICE-CONTROLLER] ${invoices.length} facturas encontradas`);
+    return res.status(200).json({
+      success: true,
+      message: 'Facturas fiscales obtenidas exitosamente',
+      data: formattedInvoices,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalItems: count,
+        itemsPerPage: parseInt(limit),
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [INVOICE-CONTROLLER] Error en getAllInvoicesSimple:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener facturas fiscales',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
+
+// 📋 VERSIÓN CON RELACIONES (cuando funcione la simple)
+const getAllInvoices = async (req, res) => {
+  try {
+    console.log('📋 [INVOICE-CONTROLLER] Obteniendo facturas con relaciones');
+    
+    const {
+      page = 1,
+      limit = 10,
+      status = 'sent'
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+    
+    // 🔧 VERIFICAR ASOCIACIONES DISPONIBLES
+    console.log('🔍 Verificando asociaciones disponibles:');
+    console.log('- Invoice.associations:', Object.keys(Invoice.associations || {}));
+    console.log('- Bill.associations:', Object.keys(Bill.associations || {}));
+
+    // 🔧 CONSTRUIR INCLUDES DINÁMICAMENTE
+    const includes = [];
+    
+    // Solo agregar Bill si la asociación existe
+    if (Invoice.associations && Invoice.associations.bill) {
+      console.log('✅ Asociación Invoice.bill encontrada');
+      includes.push({
+        model: Bill,
+        as: 'bill',
+        required: false,
+        // Solo incluir Booking si Bill tiene la asociación
+        include: Bill.associations && Bill.associations.booking ? [
+          {
+            model: Booking,
+            as: 'booking',
+            required: false,
+            attributes: ['bookingId', 'roomNumber', 'checkInDate', 'checkOutDate']
+          }
+        ] : []
+      });
+    } else {
+      console.warn('⚠️ Asociación Invoice.bill no encontrada');
+    }
+
+    // Solo agregar SellerData si la asociación existe
+    if (Invoice.associations && Invoice.associations.seller) {
+      console.log('✅ Asociación Invoice.seller encontrada');
+      includes.push({
+        model: SellerData,
+        as: 'seller',
+        required: false,
+        attributes: ['sdocno', 'scostumername', 'selectronicmail']
+      });
+    } else {
+      console.warn('⚠️ Asociación Invoice.seller no encontrada');
+    }
+
+    // Solo agregar Buyer si la asociación existe
+    if (Invoice.associations && Invoice.associations.buyer) {
+      console.log('✅ Asociación Invoice.buyer encontrada');
+      includes.push({
+        model: Buyer,
+        as: 'buyer',
+        required: false,
+        attributes: ['sdocno', 'scostumername', 'selectronicmail']
+      });
+    } else {
+      console.warn('⚠️ Asociación Invoice.buyer no encontrada');
+    }
+
+    console.log(`🔧 Usando ${includes.length} includes en la consulta`);
+
+    const { count, rows: invoices } = await Invoice.findAndCountAll({
+      where: { status },
+      include: includes,
+      order: [['sentToTaxxaAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      distinct: true,
+      subQuery: false
+    });
+
+    // 🔧 FORMATEAR RESPUESTA
+    const formattedInvoices = invoices.map(invoice => {
+      const invoiceData = invoice.toJSON();
+      
+      return {
+        id: invoiceData.id,
+        billId: invoiceData.billId,
+        documentType: invoiceData.documentType,
+        prefix: invoiceData.prefix,
+        invoiceSequentialNumber: invoiceData.invoiceSequentialNumber,
+        fullInvoiceNumber: `${invoiceData.prefix}${invoiceData.invoiceSequentialNumber}`,
+        buyerName: invoiceData.buyerName,
+        buyerEmail: invoiceData.buyerEmail,
+        totalAmount: invoiceData.totalAmount,
+        taxAmount: invoiceData.taxAmount,
+        netAmount: invoiceData.netAmount,
+        cufe: invoiceData.cufe,
+        status: invoiceData.status,
+        sentToTaxxaAt: invoiceData.sentToTaxxaAt,
+        orderReference: invoiceData.orderReference,
+        hasCreditNote: invoiceData.hasCreditNote || false,
+        creditNoteAmount: invoiceData.creditNoteAmount || 0,
+        
+        // ⭐ DATOS DE RELACIONES (si existen)
+        booking: invoiceData.bill?.booking ? {
+          bookingId: invoiceData.bill.booking.bookingId,
+          roomNumber: invoiceData.bill.booking.roomNumber,
+          checkInDate: invoiceData.bill.booking.checkInDate,
+          checkOutDate: invoiceData.bill.booking.checkOutDate
+        } : null,
+        
+        seller: invoiceData.seller || null,
+        buyer: invoiceData.buyer || null,
+        
+        createdAt: invoiceData.createdAt,
+        updatedAt: invoiceData.updatedAt
+      };
+    });
+
+    const totalPages = Math.ceil(count / limit);
+
+    console.log(`✅ [INVOICE-CONTROLLER] ${invoices.length} facturas encontradas con relaciones`);
 
     return res.status(200).json({
       success: true,
@@ -121,11 +215,10 @@ const getAllInvoices = async (req, res) => {
 
   } catch (error) {
     console.error('❌ [INVOICE-CONTROLLER] Error en getAllInvoices:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error al obtener facturas fiscales',
-      error: error.message
-    });
+    
+    // 🔧 FALLBACK A VERSIÓN SIMPLE
+    console.log('🔄 Intentando versión simple como fallback...');
+    return getAllInvoicesSimple(req, res);
   }
 };
 
@@ -428,6 +521,7 @@ const resendInvoice = async (req, res) => {
 module.exports = {
   getAllInvoices,
   getInvoiceById,
+  getAllInvoicesSimple,
   getNumberingStats,
   searchInvoices,
   resendInvoice

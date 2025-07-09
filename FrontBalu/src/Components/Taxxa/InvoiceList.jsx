@@ -8,6 +8,7 @@ const InvoiceList = () => {
   const dispatch = useDispatch();
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
+  const [retryAttempts, setRetryAttempts] = useState(0);
   const [creditNoteData, setCreditNoteData] = useState({
     creditReason: '1',
     amount: '',
@@ -22,9 +23,28 @@ const InvoiceList = () => {
     };
   });
 
+  const loadInvoices = async () => {
+    try {
+      await dispatch(getAllInvoices());
+      setRetryAttempts(0); // Reset en éxito
+    } catch (error) {
+      console.error('Error cargando facturas:', error);
+      if (retryAttempts < 3) {
+        setRetryAttempts(prev => prev + 1);
+        setTimeout(() => {
+          console.log(`🔄 Reintentando cargar facturas (intento ${retryAttempts + 1}/3)`);
+          loadInvoices();
+        }, 2000);
+      } else {
+        toast.error('Error al cargar las facturas después de varios intentos');
+      }
+    }
+  };
+
   useEffect(() => {
-    dispatch(getAllInvoices());
+    loadInvoices();
   }, [dispatch]);
+
 
   const handleCreateCreditNote = async () => {
     if (!selectedInvoice || !creditNoteData.amount) {
@@ -60,12 +80,37 @@ const InvoiceList = () => {
     '6': 'Descuento comercial por volumen de ventas'
   };
 
+ if (error && !loading) {
+    return (
+      <DashboardLayout>
+        <div className="container mx-auto p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+            <div className="text-red-400 text-4xl mb-4">⚠️</div>
+            <h3 className="text-lg font-medium text-red-900 mb-2">Error al cargar facturas</h3>
+            <p className="text-red-700 mb-4">
+              {error || 'Ha ocurrido un error inesperado al cargar las facturas.'}
+            </p>
+            <button
+              onClick={loadInvoices}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+            >
+              🔄 Reintentar
+            </button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   if (loading) {
     return (
       <DashboardLayout>
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Cargando facturas emitidas...</span>
+          <span className="ml-3 text-gray-600">
+            Cargando facturas emitidas...
+            {retryAttempts > 0 && ` (Intento ${retryAttempts + 1}/3)`}
+          </span>
         </div>
       </DashboardLayout>
     );

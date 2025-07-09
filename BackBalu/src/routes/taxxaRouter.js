@@ -15,7 +15,7 @@ const {
 
 // 🆕 IMPORTAR NUEVO CONTROLLER DE INVOICES
 const {
-  getAllInvoices,
+  getAllInvoicesSimple,
   getInvoiceById,
   getNumberingStats,
   searchInvoices,
@@ -46,7 +46,7 @@ router.put('/sellerData/:sdocno', allowRoles(["owner", "admin"]), updateSellerDa
 router.get('/sellerData/:sdocno', allowRoles(["owner", "admin"]), getSellerDataBySdocno);
 
 // 🆕 NUEVAS RUTAS DE GESTIÓN DE FACTURAS EMITIDAS
-router.get('/invoices', allowRoles(["owner", "admin", "staff"]), getAllInvoices);           // Listar todas las facturas
+router.get('/invoices', allowRoles(["owner", "admin", "staff"]), getAllInvoicesSimple);          // Listar todas las facturas
 router.get('/invoices/search', allowRoles(["owner", "admin", "staff"]), searchInvoices);    // Buscar facturas
 router.get('/invoices/stats', allowRoles(["owner", "admin"]), getNumberingStats);           // Estadísticas
 router.get('/invoices/:invoiceId', allowRoles(["owner", "admin", "staff"]), getInvoiceById); // Factura específica
