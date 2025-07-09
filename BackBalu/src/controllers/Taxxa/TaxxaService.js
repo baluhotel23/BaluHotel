@@ -1,4 +1,4 @@
-const { SellerData, User, Buyer, Booking, Bill, Invoice, HotelSettings } = require('../../data');
+const { SellerData, User, Buyer, Booking, Bill, Invoice, CreditNote } = require('../../data');
 const { generateToken, sendDocument } = require('./taxxaUtils');
 const { createInvoiceWithNumber, cancelInvoice } = require('./invoiceNumberController');
 

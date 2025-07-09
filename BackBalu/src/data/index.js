@@ -80,7 +80,7 @@ const {
   RoomCategory,
   LaundryMovement,
   CreditNote,
-  HotelSettings,
+ 
   RoomService, // ⭐ CORREGIDO: RoomService en lugar de RoomServices
   Expense
 } = sequelize.models;
