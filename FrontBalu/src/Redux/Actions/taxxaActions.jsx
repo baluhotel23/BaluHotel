@@ -193,52 +193,66 @@ export const updateSellerData = (sdocno, sellerData) => async (dispatch) => {
 };
 
 // 📧 ENVIAR FACTURA
+// 📧 ENVIAR FACTURA - CORREGIDA
 export const sendInvoice = (invoiceData) => async (dispatch) => {
   dispatch({ type: 'SEND_INVOICE_REQUEST' });
   
   try {
     console.log('📧 [INVOICE] Enviando factura:', JSON.stringify(invoiceData, null, 2));
   
-    const response = await api.post(`/taxxa/sendInvoice`, invoiceData, {
+    // 🔧 USAR EL ENDPOINT CORRECTO PARA FACTURAS DE BILLS
+    const response = await api.post(`/taxxa/invoice`, invoiceData, {
       headers: {
         "Content-Type": "application/json",
       },
     });
   
-    dispatch({ type: 'SEND_INVOICE_SUCCESS', payload: response.data });
-    toast.success('Factura enviada exitosamente');
+    console.log('✅ [INVOICE] Respuesta exitosa:', response.data);
     
-    return response.data;
+    dispatch({ type: 'SEND_INVOICE_SUCCESS', payload: response.data });
+    toast.success('Factura enviada a Taxxa exitosamente');
+    
+    return {
+      success: true,
+      data: response.data,
+      invoice: response.data.data // Invoice creada
+    };
+    
   } catch (error) {
     console.error('❌ [INVOICE] Error al enviar factura:', error);
   
     const errorData = error.response?.data;
     let errorMessage = "Error al enviar la factura";
-    let shouldResend = true;
-  
+    
     if (errorData && errorData.rerror) {
       if (errorData.rerror === 1262 || errorData.rerror === 1236) {
-        shouldResend = false;
-        errorMessage = `Error al enviar la factura: Contingencia activada (rerror: ${errorData.rerror}). No es necesario reenviar la factura.`;
+        errorMessage = `Contingencia activada (rerror: ${errorData.rerror}). Factura procesada pero con advertencia.`;
         toast.warning(errorMessage);
+        
+        // 🔧 CONTINGENCIA NO ES ERROR TOTAL
+        dispatch({ type: 'SEND_INVOICE_SUCCESS', payload: { 
+          ...errorData, 
+          isContingency: true 
+        }});
+        
+        return {
+          success: true,
+          data: errorData,
+          isContingency: true
+        };
       } else if (errorData.smessage?.string) {
         const errorMessages = Object.values(errorData.smessage.string);
         errorMessage = errorMessages.join('\n');
-      } else {
-        errorMessage = JSON.stringify(errorData);
       }
-    } else if (error.message) {
-      errorMessage = error.message;
     }
   
     dispatch({ type: 'SEND_INVOICE_FAILURE', payload: errorMessage });
+    toast.error(errorMessage);
     
-    if (shouldResend) {
-      toast.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-    
-    return { error: true, message: errorMessage, shouldResend };
+    return {
+      success: false,
+      error: errorMessage
+    };
   }
 };
 
@@ -539,3 +553,82 @@ export const clearBuyerErrors = () => ({
 export const clearInvoiceErrors = () => ({
   type: 'CLEAR_INVOICE_ERRORS'
 });
+
+// 📋 OBTENER TODAS LAS FACTURAS FISCALES (INVOICES)
+export const getAllInvoices = (queryParams = {}) => async (dispatch) => {
+  dispatch({ type: 'GET_ALL_INVOICES_REQUEST' });
+  
+  try {
+    const { data } = await api.get('/taxxa/invoices', { params: queryParams });
+    
+    dispatch({ type: 'GET_ALL_INVOICES_SUCCESS', payload: data.data });
+    return data;
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al obtener facturas fiscales';
+    dispatch({ type: 'GET_ALL_INVOICES_FAILURE', payload: errorMessage });
+    toast.error(errorMessage);
+    throw error;
+  }
+};
+
+// 📄 OBTENER INVOICE POR ID
+export const getInvoiceById = (invoiceId) => async (dispatch) => {
+  dispatch({ type: 'GET_INVOICE_BY_ID_REQUEST' });
+  
+  try {
+    const { data } = await api.get(`/taxxa/invoices/${invoiceId}`);
+    
+    dispatch({ type: 'GET_INVOICE_BY_ID_SUCCESS', payload: data.data });
+    return data.data;
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al obtener factura fiscal';
+    dispatch({ type: 'GET_INVOICE_BY_ID_FAILURE', payload: errorMessage });
+    toast.error(errorMessage);
+    throw error;
+  }
+};
+
+// 📝 CREAR NOTA DE CRÉDITO
+export const createCreditNote = (creditNoteData) => async (dispatch) => {
+  dispatch({ type: 'CREATE_CREDIT_NOTE_REQUEST' });
+  
+  try {
+    console.log('📝 [CREDIT-NOTE] Creando nota de crédito:', creditNoteData);
+    
+    const { data } = await api.post('/taxxa/credit-note', creditNoteData);
+    
+    dispatch({ type: 'CREATE_CREDIT_NOTE_SUCCESS', payload: data.data });
+    toast.success('Nota de crédito enviada a Taxxa exitosamente');
+    
+    return {
+      success: true,
+      data: data.data
+    };
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al crear nota de crédito';
+    dispatch({ type: 'CREATE_CREDIT_NOTE_FAILURE', payload: errorMessage });
+    toast.error(errorMessage);
+    
+    return {
+      success: false,
+      error: errorMessage
+    };
+  }
+};
+
+// 📊 OBTENER ESTADÍSTICAS DE NUMERACIÓN
+export const getNumberingStats = () => async (dispatch) => {
+  dispatch({ type: 'GET_NUMBERING_STATS_REQUEST' });
+  
+  try {
+    const { data } = await api.get('/taxxa/numbering-stats');
+    
+    dispatch({ type: 'GET_NUMBERING_STATS_SUCCESS', payload: data.data });
+    return data.data;
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 'Error al obtener estadísticas';
+    dispatch({ type: 'GET_NUMBERING_STATS_FAILURE', payload: errorMessage });
+    toast.error(errorMessage);
+    throw error;
+  }
+};

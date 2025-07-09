@@ -30,6 +30,28 @@ const initialState = {
   municipalitiesError: null,
   validationError: null,
   searchError: null,
+
+  // 🆕 NUEVOS ESTADOS PARA FACTURAS EMITIDAS Y NOTAS DE CRÉDITO
+  invoices: [],
+  loadingInvoices: false,
+  invoicesError: null,
+  selectedInvoice: null,
+  
+  creditNotes: [],
+  loadingCreditNotes: false,
+  creditNotesError: null,
+  
+  numberingStats: null,
+  loadingStats: false,
+  statsError: null,
+  
+  // 🔧 Estado para modal de nota de crédito
+  showCreditNoteModal: false,
+  creditNoteFormData: {
+    creditReason: '1',
+    amount: '',
+    description: ''
+  }
 };
 
 const taxxaReducer = (state = initialState, action) => {
@@ -53,12 +75,21 @@ const taxxaReducer = (state = initialState, action) => {
     case 'FETCH_SELLER_REQUEST':
     case 'CREATE_SELLER_REQUEST':
     case 'UPDATE_SELLER_REQUEST':
+      return {
+        ...state,
+        loading: true,
+        error: null,
+        message: null,
+      };
+
+    // 🔧 SEND_INVOICE_REQUEST - CORREGIDO
     case 'SEND_INVOICE_REQUEST':
       return {
         ...state,
         loading: true,
         error: null,
         message: null,
+        invoice: null // Reset previous invoice
       };
 
     // Success States - Existentes
@@ -100,13 +131,21 @@ const taxxaReducer = (state = initialState, action) => {
         error: null,
         message: 'Datos del comercio actualizados correctamente.',
       };
+    
+    // 🔧 SEND_INVOICE_SUCCESS - CORREGIDO
     case 'SEND_INVOICE_SUCCESS':
       return {
         ...state,
         loading: false,
         invoice: action.payload,
         error: null,
-        message: 'Factura enviada exitosamente.',
+        message: action.payload.isContingency 
+          ? 'Factura enviada con contingencia activada'
+          : 'Factura enviada exitosamente a Taxxa',
+        // 🆕 AGREGAR A LA LISTA DE FACTURAS SI VIENE CON DATOS
+        invoices: action.payload.data?.invoice 
+          ? [action.payload.data.invoice, ...state.invoices]
+          : state.invoices
       };
 
     // Failure States - Existentes
@@ -132,9 +171,10 @@ const taxxaReducer = (state = initialState, action) => {
         ...state,
         loading: false,
         error: action.payload,
+        message: null,
       };
 
-    // 🆕 NUEVOS CASOS PARA CATÁLOGOS DIAN
+    // 🆕 NUEVOS CASOS PARA CATÁLOGOS DIAN (sin cambios - están bien)
 
     // 🌍 PAÍSES
     case 'FETCH_COUNTRIES_REQUEST':
@@ -187,13 +227,13 @@ const taxxaReducer = (state = initialState, action) => {
       return {
         ...state,
         loadingMunicipalities: true,
-        error: null
+        municipalitiesError: null // 🔧 CORREGIDO: usar municipalitiesError
       };
       
     case 'FETCH_MUNICIPALITIES_SUCCESS': {
       console.log('📮 [REDUCER] FETCH_MUNICIPALITIES_SUCCESS payload:', action.payload);
       
-      const { municipalities, cacheKey, search, limit } = action.payload;
+      const { municipalities, cacheKey } = action.payload;
       
       // 🔧 VERIFICAR QUE MUNICIPALITIES SEA UN ARRAY
       if (!Array.isArray(municipalities)) {
@@ -201,14 +241,14 @@ const taxxaReducer = (state = initialState, action) => {
         return {
           ...state,
           loadingMunicipalities: false,
-          error: 'Formato de datos inválido'
+          municipalitiesError: 'Formato de datos inválido'
         };
       }
       
       return {
         ...state,
         loadingMunicipalities: false,
-        error: null,
+        municipalitiesError: null,
         municipalitiesCache: {
           ...state.municipalitiesCache,
           [cacheKey]: municipalities  // 🎯 GUARDAR EL ARRAY DE MUNICIPIOS
@@ -220,7 +260,7 @@ const taxxaReducer = (state = initialState, action) => {
       return {
         ...state,
         loadingMunicipalities: false,
-        error: action.payload
+        municipalitiesError: action.payload
       };
 
     // ✅ VALIDACIÓN DE UBICACIÓN
@@ -245,6 +285,130 @@ const taxxaReducer = (state = initialState, action) => {
         locationValidation: null // Reset validación en error
       };
 
+    // 🆕 CASOS PARA FACTURAS EMITIDAS
+
+    // 📋 OBTENER TODAS LAS FACTURAS
+    case 'GET_ALL_INVOICES_REQUEST':
+      return {
+        ...state,
+        loadingInvoices: true,
+        invoicesError: null
+      };
+    case 'GET_ALL_INVOICES_SUCCESS':
+      return {
+        ...state,
+        loadingInvoices: false,
+        invoices: action.payload,
+        invoicesError: null
+      };
+    case 'GET_ALL_INVOICES_FAILURE':
+      return {
+        ...state,
+        loadingInvoices: false,
+        invoicesError: action.payload,
+        invoices: []
+      };
+
+    // 📄 OBTENER FACTURA POR ID
+    case 'GET_INVOICE_BY_ID_REQUEST':
+      return {
+        ...state,
+        loading: true,
+        error: null
+      };
+    case 'GET_INVOICE_BY_ID_SUCCESS':
+      return {
+        ...state,
+        loading: false,
+        selectedInvoice: action.payload,
+        error: null
+      };
+    case 'GET_INVOICE_BY_ID_FAILURE':
+      return {
+        ...state,
+        loading: false,
+        error: action.payload,
+        selectedInvoice: null
+      };
+
+    // 📝 CREAR NOTA DE CRÉDITO
+    case 'CREATE_CREDIT_NOTE_REQUEST':
+      return {
+        ...state,
+        loadingCreditNotes: true,
+        creditNotesError: null
+      };
+    case 'CREATE_CREDIT_NOTE_SUCCESS':
+      return {
+        ...state,
+        loadingCreditNotes: false,
+        creditNotes: [...state.creditNotes, action.payload],
+        creditNotesError: null,
+        showCreditNoteModal: false, // Cerrar modal al éxito
+        creditNoteFormData: { // Reset form
+          creditReason: '1',
+          amount: '',
+          description: ''
+        }
+      };
+    case 'CREATE_CREDIT_NOTE_FAILURE':
+      return {
+        ...state,
+        loadingCreditNotes: false,
+        creditNotesError: action.payload
+      };
+
+    // 📊 OBTENER ESTADÍSTICAS DE NUMERACIÓN
+    case 'GET_NUMBERING_STATS_REQUEST':
+      return {
+        ...state,
+        loadingStats: true,
+        statsError: null
+      };
+    case 'GET_NUMBERING_STATS_SUCCESS':
+      return {
+        ...state,
+        loadingStats: false,
+        numberingStats: action.payload,
+        statsError: null
+      };
+    case 'GET_NUMBERING_STATS_FAILURE':
+      return {
+        ...state,
+        loadingStats: false,
+        statsError: action.payload,
+        numberingStats: null
+      };
+
+    // 🔧 CASOS PARA MANEJO DEL MODAL DE NOTA DE CRÉDITO
+    case 'SET_SELECTED_INVOICE':
+      return {
+        ...state,
+        selectedInvoice: action.payload
+      };
+    case 'TOGGLE_CREDIT_NOTE_MODAL':
+      return {
+        ...state,
+        showCreditNoteModal: action.payload
+      };
+    case 'UPDATE_CREDIT_NOTE_FORM':
+      return {
+        ...state,
+        creditNoteFormData: {
+          ...state.creditNoteFormData,
+          ...action.payload
+        }
+      };
+    case 'RESET_CREDIT_NOTE_FORM':
+      return {
+        ...state,
+        creditNoteFormData: {
+          creditReason: '1',
+          amount: '',
+          description: ''
+        }
+      };
+
     // 🗑️ LIMPIAR CACHE
     case 'CLEAR_DIAN_CACHE':
       return {
@@ -261,6 +425,22 @@ const taxxaReducer = (state = initialState, action) => {
         municipalitiesError: null,
         validationError: null,
         searchError: null
+      };
+
+    // 🧹 LIMPIAR FACTURAS Y NOTAS DE CRÉDITO
+    case 'CLEAR_INVOICES_CACHE':
+      return {
+        ...state,
+        invoices: [],
+        creditNotes: [],
+        selectedInvoice: null,
+        numberingStats: null,
+        showCreditNoteModal: false,
+        creditNoteFormData: {
+          creditReason: '1',
+          amount: '',
+          description: ''
+        }
       };
 
     // 🧹 RESET GENERAL (opcional - para limpiar todo el estado TAXXA)
