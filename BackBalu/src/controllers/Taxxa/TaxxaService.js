@@ -499,15 +499,7 @@ const createCreditNote = async (req, res) => {
     }
 
     // 🔧 VERIFICAR SI YA EXISTE UNA NOTA DE CRÉDITO PARA ESTA FACTURA
-    const existingCreditNote = await Invoice.findOne({
-      where: { 
-        billId: bill.idBill,
-        documentType: 'CreditNote',
-        status: 'sent'
-      }
-    });
-
-    if (existingCreditNote) {
+       if (existingCreditNote) {
       console.log('⚠️ Ya existe una nota de crédito para esta factura');
       return res.status(400).json({
         message: 'Ya existe una nota de crédito enviada para esta factura',
