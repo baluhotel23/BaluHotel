@@ -56,6 +56,6 @@ router.post('/invoices/:invoiceId/resend', allowRoles(["owner", "admin"]), resen
 router.post('/invoice', allowRoles(["owner", "admin"]), createInvoice);
 
 // 🆕 RUTA ALTERNATIVA PARA CREAR NOTAS DE CRÉDITO (manteniendo compatibilidad)
-router.post('/credit-note', authMiddleware, createCreditNote); 
+router.post('/credit-note', allowRoles(["owner", "admin"]), createCreditNote); 
 
 module.exports = router;
