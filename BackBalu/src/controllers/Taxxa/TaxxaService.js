@@ -358,24 +358,30 @@ const createInvoice = async (req, res) => {
       await bill.update({
         taxxaStatus: 'sent',
         taxInvoiceId: createdInvoice.getFullInvoiceNumber(),
-        cufe: taxxaResponse.jApiResponse?.cufe || taxxaResponse.scufe || taxxaResponse.cufe,
-        taxxaResponse: taxxaResponse,
-        sentToTaxxaAt: new Date()
-      });
+        cufe: taxxaResponse.jApiResponse?.cufe 
+    || taxxaResponse.scufe 
+    || taxxaResponse.cufe 
+    || taxxaResponse.jret?.scufe, // <--- AGREGADO
+  taxxaResponse: taxxaResponse,
+  sentToTaxxaAt: new Date()
+});
 
       return res.status(200).json({
-        message: 'Factura fiscal enviada a Taxxa con éxito',
-        success: true,
-        data: {
-          invoiceId: createdInvoice.id,
-          invoiceNumber: createdInvoice.getFullInvoiceNumber(),
-          billId: bill.idBill,
-          cufe: taxxaResponse.jApiResponse?.cufe || taxxaResponse.scufe,
-          totalAmount: createdInvoice.totalAmount,
-          sentAt: createdInvoice.sentToTaxxaAt,
-          taxxaResponse: taxxaResponse
-        }
-      });
+  message: 'Factura fiscal enviada a Taxxa con éxito',
+  success: true,
+  data: {
+    invoiceId: createdInvoice.id,
+    invoiceNumber: createdInvoice.getFullInvoiceNumber(),
+    billId: bill.idBill,
+    // 🔧 Aquí también
+    cufe: taxxaResponse.jApiResponse?.cufe 
+      || taxxaResponse.scufe 
+      || taxxaResponse.jret?.scufe,
+    totalAmount: createdInvoice.totalAmount,
+    sentAt: createdInvoice.sentToTaxxaAt,
+    taxxaResponse: taxxaResponse
+  }
+});
       
     } else {
       console.error('Error en respuesta de Taxxa:', taxxaResponse);
