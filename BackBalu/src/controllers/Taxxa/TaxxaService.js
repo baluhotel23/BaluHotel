@@ -344,44 +344,53 @@ const createInvoice = async (req, res) => {
     console.log('Payload a enviar:', JSON.stringify(taxxaPayload, null, 2));
 
     // 🔧 ENVIAR DOCUMENTO
-    const taxxaResponse = await sendDocument(taxxaPayload);
-    console.log('Respuesta de Taxxa:', JSON.stringify(taxxaResponse, null, 2));
+const taxxaResponse = await sendDocument(taxxaPayload);
+console.log('Respuesta de Taxxa:', JSON.stringify(taxxaResponse, null, 2));
 
-    // 🔧 PROCESAR RESPUESTA - IGUAL QUE TU PROYECTO QUE FUNCIONA
-    if (taxxaResponse && taxxaResponse.rerror === 0) {
-      console.log('=== Factura fiscal enviada exitosamente ===');
-      
-      // 🔧 MARCAR FACTURA FISCAL COMO ENVIADA
-      await createdInvoice.markAsSent(taxxaResponse);
-      
-      // 🔧 ACTUALIZAR FACTURA INTERNA CON REFERENCIA
-      await bill.update({
-        taxxaStatus: 'sent',
-        taxInvoiceId: createdInvoice.getFullInvoiceNumber(),
-        cufe: taxxaResponse.jApiResponse?.cufe 
-    || taxxaResponse.scufe 
-    || taxxaResponse.cufe 
-    || taxxaResponse.jret?.scufe, // <--- AGREGADO
-  taxxaResponse: taxxaResponse,
-  sentToTaxxaAt: new Date()
-});
+if (taxxaResponse && taxxaResponse.rerror === 0) {
+  console.log('=== Factura fiscal enviada exitosamente ===');
 
-      return res.status(200).json({
-  message: 'Factura fiscal enviada a Taxxa con éxito',
-  success: true,
-  data: {
-    invoiceId: createdInvoice.id,
-    invoiceNumber: createdInvoice.getFullInvoiceNumber(),
-    billId: bill.idBill,
-    // 🔧 Aquí también
+  // 🔧 EXTRAER QR CODE DE LA RESPUESTA
+  let qrCode = null;
+  if (taxxaResponse?.jret?.sqr) {
+    const match = taxxaResponse.jret.sqr.match(/https?:\/\/[^\s]+/);
+    if (match) {
+      qrCode = match[0];
+    }
+  }
+
+  // 🔧 MARCAR FACTURA FISCAL COMO ENVIADA
+  await createdInvoice.markAsSent(taxxaResponse);
+
+  // 🔧 ACTUALIZAR FACTURA INTERNA CON REFERENCIA Y QR
+  await bill.update({
+    taxxaStatus: 'sent',
+    taxInvoiceId: createdInvoice.getFullInvoiceNumber(),
     cufe: taxxaResponse.jApiResponse?.cufe 
       || taxxaResponse.scufe 
+      || taxxaResponse.cufe 
       || taxxaResponse.jret?.scufe,
-    totalAmount: createdInvoice.totalAmount,
-    sentAt: createdInvoice.sentToTaxxaAt,
-    taxxaResponse: taxxaResponse
-  }
-});
+    taxxaResponse: taxxaResponse,
+    sentToTaxxaAt: new Date(),
+    qrCode // <--- Guarda el QR aquí
+  });
+
+  return res.status(200).json({
+    message: 'Factura fiscal enviada a Taxxa con éxito',
+    success: true,
+    data: {
+      invoiceId: createdInvoice.id,
+      invoiceNumber: createdInvoice.getFullInvoiceNumber(),
+      billId: bill.idBill,
+      cufe: taxxaResponse.jApiResponse?.cufe 
+        || taxxaResponse.scufe 
+        || taxxaResponse.jret?.scufe,
+      qrCode, // <--- Devuelve el QR también
+      totalAmount: createdInvoice.totalAmount,
+      sentAt: createdInvoice.sentToTaxxaAt,
+      taxxaResponse: taxxaResponse
+    }
+  });
       
     } else {
       console.error('Error en respuesta de Taxxa:', taxxaResponse);
