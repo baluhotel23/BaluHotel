@@ -7,8 +7,8 @@ import {
   getAllBookings,
   updateBookingStatus,
   generateBill,
-   checkIn,        // ⭐ AGREGAR
-  checkOut,       // ⭐ AGREGAR
+  checkIn, // ⭐ AGREGAR
+  checkOut, // ⭐ AGREGAR
 } from "../../Redux/Actions/bookingActions";
 
 const getRealPaymentSummary = (booking) => {
@@ -69,6 +69,9 @@ const CheckOut = () => {
   const [showExtraCharges, setShowExtraCharges] = useState(false);
   const [selectedBookingForExtras, setSelectedBookingForExtras] =
     useState(null);
+  const [showEarlyCheckOutModal, setShowEarlyCheckOutModal] = useState(false);
+  const [earlyCheckOutDate, setEarlyCheckOutDate] = useState("");
+  const [bookingForEarlyCheckOut, setBookingForEarlyCheckOut] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showBillModal, setShowBillModal] = useState(false);
   const [generatedBill, setGeneratedBill] = useState(null);
@@ -236,95 +239,119 @@ const CheckOut = () => {
     }
   };
 
- // ⭐ CORRECCIÓN COMPLETA DE LA FUNCIÓN handleCheckOut
-// ⭐ FUNCIÓN handleCheckOut COMPLETAMENTE CORREGIDA
-const handleCheckOut = async (bookingId) => {
-  if (!bookingId) {
-    toast.error("ID de reserva no válido");
-    return;
-  }
-  
-  setIsLoading(true);
-  
-  try {
-    const booking = bookings.find((b) => b.bookingId === bookingId);
-    const financials = getRealPaymentSummary(booking);
-    
-    if (!booking) {
-      throw new Error("Reserva no encontrada");
-    }
-    
-    if (!financials.isFullyPaid) {
-      toast.error("❌ No se puede completar el check-out. Quedan pagos pendientes.");
+  // ⭐ CORRECCIÓN COMPLETA DE LA FUNCIÓN handleCheckOut
+  // ⭐ FUNCIÓN handleCheckOut COMPLETAMENTE CORREGIDA
+  const handleCheckOut = async (bookingId, customCheckOutDate = null) => {
+    if (!bookingId) {
+      toast.error("ID de reserva no válido");
       return;
     }
-    
-    console.log(`🏁 [CHECKOUT] Iniciando check-out para reserva: ${bookingId}`, {
-      currentStatus: booking.status,
-      isFullyPaid: financials.isFullyPaid
-    });
-    
-    // ⭐ OPCIÓN 1: Si está en 'paid', hacer check-in primero
-    if (booking.status === 'paid') {
-      console.log('🔄 [CHECKOUT] Reserva en estado "paid", realizando check-in primero...');
-      
-      try {
-        const checkInResult = await dispatch(checkIn(bookingId, {
-          actualCheckIn: new Date().toISOString(),
-          notes: "Check-in automático para proceder con check-out"
-        }));
-        
-        console.log('📋 [CHECKOUT] Resultado del check-in:', checkInResult);
-        
-        // ⭐ VERIFICAR SI EL RESULTADO TIENE LA ESTRUCTURA CORRECTA
-        if (!checkInResult || checkInResult.success !== true) {
-          throw new Error(`Error en check-in automático: ${checkInResult?.error || 'Respuesta inválida'}`);
-        }
-        
-        console.log('✅ [CHECKOUT] Check-in automático completado');
-        
-        // ⭐ PEQUEÑA PAUSA PARA ASEGURAR QUE EL ESTADO SE ACTUALICE
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-      } catch (checkInError) {
-        console.error('❌ [CHECKOUT] Error en check-in automático:', checkInError);
-        throw new Error(`Error en check-in automático: ${checkInError.message}`);
-      }
-    }
-    
-    // ⭐ AHORA REALIZAR EL CHECK-OUT
-    console.log('🏁 [CHECKOUT] Procediendo con check-out...');
-    
-    try {
-      const checkOutResult = await dispatch(checkOut(bookingId, {
-        actualCheckOut: new Date().toISOString(),
-        notes: "Check-out completado desde panel administrativo",
-        completedBy: "admin"
-      }));
-      
-      console.log('📋 [CHECKOUT] Resultado del check-out:', checkOutResult);
-      
-      // ⭐ VERIFICAR SI EL RESULTADO TIENE LA ESTRUCTURA CORRECTA
-      if (!checkOutResult || checkOutResult.success !== true) {
-        throw new Error(`Error en check-out: ${checkOutResult?.error || 'Respuesta inválida'}`);
-      }
-      
-      toast.success("🎉 Check-out completado exitosamente");
-      await loadBookings(); // Recargar la lista
-      
-    } catch (checkOutError) {
-      console.error('❌ [CHECKOUT] Error en check-out:', checkOutError);
-      throw new Error(`Error en check-out: ${checkOutError.message}`);
-    }
-    
-  } catch (error) {
-    console.error('❌ [CHECKOUT] Error general:', error);
-    toast.error(`❌ Error al completar check-out: ${error.message}`);
-  } finally {
-    setIsLoading(false);
-  }
-};
 
+    setIsLoading(true);
+
+    try {
+      const booking = bookings.find((b) => b.bookingId === bookingId);
+      const financials = getRealPaymentSummary(booking);
+
+      if (!booking) {
+        throw new Error("Reserva no encontrada");
+      }
+
+      if (!financials.isFullyPaid) {
+        toast.error(
+          "❌ No se puede completar el check-out. Quedan pagos pendientes."
+        );
+        return;
+      }
+
+      console.log(
+        `🏁 [CHECKOUT] Iniciando check-out para reserva: ${bookingId}`,
+        {
+          currentStatus: booking.status,
+          isFullyPaid: financials.isFullyPaid,
+        }
+      );
+
+      // Si está en 'paid', hacer check-in primero
+      if (booking.status === "paid") {
+        console.log(
+          '🔄 [CHECKOUT] Reserva en estado "paid", realizando check-in primero...'
+        );
+
+        try {
+          const checkInResult = await dispatch(
+            checkIn(bookingId, {
+              actualCheckIn: new Date().toISOString(),
+              notes: "Check-in automático para proceder con check-out",
+            })
+          );
+
+          console.log("📋 [CHECKOUT] Resultado del check-in:", checkInResult);
+
+          if (!checkInResult || checkInResult.success !== true) {
+            throw new Error(
+              `Error en check-in automático: ${
+                checkInResult?.error || "Respuesta inválida"
+              }`
+            );
+          }
+
+          console.log("✅ [CHECKOUT] Check-in automático completado");
+
+          // Pausa para asegurar que el estado se actualice
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } catch (checkInError) {
+          console.error(
+            "❌ [CHECKOUT] Error en check-in automático:",
+            checkInError
+          );
+          throw new Error(
+            `Error en check-in automático: ${checkInError.message}`
+          );
+        }
+      }
+
+      // Ahora realizar el check-out (usa la fecha personalizada si existe)
+      console.log("🏁 [CHECKOUT] Procediendo con check-out...");
+
+      const checkOutPayload = {
+        actualCheckOut: customCheckOutDate
+          ? new Date(customCheckOutDate).toISOString()
+          : new Date().toISOString(),
+        notes: customCheckOutDate
+          ? "Check-out anticipado solicitado desde panel"
+          : "Check-out completado desde panel administrativo",
+        completedBy: "admin",
+      };
+
+      try {
+        const checkOutResult = await dispatch(
+          checkOut(bookingId, checkOutPayload)
+        );
+
+        console.log("📋 [CHECKOUT] Resultado del check-out:", checkOutResult);
+
+        if (!checkOutResult || checkOutResult.success !== true) {
+          throw new Error(
+            `Error en check-out: ${
+              checkOutResult?.error || "Respuesta inválida"
+            }`
+          );
+        }
+
+        toast.success("🎉 Check-out completado exitosamente");
+        await loadBookings();
+      } catch (checkOutError) {
+        console.error("❌ [CHECKOUT] Error en check-out:", checkOutError);
+        throw new Error(`Error en check-out: ${checkOutError.message}`);
+      }
+    } catch (error) {
+      console.error("❌ [CHECKOUT] Error general:", error);
+      toast.error(`❌ Error al completar check-out: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleOpenExtraCharges = (booking) => {
     setSelectedBookingForExtras(booking);
@@ -995,46 +1022,71 @@ const handleCheckOut = async (bookingId) => {
                         )}
 
                       {/* 🏁 BOTÓN DE CHECK-OUT CORREGIDO */}
-                    <button
-  className={`flex-1 px-4 py-2 rounded-lg text-white transition-colors flex items-center justify-center gap-2 ${
-    // ⭐ CORRECCIÓN: Agregar 'paid' a los estados válidos
-    !financials.isFullyPaid ||
-    !["checked-in", "paid"].includes(booking.status)
-      ? "bg-gray-400 cursor-not-allowed"
-      : daysUntilCheckOut <= 0
-      ? "bg-red-600 hover:bg-red-700 animate-pulse"
-      : daysUntilCheckOut <= 1
-      ? "bg-orange-600 hover:bg-orange-700"
-      : "bg-green-600 hover:bg-green-700"
-  }`}
-  onClick={() => {
-    // ⭐ CORRECCIÓN: Asegurar que se pase solo el bookingId
-    if (financials.isFullyPaid && ["checked-in", "paid"].includes(booking.status)) {
-      handleCheckOut(booking.bookingId);
-    }
-  }}
-  disabled={
-    !financials.isFullyPaid ||
-    !["checked-in", "paid"].includes(booking.status) ||
-    isLoading ||
-    loading.bills
-  }
->
-  <span>
-    {!financials.isFullyPaid
-      ? "⏳"
-      : daysUntilCheckOut <= 0
-      ? "🚨"
-      : "🏁"}
-  </span>
-  {!financials.isFullyPaid
-    ? "Pago Requerido"
-    : daysUntilCheckOut <= 0
-    ? "CHECK-OUT URGENTE"
-    : daysUntilCheckOut <= 1
-    ? "Finalizar Mañana"
-    : "Finalizar Check-Out"}
-</button>
+                      <button
+                        className={`flex-1 px-4 py-2 rounded-lg text-white transition-colors flex items-center justify-center gap-2 ${
+                          !financials.isFullyPaid ||
+                          !["checked-in", "paid"].includes(booking.status)
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : daysUntilCheckOut <= 0
+                            ? "bg-red-600 hover:bg-red-700 animate-pulse"
+                            : daysUntilCheckOut <= 1
+                            ? "bg-orange-600 hover:bg-orange-700"
+                            : "bg-green-600 hover:bg-green-700"
+                        }`}
+                        onClick={() => {
+                          if (
+                            financials.isFullyPaid &&
+                            ["checked-in", "paid"].includes(booking.status)
+                          ) {
+                            handleCheckOut(booking.bookingId);
+                          }
+                        }}
+                        disabled={
+                          !financials.isFullyPaid ||
+                          !(
+                            ["checked-in", "paid"].includes(booking.status) ||
+                            booking.bookingStatus?.isOverdue
+                          ) ||
+                          isLoading ||
+                          loading.bills
+                        }
+                      >
+                        <span>
+                          {!financials.isFullyPaid
+                            ? "⏳"
+                            : daysUntilCheckOut <= 0
+                            ? "🚨"
+                            : "🏁"}
+                        </span>
+                        {!financials.isFullyPaid
+                          ? "Pago Requerido"
+                          : daysUntilCheckOut <= 0
+                          ? "CHECK-OUT URGENTE"
+                          : daysUntilCheckOut <= 1
+                          ? "Finalizar Mañana"
+                          : "Finalizar Check-Out"}
+                      </button>
+
+                      {/* ⏩ BOTÓN DE RETIRO ANTICIPADO */}
+                      <button
+                        className="flex-1 px-4 py-2 rounded-lg text-blue-700 border border-blue-700 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                        onClick={() => {
+                          setBookingForEarlyCheckOut(booking);
+                          setEarlyCheckOutDate(
+                            new Date().toISOString().slice(0, 16)
+                          );
+                          setShowEarlyCheckOutModal(true);
+                        }}
+                        disabled={
+                          !financials.isFullyPaid ||
+                          !["checked-in", "paid"].includes(booking.status) ||
+                          isLoading ||
+                          loading.bills
+                        }
+                      >
+                        <span>⏩</span>
+                        Retiro anticipado
+                      </button>
                     </div>
 
                     {/* 📊 ESTADO DE LA RESERVA CORREGIDO */}
@@ -1177,6 +1229,54 @@ const handleCheckOut = async (bookingId) => {
                   Cerrar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showEarlyCheckOutModal && bookingForEarlyCheckOut && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-bold mb-2 text-blue-700">
+              Retiro anticipado
+            </h3>
+            <p className="mb-4 text-gray-700">
+              Selecciona la nueva fecha y hora de salida para la reserva #
+              {bookingForEarlyCheckOut.bookingId}
+            </p>
+            <input
+              type="datetime-local"
+              className="w-full border px-3 py-2 rounded mb-4"
+              value={earlyCheckOutDate}
+              onChange={(e) => setEarlyCheckOutDate(e.target.value)}
+              max={bookingForEarlyCheckOut.checkOut?.slice(0, 16)}
+            />
+            <div className="flex gap-2">
+              <button
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={async () => {
+                  setIsLoading(true);
+                  try {
+                    // Modifica handleCheckOut para aceptar la fecha personalizada
+                    await handleCheckOut(
+                      bookingForEarlyCheckOut.bookingId,
+                      earlyCheckOutDate
+                    );
+                    setShowEarlyCheckOutModal(false);
+                    setBookingForEarlyCheckOut(null);
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                disabled={!earlyCheckOutDate || isLoading}
+              >
+                Confirmar retiro anticipado
+              </button>
+              <button
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                onClick={() => setShowEarlyCheckOutModal(false)}
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>

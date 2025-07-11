@@ -257,27 +257,27 @@ export const checkIn = (bookingId, checkInData) => async (dispatch) => {
 
 // ⭐ CORREGIR LA RUTA DE CHECK-OUT TAMBIÉN
 export const checkOut = (bookingId, checkOutData) => async (dispatch) => {
-  dispatch({ type: 'CHECKOUT_REQUEST' });
+  dispatch({ type: 'CHECKOUT_BOOKING_REQUEST' });
   try {
     console.log(`🏁 [CHECKOUT] Iniciando check-out para reserva: ${bookingId}`, checkOutData);
-    
+
     if (!bookingId) {
       throw new Error('bookingId es requerido');
     }
-    
+
     const validBookingId = parseInt(bookingId) || bookingId;
-    
-    // ⭐ CORREGIR LA RUTA: usar 'check-out' con guión
+
+    // Usa la ruta correcta y pasa actualCheckOut si aplica
     const { data } = await api.put(`/bookings/${validBookingId}/check-out`, checkOutData);
-    
-    dispatch({ type: 'CHECKOUT_SUCCESS', payload: data.data });
+
+    dispatch({ type: 'CHECKOUT_BOOKING_SUCCESS', payload: data.data });
     console.log('✅ [CHECKOUT] Check-out exitoso:', data.data);
-    
+
     return { success: true, data: data.data };
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al realizar check-out';
     console.error('❌ [CHECKOUT] Error:', errorMessage);
-    dispatch({ type: 'CHECKOUT_FAILURE', payload: errorMessage });
+    dispatch({ type: 'CHECKOUT_BOOKING_FAILURE', payload: errorMessage });
     return { success: false, error: errorMessage };
   }
 };
@@ -923,9 +923,9 @@ export const checkAllCheckInRequirements = (bookingId, bookingData = null) => as
     
     // ⭐ ORDENAR PASOS PENDIENTES POR PRIORIDAD
     const orderedPendingSteps = Object.entries(requirements)
-      .filter(([key, req]) => !req.status)
+      .filter(([, req]) => !req.status)
       .sort(([, a], [, b]) => a.priority - b.priority)
-      .map(([key, req]) => req.name);
+      .map(([, req]) => req.name);
     
     // ⭐ DETERMINAR SI TODOS LOS REQUISITOS ESTÁN COMPLETOS
     const allRequirementsMet = pendingSteps.length === 0;

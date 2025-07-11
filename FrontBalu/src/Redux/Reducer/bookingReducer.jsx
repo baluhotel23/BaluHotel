@@ -365,32 +365,32 @@ const bookingReducer = (state = initialState, action) => {
 
     // ⭐ CHECK-OUT TRADICIONAL - OPTIMIZADO
     case "CHECKOUT_BOOKING_REQUEST":
-      return { 
-        ...state, 
-        loading: { ...state.loading, checkOut: true }, 
-        errors: { ...state.errors, checkOut: null },
-        checkInOut: { ...state.checkInOut, currentOperation: 'check-out' }
-      };
-    case "CHECKOUT_BOOKING_SUCCESS":
-      return {
-        ...state,
-        loading: { ...state.loading, checkOut: false },
-        bookingDetails: action.payload,
-        bill: action.payload.bill,
-        checkInOut: { 
-          ...state.checkInOut, 
-          currentOperation: null,
-          inventoryReturned: action.payload.inventoryProcessed || []
-        },
-        success: { message: 'Check-out realizado exitosamente', type: 'check-out' }
-      };
-    case "CHECKOUT_BOOKING_FAILURE":
-      return { 
-        ...state, 
-        loading: { ...state.loading, checkOut: false }, 
-        errors: { ...state.errors, checkOut: action.payload },
-        checkInOut: { ...state.checkInOut, currentOperation: null }
-      };
+  return { 
+    ...state, 
+    loading: { ...state.loading, checkOut: true }, 
+    errors: { ...state.errors, checkOut: null },
+    checkInOut: { ...state.checkInOut, currentOperation: 'check-out' }
+  };
+case "CHECKOUT_BOOKING_SUCCESS":
+  return {
+    ...state,
+    loading: { ...state.loading, checkOut: false },
+    bookingDetails: action.payload.booking || action.payload, // Soporta ambos formatos
+    bill: action.payload.bill || null,
+    checkInOut: { 
+      ...state.checkInOut, 
+      currentOperation: null,
+      inventoryReturned: action.payload.inventoryProcessed || []
+    },
+    success: { message: 'Check-out realizado exitosamente', type: 'check-out' }
+  };
+case "CHECKOUT_BOOKING_FAILURE":
+  return { 
+    ...state, 
+    loading: { ...state.loading, checkOut: false }, 
+    errors: { ...state.errors, checkOut: action.payload },
+    checkInOut: { ...state.checkInOut, currentOperation: null }
+  };
 
     // ⭐ CHECK-OUT CON INVENTARIO - NUEVO
     case "CHECKOUT_BOOKING_WITH_INVENTORY_REQUEST":
