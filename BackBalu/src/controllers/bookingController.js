@@ -4355,13 +4355,18 @@ const checkOut = async (req, res, next) => {
       });
     }
 
-    if (booking.status !== "checked-in") {
-      return res.status(400).json({
-        error: true,
-        message: `Solo se puede hacer check-out de reservas con check-in activo. Estado actual: ${booking.status}`,
-        timestamp: formatForLogs(getColombiaTime()),
-      });
-    }
+   if (!["checked-in", "paid", "confirmed"].includes(booking.status)) {
+  return res.status(400).json({
+    error: true,
+    message: `Solo se puede hacer check-out de reservas activas. Estado actual: ${booking.status}`,
+    timestamp: formatForLogs(getColombiaTime()),
+  });
+}
+
+// Si está paid o confirmed, hacer check-in automático antes de continuar
+if (["paid", "confirmed"].includes(booking.status)) {
+  await booking.update({ status: "checked-in" });
+}
 
     // FECHAS Y CÁLCULO DE NOCHES REALES
     const now = getColombiaTime();

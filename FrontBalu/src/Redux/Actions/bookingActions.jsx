@@ -257,6 +257,7 @@ export const checkIn = (bookingId, checkInData) => async (dispatch) => {
 
 // ⭐ CORREGIR LA RUTA DE CHECK-OUT TAMBIÉN
 export const checkOut = (bookingId, checkOutData) => async (dispatch) => {
+  
   dispatch({ type: 'CHECKOUT_BOOKING_REQUEST' });
   try {
     console.log(`🏁 [CHECKOUT] Iniciando check-out para reserva: ${bookingId}`, checkOutData);
