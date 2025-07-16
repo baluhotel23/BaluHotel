@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import PaymentAndReceipt from "../Booking/PaymentAndReceipt";
 import ExtraCharges from "./ExtraCharge";
+import { calculateRoomCharge } from "../../utils/calculateRoomCharge";
 import {
   getAllBookings,
   updateBookingStatus,
@@ -241,13 +242,12 @@ const CheckOut = () => {
 
   // ⭐ CORRECCIÓN COMPLETA DE LA FUNCIÓN handleCheckOut
   // ⭐ FUNCIÓN handleCheckOut COMPLETAMENTE CORREGIDA
-  const handleCheckOut = async (bookingId, customCheckOutDate = null) => {
-
-    console.log("Handler handleCheckOut llamado", bookingId, customCheckOutDate);
-    if (!bookingId) {
-      toast.error("ID de reserva no válido");
-      return;
-    }
+const handleCheckOut = async (bookingId, customCheckOutDate = null) => {
+  console.log("Handler handleCheckOut llamado", bookingId, customCheckOutDate);
+  if (!bookingId) {
+    toast.error("ID de reserva no válido");
+    return;
+  }
 
   setIsLoading(true);
 
@@ -264,6 +264,29 @@ const CheckOut = () => {
         "❌ No se puede completar el check-out. Quedan pagos pendientes."
       );
       return;
+    }
+
+    // Si es retiro anticipado, recalcula el total de la reserva
+    let recalculatedTotal = null;
+    if (customCheckOutDate) {
+      const checkIn = new Date(booking.checkIn);
+      const earlyCheckOut = new Date(customCheckOutDate);
+      const nights = Math.max(
+        1,
+        Math.ceil(
+          (earlyCheckOut - checkIn) / (1000 * 60 * 60 * 24)
+        )
+      );
+      recalculatedTotal = calculateRoomCharge(
+        booking.room,
+        booking.guestCount,
+        nights
+      );
+      toast.info(
+        `Nuevo total por retiro anticipado: $${recalculatedTotal.toLocaleString()} (${nights} noche${nights > 1 ? "s" : ""})`
+      );
+      // Si necesitas enviar el nuevo total al backend, agrégalo al payload:
+      // checkOutPayload.recalculatedTotal = recalculatedTotal;
     }
 
     console.log(
@@ -328,6 +351,8 @@ const CheckOut = () => {
         ? "Check-out anticipado solicitado desde panel"
         : "Check-out completado desde panel administrativo",
       completedBy: "admin",
+      // Si recalculaste el total, puedes incluirlo aquí si tu backend lo soporta:
+      // recalculatedTotal,
     };
 
     try {
