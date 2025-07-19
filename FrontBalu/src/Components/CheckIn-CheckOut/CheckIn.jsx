@@ -11,7 +11,7 @@ import {
   checkIn,
   getBookingById
 } from "../../Redux/Actions/bookingActions";
-import { updateRoomStatus } from "../../Redux/Actions/roomActions";
+import { updateRoomStatus,  } from "../../Redux/Actions/roomActions";
 import DashboardLayout from "../Dashboard/DashboardLayout";
 import { getRegistrationPassesByBooking } from "../../Redux/Actions/registerActions";
 import { removeStock } from "../../Redux/Actions/inventoryActions";
@@ -37,7 +37,7 @@ const CheckIn = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [dateRange, setDateRange] = useState({
     from: dayjs().format("YYYY-MM-DD"),
-    to: dayjs().format("YYYY-MM-DD"),
+    to: dayjs().add(7, 'days').format("YYYY-MM-DD"), // ✅ 7 días después
   });
 
   // Estados de inventario básico

@@ -72,9 +72,9 @@ router.get('/reports/valuation', allowRoles(['owner', 'admin']), getInventoryVal
 router.get('/reports/movements', allowRoles(['owner', 'admin']), getInventoryMovements);
 
 // Asignación a habitaciones
-router.get('/room-assignments', getRoomAssignments);
+router.get('/room-assignments/:roomId', getRoomAssignments);
 router.post('/room-assignments', createRoomAssignment);
-router.get('/room-assignments/:roomId', getRoomAssignmentDetails);
+//router.get('/room-assignments/:roomId', getRoomAssignmentDetails);
 
 // === RUTAS CON PARÁMETROS ===
 

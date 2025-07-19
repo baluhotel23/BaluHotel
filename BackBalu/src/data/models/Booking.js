@@ -121,11 +121,106 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
       comment: 'Indica si la reserva está en proceso de check-in'
+    },
+
+    // ✅ NUEVOS CAMPOS PARA DESCUENTOS
+    discountAmount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0,
+      validate: {
+        min: 0,
+        isDecimal: true
+      },
+      comment: 'Monto del descuento aplicado'
+    },
+    
+    discountReason: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      validate: {
+        len: [0, 255]
+      },
+      comment: 'Razón del descuento aplicado'
+    },
+    
+    discountAppliedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Fecha y hora cuando se aplicó el descuento'
+    },
+    
+    discountAppliedBy: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      comment: 'Usuario que aplicó el descuento'
+    },
+    
+    originalAmount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      validate: {
+        min: 0,
+        isDecimal: true
+      },
+      comment: 'Monto original antes del descuento'
     }
   }, {
     timestamps: true,
     tableName: 'Bookings'
   });
+
+  // ✅ MÉTODOS DE INSTANCIA PARA MANEJAR DESCUENTOS
+  Booking.prototype.applyDiscount = function(discountAmount, reason, appliedBy) {
+    // Guardar el monto original si no existe
+    if (!this.originalAmount) {
+      this.originalAmount = this.totalAmount;
+    }
+    
+    this.discountAmount = discountAmount;
+    this.discountReason = reason;
+    this.discountAppliedAt = new Date();
+    this.discountAppliedBy = appliedBy;
+    
+    // Calcular nuevo total
+    const adjustedAmount = Math.max(0, parseFloat(this.originalAmount) - parseFloat(discountAmount));
+    this.totalAmount = adjustedAmount;
+    
+    return this;
+  };
+
+  // ✅ MÉTODO PARA OBTENER MONTO EFECTIVO
+  Booking.prototype.getEffectiveAmount = function() {
+    const original = parseFloat(this.originalAmount || this.totalAmount);
+    const discount = parseFloat(this.discountAmount || 0);
+    return Math.max(0, original - discount);
+  };
+
+  // ✅ MÉTODO PARA VERIFICAR SI TIENE DESCUENTO
+  Booking.prototype.hasDiscount = function() {
+    return this.discountAmount && parseFloat(this.discountAmount) > 0;
+  };
+
+  // ✅ MÉTODO PARA OBTENER INFO FORMATEADA DEL DESCUENTO
+  Booking.prototype.getDiscountInfo = function() {
+    if (!this.hasDiscount()) return null;
+
+    return {
+      discountAmount: parseFloat(this.discountAmount),
+      discountReason: this.discountReason,
+      discountAppliedAt: this.discountAppliedAt,
+      discountAppliedBy: this.discountAppliedBy,
+      originalAmount: parseFloat(this.originalAmount || this.totalAmount),
+      adjustedAmount: this.getEffectiveAmount(),
+      discountPercentage: this.originalAmount ? 
+        Math.round((parseFloat(this.discountAmount) / parseFloat(this.originalAmount)) * 100) : 0,
+      // Formateos
+      discountAmountFormatted: `$${parseFloat(this.discountAmount).toLocaleString()}`,
+      originalAmountFormatted: `$${parseFloat(this.originalAmount || this.totalAmount).toLocaleString()}`,
+      adjustedAmountFormatted: `$${this.getEffectiveAmount().toLocaleString()}`,
+      savingsMessage: `Ahorro de $${parseFloat(this.discountAmount).toLocaleString()} aplicado por ${this.discountReason || 'descuento'}`
+    };
+  };
 
   return Booking;
 };

@@ -7,8 +7,8 @@ import { calculateRoomCharge } from "../../utils/calculateRoomCharge";
 import {
   getAllBookings,
   updateBookingStatus,
+  getAllBills,
   generateBill,
-  checkIn, // ⭐ AGREGAR
   checkOut, // ⭐ AGREGAR
 } from "../../Redux/Actions/bookingActions";
 
@@ -20,40 +20,106 @@ const getRealPaymentSummary = (booking) => {
     )
     .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
 
-  const totalReserva = parseFloat(
-    booking.totalAmount || booking.financialSummary?.totalReserva || 0
+  // ✅ OBTENER MONTOS CON SOPORTE PARA DESCUENTOS
+  const originalAmount = parseFloat(
+    booking.originalAmount || booking.totalAmount || 0
   );
+  const discountAmount = parseFloat(booking.discountAmount || 0);
+  const totalReserva = parseFloat(booking.totalAmount || 0); // Ya incluye descuentos aplicados
+
   const totalExtras =
     booking.extraCharges?.reduce(
       (sum, c) => sum + parseFloat(c.amount || 0) * (parseInt(c.quantity) || 1),
       0
     ) || 0;
-  const totalFinal = totalReserva + totalExtras;
 
-  // ⭐ CORRECCIÓN: Asegurar que no sea negativo
+  // ✅ CALCULAR TOTAL FINAL CON DESCUENTOS APLICADOS
+  const totalFinal = totalReserva + totalExtras;
   const totalPendiente = Math.max(totalFinal - totalPagado, 0);
 
+  // ✅ INFORMACIÓN DE DESCUENTO
+  const hasDiscount = discountAmount > 0;
+  const originalTotalWithExtras = originalAmount + totalExtras;
+  const totalSavings = hasDiscount ? discountAmount : 0;
+  const effectiveDiscountPercentage =
+    originalAmount > 0
+      ? Math.round((discountAmount / originalAmount) * 100)
+      : 0;
+
   return {
+    // ✅ MONTOS BÁSICOS
     totalReserva,
     totalExtras,
     totalFinal,
     totalPagado,
     totalPendiente,
+
+    // ✅ INFORMACIÓN DE DESCUENTOS
+    originalAmount,
+    discountAmount,
+    totalSavings,
+    hasDiscount,
+    effectiveDiscountPercentage,
+    discountReason: booking.discountReason || null,
+    discountAppliedAt: booking.discountAppliedAt || null,
+    discountAppliedBy: booking.discountAppliedBy || null,
+
+    // ✅ ESTADOS DE PAGO
     paymentStatus:
       totalPendiente === 0
         ? "paid"
         : totalPagado > 0
         ? "partially_paid"
         : "unpaid",
-    isFullyPaid: totalPendiente === 0, // ⭐ CORRECCIÓN: Usar totalPendiente === 0
+    isFullyPaid: totalPendiente === 0,
     paymentPercentage:
-      totalFinal > 0 ? Math.round((totalPagado / totalFinal) * 100) : 100, // ⭐ Si no hay total, es 100%
+      totalFinal > 0 ? Math.round((totalPagado / totalFinal) * 100) : 100,
+
+    // ✅ FORMATEOS MEJORADOS
     totalReservaFormatted: `$${totalReserva.toLocaleString()}`,
     totalExtrasFormatted: `$${totalExtras.toLocaleString()}`,
     totalFinalFormatted: `$${totalFinal.toLocaleString()}`,
     totalPagadoFormatted: `$${totalPagado.toLocaleString()}`,
     totalPendienteFormatted: `$${totalPendiente.toLocaleString()}`,
+
+    // ✅ FORMATEOS DE DESCUENTO
+    originalAmountFormatted: `$${originalAmount.toLocaleString()}`,
+    discountAmountFormatted: `$${discountAmount.toLocaleString()}`,
+    totalSavingsFormatted: `$${totalSavings.toLocaleString()}`,
+    originalTotalWithExtrasFormatted: `$${originalTotalWithExtras.toLocaleString()}`,
+
+    // ✅ INFORMACIÓN ADICIONAL
     extraChargesCount: booking.extraCharges?.length || 0,
+
+    // ✅ RESUMEN PARA MOSTRAR EN UI
+    summaryMessage: hasDiscount
+      ? `Total original: $${originalTotalWithExtras.toLocaleString()} - Descuento: $${discountAmount.toLocaleString()} (${effectiveDiscountPercentage}%) = Final: $${totalFinal.toLocaleString()}`
+      : `Total: $${totalFinal.toLocaleString()}`,
+
+    // ✅ BREAKDOWN DETALLADO
+    breakdown: {
+      originalReservation: originalAmount,
+      discountApplied: discountAmount,
+      adjustedReservation: totalReserva,
+      extraCharges: totalExtras,
+      grandTotal: totalFinal,
+      totalPaid: totalPagado,
+      remainingBalance: totalPendiente,
+    },
+
+    // ✅ BREAKDOWN FORMATEADO
+    breakdownFormatted: {
+      originalReservation: `$${originalAmount.toLocaleString()}`,
+      discountApplied: hasDiscount
+        ? `-$${discountAmount.toLocaleString()}`
+        : "$0",
+      adjustedReservation: `$${totalReserva.toLocaleString()}`,
+      extraCharges:
+        totalExtras > 0 ? `+$${totalExtras.toLocaleString()}` : "$0",
+      grandTotal: `$${totalFinal.toLocaleString()}`,
+      totalPaid: `$${totalPagado.toLocaleString()}`,
+      remainingBalance: `$${totalPendiente.toLocaleString()}`,
+    },
   };
 };
 
@@ -103,26 +169,44 @@ const CheckOut = () => {
 
   const bookings = React.useMemo(() => {
     let filteredBookings = allBookings.filter((booking) => {
-      // ⭐ CORRECCIÓN: Incluir reservas "paid" que puedan necesitar check-out
-      const isValidStatus = [
-        "checked-in",
-        "paid", // ⭐ AGREGAR 'paid' aquí
-        "confirmed",
-      ].includes(booking.status);
+      if (booking.status === "completed") {
+        return false;
+      }
 
-      // Si es 'completed', solo incluir si hay pagos pendientes
-      const isCompletedWithPending =
+      // 1. Reservas listas para check-out (estado correcto + pagadas)
+      const readyForCheckOut = booking.status === "checked-in";
+
+      // 2. Reservas que necesitan pago antes del check-out
+      const needsPaymentProcessing = ["confirmed", "paid"].includes(
+        booking.status
+      );
+
+      // 3. Reservas completadas con problemas financieros
+      const hasFinancialIssues =
         booking.status === "completed" &&
         getRealPaymentSummary(booking).totalPendiente > 0;
 
-      return isValidStatus || isCompletedWithPending;
+      // 4. Reservas vencidas que requieren atención inmediata
+      const isOverdue =
+        booking.bookingStatus?.isOverdue ||
+        getDaysUntilCheckOut(booking.checkOut) < 0;
+
+      // ✅ INCLUIR SI CUMPLE CUALQUIERA DE ESTOS CRITERIOS
+      return (
+        readyForCheckOut ||
+        needsPaymentProcessing ||
+        hasFinancialIssues ||
+        isOverdue
+      );
     });
 
+    // ✅ APLICAR FILTROS ADICIONALES DEL USUARIO
     if (filters.status) {
       filteredBookings = filteredBookings.filter(
         (b) => b.status === filters.status
       );
     }
+
     if (filters.roomNumber) {
       filteredBookings = filteredBookings.filter(
         (b) =>
@@ -130,6 +214,7 @@ const CheckOut = () => {
           b.room?.roomNumber?.toString().includes(filters.roomNumber)
       );
     }
+
     if (filters.guestId) {
       filteredBookings = filteredBookings.filter(
         (b) =>
@@ -138,25 +223,53 @@ const CheckOut = () => {
       );
     }
 
+    // ✅ ORDENAMIENTO MEJORADO CON PRIORIDADES CLARAS
     const sortedBookings = [...filteredBookings].sort((a, b) => {
       if (sortBy === "checkOut") {
+        // Prioridad 1: Reservas vencidas (más urgentes primero)
         const priorityA = getCheckOutPriority(a);
         const priorityB = getCheckOutPriority(b);
+
         if (priorityA !== priorityB) {
           return priorityA - priorityB;
         }
+
+        // Prioridad 2: Por fecha de check-out
         const dateA = new Date(a.checkOut || "9999-12-31");
         const dateB = new Date(b.checkOut || "9999-12-31");
         return dateA - dateB;
       } else if (sortBy === "amount") {
+        // Ordenar por monto pendiente (mayor primero)
         const amountA = getRealPaymentSummary(a).totalPendiente || 0;
         const amountB = getRealPaymentSummary(b).totalPendiente || 0;
         return amountB - amountA;
       } else if (sortBy === "room") {
+        // Ordenar por número de habitación
         const roomA = a.roomNumber || a.room?.roomNumber || "";
         const roomB = b.roomNumber || b.room?.roomNumber || "";
         return roomA.toString().localeCompare(roomB.toString());
+      } else if (sortBy === "status") {
+        // ✅ NUEVO: Ordenar por estado (prioridad de procesamiento)
+        const statusPriority = {
+          "checked-in": 1, // Listas para check-out
+          paid: 2, // Necesitan check-in primero
+          confirmed: 3, // Necesitan pago
+          completed: 4, // Con problemas financieros
+        };
+
+        const priorityA = statusPriority[a.status] || 999;
+        const priorityB = statusPriority[b.status] || 999;
+
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+
+        // Si mismo estado, ordenar por fecha de check-out
+        const dateA = new Date(a.checkOut || "9999-12-31");
+        const dateB = new Date(b.checkOut || "9999-12-31");
+        return dateA - dateB;
       } else {
+        // Por defecto: fecha de creación (más recientes primero)
         return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
       }
     });
@@ -242,148 +355,628 @@ const CheckOut = () => {
 
   // ⭐ CORRECCIÓN COMPLETA DE LA FUNCIÓN handleCheckOut
   // ⭐ FUNCIÓN handleCheckOut COMPLETAMENTE CORREGIDA
-const handleCheckOut = async (bookingId, customCheckOutDate = null) => {
-  console.log("Handler handleCheckOut llamado", bookingId, customCheckOutDate);
-  if (!bookingId) {
-    toast.error("ID de reserva no válido");
-    return;
-  }
+  const handleCheckOut = async (
+    bookingId,
+    customCheckOutDate = null,
+    discountAmount = 0,
+    discountReason = "",
+    forceExpiredCheckout = false // ✅ NUEVO PARÁMETRO PARA FORZAR
+  ) => {
+    console.log("🏁 [CHECKOUT] Handler handleCheckOut llamado", {
+      bookingId,
+      customCheckOutDate,
+      discountAmount,
+      discountReason,
+      forceExpiredCheckout,
+    });
 
-  setIsLoading(true);
-
-  try {
-    const booking = bookings.find((b) => b.bookingId === bookingId);
-    const financials = getRealPaymentSummary(booking);
-
-    if (!booking) {
-      throw new Error("Reserva no encontrada");
+    if (!bookingId) {
+      toast.error("ID de reserva no válido");
+      return;
     }
 
-    if (!financials.isFullyPaid) {
+    setIsLoading(true);
+
+    try {
+      const booking = bookings.find((b) => b.bookingId === bookingId);
+      const financials = getRealPaymentSummary(booking);
+
+      if (!booking) {
+        throw new Error("Reserva no encontrada");
+      }
+
+      // ✅ VERIFICAR SI ES RESERVA VENCIDA
+      const daysUntilCheckOut = getDaysUntilCheckOut(booking.checkOut);
+      const isExpired = daysUntilCheckOut < 0;
+      const isOverdue = booking.bookingStatus?.isOverdue || isExpired;
+
+      console.log("📊 [CHECKOUT] Estado actual de la reserva:", {
+        bookingId: booking.bookingId,
+        status: booking.status,
+        totalAmount: booking.totalAmount,
+        daysUntilCheckOut,
+        isExpired,
+        isOverdue,
+        financials: {
+          totalFinal: financials.totalFinal,
+          totalPagado: financials.totalPagado,
+          isFullyPaid: financials.isFullyPaid,
+          balance: financials.balance,
+        },
+      });
+
+      // ✅ VALIDACIÓN DE ESTADO MEJORADA PARA RESERVAS VENCIDAS
+      const validStatusesForNormal = ["checked-in", "paid", "confirmed"];
+      const validStatusesForExpired = [
+        ...validStatusesForNormal,
+        "completed",
+        "pending",
+      ];
+
+      const allowedStatuses = isOverdue
+        ? validStatusesForExpired
+        : validStatusesForNormal;
+
+      if (!allowedStatuses.includes(booking.status)) {
+        toast.error(
+          `❌ No se puede procesar check-out para reservas en estado "${booking.status}"`
+        );
+
+        // ✅ SUGERIR ACCIÓN SEGÚN ESTADO
+        if (booking.status === "cancelled") {
+          toast.info("💡 Las reservas canceladas no requieren check-out", {
+            autoClose: 5000,
+          });
+        } else {
+          toast.info(`💡 Estado "${booking.status}" no válido para check-out`, {
+            autoClose: 5000,
+          });
+        }
+        return;
+      }
+
+      // ✅ MENSAJES ESPECÍFICOS MEJORADOS
+      if (isOverdue) {
+        toast.warning(
+          `🚨 RESERVA VENCIDA (${Math.abs(
+            daysUntilCheckOut
+          )} días) - Procesando cierre forzado para liberar habitación`,
+          { autoClose: 4000 }
+        );
+      } else if (booking.status === "paid") {
+        toast.info("📝 Procesando check-out directo desde estado 'pagada'", {
+          autoClose: 3000,
+        });
+      } else if (booking.status === "confirmed") {
+        toast.info("📝 Procesando check-out desde estado 'confirmada'", {
+          autoClose: 3000,
+        });
+      }
+
+      // ✅ CALCULAR DESCUENTOS Y TOTALES - LÓGICA ESPECIAL PARA VENCIDAS
+      let finalTotal = financials.totalFinal;
+      let needsPayment = false;
+      let automaticDiscount = 0;
+      let automaticDiscountReason = "";
+
+      // ✅ DESCUENTO AUTOMÁTICO PARA RESERVAS VENCIDAS SIN PAGO
+      if (isOverdue && !financials.isFullyPaid && discountAmount === 0) {
+        const daysPastDue = Math.abs(daysUntilCheckOut);
+
+        // Aplicar descuento total si está muy vencida (más de 3 días)
+        if (daysPastDue > 3) {
+          automaticDiscount = financials.totalPendiente;
+          automaticDiscountReason = `Descuento automático por reserva vencida ${daysPastDue} días - Liberación de habitación`;
+          discountAmount = automaticDiscount;
+          discountReason = automaticDiscountReason;
+
+          toast.warning(
+            `⚠️ Aplicando descuento automático de $${automaticDiscount.toLocaleString()} por reserva muy vencida`,
+            { autoClose: 5000 }
+          );
+        } else {
+          // Para vencidas recientes, sugerir descuento pero permitir continuar
+          toast.info(
+            `💡 Reserva vencida ${daysPastDue} día(s). Se puede aplicar descuento o continuar con pago pendiente.`,
+            { autoClose: 4000 }
+          );
+        }
+      }
+
+      if (discountAmount > 0) {
+        // ✅ APLICAR DESCUENTO SOLO AL CARGO DE HABITACIÓN, NO A EXTRAS
+        const roomCharge = parseFloat(booking.totalAmount) || 0;
+        const extraCharges = financials.totalFinal - roomCharge;
+
+        // El descuento se aplica solo al cargo de habitación
+        const discountedRoomCharge = Math.max(0, roomCharge - discountAmount);
+        finalTotal = discountedRoomCharge + extraCharges;
+
+        const newBalance = Math.max(0, finalTotal - financials.totalPagado);
+        needsPayment = newBalance > 0;
+
+        console.log("💰 [CHECKOUT] Cálculo de descuento:", {
+          roomCharge,
+          extraCharges,
+          discountAmount,
+          discountedRoomCharge,
+          finalTotal,
+          totalPagado: financials.totalPagado,
+          newBalance,
+          needsPayment,
+          isExpired,
+          automaticDiscount,
+        });
+
+        toast.info(
+          `💰 Descuento aplicado: $${discountAmount.toLocaleString()} - Nuevo total: $${finalTotal.toLocaleString()}`,
+          { autoClose: 4000 }
+        );
+      } else {
+        needsPayment = !financials.isFullyPaid;
+      }
+
+      // ✅ VALIDACIÓN DE PAGOS RELAJADA PARA RESERVAS VENCIDAS
+      if (needsPayment && discountAmount === 0 && !isOverdue) {
+        toast.error(
+          `❌ No se puede completar el check-out. Balance pendiente: $${(
+            finalTotal - financials.totalPagado
+          ).toLocaleString()}. Realice el pago o aplique un descuento.`
+        );
+        return;
+      }
+
+      if (needsPayment && discountAmount === 0 && isOverdue) {
+        // ✅ PARA VENCIDAS, OFRECER OPCIONES
+        const confirmForceCheckout = window.confirm(
+          `🚨 RESERVA VENCIDA CON BALANCE PENDIENTE\n\n` +
+            `💰 Balance pendiente: $${(
+              finalTotal - financials.totalPagado
+            ).toLocaleString()}\n` +
+            `📅 Vencida hace ${Math.abs(daysUntilCheckOut)} día(s)\n\n` +
+            `¿Desea forzar el check-out para liberar la habitación?\n` +
+            `(Se puede aplicar descuento automático o gestionar el pago posteriormente)`
+        );
+
+        if (!confirmForceCheckout) {
+          toast.info("Check-out cancelado por el usuario");
+          return;
+        }
+
+        // Aplicar descuento automático si usuario acepta
+        const applyAutoDiscount = window.confirm(
+          `¿Aplicar descuento automático de $${financials.totalPendiente.toLocaleString()} para cerrar la cuenta?`
+        );
+
+        if (applyAutoDiscount) {
+          discountAmount = financials.totalPendiente;
+          discountReason = `Descuento por reserva vencida ${Math.abs(
+            daysUntilCheckOut
+          )} días - Cierre forzado`;
+          finalTotal = financials.totalPagado; // Solo lo que ya se pagó
+          needsPayment = false;
+
+          toast.warning(
+            `⚠️ Aplicando descuento automático de $${discountAmount.toLocaleString()}`,
+            { autoClose: 4000 }
+          );
+        } else {
+          // Continuar con balance pendiente
+          toast.warning(
+            `⚠️ Continuando con balance pendiente de $${financials.totalPendiente.toLocaleString()} - Requiere seguimiento posterior`,
+            { autoClose: 6000 }
+          );
+        }
+      }
+
+      if (needsPayment && discountAmount > 0) {
+        const remainingBalance = finalTotal - financials.totalPagado;
+
+        if (remainingBalance > 0 && !isOverdue) {
+          toast.error(
+            `❌ El descuento no es suficiente. Balance restante: $${remainingBalance.toLocaleString()}. Aumente el descuento o complete el pago.`
+          );
+          return;
+        } else if (remainingBalance > 0 && isOverdue) {
+          toast.warning(
+            `⚠️ Balance restante: $${remainingBalance.toLocaleString()}. Continuando con reserva vencida...`,
+            { autoClose: 4000 }
+          );
+        }
+      }
+
+      // ✅ CALCULAR NUEVO TOTAL PARA RETIRO ANTICIPADO (MEJORADO)
+      let recalculatedTotal = null;
+      let nightsCalculated = null;
+
+      if (customCheckOutDate) {
+        const checkIn = new Date(booking.checkIn);
+        const earlyCheckOut = new Date(customCheckOutDate);
+        nightsCalculated = Math.max(
+          1,
+          Math.ceil((earlyCheckOut - checkIn) / (1000 * 60 * 60 * 24))
+        );
+
+        recalculatedTotal = calculateRoomCharge(
+          booking.room,
+          booking.guestCount,
+          nightsCalculated
+        );
+
+        console.log("📅 [CHECKOUT] Cálculo de retiro anticipado:", {
+          checkIn: checkIn.toISOString(),
+          earlyCheckOut: earlyCheckOut.toISOString(),
+          nightsCalculated,
+          recalculatedTotal,
+          originalTotal: booking.totalAmount,
+        });
+
+        toast.info(
+          `🗓️ Retiro anticipado: ${nightsCalculated} noche${
+            nightsCalculated > 1 ? "s" : ""
+          } - Total recalculado: $${recalculatedTotal.toLocaleString()}`,
+          { autoClose: 5000 }
+        );
+      }
+
+      console.log(
+        `🏁 [CHECKOUT] Iniciando check-out para reserva: ${bookingId}`,
+        {
+          currentStatus: booking.status,
+          isFullyPaid: !needsPayment,
+          customCheckOutDate,
+          discountAmount,
+          finalTotal,
+          recalculatedTotal,
+          nightsCalculated,
+          isOverdue,
+          forceExpiredCheckout: isOverdue,
+        }
+      );
+
+      // ✅ PREPARAR PAYLOAD DE CHECK-OUT MEJORADO CON SOPORTE PARA VENCIDAS
+      const checkOutPayload = {
+        actualCheckOut: customCheckOutDate
+          ? new Date(customCheckOutDate).toISOString()
+          : new Date().toISOString(),
+        notes: isOverdue
+          ? `Check-out forzado para reserva vencida ${Math.abs(
+              daysUntilCheckOut
+            )} días - Liberación de habitación${
+              discountAmount > 0
+                ? ` - Descuento: $${discountAmount.toLocaleString()} (${discountReason})`
+                : ""
+            }`
+          : customCheckOutDate
+          ? `Check-out anticipado desde panel - ${
+              discountReason || "Retiro anticipado"
+            }: ${nightsCalculated} noche${nightsCalculated > 1 ? "s" : ""}${
+              discountAmount > 0
+                ? ` - Descuento: $${discountAmount.toLocaleString()} (${discountReason})`
+                : ""
+            }`
+          : `Check-out completado desde panel administrativo${
+              discountAmount > 0
+                ? ` - Descuento: $${discountAmount.toLocaleString()} (${discountReason})`
+                : ""
+            }`,
+        completedBy: "admin",
+        // ✅ CAMPOS DE DESCUENTO CONSISTENTES CON EL BACKEND
+        applyDiscount: discountAmount > 0,
+        discountAmount: discountAmount || 0,
+        discountReason: discountReason || "",
+        recalculatedTotal: recalculatedTotal || null,
+        skipInventoryValidation: true,
+        roomCondition: "good",
+        generateBillAfterCheckout: true,
+        // ✅ NUEVOS CAMPOS PARA RESERVAS VENCIDAS
+        isExpiredCheckout: isOverdue,
+        daysPastDue: isOverdue ? Math.abs(daysUntilCheckOut) : 0,
+        forceCheckOut: isOverdue, // Forzar completado para liberar habitación
+      };
+
+      // ✅ EJECUTAR CHECK-OUT CON MEJOR MANEJO DE ERRORES
+      try {
+        console.log("➡️ [CHECKOUT] Enviando payload:", checkOutPayload);
+        const checkOutResult = await dispatch(
+          checkOut(bookingId, checkOutPayload)
+        );
+
+        console.log("📋 [CHECKOUT] Resultado del check-out:", checkOutResult);
+
+        // ✅ VALIDAR RESULTADO CON MAYOR DETALLE
+        if (!checkOutResult) {
+          throw new Error("No se recibió respuesta del servidor");
+        }
+
+        if (checkOutResult.success === false || checkOutResult.error) {
+          throw new Error(
+            checkOutResult.error ||
+              checkOutResult.message ||
+              "Error desconocido en check-out"
+          );
+        }
+
+        // ✅ CHECK-OUT EXITOSO
+        console.log(
+          "✅ [CHECKOUT] Check-out exitoso, intentando generar factura..."
+        );
+
+        // ✅ MENSAJE DE ÉXITO ESPECÍFICO PARA VENCIDAS
+        if (isOverdue) {
+          toast.success(
+            `🎉 Reserva vencida procesada exitosamente - Habitación ${
+              booking.room?.roomNumber
+            } liberada${
+              discountAmount > 0
+                ? ` con descuento de $${discountAmount.toLocaleString()}`
+                : ""
+            }`,
+            { autoClose: 6000 }
+          );
+        }
+
+        // ✅ GENERAR FACTURA CON MANEJO MEJORADO
+        try {
+          console.log("🧾 [CHECKOUT] Iniciando generación de factura...");
+          const billResult = await dispatch(generateBill(bookingId));
+
+          console.log(
+            "📋 [CHECKOUT] Resultado de generación de factura:",
+            billResult
+          );
+
+          if (billResult && billResult.error === false && billResult.data) {
+            // ✅ FACTURA GENERADA EXITOSAMENTE
+            if (!isOverdue) {
+              toast.success(
+                `🎉 Check-out y facturación completados exitosamente${
+                  discountAmount > 0
+                    ? ` con descuento de $${discountAmount.toLocaleString()}`
+                    : ""
+                }`,
+                { autoClose: 6000 }
+              );
+            }
+
+            // ✅ MOSTRAR FACTURA GENERADA
+            setGeneratedBill(billResult.data);
+            setShowBillModal(true);
+
+            // ✅ DISPARAR RECARGA DE FACTURAS PARA TAXXA
+            setTimeout(() => {
+              dispatch(getAllBills());
+            }, 1000);
+          } else {
+            // ✅ CHECK-OUT OK, FACTURA FALLÓ (NO ES CRÍTICO)
+            console.warn(
+              "⚠️ [CHECKOUT] Factura no se generó automáticamente:",
+              billResult
+            );
+            const successMessage = isOverdue
+              ? `✅ Reserva vencida procesada - Habitación liberada${
+                  discountAmount > 0
+                    ? ` con descuento de $${discountAmount.toLocaleString()}`
+                    : ""
+                }`
+              : `✅ Check-out completado${
+                  discountAmount > 0
+                    ? ` con descuento de $${discountAmount.toLocaleString()}`
+                    : ""
+                }`;
+
+            toast.warning(
+              `${successMessage}. La factura se puede generar manualmente desde el panel.`,
+              { autoClose: 8000 }
+            );
+          }
+        } catch (billError) {
+          console.warn(
+            "⚠️ [CHECKOUT] Error generando factura automática:",
+            billError
+          );
+          const successMessage = isOverdue
+            ? `✅ Reserva vencida procesada - Habitación liberada${
+                discountAmount > 0
+                  ? ` con descuento de $${discountAmount.toLocaleString()}`
+                  : ""
+              }`
+            : `✅ Check-out completado${
+                discountAmount > 0
+                  ? ` con descuento de $${discountAmount.toLocaleString()}`
+                  : ""
+              }`;
+
+          toast.warning(
+            `${successMessage}. Error al generar factura automática - puede generarla manualmente.`,
+            { autoClose: 8000 }
+          );
+        }
+
+        // ✅ SIEMPRE RECARGAR DATOS AL FINAL
+        console.log("🔄 [CHECKOUT] Recargando datos de reservas...");
+        await loadBookings();
+
+        // ✅ LOG FINAL DE ÉXITO
+        console.log("🎯 [CHECKOUT] Proceso completado exitosamente:", {
+          bookingId,
+          finalStatus: "completed",
+          discountApplied: discountAmount,
+          totalProcessed: finalTotal,
+          wasExpired: isOverdue,
+          roomLiberated: true,
+        });
+      } catch (checkOutError) {
+        console.error(
+          "❌ [CHECKOUT] Error específico en check-out:",
+          checkOutError
+        );
+        throw new Error(`Error en check-out: ${checkOutError.message}`);
+      }
+    } catch (error) {
+      console.error("❌ [CHECKOUT] Error general:", error);
+
+      // ✅ MENSAJE DE ERROR MÁS ESPECÍFICO
+      const errorMessage = error.message || "Error desconocido";
+
+      if (errorMessage.includes("payment")) {
+        toast.error(`❌ Error de pagos: ${errorMessage}`);
+      } else if (errorMessage.includes("status")) {
+        toast.error(`❌ Error de estado: ${errorMessage}`);
+      } else if (errorMessage.includes("network")) {
+        toast.error(`❌ Error de conexión: ${errorMessage}`);
+      } else {
+        toast.error(`❌ Error al completar check-out: ${errorMessage}`);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ✅ NUEVO: FUNCIÓN PARA MANEJAR RETIRO ANTICIPADO CON DESCUENTO
+  const handleEarlyCheckOutWithDiscount = async (booking, earlyDate) => {
+    const checkIn = new Date(booking.checkIn);
+    const earlyCheckOut = new Date(earlyDate);
+    const originalCheckOut = new Date(booking.checkOut);
+
+    // ✅ VALIDAR FECHA DE RETIRO ANTICIPADO
+    if (earlyCheckOut <= checkIn) {
+      toast.error("❌ La fecha de salida debe ser posterior al check-in");
+      return;
+    }
+
+    if (earlyCheckOut >= originalCheckOut) {
       toast.error(
-        "❌ No se puede completar el check-out. Quedan pagos pendientes."
+        "❌ La fecha de salida debe ser anterior a la fecha original"
       );
       return;
     }
 
-    // Si es retiro anticipado, recalcula el total de la reserva
-    let recalculatedTotal = null;
-    if (customCheckOutDate) {
-      const checkIn = new Date(booking.checkIn);
-      const earlyCheckOut = new Date(customCheckOutDate);
-      const nights = Math.max(
-        1,
-        Math.ceil(
-          (earlyCheckOut - checkIn) / (1000 * 60 * 60 * 24)
-        )
-      );
-      recalculatedTotal = calculateRoomCharge(
-        booking.room,
-        booking.guestCount,
-        nights
-      );
-      toast.info(
-        `Nuevo total por retiro anticipado: $${recalculatedTotal.toLocaleString()} (${nights} noche${nights > 1 ? "s" : ""})`
-      );
-      // Si necesitas enviar el nuevo total al backend, agrégalo al payload:
-      // checkOutPayload.recalculatedTotal = recalculatedTotal;
-    }
-
-    console.log(
-      `🏁 [CHECKOUT] Iniciando check-out para reserva: ${bookingId}`,
-      {
-        currentStatus: booking.status,
-        isFullyPaid: financials.isFullyPaid,
-        customCheckOutDate,
-      }
+    // Calcular noches originales vs actuales
+    const originalNights = Math.ceil(
+      (originalCheckOut - checkIn) / (1000 * 60 * 60 * 24)
+    );
+    const actualNights = Math.max(
+      1,
+      Math.ceil((earlyCheckOut - checkIn) / (1000 * 60 * 60 * 24))
     );
 
-    // Si está en 'paid', hacer check-in primero
-    if (booking.status === "paid") {
-      console.log(
-        '🔄 [CHECKOUT] Reserva en estado "paid", realizando check-in primero...'
-      );
+    // ✅ OBTENER INFORMACIÓN FINANCIERA ACTUAL
+    const financials = getRealPaymentSummary(booking);
 
-      try {
-        const checkInResult = await dispatch(
-          checkIn(bookingId, {
-            actualCheckIn: new Date().toISOString(),
-            notes: "Check-in automático para proceder con check-out",
-          })
-        );
+    // ✅ CONSIDERAR DESCUENTOS EXISTENTES AL CALCULAR
+    const originalAmount = parseFloat(
+      booking.originalAmount || booking.totalAmount || 0
+    );
+    const existingDiscount = parseFloat(booking.discountAmount || 0);
+    const baseAmountForCalculation = originalAmount; // Usar monto original para cálculo limpio
 
-        console.log("📋 [CHECKOUT] Resultado del check-in:", checkInResult);
+    // Calcular nuevo costo por las noches reales
+    const newRoomCost = calculateRoomCharge(
+      booking.room,
+      booking.guestCount,
+      actualNights
+    );
 
-        if (!checkInResult || checkInResult.success !== true) {
-          throw new Error(
-            `Error en check-in automático: ${
-              checkInResult?.error || "Respuesta inválida"
-            }`
-          );
-        }
+    // ✅ CALCULAR DESCUENTO BASADO EN DIFERENCIA DE NOCHES
+    const potentialDiscount = Math.max(
+      0,
+      baseAmountForCalculation - newRoomCost
+    );
+    const nightsSaved = originalNights - actualNights;
+    const savingsPercentage =
+      baseAmountForCalculation > 0
+        ? Math.round((potentialDiscount / baseAmountForCalculation) * 100)
+        : 0;
 
-        console.log("✅ [CHECKOUT] Check-in automático completado");
+    // ✅ INFORMACIÓN PARA EL USUARIO
+    const newTotalWithExtras = newRoomCost + financials.totalExtras;
+    const newBalance = Math.max(0, newTotalWithExtras - financials.totalPagado);
 
-        // Pausa para asegurar que el estado se actualice
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      } catch (checkInError) {
-        console.error(
-          "❌ [CHECKOUT] Error en check-in automático:",
-          checkInError
-        );
-        throw new Error(
-          `Error en check-in automático: ${checkInError.message}`
-        );
-      }
-    }
-
-    // Ahora realizar el check-out (usa la fecha personalizada si existe)
-    console.log("🏁 [CHECKOUT] Procediendo con check-out...", {
-      bookingId,
-      customCheckOutDate,
+    console.log("📊 [EARLY CHECKOUT] Cálculos de retiro anticipado:", {
+      originalNights,
+      actualNights,
+      nightsSaved,
+      originalAmount: baseAmountForCalculation,
+      newRoomCost,
+      potentialDiscount,
+      savingsPercentage,
+      existingDiscount,
+      totalExtras: financials.totalExtras,
+      totalPaid: financials.totalPagado,
+      newBalance,
     });
 
-    const checkOutPayload = {
-      actualCheckOut: customCheckOutDate
-        ? new Date(customCheckOutDate).toISOString()
-        : new Date().toISOString(),
-      notes: customCheckOutDate
-        ? "Check-out anticipado solicitado desde panel"
-        : "Check-out completado desde panel administrativo",
-      completedBy: "admin",
-      // Si recalculaste el total, puedes incluirlo aquí si tu backend lo soporta:
-      // recalculatedTotal,
-    };
+    // ✅ MODAL DE CONFIRMACIÓN MEJORADO CON MÁS DETALLES
+    const confirmMessage =
+      `🗓️ RETIRO ANTICIPADO CON DESCUENTO\n\n` +
+      `📅 Check-in: ${checkIn.toLocaleDateString("es-CO")}\n` +
+      `📅 Salida original: ${originalCheckOut.toLocaleDateString(
+        "es-CO"
+      )} (${originalNights} noches)\n` +
+      `📅 Nueva salida: ${earlyCheckOut.toLocaleDateString(
+        "es-CO"
+      )} (${actualNights} noches)\n` +
+      `🛌 Noches ahorradas: ${nightsSaved}\n\n` +
+      `💰 CÁLCULO FINANCIERO:\n` +
+      `   • Costo original habitación: $${baseAmountForCalculation.toLocaleString()}\n` +
+      `   • Nuevo costo habitación: $${newRoomCost.toLocaleString()}\n` +
+      `   • Descuento por noches no usadas: $${potentialDiscount.toLocaleString()} (${savingsPercentage}%)\n` +
+      (financials.totalExtras > 0
+        ? `   • Consumos extras: $${financials.totalExtras.toLocaleString()}\n`
+        : "") +
+      `   • Total ajustado: $${newTotalWithExtras.toLocaleString()}\n` +
+      `   • Ya pagado: $${financials.totalPagado.toLocaleString()}\n` +
+      `   • ${
+        newBalance > 0
+          ? `Saldo pendiente: $${newBalance.toLocaleString()}`
+          : "Cuenta saldada ✅"
+      }\n\n` +
+      (existingDiscount > 0
+        ? `⚠️ NOTA: Ya tiene descuento previo de $${existingDiscount.toLocaleString()}\n\n`
+        : "") +
+      `¿Proceder con el check-out anticipado y aplicar descuento?`;
 
-    try {
-      console.log("➡️ [CHECKOUT] Payload enviado:", checkOutPayload);
-      const checkOutResult = await dispatch(
-        checkOut(bookingId, checkOutPayload)
-      );
+    const confirmDiscount = window.confirm(confirmMessage);
 
-      console.log("📋 [CHECKOUT] Resultado del check-out:", checkOutResult);
+    if (confirmDiscount) {
+      try {
+        setIsLoading(true);
 
-      if (!checkOutResult || checkOutResult.success !== true) {
-        throw new Error(
-          `Error en check-out: ${
-            checkOutResult?.error || "Respuesta inválida"
-          }`
+        // ✅ MENSAJE INFORMATIVO MIENTRAS PROCESA
+        toast.info(
+          `🔄 Procesando retiro anticipado con descuento de $${potentialDiscount.toLocaleString()}...`,
+          { autoClose: 3000 }
         );
-      }
 
-      toast.success("🎉 Check-out completado exitosamente");
-      await loadBookings();
-    } catch (checkOutError) {
-      console.error("❌ [CHECKOUT] Error en check-out:", checkOutError);
-      throw new Error(`Error en check-out: ${checkOutError.message}`);
+        const discountReason = `Retiro anticipado: ${originalNights} noches → ${actualNights} noches (${nightsSaved} día${
+          nightsSaved > 1 ? "s" : ""
+        } menos)`;
+
+        await handleCheckOut(
+          booking.bookingId,
+          earlyDate,
+          potentialDiscount,
+          discountReason
+        );
+
+        // ✅ LOG DE ÉXITO
+        console.log("✅ [EARLY CHECKOUT] Retiro anticipado completado:", {
+          bookingId: booking.bookingId,
+          nightsSaved,
+          discountApplied: potentialDiscount,
+          newTotal: newTotalWithExtras,
+        });
+      } catch (error) {
+        console.error("❌ [EARLY CHECKOUT] Error en retiro anticipado:", error);
+        toast.error(`❌ Error al procesar retiro anticipado: ${error.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      toast.info("🚫 Retiro anticipado cancelado por el usuario");
     }
-  } catch (error) {
-    console.error("❌ [CHECKOUT] Error general:", error);
-    toast.error(`❌ Error al completar check-out: ${error.message}`);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleOpenExtraCharges = (booking) => {
     setSelectedBookingForExtras(booking);
@@ -548,6 +1141,10 @@ const handleCheckOut = async (bookingId, customCheckOutDate = null) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="checkOut">📅 Fecha de salida</option>
+                <option value="status">
+                  🎯 Prioridad de procesamiento
+                </option>{" "}
+                {/* ✅ AGREGAR ESTA LÍNEA FALTANTE */}
                 <option value="amount">💰 Monto pendiente</option>
                 <option value="room">🚪 Número habitación</option>
                 <option value="created">🕐 Fecha creación</option>
@@ -1031,9 +1628,9 @@ const handleCheckOut = async (bookingId, customCheckOutDate = null) => {
 
                       {/* 🧾 BOTÓN DE GENERAR FACTURA */}
                       {financials.isFullyPaid &&
-                        ["checked-in", "completed"].includes(
+                        ["checked-in", "completed", "paid"].includes(
                           booking.status
-                        ) && (
+                        ) && ( // ✅ AGREGAR "paid"
                           <button
                             className="px-4 py-2 rounded-lg text-white bg-purple-600 hover:bg-purple-700 transition-colors flex items-center gap-2"
                             onClick={() => handleGenerateBill(booking)}
@@ -1057,7 +1654,14 @@ const handleCheckOut = async (bookingId, customCheckOutDate = null) => {
                       <button
                         className={`flex-1 px-4 py-2 rounded-lg text-white transition-colors flex items-center justify-center gap-2 ${
                           !financials.isFullyPaid ||
-                          !['pending', 'confirmed', 'paid', 'checked-in', 'completed', 'advanced'].includes(booking.status)
+                          ![
+                            "pending",
+                            "confirmed",
+                            "paid",
+                            "checked-in",
+                            "completed",
+                            "advanced",
+                          ].includes(booking.status)
                             ? "bg-gray-400 cursor-not-allowed"
                             : daysUntilCheckOut <= 0
                             ? "bg-red-600 hover:bg-red-700 animate-pulse"
@@ -1100,18 +1704,22 @@ const handleCheckOut = async (bookingId, customCheckOutDate = null) => {
                       </button>
 
                       {/* ⏩ BOTÓN DE RETIRO ANTICIPADO */}
-                     <button
-  className="flex-1 px-4 py-2 rounded-lg text-blue-700 border border-blue-700 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
-  onClick={() => {
-    setBookingForEarlyCheckOut(booking);
-    setEarlyCheckOutDate(new Date().toISOString().slice(0, 16));
-    setShowEarlyCheckOutModal(true);
-  }}
-  disabled={isLoading || loading.bills}
->
-  <span>⏩</span>
-  Retiro anticipado
-</button>
+                      {["checked-in", "paid"].includes(booking.status) && (
+                        <button
+                          className="flex-1 px-4 py-2 rounded-lg text-blue-700 border border-blue-700 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                          onClick={() => {
+                            setBookingForEarlyCheckOut(booking);
+                            setEarlyCheckOutDate(
+                              new Date().toISOString().slice(0, 16)
+                            );
+                            setShowEarlyCheckOutModal(true);
+                          }}
+                          disabled={isLoading || loading.bills}
+                        >
+                          <span>⏩</span>
+                          Retiro anticipado
+                        </button>
+                      )}
                     </div>
 
                     {/* 📊 ESTADO DE LA RESERVA CORREGIDO */}
@@ -1260,48 +1868,71 @@ const handleCheckOut = async (bookingId, customCheckOutDate = null) => {
       )}
       {showEarlyCheckOutModal && bookingForEarlyCheckOut && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold mb-2 text-blue-700">
-              Retiro anticipado
+              ⏩ Retiro Anticipado
             </h3>
             <p className="mb-4 text-gray-700">
-              Selecciona la nueva fecha y hora de salida para la reserva #
-              {bookingForEarlyCheckOut.bookingId}
+              Selecciona la nueva fecha de salida. El sistema calculará
+              automáticamente el descuento correspondiente.
             </p>
+
+            <div className="mb-4 p-3 bg-blue-50 rounded text-sm">
+              <div className="font-medium text-blue-800">
+                Reserva #{bookingForEarlyCheckOut.bookingId}
+              </div>
+              <div className="text-blue-600">
+                📅 Check-in:{" "}
+                {new Date(bookingForEarlyCheckOut.checkIn).toLocaleDateString()}
+              </div>
+              <div className="text-blue-600">
+                📅 Salida original:{" "}
+                {new Date(
+                  bookingForEarlyCheckOut.checkOut
+                ).toLocaleDateString()}
+              </div>
+            </div>
+
             <input
               type="datetime-local"
               className="w-full border px-3 py-2 rounded mb-4"
               value={earlyCheckOutDate}
               onChange={(e) => setEarlyCheckOutDate(e.target.value)}
+              min={bookingForEarlyCheckOut.checkIn?.slice(0, 16)}
               max={bookingForEarlyCheckOut.checkOut?.slice(0, 16)}
             />
+
             <div className="flex gap-2">
               <button
-  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-  onClick={async () => {
-    console.log("➡️ Intentando retiro anticipado", {
-      bookingId: bookingForEarlyCheckOut.bookingId,
-      earlyCheckOutDate,
-    });
-    setIsLoading(true);
-    try {
-      await handleCheckOut(
-        bookingForEarlyCheckOut.bookingId,
-        earlyCheckOutDate
-      );
-      setShowEarlyCheckOutModal(false);
-      setBookingForEarlyCheckOut(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }}
-  disabled={!earlyCheckOutDate || isLoading}
->
-  Confirmar retiro anticipado
-</button>
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={async () => {
+                  if (earlyCheckOutDate) {
+                    setIsLoading(true);
+                    try {
+                      // ✅ USAR LA FUNCIÓN CON DESCUENTO AUTOMÁTICO
+                      await handleEarlyCheckOutWithDiscount(
+                        bookingForEarlyCheckOut,
+                        earlyCheckOutDate
+                      );
+                      setShowEarlyCheckOutModal(false);
+                      setBookingForEarlyCheckOut(null);
+                      setEarlyCheckOutDate("");
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }
+                }}
+                disabled={!earlyCheckOutDate || isLoading}
+              >
+                {isLoading ? "Procesando..." : "Confirmar con Descuento"}
+              </button>
               <button
                 className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                onClick={() => setShowEarlyCheckOutModal(false)}
+                onClick={() => {
+                  setShowEarlyCheckOutModal(false);
+                  setBookingForEarlyCheckOut(null);
+                  setEarlyCheckOutDate("");
+                }}
               >
                 Cancelar
               </button>

@@ -44,6 +44,8 @@ import FacturasPendientes from "./Components/Taxxa/FacturasPendientes";
 import PanelTaxxa from "./Components/Taxxa/PanelTaxxa";
 import InvoiceList from "./Components/Taxxa/InvoiceList";
 import ConfiguracionHotel from "./Components/Dashboard/ConfiguracionHotel";
+import CompletedBookings from "./Components/CheckOut/CompletedBookings";
+
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -155,6 +157,14 @@ const AppContent = () => {
             element={
               <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
                 <CheckOut />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/completas"
+            element={
+              <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
+                <CompletedBookings />
               </PrivateRoute>
             }
           />

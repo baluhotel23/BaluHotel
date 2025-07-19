@@ -329,4 +329,4 @@ export const getInventorySummary = () => async (dispatch) => {
     });
     return { success: false, error: errorMessage };
   }
-};
+};  

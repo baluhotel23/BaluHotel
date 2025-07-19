@@ -1,4 +1,4 @@
-const { BasicInventory, Purchase, PurchaseItem, RoomCheckIn, LaundryMovement } = require('../data');
+const { BasicInventory, Purchase, PurchaseItem, RoomCheckIn, Room, LaundryMovement, RoomBasics } = require('../data');
 const { CustomError } = require('../middleware/error');
 const { catchedAsync } = require('../utils/catchedAsync');
 const { upload } = require('../middleware/multer');
@@ -947,12 +947,8 @@ const getConsumptionReport = async (req, res) => {
 };
 
   const getRoomAssignments = async (req, res) => {
-    // ❌ PROBLEMA: RoomCheckIn no tiene relación directa con BasicInventory
-    // ❌ RoomCheckIn es para preparación de habitaciones, no para asignación de inventario
-    
-    // ✅ SOLUCIÓN: Usar RoomBasics que SÍ relaciona Room con BasicInventory
-    const { RoomBasics, Room, BasicInventory } = require('../data');
-    
+    const { roomNumber } = req.params;
+
     const assignments = await RoomBasics.findAll({
       include: [
         {
