@@ -3,17 +3,24 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchUserByDocument } from "../../Redux/Actions/actions";
 import BuyerForm from "./BuyerForm";
 import UserRegistrationPopup from "./UserRegistrationPopup";
-import DocumentTypePopup from "./DocumentTypePopup"; // Importa el popup
-import { useNavigate } from "react-router-dom";
+import DocumentTypePopup from "./DocumentTypePopup";
+import { useNavigate, useLocation } from "react-router-dom";
 import OrdenesPendientes from "./OrdenesPendientes";
 
 const BillingForm = () => {
   const navigate = useNavigate();
-  const [n_document, setNDocument] = useState("");
+  const location = useLocation();
+  
+  // ✅ OBTENER DATOS DE LA RESERVA SI VIENEN DEL CHECK-OUT
+  const { buyer: preloadedBuyer, bookingData, preGeneratedBill } = location.state || {};
+  
+  const [n_document, setNDocument] = useState(
+    preloadedBuyer?.jpartylegalentity?.sdocno || ""
+  );
   const [showRegistrationPopup, setShowRegistrationPopup] = useState(false);
-  const [showInvoicePopup, setShowInvoicePopup] = useState(false); // Estado para el popup
-  const [jbuyer, setBuyer] = useState({
-   
+  const [showInvoicePopup, setShowInvoicePopup] = useState(false);
+  const [jbuyer, setBuyer] = useState(
+    preloadedBuyer || {
       wlegalorganizationtype: "person",
       scostumername: "Consumidor Final",
       stributaryidentificationkey: "01",
@@ -38,18 +45,19 @@ const BillingForm = () => {
           szip: ""
         }
       }
-    });
+    }
+  );
 
-    const handleSelectDocument = (selectedDocument) => {
-      setNDocument(selectedDocument); // Actualizar el estado con el documento seleccionado
-    };
+  const handleSelectDocument = (selectedDocument) => {
+    setNDocument(selectedDocument);
+  };
 
   const handleProceedToDocument = () => {
     if (jbuyer.scostumername === "CONSUMIDOR FINAL") {
       alert("Completa los datos del comprador antes de continuar.");
       return;
     }
-    setShowInvoicePopup(true); // Abrir el popup para seleccionar el tipo de comprobante
+    setShowInvoicePopup(true);
   };
 
   const dispatch = useDispatch();
@@ -86,10 +94,7 @@ const BillingForm = () => {
       setBuyer((prevBuyer) => ({
         ...prevBuyer,
         wlegalorganizationtype: wlegalorganizationtype || "person",
-        scostumername:
-          scostumername ||
-          `${first_name} ${last_name}`.trim() ||
-          "Consumidor Final",
+        scostumername: scostumername || `${first_name} ${last_name}`.trim() || "Consumidor Final",
         stributaryidentificationkey: stributaryidentificationkey || "01",
         stributaryidentificationname: "IVA",
         sfiscalresponsibilities: sfiscalresponsibilities || "R-99-PN",
@@ -116,24 +121,45 @@ const BillingForm = () => {
     }
   }, [userTaxxa]);
 
- 
-
   const handleSubmit = (e) => {
     e.preventDefault();
-    
   };
 
   const closePopup = () => setShowRegistrationPopup(false);
 
   return (
     <div className="flex flex-col min-h-screen">
+      {/* ✅ MOSTRAR INFORMACIÓN DE LA RESERVA SI VIENE DEL CHECK-OUT */}
+      {bookingData && (
+        <div className="bg-blue-50 border-b border-blue-200 p-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-lg font-semibold text-blue-800 mb-2">
+              🏨 Facturación desde Check-Out - Reserva #{bookingData.bookingId}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <strong>Habitación:</strong> {bookingData.room?.roomNumber}
+              </div>
+              <div>
+                <strong>Huésped:</strong> {bookingData.guest?.scostumername}
+              </div>
+              <div>
+                <strong>Total Factura:</strong> ${parseFloat(preGeneratedBill?.totalAmount || 0).toLocaleString()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 bg-gray-900">
-      <OrdenesPendientes
+        <OrdenesPendientes
           filterType="facturablesPendientes"
           mode="billingForm"
-          onSelectOrder={handleSelectDocument} // Pasar la función de callback
+          onSelectOrder={handleSelectDocument}
+          // ✅ SI VIENE DE CHECK-OUT, PRESELECCIONAR LA ORDEN
+          preSelectedBooking={bookingData}
         />
-    </div>
+      </div>
 
       <div className="p-6 max-w-lg mx-auto pt-16 grid-cols-4">
         <form onSubmit={handleFetchUser} className="flex flex-col gap-4 mb-6">
@@ -160,6 +186,7 @@ const BillingForm = () => {
         </form>
 
         {showRegistrationPopup && <UserRegistrationPopup onClose={closePopup} />}
+        
         <button
           type="button"
           onClick={handleProceedToDocument}
@@ -168,19 +195,28 @@ const BillingForm = () => {
           Proceder a Facturar o Nota de Crédito
         </button>
 
-        {/* Popup para seleccionar tipo de comprobante */}
         {showInvoicePopup && (
           <DocumentTypePopup
             onClose={() => setShowInvoicePopup(false)}
             onSubmit={(type) => {
               if (type === "01") {
-                console.log("Invoice Data:", jbuyer); // Log invoice data
-                navigate("/invoice", { state: { buyer: jbuyer } });
-                // Navegar a la ruta de facturas
+                console.log("Invoice Data:", jbuyer);
+                navigate("/invoice", { 
+                  state: { 
+                    buyer: jbuyer,
+                    bookingData,
+                    preGeneratedBill 
+                  }
+                });
               } else if (type === "91") {
-                console.log("Credit Note Data:", jbuyer); // Log credit note data
-                navigate("/creditN", { state: { buyer: jbuyer } });
-                // Navegar a la ruta de notas de crédito
+                console.log("Credit Note Data:", jbuyer);
+                navigate("/creditN", { 
+                  state: { 
+                    buyer: jbuyer,
+                    bookingData,
+                    preGeneratedBill 
+                  }
+                });
               }
             }}
           />
