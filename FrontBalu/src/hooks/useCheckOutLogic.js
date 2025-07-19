@@ -7,9 +7,9 @@ import {
   getAllBills,
   generateBill,
   checkOut,
-} from "../../../Redux/Actions/bookingActions";
+} from "../Redux/Actions/bookingActions";
 import { getRealPaymentSummary } from "../utils/paymentUtils";
-import { calculateRoomCharge } from "../../../utils/calculateRoomCharge";
+import { estimateEarlyCheckoutDiscount } from "../utils/calculateRoomCharge";
 
 export const useCheckOutLogic = () => {
   const dispatch = useDispatch();
@@ -194,7 +194,7 @@ export const useCheckOutLogic = () => {
 
       // Preparar datos de check-out
       const checkOutData = {
-        inventoryReturns: [], // Si tienes inventario, agrégalo aquí
+        inventoryReturns: [],
         forceCheckOut: forceExpiredCheckout || financials.totalPendiente > 0,
         notes: discountReason || "Check-out desde gestión",
         roomCondition: "good",
@@ -202,27 +202,23 @@ export const useCheckOutLogic = () => {
         generateBillAfterCheckout: financials.totalPendiente === 0,
       };
 
-      // ✅ AGREGAR DATOS DE DESCUENTO SI SE PROPORCIONA
       if (discountAmount > 0 && discountReason) {
         checkOutData.applyDiscount = true;
         checkOutData.discountAmount = discountAmount;
         checkOutData.discountReason = discountReason;
       }
 
-      // ✅ AGREGAR FECHA PERSONALIZADA SI SE PROPORCIONA
       if (customCheckOutDate) {
         checkOutData.actualCheckOut = customCheckOutDate;
         checkOutData.isEarlyCheckOut = new Date(customCheckOutDate) < new Date(targetBooking.checkOut);
       }
 
-      // Realizar check-out
       const result = await dispatch(checkOut(bookingId, checkOutData));
       
       if (result?.error) {
         throw new Error(result.message || "Error en el check-out");
       }
 
-      // ✅ MENSAJE DE ÉXITO CON INFORMACIÓN DETALLADA
       const isEarlyCheckOut = checkOutData.isEarlyCheckOut;
       const hasDiscount = discountAmount > 0;
       
@@ -237,8 +233,6 @@ export const useCheckOutLogic = () => {
       }
 
       toast.success(successMessage, { autoClose: 5000 });
-
-      // Recargar datos
       await loadBookings();
 
       console.log("✅ [CHECK-OUT] Completado exitosamente:", {
@@ -267,7 +261,6 @@ export const useCheckOutLogic = () => {
     const earlyCheckOut = new Date(earlyDate);
     const originalCheckOut = new Date(booking.checkOut);
 
-    // ✅ VALIDACIONES DE FECHA
     if (earlyCheckOut <= checkIn) {
       toast.error("❌ La fecha de salida debe ser posterior al check-in");
       return;
@@ -278,102 +271,42 @@ export const useCheckOutLogic = () => {
       return;
     }
 
-    // Calcular noches originales vs actuales
-    const originalNights = Math.ceil(
-      (originalCheckOut - checkIn) / (1000 * 60 * 60 * 24)
-    );
-    const actualNights = Math.max(
-      1,
-      Math.ceil((earlyCheckOut - checkIn) / (1000 * 60 * 60 * 24))
-    );
+    // ✅ USAR ESTIMACIÓN DEL BACKEND
+    const preview = estimateEarlyCheckoutDiscount(booking, earlyDate);
+    
+    if (!preview) {
+      toast.error("❌ No se puede calcular descuento para esta fecha");
+      return;
+    }
 
-    // ✅ OBTENER INFORMACIÓN FINANCIERA ACTUAL
     const financials = getRealPaymentSummary(booking);
     
-    // ✅ CONSIDERAR DESCUENTOS EXISTENTES
-    const originalAmount = parseFloat(booking.originalAmount || booking.totalAmount || 0);
-    const existingDiscount = parseFloat(booking.discountAmount || 0);
-
-    // Calcular nuevo costo por las noches reales
-    let newRoomCost;
-    try {
-      newRoomCost = calculateRoomCharge(
-        booking.room,
-        booking.guestCount,
-        actualNights
-      );
-    } catch (error) {
-      // Fallback: cálculo proporcional simple
-      newRoomCost = (originalAmount / originalNights) * actualNights;
-    }
-    
-    // ✅ CALCULAR DESCUENTO BASADO EN DIFERENCIA DE NOCHES
-    const potentialDiscount = Math.max(0, originalAmount - newRoomCost);
-    const nightsSaved = originalNights - actualNights;
-    const savingsPercentage = originalAmount > 0 
-      ? Math.round((potentialDiscount / originalAmount) * 100) 
-      : 0;
-
-    // ✅ INFORMACIÓN PARA EL USUARIO
-    const newTotalWithExtras = newRoomCost + financials.totalExtras;
-    const newBalance = Math.max(0, newTotalWithExtras - financials.totalPagado);
-
-    console.log("📊 [EARLY CHECKOUT] Cálculos:", {
-      originalNights,
-      actualNights,
-      nightsSaved,
-      originalAmount,
-      newRoomCost,
-      potentialDiscount,
-      savingsPercentage,
-      existingDiscount,
-      newBalance
-    });
-
-    // ✅ MODAL DE CONFIRMACIÓN DETALLADO
     const confirmMessage = 
       `🗓️ RETIRO ANTICIPADO CON DESCUENTO\n\n` +
       `📅 Check-in: ${checkIn.toLocaleDateString('es-CO')}\n` +
-      `📅 Salida original: ${originalCheckOut.toLocaleDateString('es-CO')} (${originalNights} noches)\n` +
-      `📅 Nueva salida: ${earlyCheckOut.toLocaleDateString('es-CO')} (${actualNights} noches)\n` +
-      `🛌 Noches ahorradas: ${nightsSaved}\n\n` +
-      `💰 CÁLCULO FINANCIERO:\n` +
-      `   • Costo original habitación: $${originalAmount.toLocaleString()}\n` +
-      `   • Nuevo costo habitación: $${newRoomCost.toLocaleString()}\n` +
-      `   • Descuento por noches no usadas: $${potentialDiscount.toLocaleString()} (${savingsPercentage}%)\n` +
-      (financials.totalExtras > 0 ? `   • Consumos extras: $${financials.totalExtras.toLocaleString()}\n` : '') +
-      `   • Total ajustado: $${newTotalWithExtras.toLocaleString()}\n` +
-      `   • Ya pagado: $${financials.totalPagado.toLocaleString()}\n` +
-      `   • ${newBalance > 0 ? `Saldo pendiente: $${newBalance.toLocaleString()}` : 'Cuenta saldada ✅'}\n\n` +
-      (existingDiscount > 0 ? `⚠️ NOTA: Ya tiene descuento previo de $${existingDiscount.toLocaleString()}\n\n` : '') +
-      `¿Proceder con el check-out anticipado y aplicar descuento?`;
+      `📅 Salida original: ${originalCheckOut.toLocaleDateString('es-CO')} (${preview.originalNights} noches)\n` +
+      `📅 Nueva salida: ${earlyCheckOut.toLocaleDateString('es-CO')} (${preview.actualNights} noches)\n` +
+      `🛌 Noches ahorradas: ${preview.nightsSaved}\n\n` +
+      `💰 ESTIMACIÓN FINANCIERA (el backend calculará el monto final):\n` +
+      `   • Total actual (backend): $${financials.totalFinal.toLocaleString()}\n` +
+      `   • Descuento estimado: ~$${preview.estimatedDiscount.toLocaleString()}\n` +
+      `   • Ya pagado: $${financials.totalPagado.toLocaleString()}\n\n` +
+      `⚠️ NOTA: El descuento final será calculado por el sistema del hotel.\n\n` +
+      `¿Proceder con el check-out anticipado?`;
 
     const confirmDiscount = window.confirm(confirmMessage);
 
     if (confirmDiscount) {
       try {
-        // ✅ MENSAJE INFORMATIVO MIENTRAS PROCESA
-        toast.info(
-          `🔄 Procesando retiro anticipado con descuento de $${potentialDiscount.toLocaleString()}...`, 
-          { autoClose: 3000 }
-        );
+        toast.info("🔄 Procesando retiro anticipado (el backend calculará descuentos)...", { autoClose: 3000 });
 
-        const discountReason = `Retiro anticipado: ${originalNights} noches → ${actualNights} noches (${nightsSaved} día${nightsSaved > 1 ? 's' : ''} menos)`;
-        
         await handleCheckOut(
           booking.bookingId,
           earlyDate,
-          potentialDiscount,
-          discountReason,
+          0, // El backend calculará el descuento
+          `Retiro anticipado solicitado: ${preview.originalNights} → ${preview.actualNights} noches`,
           false
         );
-
-        console.log("✅ [EARLY CHECKOUT] Completado:", {
-          bookingId: booking.bookingId,
-          nightsSaved,
-          discountApplied: potentialDiscount,
-          newTotal: newTotalWithExtras
-        });
 
       } catch (error) {
         console.error("❌ [EARLY CHECKOUT] Error:", error);
@@ -391,13 +324,11 @@ export const useCheckOutLogic = () => {
       return;
     }
 
-    // Verificar estado válido
     if (!["completed", "checked-in", "paid"].includes(booking.status)) {
       toast.error("❌ Solo se pueden generar facturas para reservas completadas o activas");
       return;
     }
 
-    // Verificar pagos
     const financials = getRealPaymentSummary(booking);
     if (financials.totalPendiente > 0) {
       const confirmGenerate = window.confirm(
@@ -423,7 +354,7 @@ export const useCheckOutLogic = () => {
         includeExtras: true,
         paymentMethod: financials.isFullyPaid ? "mixed" : "pending",
         generatePDF: true,
-        applyDiscounts: true // ✅ Incluir descuentos aplicados
+        applyDiscounts: true
       };
 
       const result = await dispatch(generateBill(billData));
@@ -432,14 +363,11 @@ export const useCheckOutLogic = () => {
         throw new Error(result.message || "Error al generar factura");
       }
 
-      // ✅ MOSTRAR FACTURA GENERADA
       if (result?.bill) {
         setGeneratedBill(result.bill);
         setShowBillModal(true);
         
         toast.success("✅ Factura generada exitosamente", { autoClose: 3000 });
-        
-        // Recargar datos para actualizar estado
         await loadBookings();
       }
 
@@ -458,25 +386,19 @@ export const useCheckOutLogic = () => {
     console.log("💳 [PAYMENT-SUCCESS] Datos recibidos:", paymentData);
     
     try {
-      // Mensaje de éxito
       toast.success(
         `✅ Pago procesado: $${parseFloat(paymentData.amount || 0).toLocaleString()}`,
         { autoClose: 5000 }
       );
 
-      // Cerrar modal de pago
       setSelectedBooking(null);
-
-      // Recargar datos para reflejar el nuevo pago
       await loadBookings();
 
-      // ✅ VERIFICAR SI AHORA ESTÁ COMPLETAMENTE PAGADO
       const updatedBooking = bookings.find(b => b.bookingId === paymentData.bookingId);
       if (updatedBooking) {
         const updatedFinancials = getRealPaymentSummary(updatedBooking);
         
         if (updatedFinancials.isFullyPaid) {
-          // Preguntar si desea generar factura automáticamente
           setTimeout(() => {
             const generateBill = window.confirm(
               `🎉 ¡PAGO COMPLETADO!\n\n` +
@@ -497,7 +419,6 @@ export const useCheckOutLogic = () => {
     }
   }, [bookings, loadBookings, handleGenerateBill]);
 
-  // ✅ CARGAR DATOS INICIAL
   useEffect(() => {
     loadBookings();
   }, [loadBookings]);

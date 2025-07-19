@@ -1,15 +1,15 @@
 import React from "react";
-import { useCheckOutLogic } from "./useCheckOutLogic";
+import { useCheckOutLogic } from "../../hooks/useCheckOutLogic";
 import CheckOutHeader from "./CheckOutHeader";
 import CheckOutFilters from "./CheckOutFilters";
 import BookingCard from "./BookingCard";
 import PaymentAndReceipt from "../Booking/PaymentAndReceipt";
 import ExtraCharges from "./ExtraCharge";
-import BillModal from "../Taxxa/";
-import EarlyCheckOutModal from "./components/EarlyCheckOutModal";
-import LoadingSpinner from "./components/LoadingSpinner";
-import EmptyState from "./components/EmptyState";
-import { getCheckOutBadge } from "./utils/checkOutUtils";
+import BillModal from "../Taxxa/BillModal";
+import EarlyCheckOutModal from "./EarlyCheckOutModal";
+import LoadingSpinner from "./LoadingSpinner";
+import EmptyState from "./EmptyState";
+import { getCheckOutBadge } from "../../utils/checkOutUtils";
 
 const CheckOut = () => {
   const {

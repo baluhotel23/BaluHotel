@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { getRealPaymentSummary } from '../utils/paymentUtils';
+import { getRealPaymentSummary } from '../../utils/paymentUtils';
 import BookingCardHeader from './BookingCardHeader';
 import BookingCardFinancials from './BookingCardFinancials';
 import BookingCardActions from './BookingCardActions';
