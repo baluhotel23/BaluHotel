@@ -251,71 +251,88 @@ export const useCheckOutLogic = () => {
   }, [bookings, dispatch, loadBookings]);
 
   // ✅ FUNCIÓN COMPLETA DE CHECK-OUT ANTICIPADO CON DESCUENTO
-  const handleEarlyCheckOutWithDiscount = useCallback(async (booking, earlyDate) => {
-    if (!booking || !earlyDate) {
-      toast.error("❌ Datos incompletos para check-out anticipado");
-      return;
-    }
+  const handleEarlyCheckOutWithDiscount = useCallback(async (booking, earlyDate, customReason = "") => {
+  if (!booking || !earlyDate) {
+    toast.error("❌ Datos incompletos para check-out anticipado");
+    return;
+  }
 
-    const checkIn = new Date(booking.checkIn);
-    const earlyCheckOut = new Date(earlyDate);
-    const originalCheckOut = new Date(booking.checkOut);
+  const checkIn = new Date(booking.checkIn);
+  const earlyCheckOut = new Date(earlyDate);
+  const originalCheckOut = new Date(booking.checkOut);
 
-    if (earlyCheckOut <= checkIn) {
-      toast.error("❌ La fecha de salida debe ser posterior al check-in");
-      return;
-    }
+  if (earlyCheckOut <= checkIn) {
+    toast.error("❌ La fecha de salida debe ser posterior al check-in");
+    return;
+  }
 
-    if (earlyCheckOut >= originalCheckOut) {
-      toast.error("❌ La fecha de salida debe ser anterior a la fecha original");
-      return;
-    }
+  if (earlyCheckOut >= originalCheckOut) {
+    toast.error("❌ La fecha de salida debe ser anterior a la fecha original");
+    return;
+  }
 
-    // ✅ USAR ESTIMACIÓN DEL BACKEND
-    const preview = estimateEarlyCheckoutDiscount(booking, earlyDate);
-    
-    if (!preview) {
-      toast.error("❌ No se puede calcular descuento para esta fecha");
-      return;
-    }
+  // ✅ USAR ESTIMACIÓN DEL BACKEND
+  const preview = estimateEarlyCheckoutDiscount(booking, earlyDate);
+  
+  if (!preview) {
+    toast.error("❌ No se puede calcular descuento para esta fecha");
+    return;
+  }
 
-    const financials = getRealPaymentSummary(booking);
-    
-    const confirmMessage = 
-      `🗓️ RETIRO ANTICIPADO CON DESCUENTO\n\n` +
-      `📅 Check-in: ${checkIn.toLocaleDateString('es-CO')}\n` +
-      `📅 Salida original: ${originalCheckOut.toLocaleDateString('es-CO')} (${preview.originalNights} noches)\n` +
-      `📅 Nueva salida: ${earlyCheckOut.toLocaleDateString('es-CO')} (${preview.actualNights} noches)\n` +
-      `🛌 Noches ahorradas: ${preview.nightsSaved}\n\n` +
-      `💰 ESTIMACIÓN FINANCIERA (el backend calculará el monto final):\n` +
-      `   • Total actual (backend): $${financials.totalFinal.toLocaleString()}\n` +
-      `   • Descuento estimado: ~$${preview.estimatedDiscount.toLocaleString()}\n` +
-      `   • Ya pagado: $${financials.totalPagado.toLocaleString()}\n\n` +
-      `⚠️ NOTA: El descuento final será calculado por el sistema del hotel.\n\n` +
-      `¿Proceder con el check-out anticipado?`;
+  const financials = getRealPaymentSummary(booking);
+  
+  // ✅ MOSTRAR PREVIEW DETALLADO DEL DESCUENTO
+  const confirmMessage = 
+    `🗓️ RETIRO ANTICIPADO CON DESCUENTO\n\n` +
+    `📅 Check-in: ${checkIn.toLocaleDateString('es-CO')}\n` +
+    `📅 Salida original: ${originalCheckOut.toLocaleDateString('es-CO')} (${preview.originalNights} noches)\n` +
+    `📅 Nueva salida: ${earlyCheckOut.toLocaleDateString('es-CO')} (${preview.actualNights} noches)\n` +
+    `🛌 Noches ahorradas: ${preview.nightsSaved}\n\n` +
+    `💰 CÁLCULO FINANCIERO:\n` +
+    `   • Total original: $${financials.totalOriginal.toLocaleString()}\n` +
+    `   • Descuento estimado: $${preview.estimatedDiscount.toLocaleString()}\n` +
+    `   • Nuevo total estimado: $${(financials.totalOriginal - preview.estimatedDiscount + financials.totalExtras).toLocaleString()}\n` +
+    `   • Ya pagado: $${financials.totalPagado.toLocaleString()}\n` +
+    `   • Balance estimado: $${Math.max(0, (financials.totalOriginal - preview.estimatedDiscount + financials.totalExtras) - financials.totalPagado).toLocaleString()}\n\n` +
+    `⚠️ NOTA: Los montos finales serán calculados por el backend.\n\n` +
+    `¿Proceder con el check-out anticipado?`;
 
-    const confirmDiscount = window.confirm(confirmMessage);
+  const confirmDiscount = window.confirm(confirmMessage);
 
-    if (confirmDiscount) {
-      try {
-        toast.info("🔄 Procesando retiro anticipado (el backend calculará descuentos)...", { autoClose: 3000 });
+  if (confirmDiscount) {
+    try {
+      toast.info("🔄 Procesando retiro anticipado con descuento...", { autoClose: 3000 });
 
-        await handleCheckOut(
-          booking.bookingId,
-          earlyDate,
-          0, // El backend calculará el descuento
-          `Retiro anticipado solicitado: ${preview.originalNights} → ${preview.actualNights} noches`,
-          false
+      // ✅ USAR RAZÓN PERSONALIZADA SI SE PROPORCIONA
+      const reason = customReason || 
+        `Check-out anticipado: ${preview.originalNights} → ${preview.actualNights} noches. ` +
+        `Descuento estimado: $${preview.estimatedDiscount.toLocaleString()}`;
+
+      await handleCheckOut(
+        booking.bookingId,
+        earlyDate,
+        preview.estimatedDiscount, // ✅ PASAR EL DESCUENTO ESTIMADO
+        reason,
+        false
+      );
+
+      // ✅ MOSTRAR MENSAJE DE ÉXITO CON DETALLES
+      setTimeout(() => {
+        toast.success(
+          `✅ Check-out anticipado completado!\n` +
+          `Descuento aplicado: $${preview.estimatedDiscount.toLocaleString()}`, 
+          { autoClose: 7000 }
         );
+      }, 1000);
 
-      } catch (error) {
-        console.error("❌ [EARLY CHECKOUT] Error:", error);
-        toast.error(`❌ Error al procesar retiro anticipado: ${error.message}`);
-      }
-    } else {
-      toast.info("🚫 Retiro anticipado cancelado por el usuario");
+    } catch (error) {
+      console.error("❌ [EARLY CHECKOUT] Error:", error);
+      toast.error(`❌ Error al procesar retiro anticipado: ${error.message}`);
     }
-  }, [handleCheckOut]);
+  } else {
+    toast.info("🚫 Retiro anticipado cancelado por el usuario");
+  }
+}, [handleCheckOut]);
 
   // ✅ FUNCIÓN COMPLETA PARA GENERAR FACTURA
   const handleGenerateBill = useCallback(async (booking) => {

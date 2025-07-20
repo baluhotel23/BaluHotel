@@ -1,9 +1,3 @@
-/**
- * Utilidades para el manejo de pagos y cálculos financieros
- * Adaptado para la estructura de datos del backend BaluHotel
- */
-
-// ✅ FUNCIÓN PRINCIPAL PARA OBTENER RESUMEN REAL DE PAGOS
 export const getRealPaymentSummary = (booking) => {
   if (!booking) {
     return {
@@ -27,22 +21,45 @@ export const getRealPaymentSummary = (booking) => {
   if (booking.financialSummary) {
     const fs = booking.financialSummary;
     
+    // ✅ CALCULAR DESCUENTOS CORRECTAMENTE
+    const totalDescuentos = parseFloat(
+      booking.discountAmount || 
+      booking.earlyCheckoutDiscount || 
+      fs.totalDescuentos ||
+      0
+    );
+
+    // ✅ VERIFICAR SI HAY DESCUENTOS POR CHECK-OUT ANTICIPADO
+    const hasEarlyCheckoutDiscount = parseFloat(booking.earlyCheckoutDiscount || 0) > 0;
+    
     return {
       totalOriginal: parseFloat(fs.totalReserva || booking.totalAmount || 0),
       totalExtras: parseFloat(fs.totalExtras || 0),
-      totalDescuentos: parseFloat(booking.discountAmount || 0), // El backend no parece manejar descuentos aún
-      totalImpuestos: parseFloat(booking.taxAmount || 0), // El backend no parece manejar impuestos aún
-      totalFinal: parseFloat(fs.totalFinal || fs.totalReserva || 0),
+      totalDescuentos, // ✅ INCLUIR TODOS LOS DESCUENTOS
+      totalImpuestos: parseFloat(booking.taxAmount || 0),
+      totalFinal: parseFloat(fs.totalFinal || fs.totalReserva || 0) - totalDescuentos, // ✅ RESTAR DESCUENTOS
       totalPagado: parseFloat(fs.totalPagado || 0),
-      totalPendiente: parseFloat(fs.totalPendiente || 0),
-      isFullyPaid: fs.isFullyPaid === true,
-      paymentPercentage: parseInt(fs.paymentPercentage || 0),
+      totalPendiente: Math.max(0, parseFloat(fs.totalPendiente || 0) - totalDescuentos), // ✅ AJUSTAR PENDIENTE
+      isFullyPaid: (parseFloat(fs.totalFinal || 0) - totalDescuentos) <= parseFloat(fs.totalPagado || 0),
+      paymentPercentage: (() => {
+        const finalAmount = parseFloat(fs.totalFinal || 0) - totalDescuentos;
+        const paidAmount = parseFloat(fs.totalPagado || 0);
+        return finalAmount > 0 ? Math.min(100, Math.round((paidAmount / finalAmount) * 100)) : 0;
+      })(),
       hasPayments: fs.paymentsCount > 0 || fs.totalPagado > 0,
       hasExtras: fs.hasExtras === true || fs.totalExtras > 0,
-      hasDiscounts: parseFloat(booking.discountAmount || 0) > 0,
+      hasDiscounts: totalDescuentos > 0,
+      hasEarlyCheckoutDiscount, // ✅ NUEVO CAMPO
       
       // ✅ INFORMACIÓN ADICIONAL DEL BACKEND
-      paymentStatus: fs.paymentStatus,
+      paymentStatus: (() => {
+        const finalAmount = parseFloat(fs.totalFinal || 0) - totalDescuentos;
+        const paidAmount = parseFloat(fs.totalPagado || 0);
+        
+        if (finalAmount <= paidAmount) return 'fully_paid';
+        if (paidAmount === 0) return 'unpaid';
+        return 'partially_paid';
+      })(),
       paymentsCount: fs.paymentsCount || 0,
       extraChargesCount: fs.extraChargesCount || 0,
       
@@ -55,7 +72,7 @@ export const getRealPaymentSummary = (booking) => {
           roomNumber: booking.roomNumber || booking.room?.roomNumber
         },
         extras: getExtraChargesBreakdown(booking),
-        descuentos: getDiscountsBreakdown(booking),
+        descuentos: getDiscountsBreakdown(booking), // ✅ INCLUIRÁ DESCUENTOS POR CHECK-OUT ANTICIPADO
         impuestos: {
           amount: parseFloat(booking.taxAmount || 0),
           description: "Impuestos aplicables"
@@ -70,7 +87,7 @@ export const getRealPaymentSummary = (booking) => {
   
   const totalOriginal = parseFloat(booking.totalAmount || 0);
   const totalExtras = calculateExtraCharges(booking);
-  const totalDescuentos = parseFloat(booking.discountAmount || 0);
+  const totalDescuentos = parseFloat(booking.discountAmount || booking.earlyCheckoutDiscount || 0);
   const totalImpuestos = parseFloat(booking.taxAmount || 0);
   const totalFinal = Math.max(0, totalOriginal + totalExtras - totalDescuentos + totalImpuestos);
   const totalPagado = calculateTotalPayments(booking);
@@ -89,6 +106,7 @@ export const getRealPaymentSummary = (booking) => {
     hasPayments: totalPagado > 0,
     hasExtras: totalExtras > 0,
     hasDiscounts: totalDescuentos > 0,
+    hasEarlyCheckoutDiscount: parseFloat(booking.earlyCheckoutDiscount || 0) > 0,
     breakdown: {
       habitacion: {
         amount: totalOriginal,
@@ -231,6 +249,31 @@ export const getDiscountsBreakdown = (booking) => {
       amount: parseFloat(booking.discountAmount),
       date: booking.discountDate || booking.updatedAt,
       type: booking.discountType || 'manual'
+    });
+  }
+
+  // ✅ DESCUENTO POR CHECK-OUT ANTICIPADO
+  if (booking.earlyCheckoutDiscount && parseFloat(booking.earlyCheckoutDiscount) > 0) {
+    discounts.push({
+      id: 'early-checkout-discount',
+      description: booking.earlyCheckoutReason || 'Descuento por check-out anticipado',
+      amount: parseFloat(booking.earlyCheckoutDiscount),
+      date: booking.actualCheckOut || booking.updatedAt,
+      type: 'early_checkout',
+      originalNights: booking.originalNights,
+      actualNights: booking.actualNights,
+      nightsSaved: (booking.originalNights || 0) - (booking.actualNights || 0)
+    });
+  }
+
+  // ✅ OTROS DESCUENTOS ESPECÍFICOS
+  if (booking.promoDiscount && parseFloat(booking.promoDiscount) > 0) {
+    discounts.push({
+      id: 'promo-discount',
+      description: 'Descuento promocional',
+      amount: parseFloat(booking.promoDiscount),
+      date: booking.updatedAt,
+      type: 'promotion'
     });
   }
 
