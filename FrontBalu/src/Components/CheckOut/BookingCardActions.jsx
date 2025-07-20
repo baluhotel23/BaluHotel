@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { 
   getAvailableActions, 
   canCheckOut, 
-  getPaymentStatus,
   getColorClasses 
 } from '../../utils/checkOutUtils';
+import { getPaymentStatus } from '../../utils/paymentUtils';
 import { getRealPaymentSummary } from '../../utils/paymentUtils';
 
 const BookingCardActions = ({ 

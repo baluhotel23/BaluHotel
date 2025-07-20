@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getRealPaymentSummary } from '../../utils/paymentUtils';
-import { calculateRoomCharge } from '../../hooks/calculateRoomCharge';
+import { calculateRoomCharge } from '../../utils/calculateRoomCharge';
 
 const EarlyCheckOutModal = ({
   booking,
