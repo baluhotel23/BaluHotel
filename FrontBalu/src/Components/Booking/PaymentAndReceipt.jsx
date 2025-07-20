@@ -11,12 +11,25 @@ const PaymentAndReceipt = ({
   currentBuyerData,
   selectedRoom,
   onPaymentSuccess,
+  onClose, // ✅ AGREGAR PROP onClose QUE FALTABA
 }) => {
   const dispatch = useDispatch();
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [showExtraCharges, setShowExtraCharges] = useState(false);
+
+  // ✅ AGREGAR LOG DE DEBUG PARA IDENTIFICAR PROBLEMAS
+  useEffect(() => {
+    console.log("💳 [PAYMENT-MODAL] Datos recibidos:", {
+      bookingId: bookingData?.bookingId,
+      amountToPay,
+      hasGuestData: !!currentBuyerData,
+      hasRoomData: !!selectedRoom,
+      hasPaymentInfo: !!bookingData?.paymentInfo,
+      hasFinancialSummary: !!bookingData?.financialSummary
+    });
+  }, [bookingData, amountToPay, currentBuyerData, selectedRoom]);
 
   // 🔧 FUNCIÓN PARA FORMATEAR FECHAS
   const formatDateTime = (dateString) => {
@@ -48,16 +61,37 @@ const PaymentAndReceipt = ({
       'bank_transfer': '🏦 Transferencia Bancaria',
       'card': '💳 Tarjeta',
       'other': '📝 Otro',
-      'online': '🌐 Pago Online'
+      'online': '🌐 Pago Online',
+      'nequi': '📱 Nequi',
+      'daviplata': '📱 Daviplata'
     };
     return methods[method] || `📄 ${method}`;
   };
 
-  // 🔧 FUNCIÓN MEJORADA PARA OBTENER DATOS FINANCIEROS
+  // ✅ FUNCIÓN MEJORADA PARA OBTENER DATOS FINANCIEROS - PRIORIZAR BACKEND
   const getFinancialData = () => {
     console.log('📊 [PAYMENT] bookingData recibida:', bookingData);
     
-    // 🎯 PRIORIZAR paymentInfo DEL BACKEND QUE TIENE TODOS LOS CÁLCULOS
+    // ✅ 1. PRIORIZAR financialSummary DEL BACKEND (NUEVO FORMATO)
+    if (bookingData?.financialSummary) {
+      const fs = bookingData.financialSummary;
+      console.log('✅ [PAYMENT] Usando financialSummary del backend:', fs);
+      
+      return {
+        totalReserva: parseFloat(fs.totalReserva || bookingData.totalAmount || 0),
+        totalExtras: parseFloat(fs.totalExtras || 0),
+        totalPagado: parseFloat(fs.totalPagado || 0),
+        totalFinal: parseFloat(fs.totalFinal || fs.totalReserva || 0),
+        pendienteReal: parseFloat(fs.totalPendiente || 0),
+        allPayments: fs.allPayments || [],
+        paymentCount: fs.paymentsCount || 0,
+        paymentStatus: fs.paymentStatus || 'unpaid',
+        hasExtras: fs.hasExtras || false,
+        extraChargesCount: fs.extraChargesCount || 0
+      };
+    }
+    
+    // ✅ 2. USAR paymentInfo DEL BACKEND (FORMATO ANTERIOR)
     if (bookingData?.paymentInfo) {
       const paymentInfo = bookingData.paymentInfo;
       const extraChargesInfo = bookingData.extraChargesInfo || {};
@@ -68,18 +102,17 @@ const PaymentAndReceipt = ({
         totalPagado: parseFloat(paymentInfo.totalPaid || 0),
         totalFinal: parseFloat(paymentInfo.totalAmount || bookingData.totalAmount || 0),
         pendienteReal: parseFloat(paymentInfo.balance || 0),
-        // 🆕 INFORMACIÓN ADICIONAL
         allPayments: paymentInfo.allPayments || [],
         paymentCount: paymentInfo.paymentCount || 0,
         paymentStatus: paymentInfo.paymentStatus || 'unpaid'
       };
 
-      console.log('📊 [PAYMENT] Datos financieros del backend:', financialData);
+      console.log('📊 [PAYMENT] Usando paymentInfo del backend:', financialData);
       return financialData;
     }
 
-    // 🔄 FALLBACK: Cálculo manual si no hay paymentInfo
-    console.log('⚠️ [PAYMENT] No hay paymentInfo, calculando manualmente');
+    // ✅ 3. FALLBACK: Cálculo manual si no hay datos del backend
+    console.log('⚠️ [PAYMENT] No hay datos financieros del backend, calculando manualmente');
     
     const totalReserva = parseFloat(bookingData?.totalAmount || 0);
     const extraCharges = bookingData?.extraCharges || [];
@@ -114,13 +147,157 @@ const PaymentAndReceipt = ({
   };
 
   const financialData = getFinancialData();
-  const [paymentAmount, setPaymentAmount] = useState(financialData.pendienteReal);
+  const [paymentAmount, setPaymentAmount] = useState(0);
 
-  // 🔧 ACTUALIZAR MONTO CUANDO CAMBIEN LOS DATOS
+  // ✅ ACTUALIZAR MONTO CUANDO CAMBIEN LOS DATOS
   useEffect(() => {
     const newFinancialData = getFinancialData();
-    setPaymentAmount(newFinancialData.pendienteReal);
-  }, [bookingData]);
+    const amountToSet = newFinancialData.pendienteReal || amountToPay || 0;
+    setPaymentAmount(amountToSet);
+    
+    console.log('💰 [PAYMENT] Monto actualizado:', {
+      pendienteReal: newFinancialData.pendienteReal,
+      amountToPay,
+      finalAmount: amountToSet
+    });
+  }, [bookingData, amountToPay]);
+
+  // ✅ FUNCIÓN PRINCIPAL DE PAGO MEJORADA
+  const handlePayment = async () => {
+    // 🛡️ VALIDACIONES EXHAUSTIVAS
+    if (!paymentAmount || paymentAmount <= 0) {
+      toast.error("El monto del pago debe ser mayor a 0");
+      return;
+    }
+
+    const currentFinancialData = getFinancialData();
+    
+    if (paymentAmount > currentFinancialData.pendienteReal) {
+      toast.error(`El monto del pago ($${paymentAmount.toLocaleString()}) no puede ser mayor al monto pendiente ($${currentFinancialData.pendienteReal.toLocaleString()})`);
+      return;
+    }
+
+    if (!bookingData?.bookingId) {
+      toast.error("Error: No se encontró la información de la reserva");
+      return;
+    }
+
+    if (!paymentMethod) {
+      toast.error("Debe seleccionar un método de pago");
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      console.group("🔍 [PAYMENT] Procesando pago");
+      console.log("📊 Datos financieros:", currentFinancialData);
+      console.log("💰 paymentAmount:", paymentAmount);
+      console.log("💳 paymentMethod:", paymentMethod);
+
+      // ✅ PREPARAR DATOS DEL PAGO
+      const paymentData = {
+        bookingId: bookingData.bookingId,
+        amount: parseFloat(paymentAmount),
+        paymentMethod: paymentMethod,
+        paymentDate: new Date().toISOString(),
+        paymentStatus: 'completed',
+        notes: `Pago ${getPaymentMethodLabel(paymentMethod).replace(/[^\w\s]/g, '')} - Check-out`,
+        paymentType: 'checkout',
+        description: `Pago ${paymentAmount === currentFinancialData.pendienteReal ? 'total' : 'parcial'} de reserva #${bookingData.bookingId}`,
+        // ✅ METADATOS ADICIONALES
+        metadata: {
+          totalReserva: currentFinancialData.totalReserva,
+          totalExtras: currentFinancialData.totalExtras,
+          totalPagadoAntes: currentFinancialData.totalPagado,
+          pendienteAntes: currentFinancialData.pendienteReal,
+          processedAt: new Date().toISOString(),
+          processedBy: 'checkout_system'
+        }
+      };
+
+      console.log("📤 Enviando al backend:", paymentData);
+
+      // ✅ ENVIAR AL BACKEND
+      const result = await dispatch(registerLocalPayment(paymentData));
+      
+      console.log("📥 Resultado del backend:", result);
+
+      if (result?.success || result?.data || !result?.error) {
+        console.log("✅ Pago registrado exitosamente");
+        
+        // ✅ PREPARAR DATOS DEL RESULTADO
+        const paymentDetails = {
+          paymentId: result.data?.data?.id || result.data?.id || result.paymentId || Date.now(),
+          amount: paymentAmount,
+          method: paymentMethod,
+          date: new Date(),
+          bookingId: bookingData.bookingId,
+          ...result.data?.data,
+          ...result.data
+        };
+
+        // ✅ GENERAR RECIBO CON CONTEXTO COMPLETO
+        setTimeout(() => {
+          generatePDF(paymentDetails);
+        }, 500);
+
+        // ✅ MOSTRAR ÉXITO
+        const remainingAmount = currentFinancialData.pendienteReal - paymentAmount;
+        const successMessage = remainingAmount > 0 
+          ? `✅ Pago parcial de $${parseFloat(paymentAmount).toLocaleString()} registrado. Resta: $${remainingAmount.toLocaleString()}`
+          : `✅ Pago completo de $${parseFloat(paymentAmount).toLocaleString()} registrado. ¡Cuenta saldada!`;
+        
+        toast.success(successMessage);
+        
+        // ✅ NOTIFICAR AL COMPONENTE PADRE CON DATOS COMPLETOS
+        if (onPaymentSuccess) {
+          onPaymentSuccess({
+            bookingId: bookingData.bookingId,
+            paymentId: paymentDetails.paymentId,
+            amount: paymentAmount,
+            paymentMethod,
+            paymentData: result.data,
+            isPartialPayment: paymentAmount < currentFinancialData.pendienteReal,
+            remainingAmount: Math.max(0, currentFinancialData.pendienteReal - paymentAmount),
+            isFullyPaid: paymentAmount >= currentFinancialData.pendienteReal,
+            // ✅ DATOS ADICIONALES PARA EL HOOK
+            success: true,
+            payment: paymentDetails,
+            financialData: currentFinancialData
+          });
+        }
+
+        // ✅ CERRAR MODAL DESPUÉS DE UN DELAY
+        setTimeout(() => {
+          if (onClose) {
+            onClose();
+          }
+        }, 1500);
+
+      } else {
+        throw new Error(result?.error || result?.message || 'Error desconocido al registrar el pago');
+      }
+
+    } catch (error) {
+      console.error("❌ Error al procesar el pago:", error);
+      
+      // ✅ MANEJO MEJORADO DE ERRORES
+      let errorMessage = "Error al procesar el pago";
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(`❌ ${errorMessage}`);
+      
+    } finally {
+      setIsProcessing(false);
+      console.groupEnd();
+    }
+  };
 
   // 🆕 FUNCIÓN MEJORADA PARA GENERAR PDF CON HISTORIAL COMPLETO
   const generatePDF = (paymentDetails) => {
@@ -413,125 +590,11 @@ const PaymentAndReceipt = ({
   };
 
   // 🔧 FUNCIÓN PRINCIPAL DE PAGO MEJORADA
-  const handlePayment = async () => {
-    // 🛡️ VALIDACIONES EXHAUSTIVAS
-    if (!paymentAmount || paymentAmount <= 0) {
-      toast.error("El monto del pago debe ser mayor a 0");
-      return;
-    }
-
-    const currentFinancialData = getFinancialData();
-    
-    if (paymentAmount > currentFinancialData.pendienteReal) {
-      toast.error(`El monto del pago ($${paymentAmount.toLocaleString()}) no puede ser mayor al monto pendiente ($${currentFinancialData.pendienteReal.toLocaleString()})`);
-      return;
-    }
-
-    if (!bookingData?.bookingId) {
-      toast.error("Error: No se encontró la información de la reserva");
-      return;
-    }
-
-    if (!paymentMethod) {
-      toast.error("Debe seleccionar un método de pago");
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      console.group("🔍 [PAYMENT] Procesando pago");
-      console.log("📊 Datos financieros:", currentFinancialData);
-      console.log("💰 paymentAmount:", paymentAmount);
-      console.log("💳 paymentMethod:", paymentMethod);
-
-      // 🔧 PREPARAR DATOS DEL PAGO
-      const paymentData = {
-        bookingId: bookingData.bookingId,
-        amount: parseFloat(paymentAmount),
-        paymentMethod: paymentMethod,
-        paymentDate: new Date().toISOString(),
-        paymentStatus: 'completed',
-        notes: `Pago ${getPaymentMethodLabel(paymentMethod).replace(/[^\w\s]/g, '')} - Check-out`,
-        paymentType: 'checkout',
-        description: `Pago ${paymentAmount === currentFinancialData.pendienteReal ? 'total' : 'parcial'} de reserva #${bookingData.bookingId}`,
-        // 🔧 METADATOS ADICIONALES
-        metadata: {
-          totalReserva: currentFinancialData.totalReserva,
-          totalExtras: currentFinancialData.totalExtras,
-          totalPagadoAntes: currentFinancialData.totalPagado,
-          pendienteAntes: currentFinancialData.pendienteReal,
-          processedAt: new Date().toISOString(),
-          processedBy: 'checkout_system'
-        }
-      };
-
-      console.log("📤 Enviando al backend:", paymentData);
-
-      // 🔧 ENVIAR AL BACKEND
-      const result = await dispatch(registerLocalPayment(paymentData));
-      
-      console.log("📥 Resultado del backend:", result);
-
-      if (result?.success || result?.data) {
-        console.log("✅ Pago registrado exitosamente");
-        
-        // 🔧 PREPARAR DATOS DEL RECIBO
-        const paymentDetails = {
-          paymentId: result.data?.data?.id || result.data?.id || Date.now(),
-          amount: paymentAmount,
-          method: paymentMethod,
-          date: new Date(),
-          bookingId: bookingData.bookingId,
-          ...result.data?.data
-        };
-
-        // 🧾 GENERAR RECIBO CON CONTEXTO COMPLETO
-        setTimeout(() => {
-          generatePDF(paymentDetails);
-        }, 500);
-
-        // 🎉 MOSTRAR ÉXITO
-        const remainingAmount = currentFinancialData.pendienteReal - paymentAmount;
-        const successMessage = remainingAmount > 0 
-          ? `✅ Pago parcial de $${parseFloat(paymentAmount).toLocaleString()} registrado. Resta: $${remainingAmount.toLocaleString()}`
-          : `✅ Pago completo de $${parseFloat(paymentAmount).toLocaleString()} registrado. ¡Cuenta saldada!`;
-        
-        toast.success(successMessage);
-        
-        // 🔧 NOTIFICAR AL COMPONENTE PADRE
-        if (onPaymentSuccess) {
-          onPaymentSuccess({
-            paymentMethod,
-            amount: paymentAmount,
-            paymentData: result.data,
-            isPartialPayment: paymentAmount < currentFinancialData.pendienteReal,
-            remainingAmount: Math.max(0, currentFinancialData.pendienteReal - paymentAmount),
-            isFullyPaid: paymentAmount >= currentFinancialData.pendienteReal
-          });
-        }
-
-      } else {
-        throw new Error(result?.error || result?.message || 'Error desconocido al registrar el pago');
-      }
-
-    } catch (error) {
-      console.error("❌ Error al procesar el pago:", error);
-      
-      // 🔧 MANEJO MEJORADO DE ERRORES
-      let errorMessage = "Error al procesar el pago";
-      
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      toast.error(`❌ ${errorMessage}`);
-      
-    } finally {
-      setIsProcessing(false);
-      console.groupEnd();
+ const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else if (onPaymentSuccess) {
+      onPaymentSuccess(null);
     }
   };
 
@@ -553,7 +616,7 @@ const PaymentAndReceipt = ({
               </div>
             </div>
             <button
-              onClick={() => onPaymentSuccess && onPaymentSuccess(null)}
+              onClick={handleClose}
               className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
             >
               Cerrar
@@ -564,24 +627,30 @@ const PaymentAndReceipt = ({
     );
   }
 
-  // 🔧 OBTENER DATOS PARA LOS HISTORIALES
+  // ✅ OBTENER DATOS PARA LOS HISTORIALES
   const paymentHistory = financialData.allPayments || bookingData?.payments?.filter(p => p.paymentStatus === 'completed') || [];
   const extraCharges = bookingData?.extraCharges || [];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        {/* 🎯 HEADER */}
+        {/* ✅ HEADER MEJORADO */}
         <div className="bg-blue-600 text-white p-4 rounded-t-lg">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-bold">💳 Procesar Pago - Reserva #{bookingData?.bookingId}</h3>
             <button
-              onClick={() => onPaymentSuccess && onPaymentSuccess(null)}
+              onClick={handleClose}
               className="text-white hover:text-gray-200 text-xl font-bold"
               disabled={isProcessing}
             >
               ✕
             </button>
+          </div>
+          {/* ✅ MOSTRAR ESTADO DE LOS DATOS */}
+          <div className="text-xs mt-2 opacity-75">
+            {bookingData?.financialSummary ? '📊 Datos del backend' : 
+             bookingData?.paymentInfo ? '📊 PaymentInfo del backend' : 
+             '⚠️ Cálculo manual'}
           </div>
         </div>
 
@@ -591,10 +660,10 @@ const PaymentAndReceipt = ({
             <h4 className="font-semibold text-gray-800 mb-2">📋 Información de la Reserva</h4>
             <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
               <div>
-                <div>Habitación: {selectedRoom?.roomNumber || bookingData?.roomNumber} ({selectedRoom?.type})</div>
-                <div>Huésped: {currentBuyerData?.scostumername}</div>
-                {currentBuyerData?.sdocno && (
-                  <div>Documento: {currentBuyerData.sdocno}</div>
+                <div>Habitación: {selectedRoom?.roomNumber || bookingData?.roomNumber} ({selectedRoom?.type || bookingData?.room?.type})</div>
+                <div>Huésped: {currentBuyerData?.scostumername || bookingData?.guest?.scostumername}</div>
+                {(currentBuyerData?.sdocno || bookingData?.guest?.sdocno) && (
+                  <div>Documento: {currentBuyerData?.sdocno || bookingData?.guest?.sdocno}</div>
                 )}
               </div>
               <div>
@@ -793,9 +862,9 @@ const PaymentAndReceipt = ({
           </div>
 
           {/* 🎯 BOTONES DE ACCIÓN */}
-          <div className="flex gap-3">
+         <div className="flex gap-3">
             <button
-              onClick={() => onPaymentSuccess && onPaymentSuccess(null)}
+              onClick={handleClose}
               disabled={isProcessing}
               className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -835,23 +904,25 @@ PaymentAndReceipt.propTypes = {
     roomNumber: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     checkIn: PropTypes.string,
     checkOut: PropTypes.string,
-    paymentInfo: PropTypes.object, // ⭐ DATOS DEL BACKEND
+    paymentInfo: PropTypes.object, // ⭐ DATOS DEL BACKEND (FORMATO ANTERIOR)
+    financialSummary: PropTypes.object, // ⭐ DATOS DEL BACKEND (NUEVO FORMATO)
     extraChargesInfo: PropTypes.object, // ⭐ DATOS DEL BACKEND
     guest: PropTypes.object,
     room: PropTypes.object,
   }).isRequired,
-  amountToPay: PropTypes.number.isRequired,
+  amountToPay: PropTypes.number,
   currentBuyerData: PropTypes.shape({
     scostumername: PropTypes.string,
     sdocno: PropTypes.string,
     selectronicmail: PropTypes.string,
     stelephone: PropTypes.string,
-  }).isRequired,
+  }),
   selectedRoom: PropTypes.shape({
     type: PropTypes.string,
     roomNumber: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   }),
   onPaymentSuccess: PropTypes.func,
+  onClose: PropTypes.func, // ✅ AGREGAR onClose A LOS PropTypes
 };
 
 export default PaymentAndReceipt;

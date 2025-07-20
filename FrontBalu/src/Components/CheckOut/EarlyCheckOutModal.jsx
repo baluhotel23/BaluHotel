@@ -35,7 +35,16 @@ const EarlyCheckOutModal = ({
   const nightsSaved = originalNights - actualNights;
 
   // Calcular información financiera
-  const financials = useMemo(() => getRealPaymentSummary(booking), [booking]);
+  const financials = useMemo(() => {
+  const summary = getRealPaymentSummary(booking);
+  
+  // ✅ VERIFICAR SI YA TIENE DESCUENTOS APLICADOS
+  if (summary.hasEarlyCheckoutDiscount) {
+    console.log('⚠️ Esta reserva ya tiene un descuento por check-out anticipado aplicado');
+  }
+  
+  return summary;
+}, [booking]);
 
   // Calcular descuento y nuevo costo
   const calculations = useMemo(() => {

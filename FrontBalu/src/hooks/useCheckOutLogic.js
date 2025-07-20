@@ -399,46 +399,193 @@ export const useCheckOutLogic = () => {
   }, [dispatch, loadBookings]);
 
   // ✅ FUNCIÓN PARA MANEJAR ÉXITO DE PAGO
-  const handlePaymentSuccess = useCallback(async (paymentData) => {
-    console.log("💳 [PAYMENT-SUCCESS] Datos recibidos:", paymentData);
+ const handlePaymentSuccess = useCallback(async (paymentData) => {
+  console.log("💳 [PAYMENT-SUCCESS] Datos recibidos:", paymentData);
+  
+  try {
+    toast.success(
+      `✅ Pago procesado: $${parseFloat(paymentData.amount || 0).toLocaleString()}`,
+      { autoClose: 5000 }
+    );
+
+    // ✅ CERRAR MODAL DE PAGO INMEDIATAMENTE
+    setSelectedBooking(null);
     
-    try {
-      toast.success(
-        `✅ Pago procesado: $${parseFloat(paymentData.amount || 0).toLocaleString()}`,
-        { autoClose: 5000 }
+    // ✅ RECARGAR DATOS Y ESPERAR A QUE TERMINE
+    console.log("🔄 [PAYMENT-SUCCESS] Recargando reservas...");
+    await loadBookings();
+    
+    // ✅ BUSCAR LA RESERVA ACTUALIZADA CON DIFERENTES FORMATOS DE ID
+    const bookingIdToFind = paymentData.bookingId || paymentData.id;
+    console.log("🔍 [PAYMENT-SUCCESS] Buscando reserva actualizada:", bookingIdToFind);
+    
+    // Dar tiempo a que se actualice el estado de Redux
+    setTimeout(async () => {
+      // Obtener la lista más reciente del estado de Redux
+      const freshBookings = allBookings;
+      console.log("📊 [PAYMENT-SUCCESS] Reservas disponibles:", freshBookings.map(b => ({
+        id: b.bookingId,
+        status: b.status,
+        room: b.roomNumber
+      })));
+      
+      const updatedBooking = freshBookings.find(b => 
+        b.bookingId === bookingIdToFind || 
+        b.bookingId === parseInt(bookingIdToFind) ||
+        b.id === bookingIdToFind
       );
-
-      setSelectedBooking(null);
-      await loadBookings();
-
-      const updatedBooking = bookings.find(b => b.bookingId === paymentData.bookingId);
+      
       if (updatedBooking) {
-        const updatedFinancials = getRealPaymentSummary(updatedBooking);
+        console.log("✅ [PAYMENT-SUCCESS] Reserva encontrada:", {
+          bookingId: updatedBooking.bookingId,
+          status: updatedBooking.status,
+          room: updatedBooking.roomNumber
+        });
         
+        const updatedFinancials = getRealPaymentSummary(updatedBooking);
+        console.log("💰 [PAYMENT-SUCCESS] Estado financiero actualizado:", {
+          totalFinal: updatedFinancials.totalFinal,
+          totalPagado: updatedFinancials.totalPagado,
+          totalPendiente: updatedFinancials.totalPendiente,
+          isFullyPaid: updatedFinancials.isFullyPaid
+        });
+        
+        // ✅ VERIFICAR SI ESTÁ COMPLETAMENTE PAGADA
         if (updatedFinancials.isFullyPaid) {
-          setTimeout(() => {
-            const generateBill = window.confirm(
-              `🎉 ¡PAGO COMPLETADO!\n\n` +
-              `La reserva #${paymentData.bookingId} está ahora completamente pagada.\n\n` +
-              `¿Desea generar la factura automáticamente?`
-            );
-            
-            if (generateBill) {
-              handleGenerateBill(updatedBooking);
-            }
-          }, 1500);
+          const generateBill = window.confirm(
+            `🎉 ¡PAGO COMPLETADO!\n\n` +
+            `La reserva #${updatedBooking.bookingId} está ahora completamente pagada.\n\n` +
+            `Total: $${updatedFinancials.totalFinal.toLocaleString()}\n` +
+            `Pagado: $${updatedFinancials.totalPagado.toLocaleString()}\n\n` +
+            `¿Desea generar la factura automáticamente?`
+          );
+          
+          if (generateBill) {
+            console.log("🧾 [PAYMENT-SUCCESS] Generando factura automáticamente...");
+            await handleGenerateBill(updatedBooking);
+          }
+        } else {
+          // ✅ MOSTRAR ESTADO ACTUAL SI AÚN HAY PENDIENTES
+          toast.info(
+            `💰 Pago aplicado correctamente.\n` +
+            `Saldo pendiente: $${updatedFinancials.totalPendiente.toLocaleString()}`,
+            { autoClose: 7000 }
+          );
         }
+      } else {
+        console.warn("⚠️ [PAYMENT-SUCCESS] No se encontró la reserva actualizada:", {
+          searchedId: bookingIdToFind,
+          availableIds: freshBookings.map(b => b.bookingId)
+        });
+        
+        // ✅ FALLBACK: MOSTRAR MENSAJE GENÉRICO
+        toast.warning(
+          "✅ Pago procesado correctamente.\n" +
+          "📋 Actualice la lista para ver los cambios.",
+          { autoClose: 5000 }
+        );
       }
+    }, 2000); // Dar 2 segundos para que se actualice el estado
 
-    } catch (error) {
-      console.error("❌ [PAYMENT-SUCCESS] Error:", error);
-      toast.error("❌ Error al procesar el éxito del pago");
+  } catch (error) {
+    console.error("❌ [PAYMENT-SUCCESS] Error:", error);
+    toast.error(`❌ Error al procesar el éxito del pago: ${error.message}`);
+  }
+}, [allBookings, loadBookings, handleGenerateBill]); // ✅ AGREGAR allBookings A LAS DEPENDENCIAS
+
+// ✅ FUNCIÓN MEJORADA PARA BUSCAR RESERVA POR ID
+const findBookingById = useCallback((bookingId) => {
+  if (!bookingId) return null;
+  
+  // ✅ BUSCAR EN DIFERENTES FORMATOS
+  const candidates = [
+    bookingId,
+    parseInt(bookingId),
+    bookingId.toString(),
+  ].filter(id => id !== null && !isNaN(id));
+  
+  for (const candidate of candidates) {
+    const found = allBookings.find(b => 
+      b.bookingId === candidate || 
+      b.id === candidate ||
+      b.bookingId === candidate.toString() ||
+      b.id === candidate.toString()
+    );
+    
+    if (found) {
+      console.log("✅ [FIND-BOOKING] Encontrada:", {
+        searchId: bookingId,
+        foundId: found.bookingId,
+        roomNumber: found.roomNumber
+      });
+      return found;
     }
-  }, [bookings, loadBookings, handleGenerateBill]);
+  }
+  
+  console.warn("⚠️ [FIND-BOOKING] No encontrada:", {
+    searchId: bookingId,
+    availableIds: allBookings.map(b => ({ id: b.bookingId, room: b.roomNumber }))
+  });
+  
+  return null;
+}, [allBookings]);
+
+// ✅ FUNCIÓN AUXILIAR PARA PROCESAR PAGOS
+const processPaymentResult = useCallback(async (paymentResult) => {
+  if (!paymentResult || paymentResult.error) {
+    const errorMsg = paymentResult?.message || "Error desconocido en el pago";
+    console.error("❌ [PROCESS-PAYMENT] Error:", errorMsg);
+    toast.error(`❌ Error en el pago: ${errorMsg}`);
+    return false;
+  }
+
+  console.log("✅ [PROCESS-PAYMENT] Pago exitoso:", paymentResult);
+  
+  // ✅ LLAMAR A handlePaymentSuccess CON LOS DATOS CORRECTOS
+  await handlePaymentSuccess({
+    bookingId: paymentResult.bookingId || paymentResult.booking?.bookingId,
+    amount: paymentResult.amount || paymentResult.payment?.amount,
+    paymentId: paymentResult.paymentId || paymentResult.payment?.paymentId,
+    method: paymentResult.method || paymentResult.payment?.paymentMethod
+  });
+  
+  return true;
+}, [handlePaymentSuccess]);
+
+// ✅ FUNCIÓN PARA RECARGAR RESERVA ESPECÍFICA
+const reloadSpecificBooking = useCallback(async (bookingId) => {
+  try {
+    console.log("🔄 [RELOAD-BOOKING] Recargando reserva específica:", bookingId);
+    
+    // Recargar todas las reservas
+    await loadBookings();
+    
+    // Buscar la reserva específica
+    const booking = findBookingById(bookingId);
+    
+    if (booking) {
+      console.log("✅ [RELOAD-BOOKING] Reserva actualizada:", {
+        bookingId: booking.bookingId,
+        status: booking.status,
+        totalAmount: booking.totalAmount
+      });
+      return booking;
+    } else {
+      console.warn("⚠️ [RELOAD-BOOKING] Reserva no encontrada después de recargar");
+      return null;
+    }
+  } catch (error) {
+    console.error("❌ [RELOAD-BOOKING] Error:", error);
+    return null;
+  }
+}, [loadBookings, findBookingById]);
 
   useEffect(() => {
     loadBookings();
   }, [loadBookings]);
+
+
+
 
   return {
     // Estados
@@ -477,32 +624,36 @@ export const useCheckOutLogic = () => {
     handleGenerateBill,
     handlePaymentSuccess,
     loadBookings,
+
+    findBookingById,
+  processPaymentResult,
+  reloadSpecificBooking,
     
     // Handlers de UI
-    handleFilterChange: useCallback((key, value) => {
-      setFilters(prev => ({ ...prev, [key]: value }));
-    }, []),
-    
-    applyFilters: useCallback(() => {
-      loadBookings();
-    }, [loadBookings]),
-    
-    clearFilters: useCallback(() => {
-      setFilters({ status: "", roomNumber: "", guestId: "" });
-      setSortBy("checkOut");
-      setTimeout(loadBookings, 100);
-    }, [loadBookings]),
-    
-    handleOpenExtraCharges: useCallback((booking) => {
-      setSelectedBookingForExtras(booking);
-      setShowExtraCharges(true);
-    }, []),
-    
-    handleExtraChargeSuccess: useCallback(async () => {
-      toast.success("✅ Cargo extra agregado exitosamente");
-      await loadBookings();
-      setShowExtraCharges(false);
-      setSelectedBookingForExtras(null);
-    }, [loadBookings]),
-  };
+     handleFilterChange: useCallback((key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }, []),
+  
+  applyFilters: useCallback(() => {
+    loadBookings();
+  }, [loadBookings]),
+  
+  clearFilters: useCallback(() => {
+    setFilters({ status: "", roomNumber: "", guestId: "" });
+    setSortBy("checkOut");
+    setTimeout(loadBookings, 100);
+  }, [loadBookings]),
+  
+  handleOpenExtraCharges: useCallback((booking) => {
+    setSelectedBookingForExtras(booking);
+    setShowExtraCharges(true);
+  }, []),
+  
+  handleExtraChargeSuccess: useCallback(async () => {
+    toast.success("✅ Cargo extra agregado exitosamente");
+    await loadBookings();
+    setShowExtraCharges(false);
+    setSelectedBookingForExtras(null);
+  }, [loadBookings]),
+};
 };
