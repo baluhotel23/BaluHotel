@@ -7,7 +7,9 @@ import {
   getProfitLossReport 
 } from '../../Redux/Actions/financialActions';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { es, } from 'date-fns/locale';
+import { parseISO, isValid } from 'date-fns';
+
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Area, AreaChart
@@ -25,7 +27,8 @@ const FinancialBalance = () => {
     profitLossReport,
     loading 
   } = useSelector(state => state.financial || {});
-
+console.log('Resumen financiero:', summary);
+console.log('Resumen financiero:', revenueByPeriod);
   // Estados para filtros
   const [period, setPeriod] = useState('month');
   const [dateRange, setDateRange] = useState({
@@ -84,83 +87,73 @@ const FinancialBalance = () => {
   };
 
   // Datos para el gráfico de gastos por categoría
-  const prepareExpensesByCategoryData = () => {
-    if (!summary || !summary.expensesByCategory) return [];
-    
-    return Object.entries(summary.expensesByCategory || {}).map(([category, amount]) => ({
-      name: formatExpenseCategory(category),
-      value: amount
-    }));
-  };
+const prepareExpensesByCategoryData = () => {
+  if (!summary || !summary.expenses?.byCategory) return [];
+  return Object.entries(summary.expenses.byCategory).map(([category, amount]) => ({
+    name: formatExpenseCategory(category),
+    value: amount
+  }));
+};
 
   // Datos para la tendencia mensual
-  const prepareMonthlyTrendData = () => {
-  if (!revenueByPeriod || !revenueByPeriod.length) {
+const prepareMonthlyTrendData = () => {
+  if (!revenueByPeriod || !Array.isArray(revenueByPeriod) || revenueByPeriod.length === 0) {
     console.warn('⚠️ [FINANCIAL] No hay datos de revenue por período');
     return [];
   }
-  
+
   console.log('📊 [FINANCIAL] Procesando datos mensuales:', revenueByPeriod);
-  
+
   return revenueByPeriod
     .map((item, index) => {
-      // 🔧 VALIDAR Y LIMPIAR LA FECHA
       let validDate = null;
-      
       try {
-        if (!item.date) {
+        // Usar la fecha de creación de la factura
+        const dateValue = item.createdAt;
+        if (!dateValue) {
           console.warn(`⚠️ [FINANCIAL] Item ${index} sin fecha:`, item);
           return null;
         }
-        
-        // 🎯 INTENTAR DIFERENTES FORMATOS DE FECHA
-        if (typeof item.date === 'string') {
-          // Formato ISO: "2025-06-01"
-          validDate = parseISO(item.date);
-        } else if (item.date instanceof Date) {
-          validDate = item.date;
-        } else {
-          // Intentar conversión directa
-          validDate = new Date(item.date);
-        }
-        
-        // ✅ VERIFICAR QUE LA FECHA SEA VÁLIDA
+        validDate = typeof dateValue === 'string' ? parseISO(dateValue) : new Date(dateValue);
         if (!isValid(validDate)) {
           console.warn(`⚠️ [FINANCIAL] Fecha inválida en item ${index}:`, {
-            originalDate: item.date,
+            originalDate: dateValue,
             parsedDate: validDate,
             item
           });
           return null;
         }
-        
         const formattedMonth = format(validDate, 'MMM', { locale: es });
-        
+
+        // Sumar reservationAmount y extraChargesAmount como ingresos
+        const ingresos = parseFloat(item.reservationAmount || 0) + parseFloat(item.extraChargesAmount || 0);
+        // Si tienes gastos, agrégalos aquí. Si no, pon 0.
+        const gastos = 0;
+
         console.log(`✅ [FINANCIAL] Item ${index} procesado:`, {
-          originalDate: item.date,
+          originalDate: dateValue,
           validDate,
           formattedMonth,
-          revenue: item.revenue,
-          expenses: item.expenses
+          ingresos,
+          gastos
         });
-        
+
         return {
           name: formattedMonth,
-          ingresos: parseFloat(item.revenue || 0),
-          gastos: parseFloat(item.expenses || 0),
-          balance: parseFloat(item.revenue || 0) - parseFloat(item.expenses || 0)
+          ingresos,
+          gastos,
+          balance: ingresos - gastos
         };
-        
       } catch (error) {
         console.error(`❌ [FINANCIAL] Error procesando item ${index}:`, {
           error: error.message,
           item,
-          originalDate: item.date
+          originalDate: item.createdAt
         });
         return null;
       }
     })
-    .filter(item => item !== null); // 🗑️ REMOVER ITEMS INVÁLIDOS
+    .filter(item => item !== null);
 };
 
   // Formateadores para nombres más amigables
@@ -568,77 +561,99 @@ const FinancialBalance = () => {
 
             {/* Gastos */}
             {activeTab === 'expenses' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white p-4 rounded-lg shadow-md">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Gastos vs Compras</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart
-                      data={prepareExpensesData()}
-                      margin={{
-                        top: 20,
-                        right: 30,
-                        left: 20,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(value)} />
-                      <Legend />
-                      <Bar dataKey="value" name="Monto" fill="#82ca9d" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="bg-white p-4 rounded-lg shadow-md">
+      <h3 className="text-lg font-semibold text-gray-700 mb-4">Gastos vs Compras</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart
+          data={prepareExpensesData()}
+          margin={{
+            top: 20,
+            right: 30,
+            left: 20,
+            bottom: 5,
+          }}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="name" />
+          <YAxis />
+          <Tooltip formatter={(value) => formatCurrency(value)} />
+          <Legend />
+          <Bar dataKey="value" name="Monto" fill="#82ca9d" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
 
-                <div className="bg-white p-4 rounded-lg shadow-md">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Gastos por Categoría</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={prepareExpensesByCategoryData()}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                        nameKey="name"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {prepareExpensesByCategoryData().map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => formatCurrency(value)} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                
-                <div className="bg-white p-4 rounded-lg shadow-md md:col-span-2">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Evolución de Gastos</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart
-                      data={prepareMonthlyTrendData()}
-                      margin={{
-                        top: 5,
-                        right: 30,
-                        left: 20,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(value)} />
-                      <Legend />
-                      <Line type="monotone" dataKey="gastos" stroke="#82ca9d" activeDot={{ r: 8 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
+    <div className="bg-white p-4 rounded-lg shadow-md">
+      <h3 className="text-lg font-semibold text-gray-700 mb-4">Gastos por Categoría</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart>
+          <Pie
+            data={prepareExpensesByCategoryData()}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            outerRadius={100}
+            fill="#8884d8"
+            dataKey="value"
+            nameKey="name"
+            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+          >
+            {prepareExpensesByCategoryData().map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value) => formatCurrency(value)} />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
+      {/* TABLA DE DETALLE POR CATEGORÍA */}
+      {summary?.expenses?.byCategory && Object.keys(summary.expenses.byCategory).length > 0 && (
+  <div className="mt-6">
+    <h4 className="text-md font-semibold text-gray-700 mb-2">Detalle por Categoría</h4>
+    <table className="min-w-full text-left">
+      <thead>
+        <tr>
+          <th className="py-2 px-4 border-b">Categoría</th>
+          <th className="py-2 px-4 border-b">Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(summary.expenses.byCategory).map(([category, amount]) => (
+          <tr key={category}>
+            <td className="py-2 px-4 border-b">{formatExpenseCategory(category)}</td>
+            <td className="py-2 px-4 border-b">{formatCurrency(amount)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+    </div>
+    
+    <div className="bg-white p-4 rounded-lg shadow-md md:col-span-2">
+      <h3 className="text-lg font-semibold text-gray-700 mb-4">Evolución de Gastos</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart
+          data={prepareMonthlyTrendData()}
+          margin={{
+            top: 5,
+            right: 30,
+            left: 20,
+            bottom: 5,
+          }}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="name" />
+          <YAxis />
+          <Tooltip formatter={(value) => formatCurrency(value)} />
+          <Legend />
+          <Line type="monotone" dataKey="gastos" stroke="#82ca9d" activeDot={{ r: 8 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+)}
 
             {/* Tendencias */}
             {activeTab === 'trend' && (
