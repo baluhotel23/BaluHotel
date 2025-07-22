@@ -7,6 +7,8 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import DashboardLayout from '../Dashboard/DashboardLayout';
 
+import * as XLSX from 'xlsx';
+
 const PurchaseList = () => {
   const dispatch = useDispatch();
   const { purchases = [], loading } = useSelector(state => state.purchase || {});
@@ -52,6 +54,28 @@ const PurchaseList = () => {
     return searchMatch && fromDateMatch && toDateMatch && supplierMatch && statusMatch;
   });
 
+  const handleExcelDownload = () => {
+  // Define los encabezados
+  const data = [
+    ['Factura', 'Fecha', 'Proveedor', 'Total', 'Estado', 'Comprobante']
+  ];
+  // Agrega las filas
+  filteredPurchases.forEach(purchase => {
+    data.push([
+      purchase.invoiceNumber || 'Sin número',
+      formatDate(purchase.purchaseDate),
+      purchase.supplier,
+      parseFloat(purchase.totalAmount || 0).toFixed(2),
+      purchase.paymentStatus,
+      purchase.receiptUrl || ''
+    ]);
+  });
+  // Crea y descarga el archivo
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Compras');
+  XLSX.writeFile(wb, `compras-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+};
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({
       ...prev,
@@ -106,6 +130,7 @@ const PurchaseList = () => {
     }
 
     return (
+      
       <div className="flex items-center space-x-1">
         <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs flex items-center">
           <FaFilePdf className="mr-1" />
@@ -153,6 +178,12 @@ const PurchaseList = () => {
   return (
      <DashboardLayout>
     <div className="bg-white shadow-md rounded-lg p-6">
+    <button
+  onClick={handleExcelDownload}
+  className="bg-green-500 text-white px-4 py-2 rounded-md flex items-center hover:bg-green-600 mr-2"
+>
+  <FaFileAlt className="mr-2" /> Descargar Excel
+</button>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-700">Historial de Compras</h2>
         <Link 

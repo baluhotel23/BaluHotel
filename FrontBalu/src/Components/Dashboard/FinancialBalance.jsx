@@ -9,6 +9,7 @@ import {
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { es, } from 'date-fns/locale';
 import { parseISO, isValid } from 'date-fns';
+import * as XLSX from 'xlsx';
 
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -197,7 +198,13 @@ const prepareMonthlyTrendData = () => {
       [field]: value
     }));
   };
-
+const handleExcelDownload = () => {
+  const data = getCSVData(); // Tu función que genera los datos (array de arrays)
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Balance');
+  XLSX.writeFile(wb, `balance-financiero-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+};
   // Datos para exportar a CSV
   const getCSVData = () => {
     const data = [];
@@ -256,13 +263,12 @@ const prepareMonthlyTrendData = () => {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Balance Financiero</h1>
           <div className="flex space-x-2">
-            <CSVLink
-              data={getCSVData()}
-              filename={`balance-financiero-${format(new Date(), 'yyyy-MM-dd')}.csv`}
-              className="bg-green-500 text-white px-4 py-2 rounded-md flex items-center hover:bg-green-600"
-            >
-              <FaDownload className="mr-2" /> Exportar
-            </CSVLink>
+            <button
+  onClick={handleExcelDownload}
+  className="bg-blue-500 text-white px-4 py-2 rounded-md flex items-center hover:bg-blue-600 ml-2"
+>
+  <FaDownload className="mr-2" /> Descargar Excel
+</button>
           </div>
         </div>
         

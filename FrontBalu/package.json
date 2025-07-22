@@ -35,7 +35,8 @@
     "react-toastify": "^11.0.5",
     "recharts": "^2.15.3",
     "redux-thunk": "^3.1.0",
-    "swiper": "^11.2.5"
+    "swiper": "^11.2.5",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
