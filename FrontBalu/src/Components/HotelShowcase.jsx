@@ -76,7 +76,7 @@ const HotelShowcase = () => {
               <div
                 className="h-32 md:h-40 rounded-2xl bg-cover bg-center shadow-lg hover:shadow-xl transition-shadow duration-300"
                 style={{
-                  backgroundImage: `url('/hotel2.jpg')`, // Cambia por tu imagen
+                  backgroundImage: `url('/hotel2.png')`, // Cambia por tu imagen
                   boxShadow: '0 0 0 3px rgba(255, 255, 255, 0.2), 0 15px 35px -10px rgba(0, 0, 0, 0.2)'
                 }}
               />
