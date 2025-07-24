@@ -91,10 +91,6 @@ const checkAvailability = async (req, res) => {
       roomType,
     });
 
-    // ⭐ DECLARAR CONSTANTES AL INICIO
-    const CHECK_OUT_HOUR = 12, CHECK_OUT_MIN = 0;
-    const CHECK_IN_HOUR = 15, CHECK_IN_MIN = 30;
-
     const where = {};
     if (roomType) where.type = roomType;
 
@@ -151,41 +147,37 @@ const checkAvailability = async (req, res) => {
           `🚫 Room ${room.roomNumber}: Status ${room.status} prevents booking`
         );
       }
-      // 3. Verificar conflictos de fechas
+      // 3. Verificar conflictos de fechas (simplificado sin horas específicas)
       else if (
         checkIn &&
         checkOut &&
         isValidDate(checkIn) &&
         isValidDate(checkOut)
       ) {
-     const CHECK_OUT_HOUR = 12, CHECK_OUT_MIN = 0;
-const CHECK_IN_HOUR = 15, CHECK_IN_MIN = 30;
+        const hasDateConflict = activeBookings.some((booking) => {
+          const bookingStart = toColombiaTime(booking.checkIn);
+          const bookingEnd = toColombiaTime(booking.checkOut);
+          const requestedStart = toColombiaTime(checkIn);
+          const requestedEnd = toColombiaTime(checkOut);
 
-const hasDateConflict = activeBookings.some((booking) => {
-  const bookingStart = toColombiaTime(booking.checkIn).set({ hour: CHECK_IN_HOUR, minute: CHECK_IN_MIN, second: 0, millisecond: 0 });
-  const bookingEnd = toColombiaTime(booking.checkOut).set({ hour: CHECK_OUT_HOUR, minute: CHECK_OUT_MIN, second: 0, millisecond: 0 });
+          // Conflicto si las fechas se solapan (sin considerar horas específicas)
+          const conflict = (bookingStart < requestedEnd && bookingEnd > requestedStart);
 
-  const requestedStart = toColombiaTime(checkIn).set({ hour: CHECK_IN_HOUR, minute: CHECK_IN_MIN, second: 0, millisecond: 0 });
-  const requestedEnd = toColombiaTime(checkOut).set({ hour: CHECK_OUT_HOUR, minute: CHECK_OUT_MIN, second: 0, millisecond: 0 });
+          if (conflict) {
+            console.log(
+              "⚠️ [CHECK-AVAILABILITY] Date conflict detected with booking:",
+              {
+                conflictingBookingId: booking.bookingId,
+                existingCheckIn: formatColombiaDate(bookingStart),
+                existingCheckOut: formatColombiaDate(bookingEnd),
+                requestedCheckIn: formatColombiaDate(requestedStart),
+                requestedCheckOut: formatColombiaDate(requestedEnd),
+              }
+            );
+          }
 
-  // Solo hay conflicto si los rangos se solapan estrictamente
-  const conflict = (bookingStart < requestedEnd && bookingEnd > requestedStart);
-
-  if (conflict) {
-    console.log(
-      "⚠️ [CREATE-BOOKING] Date conflict detected with booking:",
-      {
-        conflictingBookingId: booking.bookingId,
-        existingCheckIn: formatColombiaDate(bookingStart),
-        existingCheckOut: formatColombiaDate(bookingEnd),
-        requestedCheckIn: formatColombiaDate(requestedStart),
-        requestedCheckOut: formatColombiaDate(requestedEnd),
-      }
-    );
-  }
-
-  return conflict;
-});
+          return conflict;
+        });
 
         if (hasDateConflict) {
           isAvailable = false;
@@ -194,7 +186,7 @@ const hasDateConflict = activeBookings.some((booking) => {
         }
       }
 
-      // ⭐ SOLO bloquear por "Ocupada" si la habitación está ocupada AHORA MISMO
+      // 4. Verificar si está ocupada actualmente
       if (
         room.status === "Ocupada" &&
         activeBookings.some((booking) => {
@@ -204,8 +196,8 @@ const hasDateConflict = activeBookings.some((booking) => {
         })
       ) {
         isAvailable = false;
-        unavailabilityReason = "Room is currently occupied (now)";
-        console.log(`🚫 Room ${room.roomNumber}: Currently occupied (now)`);
+        unavailabilityReason = "Room is currently occupied";
+        console.log(`🚫 Room ${room.roomNumber}: Currently occupied`);
       }
 
       console.log(
