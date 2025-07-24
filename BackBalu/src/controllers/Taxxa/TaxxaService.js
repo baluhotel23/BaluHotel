@@ -1,6 +1,6 @@
 const { SellerData, User, Buyer, Booking, Bill, Invoice, CreditNote } = require('../../data');
 const { generateToken, sendDocument } = require('./taxxaUtils');
-const { createInvoiceWithNumber, cancelInvoice, getNextInvoiceNumber, getNextInvoiceNumber } = require('./invoiceNumberController');
+const { createInvoiceWithNumber, cancelInvoice, getNextInvoiceNumber } = require('./invoiceNumberController');
 const { Op } = require('sequelize');
 
 
