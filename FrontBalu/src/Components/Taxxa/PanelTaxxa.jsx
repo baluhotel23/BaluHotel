@@ -69,6 +69,24 @@ const PanelTaxxa = () => {
           </Link>
         </div>
 
+        {/* Card 2: Facuras manual */}
+        <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-semibold mb-2">Factura Manual</h2>
+              <p className="text-gray-600 mb-4">
+                Gestionar facturas manuales
+              </p>
+            </div>
+            <FaListAlt className="text-3xl text-blue-600" />
+          </div>
+          <Link to="/facturaManual">
+            <button className="bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded w-full">
+              FACTURACION MANUAL
+            </button>
+          </Link>
+        </div>
+
        </div>
     </DashboardLayout>
   );

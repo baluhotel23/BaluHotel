@@ -51,6 +51,75 @@ const initialState = {
     creditReason: '1',
     amount: '',
     description: ''
+  },
+
+  // ⭐ NUEVOS ESTADOS PARA FACTURACIÓN MANUAL
+  manualInvoice: {
+    // 📋 Datos iniciales (próximo número + seller)
+    data: null,                    // { nextInvoiceNumber, fullInvoiceNumber, seller }
+    loading: false,
+    error: null,
+    
+    // 🔍 Búsqueda de comprador
+    buyerSearch: {
+      loading: false,
+      found: false,
+      buyer: null,                 // Datos del comprador encontrado
+      error: null
+    },
+    
+    // 📝 Creación de factura manual
+    creating: false,               // Loading state para crear factura
+    created: null,                 // Datos de la factura creada exitosamente
+    createError: null,             // Error en la creación
+    
+    // 📄 Formulario de facturación manual
+    formData: {
+      // 👤 Datos del comprador
+      buyer: {
+        document: '',
+        docType: 13,               // Cédula de ciudadanía por defecto
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        cityCode: '',
+        department: '',
+        departmentCode: '',
+        country: 'Colombia',
+        countryCode: 'CO',
+        zipCode: ''
+      },
+      
+      // 🛒 Items de la factura (dinámico)
+      items: [{
+        description: '',
+        quantity: 1,
+        unitPrice: 0,
+        taxRate: 19,               // 19% IVA por defecto
+        totalPrice: 0              // Calculado automáticamente
+      }],
+      
+      // 📝 Información adicional
+      notes: '',                   // Notas opcionales
+      paymentMethod: 'cash'        // Método de pago por defecto
+    },
+    
+    // 💰 Totales calculados
+    totals: {
+      subtotal: 0,                 // Base sin impuestos
+      taxAmount: 0,                // Total de impuestos
+      totalAmount: 0               // Total final
+    },
+    
+    // 🔧 Estados de UI
+    ui: {
+      showBuyerForm: false,        // Para mostrar/ocultar formulario de comprador nuevo
+      activeTab: 'buyer',          // buyer | items | review
+      isDirty: false,              // Para detectar cambios no guardados
+      errors: {}                   // Errores de validación por campo
+    }
   }
 };
 
@@ -448,6 +517,244 @@ const taxxaReducer = (state = initialState, action) => {
       return {
         ...initialState
       };
+      case 'GET_MANUAL_INVOICE_DATA_REQUEST':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          loading: true,
+          error: null
+        }
+      };
+    case 'GET_MANUAL_INVOICE_DATA_SUCCESS':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          loading: false,
+          data: action.payload,
+          error: null
+        }
+      };
+    case 'GET_MANUAL_INVOICE_DATA_FAILURE':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          loading: false,
+          data: null,
+          error: action.payload
+        }
+      };
+
+    // 🔍 BUSCAR COMPRADOR PARA FACTURACIÓN MANUAL
+    case 'SEARCH_MANUAL_BUYER_REQUEST':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          buyerSearch: {
+            loading: true,
+            found: false,
+            buyer: null,
+            error: null
+          }
+        }
+      };
+    case 'SEARCH_MANUAL_BUYER_SUCCESS':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          buyerSearch: {
+            loading: false,
+            found: action.payload.found,
+            buyer: action.payload.buyer,
+            error: null
+          },
+          // 🔧 AUTO-LLENAR FORMULARIO SI SE ENCUENTRA EL COMPRADOR
+          formData: action.payload.found ? {
+            ...state.manualInvoice.formData,
+            buyer: {
+              ...state.manualInvoice.formData.buyer,
+              document: action.payload.buyer.document,
+              name: action.payload.buyer.name,
+              email: action.payload.buyer.email || '',
+              phone: action.payload.buyer.phone || '',
+              address: action.payload.buyer.address?.saddressline1 || '',
+              city: action.payload.buyer.address?.scityname || '',
+              department: action.payload.buyer.address?.sdepartmentname || '',
+              country: action.payload.buyer.address?.scountrycode === 'CO' ? 'Colombia' : 'Colombia'
+            }
+          } : state.manualInvoice.formData
+        }
+      };
+    case 'SEARCH_MANUAL_BUYER_FAILURE':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          buyerSearch: {
+            loading: false,
+            found: false,
+            buyer: null,
+            error: action.payload
+          }
+        }
+      };
+
+    // 📝 CREAR FACTURA MANUAL
+    case 'CREATE_MANUAL_INVOICE_REQUEST':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          creating: true,
+          created: null,
+          createError: null
+        }
+      };
+    case 'CREATE_MANUAL_INVOICE_SUCCESS':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          creating: false,
+          created: action.payload,
+          createError: null,
+          // 🔧 RESET FORMULARIO DESPUÉS DEL ÉXITO
+          formData: {
+            buyer: {
+              document: '',
+              name: '',
+              email: '',
+              phone: '',
+              address: '',
+              city: '',
+              department: '',
+              country: 'Colombia'
+            },
+            items: [{
+              description: '',
+              quantity: 1,
+              unitPrice: 0,
+              taxRate: 19
+            }],
+            notes: ''
+          },
+          buyerSearch: {
+            loading: false,
+            found: false,
+            buyer: null,
+            error: null
+          }
+        },
+        // 🔧 AGREGAR A LA LISTA DE FACTURAS
+        invoices: action.payload.invoice 
+          ? [action.payload.invoice, ...state.invoices]
+          : state.invoices
+      };
+    case 'CREATE_MANUAL_INVOICE_FAILURE':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          creating: false,
+          created: null,
+          createError: action.payload
+        }
+      };
+
+    // 🔧 ACTUALIZAR FORMULARIO DE FACTURACIÓN MANUAL
+    case 'UPDATE_MANUAL_INVOICE_FORM':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          formData: {
+            ...state.manualInvoice.formData,
+            ...action.payload
+          }
+        }
+      };
+
+    // 🔧 AGREGAR ITEM AL FORMULARIO
+    case 'ADD_MANUAL_INVOICE_ITEM':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          formData: {
+            ...state.manualInvoice.formData,
+            items: [
+              ...state.manualInvoice.formData.items,
+              {
+                description: '',
+                quantity: 1,
+                unitPrice: 0,
+                taxRate: 19
+              }
+            ]
+          }
+        }
+      };
+
+    // 🔧 REMOVER ITEM DEL FORMULARIO
+    case 'REMOVE_MANUAL_INVOICE_ITEM':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          formData: {
+            ...state.manualInvoice.formData,
+            items: state.manualInvoice.formData.items.filter(
+              (_, index) => index !== action.payload
+            )
+          }
+        }
+      };
+
+    // 🔧 ACTUALIZAR ITEM ESPECÍFICO
+    case 'UPDATE_MANUAL_INVOICE_ITEM':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          formData: {
+            ...state.manualInvoice.formData,
+            items: state.manualInvoice.formData.items.map(
+              (item, index) => 
+                index === action.payload.index 
+                  ? { ...item, ...action.payload.data }
+                  : item
+            )
+          }
+        }
+      };
+
+    // 🧹 LIMPIAR DATOS DE FACTURACIÓN MANUAL
+    case 'CLEAR_MANUAL_INVOICE_DATA':
+      return {
+        ...state,
+        manualInvoice: {
+          ...initialState.manualInvoice
+        }
+      };
+
+    case 'CLEAR_MANUAL_BUYER_SEARCH':
+      return {
+        ...state,
+        manualInvoice: {
+          ...state.manualInvoice,
+          buyerSearch: {
+            loading: false,
+            found: false,
+            buyer: null,
+            error: null
+          }
+        }
+      };
+
 
     default:
       return state;

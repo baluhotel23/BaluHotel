@@ -112,7 +112,7 @@ const BookingPassengerList = () => {
         { align: "right" }
       );
       doc.text(`Documento: ${selectedBooking.guestId}`, pageWidth - 40, currentY + 12, { align: "right" });
-      doc.text(`Estado: ${selectedBooking.status}`, pageWidth - 40, currentY + 24, { align: "right" });
+      
 
       currentY += 24 + 10;
       doc.line(40, currentY, pageWidth - 40, currentY);
@@ -285,10 +285,7 @@ const BookingPassengerList = () => {
                     <span className="font-medium">Documento:</span>{" "}
                     {selectedBooking.guestId}
                   </p>
-                  <p>
-                    <span className="font-medium">Estado:</span>{" "}
-                    {selectedBooking.status}
-                  </p>
+                
                 </div>
               </div>
 

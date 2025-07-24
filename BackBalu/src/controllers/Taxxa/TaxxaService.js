@@ -423,7 +423,442 @@ if (taxxaResponse && taxxaResponse.rerror === 0) {
   }
 };
 
+const createManualInvoice = async (req, res) => {
+  let createdInvoice = null;
+  
+  try {
+    console.log('=== Iniciando proceso de facturación MANUAL ===');
+    console.log('Body:', JSON.stringify(req.body, null, 2));
 
+    const { buyer, items, notes = 'Factura manual' } = req.body;
+
+    // ✅ VALIDACIONES
+    if (!buyer?.document || !buyer?.name) {
+      return res.status(400).json({
+        message: 'Datos del comprador son obligatorios (documento y nombre)',
+        success: false,
+      });
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        message: 'Debe incluir al menos un item para facturar',
+        success: false,
+      });
+    }
+
+    // Validar cada item
+    for (const item of items) {
+      if (!item.description || !item.quantity || !item.unitPrice) {
+        return res.status(400).json({
+          message: 'Cada item debe tener descripción, cantidad y precio unitario',
+          success: false,
+        });
+      }
+    }
+
+    // 🔧 CALCULAR TOTALES
+    const subtotal = items.reduce((sum, item) => {
+      return sum + (parseFloat(item.quantity) * parseFloat(item.unitPrice));
+    }, 0);
+    
+    const taxRate = 0.19; // 19% IVA
+    const taxAmount = subtotal * taxRate;
+    const totalAmount = subtotal + taxAmount;
+
+    console.log('💰 Totales calculados:', { subtotal, taxAmount, totalAmount });
+
+    // 🔧 CREAR O BUSCAR COMPRADOR (igual que tu lógica actual)
+    let buyerRecord = await Buyer.findOne({
+      where: { sdocno: buyer.document }
+    });
+
+    if (!buyerRecord) {
+      console.log('👤 Creando nuevo comprador...');
+      buyerRecord = await Buyer.create({
+        sdocno: buyer.document,
+        scostumername: buyer.name,
+        selectronicmail: buyer.email || '',
+        stelephone: buyer.phone || '',
+        wdoctype: buyer.docType || 13, // CC por defecto
+        sfiscalresponsibilities: 'R-99-PN', // Persona natural por defecto
+        // Agregar dirección si viene
+        ...(buyer.address && {
+          jregistrationaddress: {
+            scountrycode: buyer.country || "CO",
+            wdepartmentcode: buyer.departmentCode || "11",
+            wtowncode: buyer.cityCode || "11001",
+            scityname: buyer.city || "Bogotá",
+            saddressline1: buyer.address,
+            szip: buyer.zipCode || "00000"
+          }
+        })
+      });
+    } else {
+      console.log('👤 Comprador existente encontrado');
+    }
+
+    // 🔧 OBTENER VENDEDOR (igual que tu lógica actual)
+    const sellerData = await SellerData.findOne({
+      where: { isActive: true },
+      order: [['createdAt', 'DESC']]
+    });
+
+    if (!sellerData) {
+      return res.status(404).json({
+        message: 'Datos del vendedor no encontrados',
+        success: false,
+      });
+    }
+
+    // 🔧 CREAR BILL MANUAL
+    const bill = await Bill.create({
+      buyerId: buyerRecord.sdocno,
+      sellerId: sellerData.sdocno,
+      totalAmount: totalAmount,
+      taxAmount: taxAmount,
+      reservationAmount: subtotal, // Base sin impuestos
+      extraChargesAmount: 0,
+      status: 'paid', // Las facturas manuales ya están pagadas
+      billType: 'manual',
+      notes: notes,
+      paymentMethod: 'cash', // Por defecto efectivo
+      taxxaStatus: 'pending'
+    });
+
+    console.log('📄 Bill manual creada:', bill.idBill);
+
+    // ⭐ USAR TU LÓGICA EXISTENTE PARA CREAR INVOICE CON NUMERACIÓN
+    try {
+      createdInvoice = await createInvoiceWithNumber({
+        billId: bill.idBill,
+        buyerId: buyerRecord.sdocno,
+        buyerName: buyerRecord.scostumername,
+        buyerEmail: buyerRecord.selectronicmail,
+        sellerId: sellerData.sdocno,
+        sellerName: sellerData.scostumername,
+        totalAmount: totalAmount,
+        taxAmount: taxAmount,
+        netAmount: subtotal,
+        orderReference: `MANUAL-${Date.now()}-${bill.idBill.slice(-8)}`
+      });
+
+      console.log(`✅ Factura fiscal manual creada: ${createdInvoice.getFullInvoiceNumber()}`);
+    } catch (invoiceError) {
+      console.error('❌ Error creando factura fiscal:', invoiceError.message);
+      return res.status(500).json({
+        message: 'Error en la numeración de facturas fiscales',
+        success: false,
+        error: invoiceError.message
+      });
+    }
+
+    // 🔧 CONSTRUIR DOCUMENTO PARA TAXXA (adaptando tu estructura existente)
+    console.log('=== Construyendo documento MANUAL para Taxxa ===');
+
+    const mapDocTypeToText = (code) => {
+      const mapping = {
+        11: "RC", 12: "TI", 13: "CC", 21: "CE", 22: "CD", 
+        31: "NIT", 41: "PA", 42: "PEP", 50: "NIT", 91: "NUIP"
+      };
+      return mapping[code] || "CC";
+    };
+
+    const numberToWords = (num) => {
+      // Función simplificada - puedes expandir según necesites
+      return `${Math.round(num).toLocaleString()} pesos colombianos`;
+    };
+
+    const currentDate = new Date().toISOString().split('T')[0];
+
+    // ⭐ ADAPTAR TU ESTRUCTURA EXISTENTE PARA ITEMS MANUALES
+    const jdocumentitems = {};
+    items.forEach((item, index) => {
+      jdocumentitems[index.toString()] = {
+        jextrainfo: {
+          sbarcode: `MANUAL-${index + 1}`
+        },
+        sdescription: item.description,
+        wunitcode: "und",
+        sstandarditemidentification: `MANUAL-ITEM-${index + 1}`,
+        sstandardidentificationcode: "999",
+        nunitprice: parseFloat(item.unitPrice),
+        nusertotal: parseFloat(item.quantity) * parseFloat(item.unitPrice),
+        nquantity: parseFloat(item.quantity),
+        jtax: {
+          jiva: {
+            nrate: item.taxRate || 19,
+            sname: "IVA",
+            namount: (parseFloat(item.quantity) * parseFloat(item.unitPrice)) * ((item.taxRate || 19) / 100),
+            nbaseamount: parseFloat(item.quantity) * parseFloat(item.unitPrice)
+          }
+        }
+      };
+    });
+
+    // ⭐ USAR EXACTAMENTE TU ESTRUCTURA EXISTENTE
+    const documentBody = {
+      sMethod: 'classTaxxa.fjDocumentAdd',
+      jParams: {
+        wVersionUBL: "2.1",
+        wenvironment: "prod",
+        jDocument: {
+          wversionubl: "2.1",
+          wenvironment: "prod",
+          wdocumenttype: "Invoice",
+          wdocumenttypecode: "01",
+          scustomizationid: "10",
+          wcurrency: "COP",
+          
+          // Numeración
+          sdocumentprefix: createdInvoice.prefix,
+          sdocumentsuffix: parseInt(createdInvoice.invoiceSequentialNumber),
+          
+          // Fechas
+          tissuedate: currentDate,
+          tduedate: currentDate,
+          
+          // Información de pago
+          wpaymentmeans: 1,
+          wpaymentmethod: "10",
+          
+          // Totales
+          nlineextensionamount: subtotal,
+          ntaxexclusiveamount: subtotal,
+          ntaxinclusiveamount: totalAmount,
+          npayableamount: totalAmount,
+          
+          // Referencias
+          sorderreference: createdInvoice.orderReference,
+          snotes: notes,
+          snotetop: "",
+          
+          // Información extra
+          jextrainfo: {
+            ntotalinvoicepayment: totalAmount,
+            stotalinvoicewords: numberToWords(totalAmount),
+            iitemscount: items.length.toString()
+          },
+          
+          // Items dinámicos
+          jdocumentitems,
+          
+          // ⭐ COMPRADOR (igual que tu estructura)
+          jbuyer: {
+            wlegalorganizationtype: buyerRecord.wlegalorganizationtype || "person",
+            scostumername: buyerRecord.scostumername,
+            stributaryidentificationkey: "O-1",
+            stributaryidentificationname: "IVA",
+            sfiscalresponsibilities: buyerRecord.sfiscalresponsibilities || "R-99-PN",
+            sfiscalregime: "48",
+            jpartylegalentity: {
+              wdoctype: mapDocTypeToText(buyerRecord.wdoctype),
+              sdocno: buyerRecord.sdocno,
+              scorporateregistrationschemename: buyerRecord.scostumername
+            },
+            jcontact: {
+              scontactperson: buyerRecord.scontactperson || buyerRecord.scostumername,
+              selectronicmail: buyerRecord.selectronicmail,
+              stelephone: buyerRecord.stelephone?.replace(/^\+57/, '') || "3000000000",
+              ...(buyerRecord.jregistrationaddress && {
+                jregistrationaddress: buyerRecord.jregistrationaddress
+              })
+            }
+          },
+          
+          // ⭐ VENDEDOR (exactamente igual que tu código existente)
+          jseller: {
+            wlegalorganizationtype: sellerData.wlegalorganizationtype === "person" ? "person" : "company",
+            sfiscalresponsibilities: sellerData.sfiscalresponsibilities,
+            sdocno: sellerData.sdocno,
+            sdoctype: mapDocTypeToText(sellerData.sdoctype),
+            ssellername: sellerData.scostumername,
+            ssellerbrand: sellerData.ssellerbrand || sellerData.scostumername,
+            scontactperson: sellerData.scontactperson?.trim(),
+            saddresszip: sellerData.spostalcode || "00000",
+            wdepartmentcode: sellerData.registration_wdepartmentcode || "11",
+            wtowncode: sellerData.registration_wprovincecode || "11001",
+            scityname: sellerData.registration_scityname || sellerData.scity,
+            jcontact: {
+              selectronicmail: sellerData.selectronicmail,
+              jregistrationaddress: {
+                wdepartmentcode: sellerData.registration_wdepartmentcode || "11",
+                sdepartmentname: sellerData.registration_sdepartmentname || "Cundinamarca",
+                scityname: sellerData.registration_scityname || sellerData.scity,
+                saddressline1: sellerData.registration_saddressline1 || sellerData.saddress,
+                scountrycode: sellerData.registration_scountrycode || "CO",
+                wprovincecode: sellerData.registration_wprovincecode || "11",
+                szip: sellerData.registration_szip || sellerData.spostalcode || "00000"
+              }
+            }
+          }
+        }
+      }
+    };
+
+    console.log('📄 Documento manual construido');
+
+    // ⭐ USAR TU LÓGICA EXISTENTE PARA ENVÍO
+    console.log('=== Generando token para Taxxa ===');
+    const token = await generateToken();
+    if (!token) {
+      await cancelInvoice(createdInvoice.id);
+      throw new Error('No se pudo generar el token de autenticación');
+    }
+
+    const taxxaPayload = {
+      stoken: token,
+      jApi: documentBody
+    };
+
+    console.log('=== Enviando factura MANUAL a Taxxa ===');
+    const taxxaResponse = await sendDocument(taxxaPayload);
+
+    if (taxxaResponse && taxxaResponse.rerror === 0) {
+      console.log('=== Factura MANUAL enviada exitosamente ===');
+
+      // QR Code
+      let qrCode = null;
+      if (taxxaResponse?.jret?.sqr) {
+        const match = taxxaResponse.jret.sqr.match(/https?:\/\/[^\s]+/);
+        if (match) {
+          qrCode = match[0];
+        }
+      }
+
+      // Marcar como enviada
+      await createdInvoice.markAsSent(taxxaResponse);
+      await bill.update({
+        taxxaStatus: 'sent',
+        taxInvoiceId: createdInvoice.getFullInvoiceNumber(),
+        cufe: taxxaResponse.jApiResponse?.cufe || taxxaResponse.scufe || taxxaResponse.jret?.scufe,
+        taxxaResponse: taxxaResponse,
+        sentToTaxxaAt: new Date(),
+        qrCode
+      });
+
+      return res.status(200).json({
+        message: 'Factura manual enviada a Taxxa con éxito',
+        success: true,
+        data: {
+          invoiceId: createdInvoice.id,
+          invoiceNumber: createdInvoice.getFullInvoiceNumber(),
+          billId: bill.idBill,
+          cufe: taxxaResponse.jApiResponse?.cufe || taxxaResponse.scufe || taxxaResponse.jret?.scufe,
+          qrCode,
+          totalAmount: createdInvoice.totalAmount,
+          sentAt: createdInvoice.sentToTaxxaAt,
+          items: items
+        }
+      });
+
+    } else {
+      console.error('Error en respuesta de Taxxa:', taxxaResponse);
+      await createdInvoice.markAsFailed(new Error(taxxaResponse?.smessage || 'Error desconocido'));
+      throw new Error(`Error en la respuesta de Taxxa: ${taxxaResponse?.smessage || JSON.stringify(taxxaResponse)}`);
+    }
+
+  } catch (error) {
+    console.error('=== Error en facturación MANUAL ===');
+    console.error('Error:', error.message);
+    
+    if (createdInvoice) {
+      try {
+        await cancelInvoice(createdInvoice.id);
+      } catch (cancelError) {
+        console.error('Error cancelando factura fiscal:', cancelError.message);
+      }
+    }
+    
+    return res.status(500).json({
+      message: 'Error al procesar la factura manual',
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+// ⭐ FUNCIÓN AUXILIAR PARA OBTENER DATOS DE FACTURACIÓN MANUAL
+const getManualInvoiceData = async (req, res) => {
+  try {
+    console.log('📋 Obteniendo datos para facturación manual...');
+
+    const nextInvoiceNumber = await getNextInvoiceNumber();
+    
+    const sellerData = await SellerData.findOne({
+      where: { isActive: true },
+      order: [['createdAt', 'DESC']]
+    });
+
+    if (!sellerData) {
+      return res.status(404).json({
+        message: 'Datos del vendedor no encontrados',
+        success: false,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        nextInvoiceNumber,
+        fullInvoiceNumber: `FE${nextInvoiceNumber}`,
+        seller: {
+          id: sellerData.sdocno,
+          name: sellerData.scostumername,
+          email: sellerData.selectronicmail
+        }
+      },
+      message: 'Datos obtenidos para facturación manual'
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo datos para facturación manual:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo datos',
+      error: error.message
+    });
+  }
+};
+
+// ⭐ FUNCIÓN PARA BUSCAR COMPRADOR
+const searchBuyerForManual = async (req, res) => {
+  try {
+    const { document } = req.params;
+    
+    const buyer = await Buyer.findOne({
+      where: { sdocno: document },
+      attributes: ['sdocno', 'scostumername', 'selectronicmail', 'stelephone', 'jregistrationaddress']
+    });
+
+    if (!buyer) {
+      return res.json({
+        success: true,
+        found: false,
+        message: 'Comprador no encontrado'
+      });
+    }
+
+    res.json({
+      success: true,
+      found: true,
+      data: {
+        document: buyer.sdocno,
+        name: buyer.scostumername,
+        email: buyer.selectronicmail,
+        phone: buyer.stelephone,
+        address: buyer.jregistrationaddress
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error buscando comprador',
+      error: error.message
+    });
+  }
+};
 
 // 🆕 FUNCIÓN PARA CREAR NOTA DE CRÉDITO
 // 🆕 FUNCIÓN PARA CREAR NOTA DE CRÉDITO - CORREGIDA
@@ -643,6 +1078,9 @@ const createCreditNote = async (req, res) => {
 // 🔧 ACTUALIZAR EXPORTS
 module.exports = {
   createInvoice,
-  createCreditNote
+  createCreditNote,
+  createManualInvoice,
+  getManualInvoiceData,
+  searchBuyerForManual
  
 };
