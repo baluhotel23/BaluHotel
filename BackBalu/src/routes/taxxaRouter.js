@@ -1,5 +1,13 @@
 const Router = require('express');
-const { createInvoice, createCreditNote } = require('../controllers/Taxxa/TaxxaService');
+// ⭐ ACTUALIZAR IMPORTS PARA INCLUIR FUNCIONES DE FACTURACIÓN MANUAL
+const { 
+  createInvoice, 
+  createCreditNote,
+  createManualInvoice,      // ⭐ NUEVO
+  getManualInvoiceData,     // ⭐ NUEVO
+  searchBuyerForManual      // ⭐ NUEVO
+} = require('../controllers/Taxxa/TaxxaService');
+
 const { verifyToken } = require("../middleware/isAuth");
 const { allowRoles } = require("../middleware/byRol");
 const {getOrCreateSellerData, updateSellerData, getSellerDataBySdocno} = require('../controllers/Taxxa/sellerDataControllers');
@@ -23,7 +31,10 @@ const {
 
 console.log('🔍 Router imports:', { 
   createInvoice: typeof createInvoice,
-  createCreditNote: typeof createCreditNote 
+  createCreditNote: typeof createCreditNote,
+  createManualInvoice: typeof createManualInvoice,        // ⭐ DEBUG NUEVO
+  getManualInvoiceData: typeof getManualInvoiceData,      // ⭐ DEBUG NUEVO
+  searchBuyerForManual: typeof searchBuyerForManual       // ⭐ DEBUG NUEVO
 });
 
 const router = Router();
@@ -38,6 +49,13 @@ router.use((req, res, next) => {
     console.log('  - Headers:', Object.keys(req.headers));
     console.log('  - Authorization:', req.headers.authorization ? 'PRESENTE' : 'AUSENTE');
     console.log('  - Body:', req.body);
+  }
+  // ⭐ AGREGAR DEBUG PARA RUTAS DE FACTURACIÓN MANUAL
+  if (req.path.includes('/manual') && req.method === 'POST') {
+    console.log('\n🎯 [MANUAL-INVOICE] Request detected!');
+    console.log('  - Method:', req.method);
+    console.log('  - Path:', req.path);
+    console.log('  - Body keys:', Object.keys(req.body || {}));
   }
   next();
 });
@@ -87,6 +105,63 @@ router.get('/invoices/search', allowRoles(["owner", "admin", "staff"]), searchIn
 router.get('/invoices/stats', allowRoles(["owner", "admin"]), getNumberingStats);
 router.get('/invoices/:invoiceId', allowRoles(["owner", "admin", "staff"]), getInvoiceById);
 router.post('/invoices/:invoiceId/resend', allowRoles(["owner", "admin"]), resendInvoice);
+
+// ⭐ NUEVAS RUTAS PARA FACTURACIÓN MANUAL
+console.log('🔧 Registrando rutas de facturación manual...');
+
+// Obtener datos para crear factura manual (próximo número + seller)
+router.get('/manual-invoice-data', allowRoles(["owner", "admin"]), (req, res) => {
+  console.log('📋 [MANUAL-DATA] Obteniendo datos para facturación manual');
+  try {
+    return getManualInvoiceData(req, res);
+  } catch (error) {
+    console.error('❌ [MANUAL-DATA] Error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error obteniendo datos para facturación manual',
+      error: error.message
+    });
+  }
+});
+
+// Buscar comprador para facturación manual
+router.get('/manual-buyer/:document', allowRoles(["owner", "admin", "staff"]), (req, res) => {
+  console.log('🔍 [MANUAL-BUYER] Buscando comprador:', req.params.document);
+  try {
+    return searchBuyerForManual(req, res);
+  } catch (error) {
+    console.error('❌ [MANUAL-BUYER] Error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error buscando comprador',
+      error: error.message
+    });
+  }
+});
+
+// Crear factura manual
+router.post('/manual-invoice', allowRoles(["owner", "admin"]), (req, res) => {
+  console.log('\n🎯 === RUTA /manual-invoice EJECUTÁNDOSE ===');
+  console.log('  - User ID:', req.user?.id);
+  console.log('  - User role:', req.user?.role);
+  console.log('  - Items count:', req.body?.items?.length || 0);
+  console.log('  - Buyer document:', req.body?.buyer?.document);
+  console.log('  - Function type:', typeof createManualInvoice);
+  
+  try {
+    console.log('📞 [MANUAL-INVOICE] Calling createManualInvoice...');
+    return createManualInvoice(req, res);
+  } catch (error) {
+    console.error('❌ [MANUAL-INVOICE] Error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno al procesar factura manual',
+      error: error.message
+    });
+  }
+});
+
+console.log('✅ Rutas de facturación manual registradas exitosamente');
 
 // 🆕 RUTA ALTERNATIVA PARA CREAR FACTURAS (manteniendo compatibilidad)
 router.post('/invoice', allowRoles(["owner", "admin"]), createInvoice);

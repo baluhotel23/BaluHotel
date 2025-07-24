@@ -632,3 +632,183 @@ export const getNumberingStats = () => async (dispatch) => {
     throw error;
   }
 };
+
+export const getManualInvoiceData = () => async (dispatch) => {
+  dispatch({ type: 'GET_MANUAL_INVOICE_DATA_REQUEST' });
+  
+  try {
+    console.log('📋 [MANUAL-INVOICE] Obteniendo datos para facturación manual...');
+    
+    const response = await api.get('/taxxa/manual-invoice-data');
+    const data = response.data;
+
+    if (data && data.success && data.data) {
+      dispatch({ 
+        type: 'GET_MANUAL_INVOICE_DATA_SUCCESS', 
+        payload: data.data 
+      });
+      
+      console.log('✅ [MANUAL-INVOICE] Datos obtenidos:', data.data);
+      return data.data;
+    } else {
+      const errorMsg = data.message || "Error al obtener datos para facturación manual";
+      dispatch({ type: 'GET_MANUAL_INVOICE_DATA_FAILURE', payload: errorMsg });
+      toast.error(errorMsg);
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ [MANUAL-INVOICE] Error:', error);
+    
+    const errorMsg = error.response?.data?.message || error.message || "Error al obtener datos para facturación manual";
+    dispatch({ type: 'GET_MANUAL_INVOICE_DATA_FAILURE', payload: errorMsg });
+    toast.error(errorMsg);
+    return null;
+  }
+};
+
+// 🔍 BUSCAR COMPRADOR PARA FACTURACIÓN MANUAL
+export const searchBuyerForManual = (document) => async (dispatch) => {
+  if (!document || document.trim().length === 0) {
+    dispatch({ type: 'CLEAR_MANUAL_BUYER_SEARCH' });
+    return null;
+  }
+
+  dispatch({ type: 'SEARCH_MANUAL_BUYER_REQUEST' });
+  
+  try {
+    console.log('🔍 [MANUAL-BUYER] Buscando comprador:', document);
+    
+    const response = await api.get(`/taxxa/manual-buyer/${document.trim()}`);
+    const data = response.data;
+
+    if (data && data.success) {
+      if (data.found && data.data) {
+        dispatch({ 
+          type: 'SEARCH_MANUAL_BUYER_SUCCESS', 
+          payload: { 
+            found: true, 
+            buyer: data.data 
+          } 
+        });
+        
+        console.log('✅ [MANUAL-BUYER] Comprador encontrado:', data.data.name);
+        toast.success(`Comprador encontrado: ${data.data.name}`);
+        return data.data;
+      } else {
+        dispatch({ 
+          type: 'SEARCH_MANUAL_BUYER_SUCCESS', 
+          payload: { 
+            found: false, 
+            buyer: null 
+          } 
+        });
+        
+        console.log('ℹ️ [MANUAL-BUYER] Comprador no encontrado');
+        toast.info('Comprador no encontrado, puede crear uno nuevo');
+        return null;
+      }
+    } else {
+      const errorMsg = data.message || "Error al buscar comprador";
+      dispatch({ type: 'SEARCH_MANUAL_BUYER_FAILURE', payload: errorMsg });
+      toast.error(errorMsg);
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ [MANUAL-BUYER] Error:', error);
+    
+    const errorMsg = error.response?.data?.message || error.message || "Error al buscar comprador";
+    dispatch({ type: 'SEARCH_MANUAL_BUYER_FAILURE', payload: errorMsg });
+    toast.error(errorMsg);
+    return null;
+  }
+};
+
+// 📝 CREAR FACTURA MANUAL
+export const createManualInvoice = (invoiceData) => async (dispatch) => {
+  dispatch({ type: 'CREATE_MANUAL_INVOICE_REQUEST' });
+  
+  try {
+    console.log('📝 [MANUAL-INVOICE] Creando factura manual:', invoiceData);
+    
+    const response = await api.post('/taxxa/manual-invoice', invoiceData, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = response.data;
+
+    if (data && data.success && data.data) {
+      dispatch({ 
+        type: 'CREATE_MANUAL_INVOICE_SUCCESS', 
+        payload: data.data 
+      });
+      
+      const successMsg = `Factura manual ${data.data.fullInvoiceNumber} creada y enviada a Taxxa exitosamente`;
+      toast.success(successMsg);
+      
+      console.log('✅ [MANUAL-INVOICE] Factura creada exitosamente:', data.data.fullInvoiceNumber);
+      
+      return {
+        success: true,
+        data: data.data
+      };
+    } else {
+      const errorMsg = data.message || "Error al crear factura manual";
+      dispatch({ type: 'CREATE_MANUAL_INVOICE_FAILURE', payload: errorMsg });
+      toast.error(errorMsg);
+      
+      return {
+        success: false,
+        error: errorMsg
+      };
+    }
+  } catch (error) {
+    console.error('❌ [MANUAL-INVOICE] Error:', error);
+    
+    const errorData = error.response?.data;
+    let errorMessage = "Error al crear factura manual";
+    
+    if (errorData) {
+      if (errorData.rerror) {
+        if (errorData.rerror === 1262 || errorData.rerror === 1236) {
+          errorMessage = `Contingencia activada (rerror: ${errorData.rerror}). Factura procesada pero con advertencia.`;
+          toast.warning(errorMessage);
+          
+          dispatch({ 
+            type: 'CREATE_MANUAL_INVOICE_SUCCESS', 
+            payload: { 
+              ...errorData, 
+              isContingency: true 
+            }
+          });
+          
+          return {
+            success: true,
+            data: errorData,
+            isContingency: true
+          };
+        }
+      }
+      
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    }
+    
+    dispatch({ type: 'CREATE_MANUAL_INVOICE_FAILURE', payload: errorMessage });
+    toast.error(errorMessage);
+    
+    return {
+      success: false,
+      error: errorMessage
+    };
+  }
+};
+
+// 🧹 LIMPIAR DATOS DE FACTURACIÓN MANUAL
+export const clearManualInvoiceData = () => ({
+  type: 'CLEAR_MANUAL_INVOICE_DATA'
+});
+
+export const clearManualBuyerSearch = () => ({
+  type: 'CLEAR_MANUAL_BUYER_SEARCH'
+});
