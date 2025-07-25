@@ -1,4 +1,4 @@
-const { DataTypes } = require("sequelize");
+const { DataTypes, Op } = require("sequelize"); // ✅ IMPORTAR Op
 
 module.exports = (sequelize) => {
   const Bill = sequelize.define("Bill", {
@@ -7,9 +7,10 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+    // ✅ CAMBIO PRINCIPAL: Hacer bookingId opcional
     bookingId: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true, // ⭐ CAMBIAR A TRUE para facturas manuales
     },
     reservationAmount: {
       type: DataTypes.DECIMAL(10, 2),
@@ -29,6 +30,27 @@ module.exports = (sequelize) => {
     },
     taxInvoiceId: {
       type: DataTypes.STRING,
+      allowNull: true,
+    },
+    // ✅ AÑADIR CAMPOS NUEVOS PARA IDENTIFICAR TIPO DE FACTURA
+    billType: {
+      type: DataTypes.STRING,
+      defaultValue: 'booking',
+      allowNull: false,
+      validate: {
+        isIn: [['booking', 'manual', 'service', 'product']]
+      }
+    },
+    buyerId: {
+      type: DataTypes.STRING, // Para referenciar al comprador
+      allowNull: true,
+    },
+    sellerId: {
+      type: DataTypes.STRING, // Para referenciar al vendedor
+      allowNull: true,
+    },
+    notes: {
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     // 🔧 USAR STRING EN LUGAR DE ENUM PARA EVITAR PROBLEMAS
@@ -65,25 +87,42 @@ module.exports = (sequelize) => {
     cufe: {
       type: DataTypes.STRING,
       allowNull: true,
+    },
+    // ✅ AÑADIR QR CODE
+    qrCode: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     }
   }, {
     timestamps: true,
     paranoid: true,
-    // 🔧 ÍNDICES SIMPLES
+    // 🔧 ÍNDICES CORREGIDOS
     indexes: [
       {
-        fields: ['bookingId']
+        fields: ['bookingId'],
+        // ✅ CORREGIR: Usar Op correctamente o simplificar
+        where: {
+          bookingId: {
+            [Op.ne]: null // ✅ AHORA SÍ FUNCIONARÁ
+          }
+        }
       },
       {
         fields: ['status']
       },
       {
         fields: ['taxxaStatus']
+      },
+      {
+        fields: ['billType']
+      },
+      {
+        fields: ['buyerId']
       }
     ]
   });
 
-  // 🆕 MÉTODOS DE INSTANCIA
+  // 🆕 MÉTODOS DE INSTANCIA ACTUALIZADOS
   Bill.prototype.canBeSentToTaxxa = function() {
     return this.status === 'paid' && 
            ['not_sent', 'failed'].includes(this.taxxaStatus) && 
@@ -100,7 +139,8 @@ module.exports = (sequelize) => {
       taxInvoiceId: taxxaData.sinvoicenumber || taxxaData.invoiceNumber,
       cufe: taxxaData.scufe || taxxaData.cufe,
       taxxaResponse: taxxaData,
-      sentToTaxxaAt: new Date()
+      sentToTaxxaAt: new Date(),
+      qrCode: taxxaData.qrCode || null
     });
   };
 
@@ -112,6 +152,15 @@ module.exports = (sequelize) => {
         timestamp: new Date() 
       }
     });
+  };
+
+  // ✅ NUEVOS MÉTODOS PARA FACTURAS MANUALES
+  Bill.prototype.isManualInvoice = function() {
+    return this.billType === 'manual';
+  };
+
+  Bill.prototype.isBookingInvoice = function() {
+    return this.billType === 'booking' && this.bookingId;
   };
 
   return Bill;

@@ -1,747 +1,489 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
-import { 
-  getManualInvoiceData, 
-  fetchBuyerByDocument,    // ⭐ USAR LA FUNCIÓN EXISTENTE
+import {
+  getManualInvoiceData,
+  fetchBuyerByDocument,
+  createBuyer,
   createManualInvoice,
   clearManualInvoiceData
 } from '../../Redux/Actions/taxxaActions';
+import BuyerForm from '../../Taxxa/BuyerForm';
 
 const FacturaManual = () => {
   const dispatch = useDispatch();
-  
-  // 🔧 Estados Redux
-  const { 
-    buyer,                   // ⭐ USAR EL BUYER DEL ESTADO GLOBAL
-    manualInvoice: {
-      data: invoiceData,
-      loading: loadingData,
-      creating,
-      created,
-      createError
-    }
+  const {
+    buyer,
+    manualInvoice: { data: invoiceData, loading: loadingData, creating, created }
   } = useSelector(state => state.taxxa);
 
-  // 🔧 Estados locales
-  const [activeTab, setActiveTab] = useState('buyer');
-  const [searchTimeout, setSearchTimeout] = useState(null);
+  // Estados locales
+  const [documentInput, setDocumentInput] = useState('');
   const [buyerSearchLoading, setBuyerSearchLoading] = useState(false);
-  const [buyerFound, setBuyerFound] = useState(false);
   const [showBuyerForm, setShowBuyerForm] = useState(false);
-  
-  // ⭐ FORMULARIO LOCAL SIMPLIFICADO
-  const [localFormData, setLocalFormData] = useState({
-    buyer: {
-      document: '',
-      docType: 13,
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
-      city: '',
-      department: '',
-      country: 'Colombia'
-    },
-    items: [{
-      description: '',
-      quantity: 1,
-      unitPrice: 0,
-      taxRate: 19,
-      totalPrice: 0
-    }],
-    notes: ''
-  });
+  const [newBuyerData, setNewBuyerData] = useState(null);
+  const [activeTab, setActiveTab] = useState('buyer');
+  const [items, setItems] = useState([{ 
+    description: '', 
+    quantity: 1, 
+    unitPrice: 0, 
+    taxRate: 19 
+  }]);
+  const [notes, setNotes] = useState('');
 
-  // 🚀 Cargar datos iniciales al montar componente
+  // Cargar datos iniciales y limpiar al desmontar
   useEffect(() => {
     dispatch(getManualInvoiceData());
-    
-    return () => {
-      dispatch(clearManualInvoiceData());
-    };
+    return () => dispatch(clearManualInvoiceData());
   }, [dispatch]);
 
-  // 🔍 Búsqueda automática de comprador con debounce USANDO FUNCIÓN EXISTENTE
+  // Búsqueda de comprador con debounce
   useEffect(() => {
-    const document = localFormData.buyer.document?.trim();
-    
-    if (document && document.length >= 6) {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-      
-      setBuyerSearchLoading(true);
-      
-      const timeoutId = setTimeout(async () => {
-        try {
-          console.log('🔍 [MANUAL-BUYER] Buscando comprador:', document);
-          
-          // ⭐ USAR LA FUNCIÓN EXISTENTE
-          const foundBuyer = await dispatch(fetchBuyerByDocument(document));
-          
-          if (foundBuyer) {
-            console.log('✅ [MANUAL-BUYER] Comprador encontrado:', foundBuyer);
-            
-            // ⭐ AUTO-LLENAR FORMULARIO CON DATOS ENCONTRADOS
-            setLocalFormData(prev => ({
-              ...prev,
-              buyer: {
-                ...prev.buyer,
-                document: foundBuyer.sdocno || document,
-                name: foundBuyer.scostumername || '',
-                email: foundBuyer.selectronicmail || '',
-                phone: foundBuyer.stelephone || '',
-                address: foundBuyer.jregistrationaddress?.saddressline1 || '',
-                city: foundBuyer.jregistrationaddress?.scityname || '',
-                department: foundBuyer.jregistrationaddress?.sdepartmentname || '',
-                country: 'Colombia'
-              }
-            }));
-            
-            setBuyerFound(true);
-            toast.success(`Comprador encontrado: ${foundBuyer.scostumername}`);
-            
-          } else {
-            console.log('ℹ️ [MANUAL-BUYER] Comprador no encontrado');
-            setBuyerFound(false);
-            toast.info('Comprador no encontrado, se creará uno nuevo');
-          }
-          
-        } catch (error) {
-          console.error('❌ [MANUAL-BUYER] Error:', error);
-          setBuyerFound(false);
-          toast.error('Error al buscar comprador');
-        } finally {
-          setBuyerSearchLoading(false);
+    const handler = setTimeout(async () => {
+      if (documentInput.length >= 6) {
+        setBuyerSearchLoading(true);
+        setShowBuyerForm(false);
+        const foundBuyer = await dispatch(fetchBuyerByDocument(documentInput));
+        if (foundBuyer) {
+          toast.success(`Comprador encontrado: ${foundBuyer.scostumername}`);
+        } else {
+          setShowBuyerForm(true);
+          setNewBuyerData({ 
+            jpartylegalentity: { 
+              sdocno: documentInput,
+              wdoctype: 13 // CC por defecto
+            },
+            jcontact: {
+              scontactperson: '',
+              selectronicmail: '',
+              stelephone: ''
+            },
+            scostumername: '',
+            sfiscalresponsibilities: 'R-99-PN'
+          });
+          toast.info('Comprador no encontrado. Por favor, complete los datos.');
         }
-      }, 800);
-      
-      setSearchTimeout(timeoutId);
-    } else {
-      setBuyerFound(false);
-      setBuyerSearchLoading(false);
-      
-      // Limpiar buyer del formulario si se borra el documento
-      if (!document) {
-        setLocalFormData(prev => ({
-          ...prev,
-          buyer: {
-            ...prev.buyer,
-            name: '',
-            email: '',
-            phone: '',
-            address: '',
-            city: '',
-            department: ''
-          }
-        }));
+        setBuyerSearchLoading(false);
+      } else {
+        setShowBuyerForm(false);
       }
+    }, 800);
+    return () => clearTimeout(handler);
+  }, [documentInput, dispatch]);
+
+  // Crear nuevo comprador
+  const handleCreateBuyer = async () => {
+    if (!newBuyerData?.scostumername || !newBuyerData?.jcontact?.selectronicmail) {
+      toast.error('El nombre y el email son obligatorios.');
+      return;
     }
-
-    return () => {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-    };
-  }, [localFormData.buyer.document, dispatch]);
-
-  // 💰 Calcular totales automáticamente
-  const calculatedTotals = useMemo(() => {
-    const subtotal = localFormData.items.reduce((sum, item) => {
-      const itemTotal = parseFloat(item.quantity || 0) * parseFloat(item.unitPrice || 0);
-      return sum + itemTotal;
-    }, 0);
     
-    const taxAmount = subtotal * 0.19; // 19% IVA
-    const totalAmount = subtotal + taxAmount;
-    
-    return {
-      subtotal: Number(subtotal.toFixed(2)),
-      taxAmount: Number(taxAmount.toFixed(2)),
-      totalAmount: Number(totalAmount.toFixed(2))
-    };
-  }, [localFormData.items]);
-
-  // 🔧 Actualizar campo del comprador
-  const updateBuyerField = (field, value) => {
-    setLocalFormData(prev => ({
-      ...prev,
-      buyer: {
-        ...prev.buyer,
-        [field]: value
-      }
-    }));
-    
-    // Si se cambia el documento, limpiar estado de búsqueda
-    if (field === 'document') {
-      setBuyerFound(false);
-    }
-  };
-
-  // 🔧 Actualizar item específico
-  const updateItem = (index, field, value) => {
-    setLocalFormData(prev => ({
-      ...prev,
-      items: prev.items.map((item, i) => 
-        i === index 
-          ? { 
-              ...item, 
-              [field]: value,
-              totalPrice: field === 'quantity' || field === 'unitPrice' 
-                ? (field === 'quantity' ? value : item.quantity) * (field === 'unitPrice' ? value : item.unitPrice)
-                : item.totalPrice
-            }
-          : item
-      )
-    }));
-  };
-
-  // ➕ Agregar nuevo item
-  const addItem = () => {
-    setLocalFormData(prev => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          description: '',
-          quantity: 1,
-          unitPrice: 0,
-          taxRate: 19,
-          totalPrice: 0
-        }
-      ]
-    }));
-  };
-
-  // ❌ Remover item
-  const removeItem = (index) => {
-    if (localFormData.items.length > 1) {
-      setLocalFormData(prev => ({
+    // Validar que scontactperson esté presente
+    if (!newBuyerData.scontactperson && !newBuyerData.jcontact?.scontactperson) {
+      setNewBuyerData(prev => ({
         ...prev,
-        items: prev.items.filter((_, i) => i !== index)
+        scontactperson: prev.scostumername,
+        jcontact: {
+          ...prev.jcontact,
+          scontactperson: prev.scostumername
+        }
       }));
     }
+
+    const result = await dispatch(createBuyer(newBuyerData));
+    if (result && !result.error) {
+      setShowBuyerForm(false);
+      setActiveTab('items');
+      toast.success('Comprador creado exitosamente. Ahora puede agregar items.');
+    }
   };
 
-  // 📝 Enviar factura
-  const handleSubmit = async () => {
-    // Validaciones básicas
-    if (!localFormData.buyer.document || !localFormData.buyer.name) {
-      toast.error('Complete los datos del comprador');
-      setActiveTab('buyer');
-      return;
+  // Enviar factura final
+  const handleSubmitInvoice = async () => {
+    if (!buyer) {
+      toast.error('Debe seleccionar o crear un comprador.');
+      return setActiveTab('buyer');
     }
-
-    const validItems = localFormData.items.filter(item => 
-      item.description && item.quantity > 0 && item.unitPrice > 0
+    
+    const validItems = items.filter(i => 
+      i.description.trim() && 
+      i.quantity > 0 && 
+      i.unitPrice > 0
     );
-
+    
     if (validItems.length === 0) {
-      toast.error('Agregue al menos un item válido');
-      setActiveTab('items');
-      return;
+      toast.error('Agregue al menos un item válido.');
+      return setActiveTab('items');
     }
 
-    // Preparar datos para envío
-    const invoicePayload = {
+    // Construir payload optimizado para tu backend
+    const payload = { 
       buyer: {
-        document: localFormData.buyer.document.trim(),
-        name: localFormData.buyer.name.trim(),
-        email: localFormData.buyer.email?.trim() || '',
-        phone: localFormData.buyer.phone?.trim() || '',
-        docType: localFormData.buyer.docType || 13,
-        address: localFormData.buyer.address?.trim() || '',
-        city: localFormData.buyer.city?.trim() || '',
-        department: localFormData.buyer.department?.trim() || '',
-        country: localFormData.buyer.country || 'Colombia'
+        document: buyer.sdocno,
+        name: buyer.scostumername,
+        email: buyer.selectronicmail,
+        phone: buyer.stelephone,
+        docType: buyer.wdoctype || 13,
+        address: buyer.jregistrationaddress?.saddressline1 || '',
+        city: buyer.jregistrationaddress?.scityname || '',
+        department: buyer.jregistrationaddress?.sdepartmentname || '',
+        country: 'Colombia'
       },
       items: validItems.map(item => ({
         description: item.description.trim(),
-        quantity: parseFloat(item.quantity),
-        unitPrice: parseFloat(item.unitPrice),
-        taxRate: item.taxRate || 19
-      })),
-      notes: localFormData.notes?.trim() || ''
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        taxRate: Number(item.taxRate || 19)
+      })), 
+      notes: notes.trim() || 'Factura manual'
     };
 
-    console.log('📤 Enviando factura manual:', invoicePayload);
-
-    const result = await dispatch(createManualInvoice(invoicePayload));
+    console.log('📤 Enviando factura manual:', payload);
     
-    if (result?.success) {
-      // Reset formulario
-      setLocalFormData({
-        buyer: {
-          document: '',
-          docType: 13,
-          name: '',
-          email: '',
-          phone: '',
-          address: '',
-          city: '',
-          department: '',
-          country: 'Colombia'
-        },
-        items: [{
-          description: '',
-          quantity: 1,
-          unitPrice: 0,
-          taxRate: 19,
-          totalPrice: 0
-        }],
-        notes: ''
-      });
-      
+    const result = await dispatch(createManualInvoice(payload));
+    
+    if (result && result.success) {
+      // Limpiar formulario tras éxito
+      setItems([{ description: '', quantity: 1, unitPrice: 0, taxRate: 19 }]);
+      setNotes('');
+      setDocumentInput('');
       setActiveTab('buyer');
       setShowBuyerForm(false);
-      setBuyerFound(false);
-      
-      // Recargar datos para próxima factura
-      dispatch(getManualInvoiceData());
     }
   };
 
-  // 🎨 Renderizar tabs
-  const renderTabs = () => (
-    <div className="flex border-b border-gray-200 mb-6">
-      {[
-        { key: 'buyer', label: '👤 Comprador', count: localFormData.buyer.document ? '✓' : '!' },
-        { key: 'items', label: '🛒 Items', count: localFormData.items.filter(i => i.description).length },
-        { key: 'review', label: '📋 Revisar', count: calculatedTotals.totalAmount > 0 ? '✓' : '' }
-      ].map(tab => (
-        <button
-          key={tab.key}
-          onClick={() => setActiveTab(tab.key)}
-          className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors duration-200 ${
-            activeTab === tab.key
-              ? 'border-blue-500 text-blue-600 bg-blue-50'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-          }`}
-        >
-          {tab.label} {tab.count && <span className="ml-1 text-xs">({tab.count})</span>}
-        </button>
-      ))}
-    </div>
-  );
+  // --- Lógica de Items ---
+  const updateItem = (index, field, value) => {
+    const newItems = [...items];
+    if (['quantity', 'unitPrice', 'taxRate'].includes(field)) {
+      newItems[index][field] = parseFloat(value) || 0;
+    } else {
+      newItems[index][field] = value;
+    }
+    setItems(newItems);
+  };
 
-  // 👤 Renderizar sección de comprador ACTUALIZADA
-  const renderBuyerSection = () => (
-    <div className="space-y-6">
-      {/* Búsqueda de comprador */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Documento del comprador
-        </label>
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <input
-              type="text"
-              value={localFormData.buyer.document}
-              onChange={(e) => updateBuyerField('document', e.target.value)}
-              placeholder="Ingrese número de documento"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            
-            {/* ⭐ ESTADOS DE BÚSQUEDA ACTUALIZADOS */}
-            {buyerSearchLoading && (
-              <p className="text-sm text-blue-600 mt-1">
-                🔍 Buscando comprador...
-              </p>
-            )}
-            
-            {buyerFound && buyer && (
-              <p className="text-sm text-green-600 mt-1">
-                ✅ Comprador encontrado: {buyer.scostumername || localFormData.buyer.name}
-              </p>
-            )}
-            
-            {localFormData.buyer.document.length >= 6 && !buyerSearchLoading && !buyerFound && (
-              <p className="text-sm text-orange-600 mt-1">
-                ℹ️ Comprador no encontrado, se creará uno nuevo
-              </p>
-            )}
-          </div>
-          
-          <button
-            onClick={() => setShowBuyerForm(!showBuyerForm)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            {showBuyerForm ? 'Ocultar' : 'Completar'} datos
-          </button>
-        </div>
-      </div>
+  const addItem = () => {
+    setItems([...items, { 
+      description: '', 
+      quantity: 1, 
+      unitPrice: 0, 
+      taxRate: 19 
+    }]);
+  };
 
-      {/* Formulario completo del comprador */}
-      {(showBuyerForm || !buyerFound) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nombre completo *
-            </label>
-            <input
-              type="text"
-              value={localFormData.buyer.name}
-              onChange={(e) => updateBuyerField('name', e.target.value)}
-              placeholder="Nombre del comprador"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={localFormData.buyer.email}
-              onChange={(e) => updateBuyerField('email', e.target.value)}
-              placeholder="email@ejemplo.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Teléfono
-            </label>
-            <input
-              type="tel"
-              value={localFormData.buyer.phone}
-              onChange={(e) => updateBuyerField('phone', e.target.value)}
-              placeholder="300 000 0000"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ciudad
-            </label>
-            <input
-              type="text"
-              value={localFormData.buyer.city}
-              onChange={(e) => updateBuyerField('city', e.target.value)}
-              placeholder="Ciudad"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Dirección
-            </label>
-            <input
-              type="text"
-              value={localFormData.buyer.address}
-              onChange={(e) => updateBuyerField('address', e.target.value)}
-              placeholder="Dirección completa"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  // 🛒 Renderizar sección de items
-  const renderItemsSection = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900">Items a facturar</h3>
-        <button
-          onClick={addItem}
-          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-        >
-          ➕ Agregar item
-        </button>
-      </div>
-      
-      <div className="space-y-3">
-        {localFormData.items.map((item, index) => (
-          <div key={index} className="bg-gray-50 p-4 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Descripción *
-                </label>
-                <input
-                  type="text"
-                  value={item.description}
-                  onChange={(e) => updateItem(index, 'description', e.target.value)}
-                  placeholder="Descripción del producto/servicio"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Cantidad *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={item.quantity}
-                  onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 1)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Precio unitario *
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={item.unitPrice}
-                  onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Total
-                  </label>
-                  <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-700">
-                    ${((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
-                  </div>
-                </div>
-                
-                {localFormData.items.length > 1 && (
-                  <button
-                    onClick={() => removeItem(index)}
-                    className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                    title="Eliminar item"
-                  >
-                    🗑️
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {/* Notas adicionales */}
-      <div className="mt-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Notas adicionales (opcional)
-        </label>
-        <textarea
-          value={localFormData.notes}
-          onChange={(e) => setLocalFormData(prev => ({ ...prev, notes: e.target.value }))}
-          placeholder="Notas o comentarios adicionales para la factura"
-          rows="3"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-    </div>
-  );
-
-  // 📋 Renderizar sección de revisión
-  const renderReviewSection = () => (
-    <div className="space-y-6">
-      {/* Información de la factura */}
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold text-blue-900 mb-2">
-          📄 Información de la factura
-        </h3>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="font-medium text-blue-800">Número:</span>
-            <p className="text-blue-700">
-              {invoiceData?.fullInvoiceNumber || 'Cargando...'}
-            </p>
-          </div>
-          <div>
-            <span className="font-medium text-blue-800">Fecha:</span>
-            <p className="text-blue-700">
-              {new Date().toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Datos del comprador */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          👤 Comprador
-        </h3>
-        <div className="space-y-2 text-sm">
-          <p><span className="font-medium">Documento:</span> {localFormData.buyer.document}</p>
-          <p><span className="font-medium">Nombre:</span> {localFormData.buyer.name}</p>
-          {localFormData.buyer.email && (
-            <p><span className="font-medium">Email:</span> {localFormData.buyer.email}</p>
-          )}
-          {localFormData.buyer.phone && (
-            <p><span className="font-medium">Teléfono:</span> {localFormData.buyer.phone}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Items */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-          🛒 Items ({localFormData.items.filter(i => i.description).length})
-        </h3>
-        <div className="space-y-2">
-          {localFormData.items
-            .filter(item => item.description)
-            .map((item, index) => (
-              <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200">
-                <div className="flex-1">
-                  <p className="font-medium">{item.description}</p>
-                  <p className="text-sm text-gray-600">
-                    {item.quantity} x ${item.unitPrice?.toLocaleString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium">
-                    ${((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            ))}
-        </div>
-      </div>
-
-      {/* Totales */}
-      <div className="bg-green-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold text-green-900 mb-3">
-          💰 Resumen
-        </h3>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span>Subtotal:</span>
-            <span>${calculatedTotals.subtotal.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>IVA (19%):</span>
-            <span>${calculatedTotals.taxAmount.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between font-bold text-lg border-t border-green-200 pt-2">
-            <span>Total:</span>
-            <span>${calculatedTotals.totalAmount.toLocaleString()}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Botón de envío */}
-      <div className="flex justify-center">
-        <button
-          onClick={handleSubmit}
-          disabled={creating || !localFormData.buyer.document || !localFormData.buyer.name || calculatedTotals.totalAmount === 0}
-          className={`px-8 py-3 rounded-lg font-medium text-lg transition-colors ${
-            creating
-              ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-              : 'bg-green-600 text-white hover:bg-green-700'
-          } ${
-            !localFormData.buyer.document || !localFormData.buyer.name || calculatedTotals.totalAmount === 0
-              ? 'opacity-50 cursor-not-allowed'
-              : ''
-          }`}
-        >
-          {creating ? (
-            <>
-              <span className="inline-block animate-spin mr-2">⏳</span>
-              Enviando a Taxxa...
-            </>
-          ) : (
-            '📤 Crear y enviar factura'
-          )}
-        </button>
-      </div>
-    </div>
-  );
-
-  // 🎨 Renderizar contenido principal
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'buyer':
-        return renderBuyerSection();
-      case 'items':
-        return renderItemsSection();
-      case 'review':
-        return renderReviewSection();
-      default:
-        return renderBuyerSection();
+  const removeItem = (index) => {
+    if (items.length > 1) {
+      setItems(items.filter((_, i) => i !== index));
     }
   };
 
+  // --- Cálculos ---
+  const totals = useMemo(() => {
+    const subtotal = items.reduce((sum, item) => {
+      return sum + (item.quantity * item.unitPrice);
+    }, 0);
+    const tax = subtotal * 0.19; // 19% IVA
+    return { 
+      subtotal: Math.round(subtotal * 100) / 100, 
+      tax: Math.round(tax * 100) / 100, 
+      total: Math.round((subtotal + tax) * 100) / 100 
+    };
+  }, [items]);
+
+  // Validar si puede avanzar de pestaña
+  const canAdvanceToItems = buyer && (buyer.scostumername || buyer.name);
+  const canAdvanceToReview = canAdvanceToItems && items.some(i => 
+    i.description.trim() && i.quantity > 0 && i.unitPrice > 0
+  );
+
+  // --- Renderizado ---
   if (loadingData) {
     return (
       <div className="flex items-center justify-center min-h-64">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">Cargando datos para facturación...</p>
-        </div>
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="ml-3">Cargando datos de facturación...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              📝 Facturación Manual
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Crear facturas para productos o servicios adicionales
+    <div className="max-w-4xl mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">📝 Facturación Manual</h1>
+        {invoiceData && (
+          <div className="text-right">
+            <p className="text-sm text-gray-600">Próxima Factura:</p>
+            <p className="text-lg font-mono text-blue-600">
+              {invoiceData.fullInvoiceNumber}
             </p>
           </div>
-          
-          {invoiceData && (
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Próxima factura:</p>
-              <p className="text-xl font-bold text-blue-600">
-                {invoiceData.fullInvoiceNumber}
-              </p>
+        )}
+      </div>
+
+      {/* Pestañas de Navegación */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8">
+          {[
+            { key: 'buyer', label: '👤 Comprador', enabled: true },
+            { key: 'items', label: `🛒 Items (${items.filter(i => i.description).length})`, enabled: canAdvanceToItems },
+            { key: 'review', label: '📋 Revisar', enabled: canAdvanceToReview }
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => tab.enabled && setActiveTab(tab.key)}
+              disabled={!tab.enabled}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === tab.key
+                  ? 'border-indigo-500 text-indigo-600'
+                  : tab.enabled
+                  ? 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-gray-300 cursor-not-allowed'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Contenido de la Pestaña Activa */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        {activeTab === 'buyer' && (
+          <div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Número de Documento del Comprador
+              </label>
+              <input 
+                type="text" 
+                value={documentInput} 
+                onChange={(e) => setDocumentInput(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Ingrese el documento para buscar o crear comprador" 
+              />
+              {buyerSearchLoading && (
+                <p className="text-sm text-blue-600 mt-2 flex items-center">
+                  <span className="animate-spin mr-2">⏳</span>
+                  Buscando comprador...
+                </p>
+              )}
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Tabs de navegación */}
-      {renderTabs()}
+            {buyer && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <p className="text-green-800 font-medium">
+                  ✅ Comprador seleccionado: {buyer.scostumername}
+                </p>
+                <p className="text-green-600 text-sm">
+                  Documento: {buyer.sdocno} | Email: {buyer.selectronicmail}
+                </p>
+                <button
+                  onClick={() => setActiveTab('items')}
+                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Continuar a Items →
+                </button>
+              </div>
+            )}
+            
+            {showBuyerForm && (
+              <div className="mt-6 border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-semibold text-orange-600 mb-4">
+                  📝 Registrar Nuevo Comprador
+                </h3>
+                <BuyerForm jbuyer={newBuyerData} setBuyer={setNewBuyerData} />
+                <div className="text-right mt-4">
+                  <button 
+                    onClick={handleCreateBuyer} 
+                    className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                  >
+                    💾 Guardar Comprador
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Contenido principal */}
-      <div className="bg-white">
-        {renderContent()}
-      </div>
-
-      {/* Mostrar factura creada exitosamente */}
-      {created && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-lg max-w-md w-full mx-4">
-            <div className="text-center">
-              <div className="text-6xl mb-4">✅</div>
-              <h2 className="text-2xl font-bold text-green-600 mb-2">
-                ¡Factura creada exitosamente!
-              </h2>
-              <p className="text-gray-600 mb-4">
-                Factura <strong>{created.fullInvoiceNumber}</strong> enviada a Taxxa
-              </p>
-              <p className="text-sm text-gray-500 mb-6">
-                Total: ${created.totalAmount?.toLocaleString()}
-              </p>
+        {activeTab === 'items' && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">🛒 Items a Facturar</h3>
               <button
-                onClick={() => {
-                  dispatch({ type: 'CREATE_MANUAL_INVOICE_SUCCESS', payload: null });
-                }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                onClick={addItem}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
               >
-                Continuar
+                ➕ Agregar Item
               </button>
             </div>
+
+            {items.map((item, index) => (
+              <div key={index} className="grid grid-cols-12 gap-4 mb-4 items-center border-b border-gray-100 pb-4">
+                <div className="col-span-12 md:col-span-5">
+                  <input 
+                    type="text" 
+                    placeholder="Descripción del producto o servicio" 
+                    value={item.description} 
+                    onChange={e => updateItem(index, 'description', e.target.value)} 
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+                <div className="col-span-4 md:col-span-2">
+                  <input 
+                    type="number" 
+                    placeholder="Cantidad" 
+                    min="1"
+                    value={item.quantity} 
+                    onChange={e => updateItem(index, 'quantity', e.target.value)} 
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+                <div className="col-span-4 md:col-span-3">
+                  <input 
+                    type="number" 
+                    placeholder="Precio Unitario" 
+                    min="0"
+                    step="0.01"
+                    value={item.unitPrice} 
+                    onChange={e => updateItem(index, 'unitPrice', e.target.value)} 
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+                <div className="col-span-4 md:col-span-2">
+                  <button 
+                    onClick={() => removeItem(index)} 
+                    className="w-full bg-red-500 text-white p-2 rounded hover:bg-red-600 transition-colors disabled:bg-gray-300" 
+                    disabled={items.length <= 1}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notas adicionales (opcional)
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Notas adicionales para la factura..."
+                className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows="3"
+              />
+            </div>
+
+            {canAdvanceToReview && (
+              <div className="text-right mt-6">
+                <button
+                  onClick={() => setActiveTab('review')}
+                  className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Revisar Factura →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'review' && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4">📋 Resumen de la Factura</h3>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h4 className="font-semibold text-blue-800 mb-2">Información del Comprador</h4>
+              <p><strong>Nombre:</strong> {buyer?.scostumername || 'No seleccionado'}</p>
+              <p><strong>Documento:</strong> {buyer?.sdocno || 'N/A'}</p>
+              <p><strong>Email:</strong> {buyer?.selectronicmail || 'N/A'}</p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse border border-gray-300">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="border border-gray-300 p-3 text-left">Descripción</th>
+                    <th className="border border-gray-300 p-3 text-center">Cant.</th>
+                    <th className="border border-gray-300 p-3 text-right">Precio Unit.</th>
+                    <th className="border border-gray-300 p-3 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.filter(i => i.description).map((item, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="border border-gray-300 p-3">{item.description}</td>
+                      <td className="border border-gray-300 p-3 text-center">{item.quantity}</td>
+                      <td className="border border-gray-300 p-3 text-right">${item.unitPrice.toLocaleString()}</td>
+                      <td className="border border-gray-300 p-3 text-right">${(item.quantity * item.unitPrice).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-100 font-semibold">
+                  <tr>
+                    <td colSpan="3" className="border border-gray-300 p-3 text-right">Subtotal:</td>
+                    <td className="border border-gray-300 p-3 text-right">${totals.subtotal.toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan="3" className="border border-gray-300 p-3 text-right">IVA (19%):</td>
+                    <td className="border border-gray-300 p-3 text-right">${totals.tax.toLocaleString()}</td>
+                  </tr>
+                  <tr className="text-lg bg-green-100">
+                    <td colSpan="3" className="border border-gray-300 p-3 text-right font-bold">Total:</td>
+                    <td className="border border-gray-300 p-3 text-right font-bold">${totals.total.toLocaleString()}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {notes && (
+              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-yellow-800"><strong>Notas:</strong> {notes}</p>
+              </div>
+            )}
+
+            <div className="text-center mt-8">
+              <button 
+                onClick={handleSubmitInvoice} 
+                disabled={creating} 
+                className={`px-8 py-3 rounded-lg text-lg font-semibold transition-colors ${
+                  creating 
+                    ? 'bg-gray-400 text-gray-700 cursor-not-allowed' 
+                    : 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl'
+                }`}
+              >
+                {creating ? (
+                  <span className="flex items-center">
+                    <span className="animate-spin mr-2">⏳</span>
+                    Enviando a Taxxa...
+                  </span>
+                ) : (
+                  '📤 Crear y Enviar Factura'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modal de éxito */}
+      {created && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-lg max-w-md w-full mx-4 text-center">
+            <div className="text-6xl mb-4">✅</div>
+            <h2 className="text-2xl font-bold mb-4 text-green-600">¡Factura Creada!</h2>
+            <p className="mb-6 text-gray-700">
+              La factura <strong>{created.invoiceNumber}</strong> ha sido enviada exitosamente a Taxxa.
+            </p>
+            <button
+              onClick={() => {
+                dispatch({ type: 'CREATE_MANUAL_INVOICE_RESET' });
+                window.location.reload(); // O navegar a otra página
+              }}
+              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              Crear Nueva Factura
+            </button>
           </div>
         </div>
       )}
