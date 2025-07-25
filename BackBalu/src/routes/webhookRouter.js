@@ -5,7 +5,7 @@ const router = express.Router();
 // const webhookController = require("../controller/webhook");
 
 // Middleware para parsear JSON y capturar el rawBody para la verificación de la firma
-router.post('/eventos', express.json({
+router.post('/events', express.json({
     verify: (req, res, buf) => {
         req.rawBody = buf.toString(); // Guardar el cuerpo crudo como string
     }

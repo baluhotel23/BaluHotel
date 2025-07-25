@@ -3,7 +3,7 @@ const { Op } = require('sequelize');
 
 // 🔧 CONFIGURACIÓN DE RESOLUCIÓN
 const RESOLUTION_CONFIG = {
-  from: 7,
+  from: 23,
   to: 500,
   prefix: "FVK",
   resolutionNumber: "18764093638527",
