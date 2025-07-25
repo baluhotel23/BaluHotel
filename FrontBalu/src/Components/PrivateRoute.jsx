@@ -5,8 +5,11 @@ import PropTypes from 'prop-types';
 const PrivateRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user } = useSelector(state => state.auth);
   const location = useLocation();
-
-  // Debug: mostrar role del usuario si existe
+if (user) {
+  console.log('Rol del usuario logueado:', user.role);
+  console.log('isAuthenticated:', isAuthenticated);
+  console.log('allowedRoles:', allowedRoles);
+}  // Debug: mostrar role del usuario si existe
   if (user) {
     console.log('Rol del usuario logueado:', user.role);
   }

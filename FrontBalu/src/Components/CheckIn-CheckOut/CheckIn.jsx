@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   getAllBookings,
   updateBookingStatus,
@@ -1090,6 +1091,19 @@ const getBookingRequirementsStatus = useCallback((booking) => {
                       🎉 COMPLETAR CHECK-IN
                     </button>
                   )}
+
+{requirementsStatus.requirements.passengersCompleted.completed && (
+  <div className="mt-3 flex justify-center">
+    <Link
+      to={`/admin/PassengerList/${booking.bookingId}`}
+      className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      👀 Ver pasajeros de la reserva
+    </Link>
+  </div>
+)}
 
                   {/* ⭐ MENSAJE DE REQUISITOS FALTANTES - ACTUALIZADO */}
                   {!requirementsStatus.allRequirementsMet && (

@@ -36,7 +36,7 @@ import LocalBookingForm from "./Components/Booking/LocalBookingForm";
 import CheckOut from "./Components/CheckOut/CheckOut";
 import ThankYouPage from "./Components/ThankYouPage";
 import BookingPassengerList from "./Components/Dashboard/BookingPassengerList";
-import PurchasePanel from './Components/Purchases/PurchasePanel';
+import PurchasePanel from "./Components/Purchases/PurchasePanel";
 import ExpenseForm from "./Components/Purchases/ExpensesForm";
 import ExpensesList from "./Components/Purchases/ExpensesList";
 import FinancialBalance from "./Components/Dashboard/FinancialBalance";
@@ -46,7 +46,6 @@ import InvoiceList from "./Components/Taxxa/InvoiceList";
 import ConfiguracionHotel from "./Components/Dashboard/ConfiguracionHotel";
 import CompletedBookings from "./Components/CheckOut/CompletedBookings";
 import FacturaManual from "./Components/Taxxa/FacturaManual";
- 
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -146,7 +145,7 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/admin/PassengerList"
+            path="/admin/PassengerList/:bookingId?"
             element={
               <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
                 <BookingPassengerList />
@@ -283,7 +282,7 @@ const AppContent = () => {
               </PrivateRoute>
             }
           />
-          
+
           <Route
             path="/pendientInvoices"
             element={
@@ -352,7 +351,8 @@ const AppContent = () => {
                 <ExpensesList />
               </PrivateRoute>
             }
-          /><Route
+          />
+          <Route
             path="/balance"
             element={
               <PrivateRoute allowedRoles={["owner"]}>
