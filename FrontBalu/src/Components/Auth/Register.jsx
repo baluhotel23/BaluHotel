@@ -12,7 +12,7 @@ import {
 const Register = () => {
   const dispatch = useDispatch();
   const { users, loading, error } = useSelector(state => state.admin);
-
+  const { user: currentUser } = useSelector(state => state.auth); // <-- para saber si es owner
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -28,6 +28,7 @@ const Register = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
+ const [newPassword, setNewPassword] = useState("");
 
   const wdoctypeOptions = [
     "RC", "TI", "CC", "TE", "CE", "NIT", "PAS", "DEX", "PEP", "PPT", "FI", "NUIP",
@@ -117,24 +118,28 @@ const Register = () => {
 
   // ⭐ FUNCIONES PARA GESTIÓN DE USUARIOS
   const handleEditUser = (user) => {
-    setEditingUser({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      wdoctype: user.wdoctype,
-      n_document: user.n_document,
-      phone: user.phone || "",
-      isActive: user.isActive
-    });
-    setShowEditModal(true);
-  };
+  setEditingUser({
+    n_document: user.n_document, // <-- usa n_document
+    email: user.email,
+    role: user.role,
+    wdoctype: user.wdoctype,
+    phone: user.phone || "",
+    isActive: user.isActive
+  });
+  setShowEditModal(true);
+};
 
   const handleUpdateUser = async () => {
     try {
-      const result = await dispatch(updateUser(editingUser.id, editingUser));
+      const updateData = { ...editingUser };
+      if (newPassword.trim()) {
+        updateData.password = newPassword;
+      }
+      const result = await dispatch(updateUser(editingUser.n_document, updateData)); 
       if (result) {
         setShowEditModal(false);
         setEditingUser(null);
+        setNewPassword(""); // limpiar campo
         loadUsers();
       }
     } catch (error) {
@@ -538,6 +543,19 @@ const Register = () => {
                     placeholder="Opcional"
                   />
                 </div>
+                {currentUser?.role === "owner" && (
+            <div>
+              <label className="block font-semibold text-gray-700 mb-2">Nueva contraseña:</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md focus:border-blue-500"
+                placeholder="Dejar vacío para no cambiar"
+                autoComplete="new-password"
+              />
+            </div>
+          )}
               </div>
               
               <div className="flex gap-3 mt-6">

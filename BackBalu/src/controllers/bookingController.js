@@ -11,6 +11,7 @@ const {
   BookingInventoryUsage,
   RoomBasics,
 } = require("../data");
+
 const { Op } = require("sequelize");
 const { CustomError } = require("../middleware/error");
 const jwt = require("jsonwebtoken");
@@ -625,13 +626,17 @@ const createBooking = async (req, res, next) => {
       }
 
       // Aplicar precio promocional si existe
-      if (room.isPromo && room.promotionPrice) {
-        pricePerNight = room.promotionPrice;
-        console.log(
-          "💰 [CREATE-BOOKING] Applied promotional price:",
-          pricePerNight
-        );
-      }
+      if (room.isPromo && room.promotionPrice && pointOfSale !== "Online") {
+  pricePerNight = room.promotionPrice;
+  console.log(
+    "💰 [CREATE-BOOKING] Applied promotional price (NO online):",
+    pricePerNight
+  );
+} else if (room.isPromo && room.promotionPrice && pointOfSale === "Online") {
+  console.log(
+    "💰 [CREATE-BOOKING] NO promo price for ONLINE booking. Using regular price."
+  );
+}
 
       finalTotalPrice = pricePerNight * nights;
       console.log(

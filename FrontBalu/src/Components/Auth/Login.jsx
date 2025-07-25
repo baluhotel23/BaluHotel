@@ -121,14 +121,7 @@ const Login = () => {
               </label>
             </div>
 
-            <div className="text-sm">
-              <Link
-                to="/forgot-password"
-                className="font-medium text-secondary hover:text-Hover"
-              >
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </div>
+            
           </div>
 
           {/* Error message */}

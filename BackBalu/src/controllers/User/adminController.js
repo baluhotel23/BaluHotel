@@ -54,10 +54,11 @@ const createStaffUser = async (req, res) => {
 };
 
 const updateUser = async (req, res) => {
-    const { id } = req.params;
+    const { n_document } = req.params;
+    console.log("ID recibido para updateUser:", n_document);
     const { email, role, ...updateData } = req.body;
 
-    const user = await User.findByPk(id);
+    const user = await User.findByPk(n_document);
     if (!user) {
         throw new CustomError('Usuario no encontrado', 404);
     }
@@ -71,7 +72,7 @@ const updateUser = async (req, res) => {
     }
 
     // Validar rol si se está actualizando
-    if (role && !['admin', 'receptionist'].includes(role)) {
+    if (role && !['admin', 'recept'].includes(role)) {
         throw new CustomError('Rol no válido para staff', 400);
     }
 

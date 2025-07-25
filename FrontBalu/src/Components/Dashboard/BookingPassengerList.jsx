@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import  { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useParams } from "react-router-dom";
 import { getBookingById } from "../../Redux/Actions/bookingActions";
 import {
   deleteRegistrationPass,
@@ -11,6 +12,7 @@ import "jspdf-autotable";
 import DashboardLayout from "./DashboardLayout";
 
 const BookingPassengerList = () => {
+  const { bookingId } = useParams();
   const dispatch = useDispatch();
   const [bookingIdInput, setBookingIdInput] = useState("");
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -25,6 +27,16 @@ const BookingPassengerList = () => {
   );
 
   const bookingDetails = useSelector((state) => state.booking.bookingDetails);
+
+  useEffect(() => {
+    if (bookingId) {
+      setBookingIdInput(bookingId);
+      setLoading(true);
+      dispatch(getBookingById(bookingId))
+        .finally(() => setLoading(false));
+    }
+  }, [bookingId, dispatch]); 
+
 
   useEffect(() => {
     if (bookingDetails) {
@@ -160,10 +172,38 @@ const BookingPassengerList = () => {
       doc.text(lines, 40, currentY);
       currentY += (lines.length * 6) + 30;
 
+           
+
+      // 👉 Agregar términos y condiciones aquí
+      doc.setFontSize(8);
+      doc.setFont(undefined, "bold");
+      doc.text(" Términos y condiciones", 40, currentY);
+      currentY += 8;
+      doc.setFont(undefined, "normal");
+      const termsText = `Hotel Balú informa a sus clientes que para modificación de fechas debe realizarse con un mínimo de 5 días a la fecha programada de la reserva.
+Hotel Balú se abstiene de realizar devoluciones de dinero por tal motivo de no poder asistir a tomar la reserva realizada el Hotel da un plazo 30 días calendario para hacer uso de la reserva solicitada.
+De no asistir y no realizar la respectiva cancelación o modificación de fecha el HOTEL BALÚ, tendrá derecho a quedarse con el anticipo realizado por el huésped.
+Habitaciones asignadas previa disponibilidad del Hotel.
+Reserva sin abono no se hará efectiva.
+Todo niño mayor de 5 años cancela tarifa.
+En caso de presentarse con acompañante, para reservas realizadas para persona sola o en acomodación múltiple, se realiza el cobro adicional.
+Se acepta el ingreso de mascotas siempre y cuando el dueño traiga equipaje para la comodidad del animal, y se haga responsable de daños o perjuicios ocasionados por el mismo.
+CHECK IN 3 PM, de lo contrario puede generar costo adicional.
+CHECK OUT 11 AM, de lo contrario puede generar costo adicional.
+Presentar siempre documento de identidad original de los visitantes.
+En caso de presentarse con menores de edad es necesario presentar el Registro civil del menor.
+El servicio de parqueadero aplica para los huéspedes hasta la 11 AM, si el huésped entrega la habitación y deja el carro en el parqueadero debe cancelar la tarifa con el encargado del Parqueadero.
+En Hotel Balú somos amigables con las mascotas, prepárate te esperamos con su camita y elementos de aseo. Gracias.
+Todo daño ocasionado en la habitación será cargado a su cuenta.`;
+      const termsLines = doc.splitTextToSize(termsText, doc.internal.pageSize.getWidth() - 80);
+      doc.text(termsLines, 40, currentY);
+      currentY += (termsLines.length * 9) + 40;
+
       doc.setFontSize(8);
       doc.text("Firma: ____________________________________", 40, currentY);
       doc.text("Cedula: ____________________________________", pageWidth / 2, currentY);
 
+      
       doc.save(`Listado_Pasajeros_Reserva_${selectedBooking.bookingId}.pdf`);
     };
     img.onerror = () => {
@@ -217,6 +257,7 @@ const BookingPassengerList = () => {
         </h2>
 
         {/* Búsqueda de reserva */}
+        {!bookingId && (
         <div className="mb-6 bg-white p-4 rounded-lg shadow">
           <div className="flex gap-4 items-end">
             <div className="flex-1">
@@ -240,7 +281,7 @@ const BookingPassengerList = () => {
             </button>
           </div>
         </div>
-
+)}
         {selectedBooking && (
           <div className="mb-4">
             <div className="flex justify-between items-center mb-4">
