@@ -10,6 +10,7 @@ const {
   BasicInventory,
   BookingInventoryUsage,
   RoomBasics,
+  Voucher
 } = require("../data");
 
 const { Op } = require("sequelize");
@@ -81,7 +82,12 @@ const getHotelScheduleEndpoint = async (req, res) => {
   }
 };
 
-// Public endpoints
+function generateVoucherCode() {
+  const prefix = 'BLU';
+  const timestamp = Date.now().toString().slice(-6);
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${prefix}${timestamp}${random}`;
+}
 
 const checkAvailability = async (req, res) => {
   try {
@@ -162,7 +168,8 @@ const checkAvailability = async (req, res) => {
           const requestedEnd = toColombiaTime(checkOut);
 
           // Conflicto si las fechas se solapan (sin considerar horas específicas)
-          const conflict = (bookingStart < requestedEnd && bookingEnd > requestedStart);
+          const conflict =
+            bookingStart < requestedEnd && bookingEnd > requestedStart;
 
           if (conflict) {
             console.log(
@@ -533,7 +540,6 @@ const createBooking = async (req, res, next) => {
         (bookingStart <= checkOutDate && bookingEnd >= checkInDate) ||
         (checkInDate <= bookingEnd && checkOutDate >= bookingStart);
 
-
       if (conflict) {
         console.log(
           "⚠️ [CREATE-BOOKING] Date conflict detected with booking:",
@@ -627,16 +633,20 @@ const createBooking = async (req, res, next) => {
 
       // Aplicar precio promocional si existe
       if (room.isPromo && room.promotionPrice && pointOfSale !== "Online") {
-  pricePerNight = room.promotionPrice;
-  console.log(
-    "💰 [CREATE-BOOKING] Applied promotional price (NO online):",
-    pricePerNight
-  );
-} else if (room.isPromo && room.promotionPrice && pointOfSale === "Online") {
-  console.log(
-    "💰 [CREATE-BOOKING] NO promo price for ONLINE booking. Using regular price."
-  );
-}
+        pricePerNight = room.promotionPrice;
+        console.log(
+          "💰 [CREATE-BOOKING] Applied promotional price (NO online):",
+          pricePerNight
+        );
+      } else if (
+        room.isPromo &&
+        room.promotionPrice &&
+        pointOfSale === "Online"
+      ) {
+        console.log(
+          "💰 [CREATE-BOOKING] NO promo price for ONLINE booking. Using regular price."
+        );
+      }
 
       finalTotalPrice = pricePerNight * nights;
       console.log(
@@ -1347,6 +1357,21 @@ const downloadBookingPdf = async (req, res, next) => {
       });
     }
 
+    const cancellationToken = jwt.sign(
+      {
+        bookingId: booking.bookingId,
+        action: "cancellation",
+        guestId: booking.guestId,
+        iat: Math.floor(Date.now() / 1000),
+      },
+      process.env.BOOKING_SECRET,
+      {
+        expiresIn: "30d", // Válido por 30 días
+      }
+    );
+
+    const cancellationUrl = `${process.env.FRONT_URL}/cancel-booking/${cancellationToken}`;
+
     console.log("🔍 [DOWNLOAD-PDF] Buscando reserva:", bookingId);
 
     // ⭐ OBTENER DATOS COMPLETOS DE LA RESERVA CON INCLUDES MEJORADOS
@@ -1632,8 +1657,59 @@ const downloadBookingPdf = async (req, res, next) => {
         doc.text("Estado de Pago: Pendiente");
       }
 
-      // ⭐ ENLACE DE SEGUIMIENTO
+      // ⭐ SECCIÓN DE CANCELACIÓN (NUEVA)
       doc.moveDown(2);
+      doc.fontSize(10).text("═".repeat(60), { align: "center" });
+      doc.moveDown(0.5);
+
+      doc
+        .fontSize(12)
+        .font("Helvetica-Bold")
+        .text("¿Necesitas cancelar o modificar tu reserva?", {
+          align: "center",
+        });
+
+      doc.moveDown(0.5);
+      doc.fontSize(10).font("Helvetica");
+      doc.text("Hotel Balú - Políticas de Cancelación:", { align: "center" });
+      doc.moveDown(0.3);
+
+      doc.text("• Modificaciones de fechas: Mínimo 5 días de anticipación", {
+        align: "center",
+      });
+      doc.text("• Más de 5 días antes: Crédito válido por 30 días calendario", {
+        align: "center",
+      });
+      doc.text("• Menos de 5 días: El hotel retiene el anticipo", {
+        align: "center",
+      });
+      doc.text("• No se realizan devoluciones de dinero", { align: "center" });
+
+      doc.moveDown(0.5);
+      doc
+        .fontSize(11)
+        .font("Helvetica-Bold")
+        .text("Enlace de Cancelación:", { align: "center" });
+      doc.fontSize(9).font("Helvetica").text(cancellationUrl, {
+        align: "center",
+        link: cancellationUrl,
+        underline: true,
+      });
+
+      doc.moveDown(0.3);
+      doc
+        .fontSize(8)
+        .text(
+          `Enlace válido hasta: ${formatColombiaDate(
+            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          )}`,
+          {
+            align: "center",
+          }
+        );
+
+      // ⭐ ENLACE DE SEGUIMIENTO
+      doc.moveDown(1.5);
       doc.fontSize(10).text("═".repeat(60), { align: "center" });
       doc.moveDown(0.5);
       doc
@@ -1649,6 +1725,19 @@ const downloadBookingPdf = async (req, res, next) => {
         link: `${process.env.FRONT_URL}/booking-status/${trackingToken}`,
       });
 
+      // ⭐ CONTACTO DE EMERGENCIA
+      doc.moveDown(1);
+      doc.fontSize(10).text("═".repeat(60), { align: "center" });
+      doc.moveDown(0.3);
+      doc
+        .fontSize(10)
+        .font("Helvetica-Bold")
+        .text("Contacto Hotel Balú", { align: "center" });
+      doc.fontSize(9).font("Helvetica");
+      doc.text("Email: reservas@baluhotel.com", { align: "center" });
+      doc.text("Teléfono: +57 300 123 4567", { align: "center" });
+      doc.text("Atención al cliente: 24 horas", { align: "center" });
+
       // ⭐ PIE DE PÁGINA
       doc.moveDown(1);
       doc.fontSize(8).text("═".repeat(80), { align: "center" });
@@ -1656,6 +1745,9 @@ const downloadBookingPdf = async (req, res, next) => {
         align: "center",
       });
       doc.text("Este es un documento oficial de Balu Hotel", {
+        align: "center",
+      });
+      doc.text("Habitaciones sujetas a disponibilidad previa del hotel", {
         align: "center",
       });
 
@@ -3319,15 +3411,32 @@ const getAllBookings = async (req, res, next) => {
       include: includeOptions,
       // ⭐ AGREGAR ATTRIBUTES CON LOS NUEVOS CAMPOS
       attributes: [
-        'bookingId', 'checkIn', 'checkOut', 'status', 'pointOfSale',
-        'guestCount', 'totalAmount', 'guestId', 'roomNumber',
-        'trackingToken', 'createdBy', 'paymentCompletedAt',
-        'actualCheckIn', 'actualCheckOut', 'createdAt', 'updatedAt',
+        "bookingId",
+        "checkIn",
+        "checkOut",
+        "status",
+        "pointOfSale",
+        "guestCount",
+        "totalAmount",
+        "guestId",
+        "roomNumber",
+        "trackingToken",
+        "createdBy",
+        "paymentCompletedAt",
+        "actualCheckIn",
+        "actualCheckOut",
+        "createdAt",
+        "updatedAt",
         // ⭐ NUEVOS CAMPOS AGREGADOS EN LA MIGRACIÓN
-        'inventoryVerified', 'inventoryVerifiedAt', 
-        'inventoryDelivered', 'inventoryDeliveredAt', 'inventoryDeliveredBy',
-        'passengersCompleted', 'passengersCompletedAt', 
-        'checkInReadyAt', 'checkInProgress'
+        "inventoryVerified",
+        "inventoryVerifiedAt",
+        "inventoryDelivered",
+        "inventoryDeliveredAt",
+        "inventoryDeliveredBy",
+        "passengersCompleted",
+        "passengersCompletedAt",
+        "checkInReadyAt",
+        "checkInProgress",
       ],
       order: [
         ["createdAt", "DESC"],
@@ -3355,11 +3464,13 @@ const getAllBookings = async (req, res, next) => {
 
       // Calcular total pagado (solo pagos completados)
       const totalPagado = payments
-  .filter((payment) => ["completed", "authorized"].includes(payment.paymentStatus))
-  .reduce((sum, payment) => {
-    const amount = parseFloat(payment.amount || 0);
-    return sum + (isNaN(amount) ? 0 : amount);
-  }, 0);
+        .filter((payment) =>
+          ["completed", "authorized"].includes(payment.paymentStatus)
+        )
+        .reduce((sum, payment) => {
+          const amount = parseFloat(payment.amount || 0);
+          return sum + (isNaN(amount) ? 0 : amount);
+        }, 0);
       // Calcular pagos pendientes
       const totalPendingPayments = payments
         .filter((payment) => payment.paymentStatus === "pending")
@@ -3481,25 +3592,36 @@ const getAllBookings = async (req, res, next) => {
         checkInProgress: bookingData.checkInProgress || false,
         checkInReadyAt: bookingData.checkInReadyAt,
         // ⭐ ESTADO CALCULADO
-        allRequirementsMet: (
+        allRequirementsMet:
           (bookingData.inventoryDelivered || false) &&
           (bookingData.passengersCompleted || false) &&
-          booking.room?.status === 'Limpia'
-        ),
+          booking.room?.status === "Limpia",
         // ⭐ PASOS COMPLETADOS
         completedSteps: [
-          ...((bookingData.inventoryVerified || false) ? ['Inventario verificado'] : []),
-          ...((bookingData.inventoryDelivered || false) ? ['Inventario entregado'] : []),
-          ...((bookingData.passengersCompleted || false) ? ['Pasajeros registrados'] : []),
-          ...(booking.room?.status === 'Limpia' ? ['Habitación limpia'] : [])
+          ...(bookingData.inventoryVerified || false
+            ? ["Inventario verificado"]
+            : []),
+          ...(bookingData.inventoryDelivered || false
+            ? ["Inventario entregado"]
+            : []),
+          ...(bookingData.passengersCompleted || false
+            ? ["Pasajeros registrados"]
+            : []),
+          ...(booking.room?.status === "Limpia" ? ["Habitación limpia"] : []),
         ],
         // ⭐ PASOS PENDIENTES
         pendingSteps: [
-          ...(!(bookingData.inventoryVerified || false) ? ['Verificar inventario'] : []),
-          ...(!(bookingData.inventoryDelivered || false) ? ['Entregar inventario'] : []),
-          ...(!((bookingData.passengersCompleted || false)) ? ['Completar registro de pasajeros'] : []),
-          ...(booking.room?.status !== 'Limpia' ? ['Limpiar habitación'] : [])
-        ]
+          ...(!(bookingData.inventoryVerified || false)
+            ? ["Verificar inventario"]
+            : []),
+          ...(!(bookingData.inventoryDelivered || false)
+            ? ["Entregar inventario"]
+            : []),
+          ...(!(bookingData.passengersCompleted || false)
+            ? ["Completar registro de pasajeros"]
+            : []),
+          ...(booking.room?.status !== "Limpia" ? ["Limpiar habitación"] : []),
+        ],
       };
 
       // ⭐ AGREGAR METADATOS ÚTILES
@@ -3522,9 +3644,11 @@ const getAllBookings = async (req, res, next) => {
           readyForBilling:
             booking.status === "checked-in" && financialSummary.isFullyPaid,
           // ⭐ NUEVAS FLAGS
-          hasInventoryTracking: !!(bookingData.inventoryVerified || bookingData.inventoryDelivered),
-          hasPassengerTracking: !!(bookingData.passengersCompleted),
-          isCheckInReady: bookingData.checkInTracking.allRequirementsMet
+          hasInventoryTracking: !!(
+            bookingData.inventoryVerified || bookingData.inventoryDelivered
+          ),
+          hasPassengerTracking: !!bookingData.passengersCompleted,
+          isCheckInReady: bookingData.checkInTracking.allRequirementsMet,
         },
       };
 
@@ -3722,7 +3846,7 @@ const checkInGuest = async (req, res, next) => {
       hasRoom: !!booking.room,
       hasPayments: booking.payments?.length > 0,
       totalPayments: booking.payments?.length || 0,
-      paymentStatuses: booking.payments?.map(p => p.paymentStatus) || [],
+      paymentStatuses: booking.payments?.map((p) => p.paymentStatus) || [],
     });
 
     // ⭐ VALIDACIONES DE ESTADO CON LOGS DETALLADOS
@@ -3793,21 +3917,25 @@ const checkInGuest = async (req, res, next) => {
 
     // ⭐ VALIDAR ESTADO DE PAGOS - LÓGICA CORREGIDA
     const totalAmount = parseFloat(booking.totalAmount || 0);
-    
+
     // ✅ NUEVA LÓGICA: Si el estado es "paid", asumir que está completamente pagado
     let totalPaid = 0;
     let paymentPercentage = 0;
-    
+
     if (booking.status === "paid") {
       // ✅ Si está en estado "paid", considerar como completamente pagado
       totalPaid = totalAmount;
       paymentPercentage = 100;
-      console.log("💰 [CHECK-IN-GUEST] Reserva en estado 'paid' - considerando completamente pagada");
+      console.log(
+        "💰 [CHECK-IN-GUEST] Reserva en estado 'paid' - considerando completamente pagada"
+      );
     } else {
       // ✅ Para otros estados, calcular basado en pagos reales
       totalPaid = booking.payments
         ? booking.payments
-            .filter(payment => ["completed", "authorized"].includes(payment.paymentStatus))
+            .filter((payment) =>
+              ["completed", "authorized"].includes(payment.paymentStatus)
+            )
             .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0)
         : 0;
       paymentPercentage = totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
@@ -3825,17 +3953,21 @@ const checkInGuest = async (req, res, next) => {
 
     // ✅ VALIDACIÓN CORREGIDA: Permitir check-in si está en estado "paid" O tiene 50% pagado
     if (!forceCheckIn && booking.status !== "paid" && paymentPercentage < 50) {
-      console.log("❌ [CHECK-IN-GUEST] Pago insuficiente para reserva no marcada como 'paid'");
+      console.log(
+        "❌ [CHECK-IN-GUEST] Pago insuficiente para reserva no marcada como 'paid'"
+      );
       return res.status(400).json({
         error: true,
-        message: "Se requiere al menos 50% del pago total para realizar check-in o que la reserva esté en estado 'paid'",
+        message:
+          "Se requiere al menos 50% del pago total para realizar check-in o que la reserva esté en estado 'paid'",
         data: {
           bookingStatus: booking.status,
           totalAmount: `$${totalAmount.toLocaleString()}`,
           totalPaid: `$${totalPaid.toLocaleString()}`,
           paymentPercentage: Math.round(paymentPercentage),
           minimumRequired: `$${(totalAmount * 0.5).toLocaleString()}`,
-          suggestion: "Complete los pagos o marque la reserva como 'paid' si ya fue pagada por otro medio",
+          suggestion:
+            "Complete los pagos o marque la reserva como 'paid' si ya fue pagada por otro medio",
         },
         timestamp: formatForLogs(getColombiaTime()),
       });
@@ -4271,12 +4403,13 @@ const checkInGuest = async (req, res, next) => {
   }
 };
 
-
-
 const checkOut = async (req, res, next) => {
   try {
     console.log("🏁 [CHECK-OUT] Iniciando proceso de check-out");
-    console.log("🕐 [CHECK-OUT] Hora Colombia:", formatForLogs(getColombiaTime()));
+    console.log(
+      "🕐 [CHECK-OUT] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
     console.log("📥 [CHECK-OUT] Parámetros recibidos:", {
       bookingId: req.params.bookingId,
       body: req.body,
@@ -4296,7 +4429,7 @@ const checkOut = async (req, res, next) => {
       discountAmount = 0,
       discountReason = "",
       recalculatedTotal = null,
-      generateBillAfterCheckout = true
+      generateBillAfterCheckout = true,
     } = req.body;
 
     // ✅ VALIDACIONES BÁSICAS
@@ -4310,32 +4443,51 @@ const checkOut = async (req, res, next) => {
 
     // ✅ OBTENER DATOS DE LA RESERVA CON LOGS DETALLADOS
     console.log("🔍 [CHECK-OUT] Obteniendo datos de la reserva...");
-    
+
     const booking = await Booking.findByPk(bookingId, {
       include: [
         {
           model: Room,
           as: "room",
           attributes: [
-            "roomNumber", "type", "status", "isActive", "maxGuests",
-            "priceSingle", "priceDouble", "priceMultiple", 
-            "pricePerExtraGuest", "promotionPrice", "isPromo"
+            "roomNumber",
+            "type",
+            "status",
+            "isActive",
+            "maxGuests",
+            "priceSingle",
+            "priceDouble",
+            "priceMultiple",
+            "pricePerExtraGuest",
+            "promotionPrice",
+            "isPromo",
           ],
         },
         {
           model: BookingInventoryUsage,
           as: "inventoryUsages",
           attributes: [
-            "id", "basicInventoryId", "quantityAssigned", "quantityConsumed",
-            "quantityReturned", "status", "assignedAt", "notes"
+            "id",
+            "basicInventoryId",
+            "quantityAssigned",
+            "quantityConsumed",
+            "quantityReturned",
+            "status",
+            "assignedAt",
+            "notes",
           ],
           include: [
             {
               model: BasicInventory,
               as: "inventory",
               attributes: [
-                "id", "name", "inventoryType", "category",
-                "currentStock", "cleanStock", "dirtyStock"
+                "id",
+                "name",
+                "inventoryType",
+                "category",
+                "currentStock",
+                "cleanStock",
+                "dirtyStock",
               ],
             },
           ],
@@ -4355,7 +4507,13 @@ const checkOut = async (req, res, next) => {
         {
           model: Payment,
           as: "payments",
-          attributes: ["paymentId", "amount", "paymentStatus", "paymentMethod", "paymentType"],
+          attributes: [
+            "paymentId",
+            "amount",
+            "paymentStatus",
+            "paymentMethod",
+            "paymentType",
+          ],
           required: false,
         },
       ],
@@ -4394,7 +4552,9 @@ const checkOut = async (req, res, next) => {
 
     // Si está paid o confirmed, hacer check-in automático antes de continuar
     if (["paid", "confirmed"].includes(booking.status)) {
-      console.log(`🔄 [CHECK-OUT] Actualizando estado de ${booking.status} a checked-in`);
+      console.log(
+        `🔄 [CHECK-OUT] Actualizando estado de ${booking.status} a checked-in`
+      );
       await booking.update({ status: "checked-in" });
     }
 
@@ -4402,14 +4562,20 @@ const checkOut = async (req, res, next) => {
     const now = getColombiaTime();
     const originalCheckIn = toColombiaTime(booking.checkIn);
     const originalCheckOut = toColombiaTime(booking.checkOut);
-    const effectiveCheckOut = actualCheckOut ? toColombiaTime(actualCheckOut) : now;
+    const effectiveCheckOut = actualCheckOut
+      ? toColombiaTime(actualCheckOut)
+      : now;
 
     // Determinar si es check-out anticipado
-    const isReallyEarlyCheckOut = effectiveCheckOut < originalCheckOut || isEarlyCheckOut;
-    
+    const isReallyEarlyCheckOut =
+      effectiveCheckOut < originalCheckOut || isEarlyCheckOut;
+
     // Calcular noches originales vs efectivas
     const originalNights = getDaysDifference(originalCheckIn, originalCheckOut);
-    const effectiveNights = Math.max(1, getDaysDifference(originalCheckIn, effectiveCheckOut));
+    const effectiveNights = Math.max(
+      1,
+      getDaysDifference(originalCheckIn, effectiveCheckOut)
+    );
 
     console.log("📅 [CHECK-OUT] Análisis de fechas:", {
       originalCheckIn: formatForLogs(originalCheckIn),
@@ -4418,22 +4584,26 @@ const checkOut = async (req, res, next) => {
       originalNights,
       effectiveNights,
       isEarlyCheckOut: isReallyEarlyCheckOut,
-      daysSaved: isReallyEarlyCheckOut ? originalNights - effectiveNights : 0
+      daysSaved: isReallyEarlyCheckOut ? originalNights - effectiveNights : 0,
     });
 
     // ✅ CÁLCULO DE PRECIOS CON SOPORTE PARA CHECK-OUT ANTICIPADO
-    let originalTotalAmount = parseFloat(booking.originalAmount || booking.totalAmount);
+    let originalTotalAmount = parseFloat(
+      booking.originalAmount || booking.totalAmount
+    );
     let effectiveTotalAmount = originalTotalAmount;
     let autoDiscountAmount = 0;
     let autoDiscountReason = "";
 
     // ✅ SI ES CHECK-OUT ANTICIPADO, CALCULAR DESCUENTO AUTOMÁTICO
     if (isReallyEarlyCheckOut && !applyDiscount && recalculatedTotal === null) {
-      console.log("🗓️ [CHECK-OUT] Calculando descuento automático por check-out anticipado...");
-      
+      console.log(
+        "🗓️ [CHECK-OUT] Calculando descuento automático por check-out anticipado..."
+      );
+
       // Calcular precio por noche basado en la configuración de la habitación
       let pricePerNight = originalTotalAmount / originalNights;
-      
+
       try {
         // Usar precios específicos si están disponibles
         if (booking.guestCount === 1 && booking.room?.priceSingle) {
@@ -4443,27 +4613,34 @@ const checkOut = async (req, res, next) => {
         } else if (booking.guestCount > 2 && booking.room?.priceMultiple) {
           pricePerNight = parseFloat(booking.room.priceMultiple);
         }
-        
+
         // Aplicar precio promocional si existe
         if (booking.room?.isPromo && booking.room?.promotionPrice) {
           pricePerNight = parseFloat(booking.room.promotionPrice);
         }
-        
+
         // Agregar costo por huéspedes extra
         if (booking.guestCount > 3 && booking.room?.pricePerExtraGuest) {
-          const extraCost = (booking.guestCount - 3) * parseFloat(booking.room.pricePerExtraGuest);
+          const extraCost =
+            (booking.guestCount - 3) *
+            parseFloat(booking.room.pricePerExtraGuest);
           pricePerNight += extraCost;
         }
       } catch (priceError) {
-        console.warn("⚠️ [CHECK-OUT] Error calculando precio por noche, usando precio promedio:", priceError.message);
+        console.warn(
+          "⚠️ [CHECK-OUT] Error calculando precio por noche, usando precio promedio:",
+          priceError.message
+        );
         pricePerNight = originalTotalAmount / originalNights;
       }
 
       // Calcular nuevo total basado en noches efectivas
       const newRoomTotal = pricePerNight * effectiveNights;
       autoDiscountAmount = Math.max(0, originalTotalAmount - newRoomTotal);
-      autoDiscountReason = `Check-out anticipado: ${originalNights} noches → ${effectiveNights} noches (${originalNights - effectiveNights} día${originalNights - effectiveNights > 1 ? 's' : ''} menos)`;
-      
+      autoDiscountReason = `Check-out anticipado: ${originalNights} noches → ${effectiveNights} noches (${
+        originalNights - effectiveNights
+      } día${originalNights - effectiveNights > 1 ? "s" : ""} menos)`;
+
       effectiveTotalAmount = newRoomTotal;
 
       console.log("💰 [CHECK-OUT] Cálculo de descuento automático:", {
@@ -4473,7 +4650,7 @@ const checkOut = async (req, res, next) => {
         originalTotalAmount,
         newRoomTotal,
         autoDiscountAmount,
-        autoDiscountReason
+        autoDiscountReason,
       });
 
       // Aplicar descuento automático
@@ -4481,40 +4658,56 @@ const checkOut = async (req, res, next) => {
         applyDiscount = true;
         discountAmount = autoDiscountAmount;
         discountReason = autoDiscountReason;
-        
-        console.log(`✅ [CHECK-OUT] Aplicando descuento automático: $${autoDiscountAmount.toLocaleString()}`);
+
+        console.log(
+          `✅ [CHECK-OUT] Aplicando descuento automático: $${autoDiscountAmount.toLocaleString()}`
+        );
       }
     }
 
     // ✅ SI SE PROPORCIONA UN TOTAL RECALCULADO, USARLO
     if (recalculatedTotal !== null && recalculatedTotal > 0) {
-      console.log("📊 [CHECK-OUT] Usando total recalculado proporcionado:", recalculatedTotal);
-      const providedDiscount = Math.max(0, originalTotalAmount - recalculatedTotal);
+      console.log(
+        "📊 [CHECK-OUT] Usando total recalculado proporcionado:",
+        recalculatedTotal
+      );
+      const providedDiscount = Math.max(
+        0,
+        originalTotalAmount - recalculatedTotal
+      );
       if (providedDiscount > 0) {
         applyDiscount = true;
         discountAmount = providedDiscount;
-        discountReason = discountReason || `Ajuste de total: $${originalTotalAmount.toLocaleString()} → $${recalculatedTotal.toLocaleString()}`;
+        discountReason =
+          discountReason ||
+          `Ajuste de total: $${originalTotalAmount.toLocaleString()} → $${recalculatedTotal.toLocaleString()}`;
         effectiveTotalAmount = recalculatedTotal;
       }
     }
 
     // ✅ APLICAR DESCUENTO MANUAL SI SE PROPORCIONA
     if (applyDiscount && discountAmount > 0) {
-      console.log(`💰 [CHECK-OUT] Aplicando descuento: $${discountAmount} - Razón: ${discountReason}`);
-      
+      console.log(
+        `💰 [CHECK-OUT] Aplicando descuento: $${discountAmount} - Razón: ${discountReason}`
+      );
+
       // Usar el método del modelo para aplicar el descuento
-      booking.applyDiscount(discountAmount, discountReason, req.user?.n_document || 'system');
-      
+      booking.applyDiscount(
+        discountAmount,
+        discountReason,
+        req.user?.n_document || "system"
+      );
+
       // Guardar cambios de descuento en la base de datos
       await booking.save();
-      
+
       effectiveTotalAmount = booking.getEffectiveAmount();
-      
+
       console.log("💰 [CHECK-OUT] Descuento aplicado exitosamente:", {
         originalAmount: booking.originalAmount,
         discountAmount: booking.discountAmount,
         newTotalAmount: booking.totalAmount,
-        effectiveAmount: effectiveTotalAmount
+        effectiveAmount: effectiveTotalAmount,
       });
     }
 
@@ -4524,7 +4717,9 @@ const checkOut = async (req, res, next) => {
       const amount = parseFloat(charge.amount || 0);
       const quantity = parseInt(charge.quantity || 1);
       const lineTotal = amount * quantity;
-      console.log(`💰 [CHECK-OUT] Cargo extra: ${charge.description} = $${amount} x ${quantity} = $${lineTotal}`);
+      console.log(
+        `💰 [CHECK-OUT] Cargo extra: ${charge.description} = $${amount} x ${quantity} = $${lineTotal}`
+      );
       return sum + lineTotal;
     }, 0);
 
@@ -4535,12 +4730,12 @@ const checkOut = async (req, res, next) => {
       discountApplied: applyDiscount ? discountAmount : 0,
       effectiveRoomCharge: effectiveTotalAmount,
       totalExtras,
-      grandTotal
+      grandTotal,
     });
 
     // ✅ CALCULAR PAGOS REALIZADOS (sin cambios en la lógica)
     const allPayments = booking.payments || [];
-    const validPayments = allPayments.filter(payment => 
+    const validPayments = allPayments.filter((payment) =>
       ["completed", "authorized"].includes(payment.paymentStatus)
     );
 
@@ -4563,19 +4758,21 @@ const checkOut = async (req, res, next) => {
       isEarlyCheckOut: isReallyEarlyCheckOut,
       nightsStayed: effectiveNights,
       originalNights,
-      discountReason: applyDiscount ? discountReason : null
+      discountReason: applyDiscount ? discountReason : null,
     });
 
     // ✅ VALIDAR PAGOS
     if (!forceCheckOut && balance > 0) {
       console.log("❌ [CHECK-OUT] BLOQUEANDO CHECK-OUT POR PAGOS PENDIENTES");
-      
+
       return res.status(400).json({
         error: true,
         message: "No se puede hacer check-out con pagos pendientes",
         data: {
           originalAmount: `$${originalTotalAmount.toLocaleString()}`,
-          discountApplied: applyDiscount ? `$${discountAmount.toLocaleString()}` : null,
+          discountApplied: applyDiscount
+            ? `$${discountAmount.toLocaleString()}`
+            : null,
           effectiveAmount: `$${effectiveTotalAmount.toLocaleString()}`,
           grandTotal: `$${grandTotal.toLocaleString()}`,
           totalPaid: `$${totalPaid.toLocaleString()}`,
@@ -4584,7 +4781,7 @@ const checkOut = async (req, res, next) => {
           isEarlyCheckOut: isReallyEarlyCheckOut,
           nightsStayed: effectiveNights,
           originalNights,
-          discountReason: applyDiscount ? discountReason : null
+          discountReason: applyDiscount ? discountReason : null,
         },
         timestamp: formatForLogs(getColombiaTime()),
       });
@@ -4601,10 +4798,11 @@ const checkOut = async (req, res, next) => {
     // [CÓDIGO DE INVENTARIO SIN CAMBIOS]
     if (inventoryUsages.length > 0) {
       for (const usage of inventoryUsages) {
-        const returnData = inventoryReturns.find(
-          (r) => r.basicInventoryId === usage.basicInventoryId
-        ) || {};
-        
+        const returnData =
+          inventoryReturns.find(
+            (r) => r.basicInventoryId === usage.basicInventoryId
+          ) || {};
+
         const {
           quantityReturned = 0,
           quantityConsumed = 0,
@@ -4631,7 +4829,8 @@ const checkOut = async (req, res, next) => {
           if (!skipInventoryValidation) {
             return res.status(400).json({
               error: true,
-              message: "Todo el inventario asignado debe ser devuelto o marcado como consumido",
+              message:
+                "Todo el inventario asignado debe ser devuelto o marcado como consumido",
               data: {
                 unprocessedItems: [error],
                 canForceCheckOut: true,
@@ -4658,13 +4857,19 @@ const checkOut = async (req, res, next) => {
           if (unprocessed > 0 && forceCheckOut) {
             updateData.quantityConsumed = quantityConsumed + unprocessed;
             updateData.status = "consumed";
-            updateData.notes = `${updateData.notes || ""} - ${unprocessed} unidades marcadas como consumidas en check-out forzado`;
+            updateData.notes = `${
+              updateData.notes || ""
+            } - ${unprocessed} unidades marcadas como consumidas en check-out forzado`;
           }
 
           await usage.update(updateData);
 
-          if (usage.inventory.inventoryType === "reusable" && quantityReturned > 0) {
-            const newDirtyStock = (usage.inventory.dirtyStock || 0) + quantityReturned;
+          if (
+            usage.inventory.inventoryType === "reusable" &&
+            quantityReturned > 0
+          ) {
+            const newDirtyStock =
+              (usage.inventory.dirtyStock || 0) + quantityReturned;
             await usage.inventory.update({ dirtyStock: newDirtyStock });
 
             laundryItems.push({
@@ -4674,7 +4879,8 @@ const checkOut = async (req, res, next) => {
               quantity: quantityReturned,
               fromRoom: booking.room?.roomNumber || booking.roomNumber,
               processedAt: formatForLogs(getColombiaTime()),
-              priority: usage.inventory.category === "bedding" ? "high" : "normal",
+              priority:
+                usage.inventory.category === "bedding" ? "high" : "normal",
             });
           }
 
@@ -4686,14 +4892,18 @@ const checkOut = async (req, res, next) => {
             category: usage.inventory.category,
             assigned: usage.quantityAssigned,
             returned: quantityReturned,
-            consumed: quantityConsumed + (unprocessed > 0 && forceCheckOut ? unprocessed : 0),
+            consumed:
+              quantityConsumed +
+              (unprocessed > 0 && forceCheckOut ? unprocessed : 0),
             unprocessed: forceCheckOut ? 0 : unprocessed,
             status: updateData.status,
             processedAt: formatForLogs(updateData.returnedAt),
             notes: updateData.notes,
           });
         } catch (inventoryError) {
-          inventoryErrors.push(`Error procesando ${usage.inventory.name}: ${inventoryError.message}`);
+          inventoryErrors.push(
+            `Error procesando ${usage.inventory.name}: ${inventoryError.message}`
+          );
         }
       }
     }
@@ -4702,7 +4912,11 @@ const checkOut = async (req, res, next) => {
     const bookingUpdateData = {
       status: "completed",
       actualCheckOut: effectiveCheckOut,
-      checkOutNotes: notes || (isReallyEarlyCheckOut ? `Check-out anticipado - ${discountReason}` : ""),
+      checkOutNotes:
+        notes ||
+        (isReallyEarlyCheckOut
+          ? `Check-out anticipado - ${discountReason}`
+          : ""),
       completedBy: req.body.completedBy || req.user?.n_document || "system",
       completedAt: getColombiaTime(),
     };
@@ -4725,10 +4939,10 @@ const checkOut = async (req, res, next) => {
     if (generateBillAfterCheckout && balance === 0) {
       try {
         console.log("🧾 [CHECK-OUT] Generando factura automáticamente...");
-        
+
         // Verificar que no exista factura previa
         const existingBill = await Bill.findOne({ where: { bookingId } });
-        
+
         if (!existingBill) {
           const billData = {
             bookingId: booking.bookingId,
@@ -4737,14 +4951,23 @@ const checkOut = async (req, res, next) => {
             taxAmount: 0,
             totalAmount: grandTotal,
             status: "paid",
-            paymentMethod: validPayments.length > 0 ? validPayments[0].paymentMethod : "cash",
+            paymentMethod:
+              validPayments.length > 0
+                ? validPayments[0].paymentMethod
+                : "cash",
           };
 
           billGenerated = await Bill.create(billData);
-          console.log("✅ [CHECK-OUT] Factura generada automáticamente:", billGenerated.idBill);
+          console.log(
+            "✅ [CHECK-OUT] Factura generada automáticamente:",
+            billGenerated.idBill
+          );
         }
       } catch (billError) {
-        console.warn("⚠️ [CHECK-OUT] Error al generar factura automática:", billError.message);
+        console.warn(
+          "⚠️ [CHECK-OUT] Error al generar factura automática:",
+          billError.message
+        );
         // No fallar el check-out por esto
       }
     }
@@ -4759,13 +4982,17 @@ const checkOut = async (req, res, next) => {
       grandTotal,
       balance,
       billGenerated: !!billGenerated,
-      completedAt: formatForLogs(getColombiaTime())
+      completedAt: formatForLogs(getColombiaTime()),
     });
 
     res.json({
       error: false,
-      message: isReallyEarlyCheckOut 
-        ? `Check-out anticipado realizado exitosamente${applyDiscount ? ` con descuento de $${discountAmount.toLocaleString()}` : ''}`
+      message: isReallyEarlyCheckOut
+        ? `Check-out anticipado realizado exitosamente${
+            applyDiscount
+              ? ` con descuento de $${discountAmount.toLocaleString()}`
+              : ""
+          }`
         : "Check-out realizado exitosamente",
       data: {
         booking: {
@@ -4775,11 +5002,13 @@ const checkOut = async (req, res, next) => {
           isEarlyCheckOut: isReallyEarlyCheckOut,
           originalNights,
           effectiveNights,
-          nightsSaved: isReallyEarlyCheckOut ? originalNights - effectiveNights : 0,
+          nightsSaved: isReallyEarlyCheckOut
+            ? originalNights - effectiveNights
+            : 0,
           guestName: booking.guest?.scostumername,
           roomNumber: booking.room?.roomNumber || booking.roomNumber,
         },
-        
+
         // ✅ INFORMACIÓN DE FECHAS MEJORADA
         stayInfo: {
           originalCheckIn: formatColombiaDate(originalCheckIn),
@@ -4788,7 +5017,9 @@ const checkOut = async (req, res, next) => {
           originalNights,
           effectiveNights,
           isEarlyCheckOut: isReallyEarlyCheckOut,
-          daysSaved: isReallyEarlyCheckOut ? originalNights - effectiveNights : 0,
+          daysSaved: isReallyEarlyCheckOut
+            ? originalNights - effectiveNights
+            : 0,
         },
 
         // ✅ INFORMACIÓN FINANCIERA CON DESCUENTOS
@@ -4804,8 +5035,10 @@ const checkOut = async (req, res, next) => {
           // ✅ INFORMACIÓN ADICIONAL DE DESCUENTO
           discountInfo: booking.getDiscountInfo(),
           // ✅ CÁLCULOS PARA MOSTRAR
-          originalRoomRate: originalNights > 0 ? originalTotalAmount / originalNights : 0,
-          effectiveRoomRate: effectiveNights > 0 ? effectiveTotalAmount / effectiveNights : 0,
+          originalRoomRate:
+            originalNights > 0 ? originalTotalAmount / originalNights : 0,
+          effectiveRoomRate:
+            effectiveNights > 0 ? effectiveTotalAmount / effectiveNights : 0,
           totalSavings: applyDiscount ? discountAmount : 0,
         },
 
@@ -4818,15 +5051,17 @@ const checkOut = async (req, res, next) => {
         },
 
         // ✅ INFORMACIÓN DE FACTURA SI SE GENERÓ
-        billing: billGenerated ? {
-          billGenerated: true,
-          billId: billGenerated.idBill,
-          billAmount: billGenerated.totalAmount,
-          billStatus: billGenerated.status,
-        } : {
-          billGenerated: false,
-          canGenerateLater: balance === 0,
-        },
+        billing: billGenerated
+          ? {
+              billGenerated: true,
+              billId: billGenerated.idBill,
+              billAmount: billGenerated.totalAmount,
+              billStatus: billGenerated.status,
+            }
+          : {
+              billGenerated: false,
+              canGenerateLater: balance === 0,
+            },
 
         nextActions: {
           canGenerateBill: !billGenerated && balance === 0,
@@ -4838,7 +5073,6 @@ const checkOut = async (req, res, next) => {
       },
       timestamp: formatForLogs(getColombiaTime()),
     });
-
   } catch (error) {
     console.error("❌ [CHECK-OUT] Error general:", error);
     console.error("❌ [CHECK-OUT] Stack trace:", error.stack);
@@ -5433,12 +5667,15 @@ const generateBill = async (req, res, next) => {
 
     // ✅ MONTO BASE ORIGINAL DE LA RESERVA
     const originalReservationAmount = parseFloat(booking.totalAmount) || 0;
-    
+
     // ✅ DESCUENTO APLICADO (si existe)
     const discountAmount = parseFloat(booking.discountAmount) || 0;
-    
+
     // ✅ MONTO DE RESERVA DESPUÉS DEL DESCUENTO
-    const adjustedReservationAmount = Math.max(0, originalReservationAmount - discountAmount);
+    const adjustedReservationAmount = Math.max(
+      0,
+      originalReservationAmount - discountAmount
+    );
 
     console.log("💰 [GENERATE-BILL] Cálculo de montos base:", {
       originalReservationAmount,
@@ -5535,7 +5772,9 @@ const generateBill = async (req, res, next) => {
       // originalAmount: originalReservationAmount || null,
     };
 
-    console.log("📝 [GENERATE-BILL] Datos de factura a crear (con descuentos):");
+    console.log(
+      "📝 [GENERATE-BILL] Datos de factura a crear (con descuentos):"
+    );
     console.log(JSON.stringify(billData, null, 2));
 
     // ⭐ CREAR REGISTRO EN LA BASE DE DATOS CON MANEJO DE ERRORES MEJORADO
@@ -5634,7 +5873,9 @@ const generateBill = async (req, res, next) => {
         originalRoomCharge: originalReservationAmount, // ✅ AGREGAR MONTO ORIGINAL
         discountApplied: discountAmount, // ✅ AGREGAR DESCUENTO
         discountReason: booking.discountReason || null, // ✅ AGREGAR RAZÓN
-        discountAppliedAt: booking.discountAppliedAt ? formatForLogs(booking.discountAppliedAt) : null,
+        discountAppliedAt: booking.discountAppliedAt
+          ? formatForLogs(booking.discountAppliedAt)
+          : null,
         extraCharges: extraCharges.map((charge) => ({
           id: charge.id,
           description: charge.description,
@@ -5653,7 +5894,8 @@ const generateBill = async (req, res, next) => {
         pointOfSale: booking.pointOfSale || "Local",
         // ✅ FORMATEOS DE DESCUENTO
         originalRoomChargeFormatted: `$${originalReservationAmount.toLocaleString()}`,
-        discountAppliedFormatted: discountAmount > 0 ? `$${discountAmount.toLocaleString()}` : null,
+        discountAppliedFormatted:
+          discountAmount > 0 ? `$${discountAmount.toLocaleString()}` : null,
         roomChargeFormatted: `$${adjustedReservationAmount.toLocaleString()}`,
       },
 
@@ -5701,20 +5943,31 @@ const generateBill = async (req, res, next) => {
       },
 
       // ✅ INFORMACIÓN DE DESCUENTO EN LA RESPUESTA
-      discountInfo: discountAmount > 0 ? {
-        discountAmount,
-        discountReason: booking.discountReason || "Descuento aplicado",
-        discountAppliedAt: booking.discountAppliedAt ? formatForLogs(booking.discountAppliedAt) : null,
-        originalAmount: originalReservationAmount,
-        adjustedAmount: adjustedReservationAmount,
-        discountPercentage: originalReservationAmount > 0 ? 
-          Math.round((discountAmount / originalReservationAmount) * 100) : 0,
-        // Formateos
-        discountAmountFormatted: `$${discountAmount.toLocaleString()}`,
-        originalAmountFormatted: `$${originalReservationAmount.toLocaleString()}`,
-        adjustedAmountFormatted: `$${adjustedReservationAmount.toLocaleString()}`,
-        savingsMessage: `Ahorro de $${discountAmount.toLocaleString()} aplicado por ${booking.discountReason || 'descuento'}`,
-      } : null,
+      discountInfo:
+        discountAmount > 0
+          ? {
+              discountAmount,
+              discountReason: booking.discountReason || "Descuento aplicado",
+              discountAppliedAt: booking.discountAppliedAt
+                ? formatForLogs(booking.discountAppliedAt)
+                : null,
+              originalAmount: originalReservationAmount,
+              adjustedAmount: adjustedReservationAmount,
+              discountPercentage:
+                originalReservationAmount > 0
+                  ? Math.round(
+                      (discountAmount / originalReservationAmount) * 100
+                    )
+                  : 0,
+              // Formateos
+              discountAmountFormatted: `$${discountAmount.toLocaleString()}`,
+              originalAmountFormatted: `$${originalReservationAmount.toLocaleString()}`,
+              adjustedAmountFormatted: `$${adjustedReservationAmount.toLocaleString()}`,
+              savingsMessage: `Ahorro de $${discountAmount.toLocaleString()} aplicado por ${
+                booking.discountReason || "descuento"
+              }`,
+            }
+          : null,
 
       // ⭐ ACCIONES DISPONIBLES
       availableActions: {
@@ -5743,23 +5996,27 @@ const generateBill = async (req, res, next) => {
       },
     };
 
-    console.log("✅ [GENERATE-BILL] Factura generada exitosamente con descuentos:", {
-      idBill: savedBill.idBill,
-      originalAmount: originalReservationAmount,
-      discountAmount: discountAmount,
-      finalAmount: savedBill.totalAmount,
-      status: savedBill.status,
-      balance: balance,
-      isFullyPaid: balance === 0,
-      discountApplied: discountAmount > 0,
-      generatedAt: formatForLogs(getColombiaTime()),
-    });
+    console.log(
+      "✅ [GENERATE-BILL] Factura generada exitosamente con descuentos:",
+      {
+        idBill: savedBill.idBill,
+        originalAmount: originalReservationAmount,
+        discountAmount: discountAmount,
+        finalAmount: savedBill.totalAmount,
+        status: savedBill.status,
+        balance: balance,
+        isFullyPaid: balance === 0,
+        discountApplied: discountAmount > 0,
+        generatedAt: formatForLogs(getColombiaTime()),
+      }
+    );
 
     res.status(201).json({
       error: false,
-      message: discountAmount > 0 ? 
-        `Factura generada exitosamente con descuento de $${discountAmount.toLocaleString()}` :
-        "Factura generada exitosamente",
+      message:
+        discountAmount > 0
+          ? `Factura generada exitosamente con descuento de $${discountAmount.toLocaleString()}`
+          : "Factura generada exitosamente",
       data: responseData,
       timestamp: formatForLogs(getColombiaTime()),
     });
@@ -6176,14 +6433,14 @@ const updateBookingStatus = async (req, res) => {
     });
 
     const { bookingId } = req.params;
-    const { 
-      status, 
-      reason, 
+    const {
+      status,
+      reason,
       notes,
       // ✅ NUEVOS CAMPOS PARA DESCUENTOS
       discountAmount = 0,
       discountReason = "",
-      applyDiscount = false
+      applyDiscount = false,
     } = req.body;
 
     // ⭐ VALIDACIONES BÁSICAS CON LOGS
@@ -6211,7 +6468,7 @@ const updateBookingStatus = async (req, res) => {
       "cancelled",
       "checked-in",
       "completed",
-      "paid" // ✅ AGREGAR 'paid' COMO ESTADO VÁLIDO
+      "paid", // ✅ AGREGAR 'paid' COMO ESTADO VÁLIDO
     ];
 
     if (!validStatuses.includes(status)) {
@@ -6230,10 +6487,14 @@ const updateBookingStatus = async (req, res) => {
     // ✅ VALIDAR DESCUENTO SI SE APLICA
     if (applyDiscount) {
       if (!discountAmount || discountAmount <= 0) {
-        console.log("❌ [UPDATE-BOOKING-STATUS] Descuento inválido:", discountAmount);
+        console.log(
+          "❌ [UPDATE-BOOKING-STATUS] Descuento inválido:",
+          discountAmount
+        );
         return res.status(400).json({
           error: true,
-          message: "El monto del descuento debe ser mayor a cero cuando applyDiscount es true",
+          message:
+            "El monto del descuento debe ser mayor a cero cuando applyDiscount es true",
           timestamp: formatForLogs(getColombiaTime()),
         });
       }
@@ -6242,7 +6503,8 @@ const updateBookingStatus = async (req, res) => {
         console.log("❌ [UPDATE-BOOKING-STATUS] Razón de descuento faltante");
         return res.status(400).json({
           error: true,
-          message: "La razón del descuento es requerida cuando se aplica un descuento",
+          message:
+            "La razón del descuento es requerida cuando se aplica un descuento",
           timestamp: formatForLogs(getColombiaTime()),
         });
       }
@@ -6285,7 +6547,9 @@ const updateBookingStatus = async (req, res) => {
       guestName: booking.guest?.scostumername,
       roomNumber: booking.room?.roomNumber || booking.roomNumber,
       currentTotalAmount: booking.totalAmount,
-      hasExistingDiscount: !!(booking.discountAmount && booking.discountAmount > 0),
+      hasExistingDiscount: !!(
+        booking.discountAmount && booking.discountAmount > 0
+      ),
     });
 
     // ✅ VALIDAR DESCUENTO CONTRA MONTO TOTAL
@@ -6293,17 +6557,20 @@ const updateBookingStatus = async (req, res) => {
       const currentTotal = parseFloat(booking.totalAmount || 0);
       const existingDiscount = parseFloat(booking.discountAmount || 0);
       const originalAmount = parseFloat(booking.originalAmount || currentTotal);
-      
+
       // Calcular el monto base disponible para descuento
       const availableForDiscount = originalAmount - existingDiscount;
-      
+
       if (discountAmount > availableForDiscount) {
-        console.log("❌ [UPDATE-BOOKING-STATUS] Descuento excede monto disponible:", {
-          discountAmount,
-          availableForDiscount,
-          originalAmount,
-          existingDiscount
-        });
+        console.log(
+          "❌ [UPDATE-BOOKING-STATUS] Descuento excede monto disponible:",
+          {
+            discountAmount,
+            availableForDiscount,
+            originalAmount,
+            existingDiscount,
+          }
+        );
         return res.status(400).json({
           error: true,
           message: `El descuento de $${discountAmount.toLocaleString()} excede el monto disponible de $${availableForDiscount.toLocaleString()}`,
@@ -6311,7 +6578,7 @@ const updateBookingStatus = async (req, res) => {
             originalAmount: `$${originalAmount.toLocaleString()}`,
             existingDiscount: `$${existingDiscount.toLocaleString()}`,
             availableForDiscount: `$${availableForDiscount.toLocaleString()}`,
-            requestedDiscount: `$${discountAmount.toLocaleString()}`
+            requestedDiscount: `$${discountAmount.toLocaleString()}`,
           },
           timestamp: formatForLogs(getColombiaTime()),
         });
@@ -6412,7 +6679,7 @@ const updateBookingStatus = async (req, res) => {
         discountAmount,
         discountReason,
         currentTotal: booking.totalAmount,
-        existingDiscount: booking.discountAmount || 0
+        existingDiscount: booking.discountAmount || 0,
       });
 
       // Guardar monto original si no existe
@@ -6423,13 +6690,18 @@ const updateBookingStatus = async (req, res) => {
       // Actualizar campos de descuento
       const existingDiscount = parseFloat(booking.discountAmount || 0);
       const newTotalDiscount = existingDiscount + discountAmount;
-      const originalAmount = parseFloat(booking.originalAmount || booking.totalAmount);
+      const originalAmount = parseFloat(
+        booking.originalAmount || booking.totalAmount
+      );
       const newTotalAmount = Math.max(0, originalAmount - newTotalDiscount);
 
       updateData.discountAmount = newTotalDiscount;
-      updateData.discountReason = existingDiscount > 0 
-        ? `${booking.discountReason || 'Descuento previo'} + ${discountReason}`
-        : discountReason;
+      updateData.discountReason =
+        existingDiscount > 0
+          ? `${
+              booking.discountReason || "Descuento previo"
+            } + ${discountReason}`
+          : discountReason;
       updateData.discountAppliedAt = getColombiaTime();
       updateData.discountAppliedBy = updatedBy;
       updateData.totalAmount = newTotalAmount;
@@ -6440,7 +6712,7 @@ const updateBookingStatus = async (req, res) => {
         newDiscountAmount: discountAmount,
         newTotalDiscount,
         newTotalAmount,
-        discountReason: updateData.discountReason
+        discountReason: updateData.discountReason,
       });
     }
 
@@ -6547,27 +6819,54 @@ const updateBookingStatus = async (req, res) => {
       },
 
       // ✅ INFORMACIÓN DE DESCUENTO
-      discountInfo: updatedBooking.discountAmount && updatedBooking.discountAmount > 0 ? {
-        discountAmount: parseFloat(updatedBooking.discountAmount),
-        discountReason: updatedBooking.discountReason,
-        discountAppliedAt: updatedBooking.discountAppliedAt ? formatForLogs(updatedBooking.discountAppliedAt) : null,
-        discountAppliedBy: updatedBooking.discountAppliedBy,
-        originalAmount: parseFloat(updatedBooking.originalAmount || updatedBooking.totalAmount),
-        adjustedAmount: parseFloat(updatedBooking.totalAmount),
-        discountPercentage: updatedBooking.originalAmount > 0 ? 
-          Math.round((parseFloat(updatedBooking.discountAmount) / parseFloat(updatedBooking.originalAmount)) * 100) : 0,
-        // Formateos
-        discountAmountFormatted: `$${parseFloat(updatedBooking.discountAmount).toLocaleString()}`,
-        originalAmountFormatted: `$${parseFloat(updatedBooking.originalAmount || updatedBooking.totalAmount).toLocaleString()}`,
-        adjustedAmountFormatted: `$${parseFloat(updatedBooking.totalAmount).toLocaleString()}`,
-        savingsMessage: `Ahorro de $${parseFloat(updatedBooking.discountAmount).toLocaleString()} aplicado por ${updatedBooking.discountReason}`,
-      } : null,
+      discountInfo:
+        updatedBooking.discountAmount && updatedBooking.discountAmount > 0
+          ? {
+              discountAmount: parseFloat(updatedBooking.discountAmount),
+              discountReason: updatedBooking.discountReason,
+              discountAppliedAt: updatedBooking.discountAppliedAt
+                ? formatForLogs(updatedBooking.discountAppliedAt)
+                : null,
+              discountAppliedBy: updatedBooking.discountAppliedBy,
+              originalAmount: parseFloat(
+                updatedBooking.originalAmount || updatedBooking.totalAmount
+              ),
+              adjustedAmount: parseFloat(updatedBooking.totalAmount),
+              discountPercentage:
+                updatedBooking.originalAmount > 0
+                  ? Math.round(
+                      (parseFloat(updatedBooking.discountAmount) /
+                        parseFloat(updatedBooking.originalAmount)) *
+                        100
+                    )
+                  : 0,
+              // Formateos
+              discountAmountFormatted: `$${parseFloat(
+                updatedBooking.discountAmount
+              ).toLocaleString()}`,
+              originalAmountFormatted: `$${parseFloat(
+                updatedBooking.originalAmount || updatedBooking.totalAmount
+              ).toLocaleString()}`,
+              adjustedAmountFormatted: `$${parseFloat(
+                updatedBooking.totalAmount
+              ).toLocaleString()}`,
+              savingsMessage: `Ahorro de $${parseFloat(
+                updatedBooking.discountAmount
+              ).toLocaleString()} aplicado por ${
+                updatedBooking.discountReason
+              }`,
+            }
+          : null,
 
       // ⭐ INFORMACIÓN DE ESTADO
       statusInfo: {
-        canCheckIn: updatedBooking.status === "confirmed" || updatedBooking.status === "paid",
+        canCheckIn:
+          updatedBooking.status === "confirmed" ||
+          updatedBooking.status === "paid",
         canCheckOut: updatedBooking.status === "checked-in",
-        isActive: ["confirmed", "checked-in", "paid"].includes(updatedBooking.status),
+        isActive: ["confirmed", "checked-in", "paid"].includes(
+          updatedBooking.status
+        ),
         isCompleted: updatedBooking.status === "completed",
         isCancelled: updatedBooking.status === "cancelled",
         isPaid: updatedBooking.status === "paid",
@@ -6594,8 +6893,10 @@ const updateBookingStatus = async (req, res) => {
         : null,
 
       // ✅ MONTOS FORMATEADOS
-      totalAmountFormatted: `$${parseFloat(updatedBooking.totalAmount || 0).toLocaleString()}`,
-      originalAmountFormatted: updatedBooking.originalAmount 
+      totalAmountFormatted: `$${parseFloat(
+        updatedBooking.totalAmount || 0
+      ).toLocaleString()}`,
+      originalAmountFormatted: updatedBooking.originalAmount
         ? `$${parseFloat(updatedBooking.originalAmount).toLocaleString()}`
         : null,
     };
@@ -6615,7 +6916,7 @@ const updateBookingStatus = async (req, res) => {
 
     res.json({
       error: false,
-      message: applyDiscount 
+      message: applyDiscount
         ? `Estado de reserva actualizado exitosamente con descuento de $${discountAmount.toLocaleString()}`
         : "Estado de reserva actualizado exitosamente",
       data: responseData,
@@ -6638,33 +6939,710 @@ const updateBookingStatus = async (req, res) => {
 };
 
 const cancelBooking = async (req, res) => {
-  const { bookingId } = req.params;
-  const { reason } = req.body;
-
-  const booking = await Booking.findByPk(bookingId);
-  if (!booking) {
-    throw new CustomError("Reserva no encontrada", 404);
-  }
-
-  if (["checked-in", "completed"].includes(booking.status)) {
-    throw new CustomError(
-      "No se puede cancelar una reserva con check-in o completada",
-      400
+  try {
+    console.log("❌ [CANCEL-BOOKING] Iniciando proceso de cancelación");
+    console.log(
+      "🕐 [CANCEL-BOOKING] Hora Colombia:",
+      formatForLogs(getColombiaTime())
     );
+    console.log("📥 [CANCEL-BOOKING] Parámetros:", {
+      bookingId: req.params.bookingId,
+      body: req.body,
+      user: req.user?.n_document || req.buyer?.sdocno || "No user",
+    });
+
+    const { bookingId } = req.params;
+    const {
+      reason,
+      requestType = "cancellation", // "cancellation" | "date_change" | "credit_voucher"
+      newCheckIn = null,
+      newCheckOut = null,
+      notes = "",
+    } = req.body;
+
+    // ⭐ VALIDACIONES BÁSICAS
+    if (!bookingId) {
+      return res.status(400).json({
+        error: true,
+        message: "bookingId es requerido",
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    if (!reason || reason.trim() === "") {
+      return res.status(400).json({
+        error: true,
+        message: "La razón de cancelación es requerida",
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    // ⭐ OBTENER DATOS COMPLETOS DE LA RESERVA
+    console.log("🔍 [CANCEL-BOOKING] Buscando reserva:", bookingId);
+
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: Room,
+          as: "room",
+          attributes: ["roomNumber", "type", "status"],
+        },
+        {
+          model: Buyer,
+          as: "guest",
+          attributes: ["sdocno", "scostumername", "selectronicmail"],
+        },
+        {
+          model: Payment,
+          as: "payments",
+          attributes: [
+            "paymentId",
+            "amount",
+            "paymentStatus",
+            "paymentMethod",
+            "paymentDate",
+          ],
+          where: { paymentStatus: ["completed", "authorized"] },
+          required: false,
+        },
+      ],
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        error: true,
+        message: "Reserva no encontrada",
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    console.log("✅ [CANCEL-BOOKING] Reserva encontrada:", {
+      bookingId: booking.bookingId,
+      status: booking.status,
+      checkIn: formatForLogs(booking.checkIn),
+      roomNumber: booking.room?.roomNumber,
+      guestName: booking.guest?.scostumername,
+      hasPayments: booking.payments?.length > 0,
+    });
+
+    // ⭐ VALIDAR QUE LA RESERVA PUEDA SER CANCELADA
+    if (!["confirmed", "paid", "pending"].includes(booking.status)) {
+      return res.status(400).json({
+        error: true,
+        message: `No se puede cancelar una reserva en estado '${booking.status}'`,
+        data: {
+          currentStatus: booking.status,
+          allowedStatuses: ["confirmed", "paid", "pending"],
+        },
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    // ⭐ CALCULAR DÍAS HASTA EL CHECK-IN
+    const now = getColombiaTime();
+    const checkInDate = toColombiaTime(booking.checkIn);
+    const daysUntilCheckIn = Math.ceil(
+      (checkInDate - now) / (1000 * 60 * 60 * 24)
+    );
+
+    console.log("📅 [CANCEL-BOOKING] Análisis de fechas:", {
+      now: formatForLogs(now),
+      checkIn: formatForLogs(checkInDate),
+      daysUntilCheckIn,
+      canModifyDates: daysUntilCheckIn >= 5,
+      isAfterCheckIn: daysUntilCheckIn < 0,
+    });
+
+    // ⭐ VALIDAR POLÍTICA DE 5 DÍAS PARA MODIFICACIÓN
+    if (requestType === "date_change" && daysUntilCheckIn < 5) {
+      return res.status(400).json({
+        error: true,
+        message:
+          "Las modificaciones de fecha deben realizarse con un mínimo de 5 días de anticipación",
+        data: {
+          daysUntilCheckIn,
+          minimumRequired: 5,
+          checkInDate: formatColombiaDate(checkInDate),
+          policy:
+            "Política del Hotel Balú: modificaciones requieren 5 días mínimo",
+        },
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    // ⭐ CALCULAR PAGOS REALIZADOS
+    const totalPaid =
+      booking.payments?.reduce((sum, payment) => {
+        return sum + parseFloat(payment.amount || 0);
+      }, 0) || 0;
+
+    console.log("💰 [CANCEL-BOOKING] Análisis financiero:", {
+      totalAmount: booking.totalAmount,
+      totalPaid,
+      hasPayments: totalPaid > 0,
+      paymentCount: booking.payments?.length || 0,
+    });
+
+    // ⭐ DETERMINAR TIPO DE CANCELACIÓN Y POLÍTICAS
+    let cancellationPolicy;
+    let refundPolicy;
+    let creditVoucherPolicy;
+
+    if (daysUntilCheckIn >= 5) {
+      // ✅ CANCELACIÓN CON SUFICIENTE ANTICIPACIÓN
+      cancellationPolicy = {
+        type: "early_cancellation",
+        description: "Cancelación con más de 5 días de anticipación",
+        allowsModification: true,
+        allowsFullCancellation: true,
+        refundType: totalPaid > 0 ? "credit_voucher" : "no_refund_needed",
+      };
+
+      if (totalPaid > 0) {
+        refundPolicy = {
+          type: "no_refund",
+          amount: 0,
+          reason: "Hotel Balú no realiza devoluciones de dinero",
+        };
+
+        creditVoucherPolicy = {
+          type: "credit_voucher",
+          amount: totalPaid,
+          validityDays: 30,
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          description:
+            "Crédito válido por 30 días calendario para nueva reserva",
+        };
+      }
+    } else if (daysUntilCheckIn >= 0) {
+      // ⚠️ CANCELACIÓN CON MENOS DE 5 DÍAS
+      cancellationPolicy = {
+        type: "late_cancellation",
+        description: "Cancelación con menos de 5 días de anticipación",
+        allowsModification: false,
+        allowsFullCancellation: true,
+        refundType: "forfeit_payment",
+      };
+
+      refundPolicy = {
+        type: "forfeit",
+        amount: 0,
+        reason: "Cancelación tardía: el hotel se queda con el anticipo",
+      };
+
+      creditVoucherPolicy = {
+        type: "forfeit",
+        amount: 0,
+        description: "No aplica crédito por cancelación tardía",
+      };
+    } else {
+      // ❌ CANCELACIÓN DESPUÉS DEL CHECK-IN (NO SHOW)
+      cancellationPolicy = {
+        type: "no_show",
+        description: "Cancelación después de la fecha de check-in",
+        allowsModification: false,
+        allowsFullCancellation: true,
+        refundType: "forfeit_payment",
+      };
+
+      refundPolicy = {
+        type: "forfeit",
+        amount: 0,
+        reason: "No show: el hotel se queda con el anticipo",
+      };
+
+      creditVoucherPolicy = {
+        type: "forfeit",
+        amount: 0,
+        description: "No aplica crédito por no presentarse",
+      };
+    }
+
+    console.log("📋 [CANCEL-BOOKING] Políticas aplicables:", {
+      cancellationPolicy: cancellationPolicy.type,
+      refundPolicy: refundPolicy.type,
+      creditVoucherPolicy: creditVoucherPolicy.type,
+      allowsModification: cancellationPolicy.allowsModification,
+    });
+
+    // ⭐ VALIDAR CAMBIO DE FECHAS SI SE SOLICITA
+    if (requestType === "date_change") {
+      if (!newCheckIn || !newCheckOut) {
+        return res.status(400).json({
+          error: true,
+          message:
+            "Para cambio de fechas se requieren newCheckIn y newCheckOut",
+          timestamp: formatForLogs(getColombiaTime()),
+        });
+      }
+
+      if (!cancellationPolicy.allowsModification) {
+        return res.status(400).json({
+          error: true,
+          message:
+            "No se permite modificación de fechas con menos de 5 días de anticipación",
+          data: {
+            daysUntilCheckIn,
+            policy: cancellationPolicy.description,
+          },
+          timestamp: formatForLogs(getColombiaTime()),
+        });
+      }
+
+      // Validar que las nuevas fechas sean válidas
+      const newCheckInDate = toColombiaTime(newCheckIn);
+      const newCheckOutDate = toColombiaTime(newCheckOut);
+
+      if (newCheckInDate <= now) {
+        return res.status(400).json({
+          error: true,
+          message: "La nueva fecha de check-in debe ser posterior a hoy",
+          timestamp: formatForLogs(getColombiaTime()),
+        });
+      }
+
+      if (newCheckOutDate <= newCheckInDate) {
+        return res.status(400).json({
+          error: true,
+          message: "La nueva fecha de check-out debe ser posterior al check-in",
+          timestamp: formatForLogs(getColombiaTime()),
+        });
+      }
+
+      // TODO: Verificar disponibilidad de la habitación en las nuevas fechas
+      // Esto requeriría una consulta adicional de disponibilidad
+    }
+
+    // ⭐ DETERMINAR QUIÉN CANCELA
+    const cancelledBy = req.user?.n_document || req.buyer?.sdocno || "guest";
+    const isStaffCancellation = !!req.user?.n_document;
+
+    // ⭐ EJECUTAR LA CANCELACIÓN O MODIFICACIÓN
+    const updateData = {
+      statusReason: reason,
+      statusUpdatedBy: cancelledBy,
+      statusUpdatedAt: getColombiaTime(),
+      cancelledBy: cancelledBy,
+      cancelledAt: getColombiaTime(),
+      cancellationNotes: notes || null,
+      cancellationType: cancellationPolicy.type,
+      // ⭐ NUEVOS CAMPOS PARA POLÍTICAS
+      refundType: refundPolicy.type,
+      refundAmount: refundPolicy.amount || 0,
+      creditVoucherAmount: creditVoucherPolicy.amount || 0,
+      creditVoucherValidUntil: creditVoucherPolicy.validUntil || null,
+      creditVoucherIssued: creditVoucherPolicy.amount > 0,
+    };
+
+    if (requestType === "date_change") {
+      // MODIFICACIÓN DE FECHAS
+      updateData.status = "confirmed";
+      updateData.checkIn = newCheckIn;
+      updateData.checkOut = newCheckOut;
+      updateData.dateChanged = true;
+      updateData.dateChangedAt = getColombiaTime();
+      updateData.dateChangedBy = cancelledBy;
+      updateData.originalCheckIn = booking.checkIn;
+      updateData.originalCheckOut = booking.checkOut;
+
+      console.log("🔄 [CANCEL-BOOKING] Modificando fechas de la reserva");
+    } else {
+      // CANCELACIÓN COMPLETA
+      updateData.status = "cancelled";
+      console.log("❌ [CANCEL-BOOKING] Cancelando reserva completamente");
+    }
+
+    console.log("📝 [CANCEL-BOOKING] Datos de actualización:", updateData);
+
+    // ⭐ ACTUALIZAR LA RESERVA
+    try {
+      await booking.update(updateData);
+      console.log("✅ [CANCEL-BOOKING] Reserva actualizada exitosamente");
+    } catch (updateError) {
+      console.error(
+        "❌ [CANCEL-BOOKING] Error al actualizar reserva:",
+        updateError
+      );
+      return res.status(500).json({
+        error: true,
+        message: "Error al procesar la cancelación",
+        details: updateError.message,
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    // ⭐ LIBERAR LA HABITACIÓN (solo si es cancelación completa)
+    if (requestType !== "date_change" && booking.room) {
+      try {
+        await booking.room.update({
+          status: "Limpia",
+          available: true,
+        });
+        console.log(
+          "🏨 [CANCEL-BOOKING] Habitación liberada:",
+          booking.room.roomNumber
+        );
+      } catch (roomError) {
+        console.warn(
+          "⚠️ [CANCEL-BOOKING] Error al liberar habitación:",
+          roomError.message
+        );
+      }
+    }
+
+    // ⭐ GENERAR VOUCHER DE CRÉDITO SI APLICA
+    let creditVoucher = null;
+    
+    if (creditVoucherPolicy.amount > 0) {
+      console.log("💳 [CANCEL-BOOKING] Creando voucher en base de datos...");
+      
+      const voucherId = `VOUCHER-${booking.bookingId}-${Date.now()}`;
+      const voucherCode = generateVoucherCode();
+      
+      try {
+        const newVoucher = await Voucher.create({
+          voucherId: voucherId,
+          voucherCode: voucherCode,
+          amount: creditVoucherPolicy.amount,
+          status: 'active',
+          guestId: booking.guestId,
+          originalBookingId: booking.bookingId,
+          validUntil: creditVoucherPolicy.validUntil,
+          createdBy: req.user?.n_document || req.buyer?.sdocno || 'system',
+          notes: `Crédito por cancelación de reserva #${booking.bookingId}. Motivo: ${reason}`,
+          metadata: {
+            originalCheckIn: formatForLogs(booking.checkIn),
+            originalCheckOut: formatForLogs(booking.checkOut),
+            originalAmount: parseFloat(booking.totalAmount),
+            cancelReason: reason,
+            cancellationType: cancellationPolicy.type,
+            daysUntilCheckIn: daysUntilCheckIn,
+            isStaffCancellation: !!req.user?.n_document,
+            cancelledAt: formatForLogs(getColombiaTime()),
+            requestType: requestType
+          }
+        });
+
+        console.log("✅ [CANCEL-BOOKING] Voucher creado exitosamente en BD:", {
+          voucherId: newVoucher.voucherId,
+          voucherCode: newVoucher.voucherCode,
+          amount: parseFloat(newVoucher.amount),
+          validUntil: formatForLogs(newVoucher.validUntil),
+          guestId: newVoucher.guestId
+        });
+
+        // ⭐ ACTUALIZAR creditVoucher CON DATOS REALES DE LA BD
+        creditVoucher = {
+          voucherId: newVoucher.voucherId,
+          voucherCode: newVoucher.voucherCode,
+          amount: parseFloat(newVoucher.amount),
+          validUntil: newVoucher.validUntil,
+          guestId: newVoucher.guestId,
+          originalBookingId: newVoucher.originalBookingId,
+          createdAt: newVoucher.createdAt,
+          status: newVoucher.status,
+          notes: newVoucher.notes,
+          // ⭐ FORMATEOS PARA EL FRONTEND
+          amountFormatted: `$${parseFloat(newVoucher.amount).toLocaleString()}`,
+          validUntilFormatted: formatColombiaDate(newVoucher.validUntil),
+          createdAtFormatted: formatForLogs(newVoucher.createdAt),
+          // ⭐ INFORMACIÓN ÚTIL PARA EL USUARIO
+          daysUntilExpiry: Math.ceil((new Date(newVoucher.validUntil) - new Date()) / (1000 * 60 * 60 * 24)),
+          canBeUsed: true,
+          usageInstructions: "Presente este código al hacer una nueva reserva: " + newVoucher.voucherCode
+        };
+
+      } catch (voucherError) {
+        console.error("❌ [CANCEL-BOOKING] Error creando voucher en BD:", voucherError);
+        console.error("🔍 [CANCEL-BOOKING] Detalles del error:", {
+          message: voucherError.message,
+          name: voucherError.name,
+          sql: voucherError.sql,
+          errors: voucherError.errors
+        });
+        
+        // ⭐ NO FALLAR LA CANCELACIÓN POR EL VOUCHER, PERO INFORMAR EL ERROR
+        creditVoucher = {
+          error: true,
+          errorMessage: "No se pudo crear el voucher automáticamente en la base de datos",
+          errorDetails: voucherError.message,
+          // ⭐ DATOS TEMPORALES PARA REFERENCIA
+          voucherId: voucherId,
+          amount: creditVoucherPolicy.amount,
+          validUntil: creditVoucherPolicy.validUntil,
+          status: "error",
+          manualCreationRequired: true,
+          contactInfo: "Contacte al hotel para que generen manualmente su voucher de crédito",
+          // ⭐ FORMATEOS PARA MOSTRAR AL USUARIO
+          amountFormatted: `$${creditVoucherPolicy.amount.toLocaleString()}`,
+          validUntilFormatted: formatColombiaDate(creditVoucherPolicy.validUntil)
+        };
+
+        // ⭐ LOG ADICIONAL PARA SEGUIMIENTO MANUAL
+        console.error("🚨 [CANCEL-BOOKING] VOUCHER MANUAL REQUERIDO:", {
+          bookingId: booking.bookingId,
+          guestId: booking.guestId,
+          guestName: booking.guest?.scostumername,
+          amount: creditVoucherPolicy.amount,
+          reason: reason,
+          timestamp: formatForLogs(getColombiaTime())
+        });
+      }
+    }
+
+    // ⭐ PREPARAR RESPUESTA COMPLETA (resto del código sin cambios)
+    const responseData = {
+      booking: {
+        bookingId: booking.bookingId,
+        status: updateData.status,
+        originalCheckIn:
+          requestType === "date_change" ? formatForLogs(booking.checkIn) : null,
+        originalCheckOut:
+          requestType === "date_change"
+            ? formatForLogs(booking.checkOut)
+            : null,
+        newCheckIn:
+          requestType === "date_change" ? formatForLogs(newCheckIn) : null,
+        newCheckOut:
+          requestType === "date_change" ? formatForLogs(newCheckOut) : null,
+        cancelledAt: formatForLogs(updateData.cancelledAt),
+        cancelledBy: cancelledBy,
+        cancellationType: cancellationPolicy.type,
+        isStaffCancellation,
+      },
+
+      // ⭐ INFORMACIÓN DE POLÍTICAS APLICADAS
+      policies: {
+        cancellation: cancellationPolicy,
+        refund: refundPolicy,
+        creditVoucher: creditVoucherPolicy,
+        daysUntilCheckIn,
+        appliedRule:
+          daysUntilCheckIn >= 5
+            ? "5+ días antes: Crédito válido por 30 días"
+            : daysUntilCheckIn >= 0
+            ? "Menos de 5 días: Hotel se queda con anticipo"
+            : "No show: Hotel se queda con anticipo",
+      },
+
+      // ⭐ INFORMACIÓN FINANCIERA
+      financial: {
+        totalAmount: parseFloat(booking.totalAmount || 0),
+        totalPaid,
+        refundAmount: refundPolicy.amount || 0,
+        creditVoucherAmount: creditVoucherPolicy.amount || 0,
+        forfeited: refundPolicy.type === "forfeit",
+        // Formateos
+        totalAmountFormatted: `$${parseFloat(
+          booking.totalAmount || 0
+        ).toLocaleString()}`,
+        totalPaidFormatted: `$${totalPaid.toLocaleString()}`,
+        refundAmountFormatted: `$${(
+          refundPolicy.amount || 0
+        ).toLocaleString()}`,
+        creditVoucherFormatted: `$${(
+          creditVoucherPolicy.amount || 0
+        ).toLocaleString()}`,
+      },
+
+      // ⭐ VOUCHER DE CRÉDITO (AHORA CON DATOS REALES DE LA BD)
+      creditVoucher,
+
+      // ⭐ INFORMACIÓN DE LA HABITACIÓN
+      room: booking.room
+        ? {
+            roomNumber: booking.room.roomNumber,
+            type: booking.room.type,
+            statusAfterCancellation:
+              requestType === "date_change" ? booking.room.status : "Limpia",
+            available: requestType !== "date_change",
+          }
+        : null,
+
+      // ⭐ PRÓXIMOS PASOS (MEJORADOS CON INFO DEL VOUCHER)
+      nextSteps: {
+        needsNewBooking:
+          requestType !== "date_change" && creditVoucherPolicy.amount > 0,
+        creditValidDays: creditVoucherPolicy.amount > 0 ? 30 : 0,
+        canRebook: creditVoucherPolicy.amount > 0 && creditVoucher && !creditVoucher.error,
+        voucherCode: creditVoucher && !creditVoucher.error ? creditVoucher.voucherCode : null,
+        voucherInstructions: creditVoucher && !creditVoucher.error 
+          ? `Use el código ${creditVoucher.voucherCode} para aplicar su crédito en una nueva reserva`
+          : null,
+        contactInfo: creditVoucher && creditVoucher.error 
+          ? "Contacte al hotel para generar manualmente su voucher de crédito"
+          : "Para nueva reserva con crédito, contactar recepción o usar el código proporcionado",
+        hotelPolicies: [
+          "Modificaciones requieren 5 días mínimo de anticipación",
+          "No se realizan devoluciones de dinero",
+          "Créditos válidos por 30 días calendario",
+          "Habitaciones sujetas a disponibilidad",
+          "Los vouchers se pueden usar para cualquier tipo de habitación"
+        ],
+        // ⭐ ACCIONES DISPONIBLES
+        availableActions: {
+          canUseVoucherOnline: creditVoucher && !creditVoucher.error,
+          canCheckVoucherStatus: creditVoucher && !creditVoucher.error,
+          needsManualVoucherCreation: creditVoucher && creditVoucher.error,
+          canMakeNewReservation: true,
+          canContactSupport: true
+        }
+      },
+    };
+
+    // ⭐ MENSAJE DE RESPUESTA PERSONALIZADO (MEJORADO)
+    let responseMessage;
+    if (requestType === "date_change") {
+      responseMessage = "Fechas de reserva modificadas exitosamente";
+    } else if (creditVoucherPolicy.amount > 0) {
+      if (creditVoucher && !creditVoucher.error) {
+        responseMessage = `Reserva cancelada exitosamente. Voucher ${creditVoucher.voucherCode} creado por $${creditVoucherPolicy.amount.toLocaleString()} válido por 30 días`;
+      } else {
+        responseMessage = `Reserva cancelada. Crédito de $${creditVoucherPolicy.amount.toLocaleString()} pendiente de generar manualmente`;
+      }
+    } else {
+      responseMessage =
+        "Reserva cancelada. Sin derecho a reembolso según políticas del hotel";
+    }
+
+    console.log("✅ [CANCEL-BOOKING] Cancelación procesada exitosamente:", {
+      bookingId: booking.bookingId,
+      type: requestType,
+      daysUntilCheckIn,
+      totalPaid,
+      creditAmount: creditVoucherPolicy.amount || 0,
+      voucherCreated: creditVoucher && !creditVoucher.error,
+      voucherCode: creditVoucher && !creditVoucher.error ? creditVoucher.voucherCode : null,
+      voucherError: creditVoucher && creditVoucher.error ? true : false,
+      completedAt: formatForLogs(getColombiaTime()),
+    });
+
+    res.json({
+      error: false,
+      message: responseMessage,
+      data: responseData,
+      timestamp: formatForLogs(getColombiaTime()),
+    });
+  } catch (error) {
+    console.error("❌ [CANCEL-BOOKING] Error general:", error);
+    console.error(
+      "🕐 [CANCEL-BOOKING] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
+    res.status(500).json({
+      error: true,
+      message: "Error interno al procesar la cancelación",
+      details: error.message,
+      timestamp: formatForLogs(getColombiaTime()),
+    });
   }
+};
 
-  await booking.update({
-    status: "cancelled",
-    statusReason: reason,
-    cancelledBy: req.buyer.sdocno,
-    cancelledAt: new Date(),
-  });
+// ...existing code...
 
-  res.json({
-    error: false,
-    message: "Reserva cancelada exitosamente",
-    data: booking,
-  });
+const getCancellationPolicies = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    const booking = await Booking.findByPk(bookingId, {
+      attributes: ["bookingId", "checkIn", "checkOut", "status", "totalAmount"],
+      include: [
+        {
+          model: Payment,
+          as: "payments",
+          attributes: ["amount", "paymentStatus"],
+          where: { paymentStatus: ["completed", "authorized"] },
+          required: false,
+        },
+      ],
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        error: true,
+        message: "Reserva no encontrada",
+      });
+    }
+
+    const now = getColombiaTime(); // DateTime de Luxon
+    const checkInDate = toColombiaTime(booking.checkIn); // DateTime de Luxon
+
+    // ✅ CORRECTO: Usar diff() de Luxon
+    const daysUntilCheckIn = Math.ceil(checkInDate.diff(now, "days").days);
+    console.log("🧪 [TEST] Verificando cálculo de días:", {
+      now: formatForLogs(now),
+      checkInDate: formatForLogs(checkInDate),
+      nowType: typeof now,
+      checkInType: typeof checkInDate,
+      daysUntilCheckIn,
+      isLuxonDateTime: now.constructor.name === "DateTime",
+    });
+    const totalPaid =
+      booking.payments?.reduce(
+        (sum, payment) => sum + parseFloat(payment.amount || 0),
+        0
+      ) || 0;
+
+    let policies;
+    if (daysUntilCheckIn >= 5) {
+      policies = {
+        canModifyDates: true,
+        canCancel: true,
+        refundType: "credit_voucher",
+        creditAmount: totalPaid,
+        creditValidityDays: 30,
+        message:
+          "Puede modificar fechas o cancelar con crédito válido por 30 días",
+      };
+    } else if (daysUntilCheckIn >= 0) {
+      policies = {
+        canModifyDates: false,
+        canCancel: true,
+        refundType: "forfeit",
+        creditAmount: 0,
+        forfeitAmount: totalPaid,
+        message:
+          "Solo puede cancelar. El hotel se queda con el anticipo por cancelación tardía",
+      };
+    } else {
+      policies = {
+        canModifyDates: false,
+        canCancel: true,
+        refundType: "forfeit",
+        creditAmount: 0,
+        forfeitAmount: totalPaid,
+        message:
+          "Solo puede cancelar. El hotel se queda con el anticipo por no presentarse",
+      };
+    }
+
+    res.json({
+      error: false,
+      data: {
+        bookingId: booking.bookingId,
+        checkIn: formatColombiaDate(booking.checkIn),
+        checkOut: formatColombiaDate(booking.checkOut),
+        daysUntilCheckIn,
+        totalAmount: parseFloat(booking.totalAmount || 0),
+        totalPaid,
+        policies,
+        hotelPolicies: {
+          modificationDeadline: "5 días mínimo de anticipación",
+          refundPolicy: "No se realizan devoluciones de dinero",
+          creditPolicy: "Créditos válidos por 30 días calendario",
+          availabilityNote: "Habitaciones sujetas a disponibilidad",
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error obteniendo políticas de cancelación:", error);
+    res.status(500).json({
+      error: true,
+      message: "Error al obtener políticas de cancelación",
+      details: error.message,
+    });
+  }
 };
 
 const getOccupancyReport = async (req, res) => {
@@ -6761,54 +7739,66 @@ const updateInventoryStatus = async (req, res) => {
   try {
     const { bookingId } = req.params;
     const { inventoryVerified, inventoryDelivered } = req.body;
-    
+
     console.log(`📦 [INVENTORY-STATUS] Updating for booking: ${bookingId}`, {
       inventoryVerified,
-      inventoryDelivered
+      inventoryDelivered,
     });
-    
+
     const booking = await Booking.findByPk(bookingId);
     if (!booking) {
       return res.status(404).json({
         error: true,
-        message: 'Reserva no encontrada'
+        message: "Reserva no encontrada",
       });
     }
-    
+
     const updateData = {};
     if (inventoryVerified !== undefined) {
       updateData.inventoryVerified = inventoryVerified;
-      updateData.inventoryVerifiedAt = inventoryVerified ? getColombiaTime() : null;
+      updateData.inventoryVerifiedAt = inventoryVerified
+        ? getColombiaTime()
+        : null;
     }
     if (inventoryDelivered !== undefined) {
       updateData.inventoryDelivered = inventoryDelivered;
-      updateData.inventoryDeliveredAt = inventoryDelivered ? getColombiaTime() : null;
-      updateData.inventoryDeliveredBy = inventoryDelivered ? (req.user?.n_document || 'system') : null;
+      updateData.inventoryDeliveredAt = inventoryDelivered
+        ? getColombiaTime()
+        : null;
+      updateData.inventoryDeliveredBy = inventoryDelivered
+        ? req.user?.n_document || "system"
+        : null;
     }
-    
+
     await booking.update(updateData);
-    
-    console.log(`✅ [INVENTORY-STATUS] Updated booking ${bookingId}:`, updateData);
-    
+
+    console.log(
+      `✅ [INVENTORY-STATUS] Updated booking ${bookingId}:`,
+      updateData
+    );
+
     res.json({
       error: false,
-      message: 'Estado de inventario actualizado exitosamente',
+      message: "Estado de inventario actualizado exitosamente",
       data: {
         bookingId,
         inventoryVerified: booking.inventoryVerified,
         inventoryDelivered: booking.inventoryDelivered,
-        inventoryVerifiedAt: booking.inventoryVerifiedAt ? formatForLogs(booking.inventoryVerifiedAt) : null,
-        inventoryDeliveredAt: booking.inventoryDeliveredAt ? formatForLogs(booking.inventoryDeliveredAt) : null,
-        inventoryDeliveredBy: booking.inventoryDeliveredBy
-      }
+        inventoryVerifiedAt: booking.inventoryVerifiedAt
+          ? formatForLogs(booking.inventoryVerifiedAt)
+          : null,
+        inventoryDeliveredAt: booking.inventoryDeliveredAt
+          ? formatForLogs(booking.inventoryDeliveredAt)
+          : null,
+        inventoryDeliveredBy: booking.inventoryDeliveredBy,
+      },
     });
-    
   } catch (error) {
-    console.error('❌ [INVENTORY-STATUS] Error:', error);
+    console.error("❌ [INVENTORY-STATUS] Error:", error);
     res.status(500).json({
       error: true,
-      message: 'Error al actualizar estado de inventario',
-      details: error.message
+      message: "Error al actualizar estado de inventario",
+      details: error.message,
     });
   }
 };
@@ -6817,76 +7807,82 @@ const updateInventoryStatus = async (req, res) => {
 const updatePassengersStatus = async (req, res) => {
   try {
     const { bookingId } = req.params;
-    
+
     console.log(`👥 [PASSENGERS-STATUS] Checking for booking: ${bookingId}`);
-    
+
     // Obtener la reserva
     const booking = await Booking.findByPk(bookingId, {
       include: [
         {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'status']
-        }
-      ]
+          as: "room",
+          attributes: ["roomNumber", "status"],
+        },
+      ],
     });
-    
+
     if (!booking) {
       return res.status(404).json({
         error: true,
-        message: 'Reserva no encontrada'
+        message: "Reserva no encontrada",
       });
     }
-    
+
     // Contar pasajeros registrados
     const registeredCount = await RegistrationPass.count({
-      where: { bookingId }
+      where: { bookingId },
     });
-    
+
     const requiredCount = parseInt(booking.guestCount) || 1;
     const passengersCompleted = registeredCount >= requiredCount;
-    
+
     // Actualizar estado si cambió
     if (booking.passengersCompleted !== passengersCompleted) {
       await booking.update({
         passengersCompleted,
-        passengersCompletedAt: passengersCompleted ? getColombiaTime() : null
+        passengersCompletedAt: passengersCompleted ? getColombiaTime() : null,
       });
     }
-    
+
     // Verificar si está listo para check-in completo
-    const isReadyForCheckIn = booking.inventoryDelivered && 
-                              passengersCompleted && 
-                              booking.room?.status === 'Limpia';
-    
+    const isReadyForCheckIn =
+      booking.inventoryDelivered &&
+      passengersCompleted &&
+      booking.room?.status === "Limpia";
+
     if (isReadyForCheckIn && !booking.checkInReadyAt) {
       await booking.update({
-        checkInReadyAt: getColombiaTime()
+        checkInReadyAt: getColombiaTime(),
       });
     }
-    
-    console.log(`✅ [PASSENGERS-STATUS] Updated booking ${bookingId}: ${passengersCompleted} (${registeredCount}/${requiredCount})`);
-    
+
+    console.log(
+      `✅ [PASSENGERS-STATUS] Updated booking ${bookingId}: ${passengersCompleted} (${registeredCount}/${requiredCount})`
+    );
+
     res.json({
       error: false,
-      message: 'Estado de pasajeros actualizado exitosamente',
+      message: "Estado de pasajeros actualizado exitosamente",
       data: {
         bookingId,
         registeredCount,
         requiredCount,
         passengersCompleted,
-        passengersCompletedAt: booking.passengersCompletedAt ? formatForLogs(booking.passengersCompletedAt) : null,
+        passengersCompletedAt: booking.passengersCompletedAt
+          ? formatForLogs(booking.passengersCompletedAt)
+          : null,
         isReadyForCheckIn,
-        checkInReadyAt: booking.checkInReadyAt ? formatForLogs(booking.checkInReadyAt) : null
-      }
+        checkInReadyAt: booking.checkInReadyAt
+          ? formatForLogs(booking.checkInReadyAt)
+          : null,
+      },
     });
-    
   } catch (error) {
-    console.error('❌ [PASSENGERS-STATUS] Error:', error);
+    console.error("❌ [PASSENGERS-STATUS] Error:", error);
     res.status(500).json({
       error: true,
-      message: 'Error al actualizar estado de pasajeros',
-      details: error.message
+      message: "Error al actualizar estado de pasajeros",
+      details: error.message,
     });
   }
 };
@@ -6895,147 +7891,456 @@ const updatePassengersStatus = async (req, res) => {
 const getCheckInStatus = async (req, res) => {
   try {
     const { bookingId } = req.params;
-    
+
     console.log(`🔍 [CHECKIN-STATUS] Getting status for booking: ${bookingId}`);
-    
+
     const booking = await Booking.findByPk(bookingId, {
       include: [
         {
           model: Room,
-          as: 'room',
-          attributes: ['roomNumber', 'status', 'type']
+          as: "room",
+          attributes: ["roomNumber", "status", "type"],
         },
         {
           model: RegistrationPass,
-          as: 'registrationPasses',
-          attributes: ['registrationNumber', 'name']
-        }
-      ]
+          as: "registrationPasses",
+          attributes: ["registrationNumber", "name"],
+        },
+      ],
     });
-    
+
     if (!booking) {
       return res.status(404).json({
         error: true,
-        message: 'Reserva no encontrada'
+        message: "Reserva no encontrada",
       });
     }
-    
+
     const registeredCount = booking.registrationPasses?.length || 0;
     const requiredCount = parseInt(booking.guestCount) || 1;
-    
+
     const checkInStatus = {
       bookingId,
       currentStatus: booking.status,
-      
+
       // Estados de inventario
       inventoryVerified: booking.inventoryVerified || false,
-      inventoryVerifiedAt: booking.inventoryVerifiedAt ? formatForLogs(booking.inventoryVerifiedAt) : null,
+      inventoryVerifiedAt: booking.inventoryVerifiedAt
+        ? formatForLogs(booking.inventoryVerifiedAt)
+        : null,
       inventoryDelivered: booking.inventoryDelivered || false,
-      inventoryDeliveredAt: booking.inventoryDeliveredAt ? formatForLogs(booking.inventoryDeliveredAt) : null,
+      inventoryDeliveredAt: booking.inventoryDeliveredAt
+        ? formatForLogs(booking.inventoryDeliveredAt)
+        : null,
       inventoryDeliveredBy: booking.inventoryDeliveredBy,
-      
+
       // Estados de pasajeros
       passengersCompleted: booking.passengersCompleted || false,
-      passengersCompletedAt: booking.passengersCompletedAt ? formatForLogs(booking.passengersCompletedAt) : null,
+      passengersCompletedAt: booking.passengersCompletedAt
+        ? formatForLogs(booking.passengersCompletedAt)
+        : null,
       registeredPassengers: registeredCount,
       requiredPassengers: requiredCount,
       passengersProgress: `${registeredCount}/${requiredCount}`,
-      
+
       // Estado de habitación
-      roomStatus: booking.room?.status || 'unknown',
-      roomClean: booking.room?.status === 'Limpia',
-      
+      roomStatus: booking.room?.status || "unknown",
+      roomClean: booking.room?.status === "Limpia",
+
       // Estado general
       checkInProgress: booking.checkInProgress || false,
-      checkInReadyAt: booking.checkInReadyAt ? formatForLogs(booking.checkInReadyAt) : null,
-      
+      checkInReadyAt: booking.checkInReadyAt
+        ? formatForLogs(booking.checkInReadyAt)
+        : null,
+
       // Verificaciones
-      allRequirementsMet: (
+      allRequirementsMet:
         (booking.inventoryDelivered || false) &&
         (booking.passengersCompleted || false) &&
-        booking.room?.status === 'Limpia'
-      ),
-      
+        booking.room?.status === "Limpia",
+
       // Pasos pendientes
       pendingSteps: [
-        ...(!(booking.inventoryVerified || false) ? ['Verificar inventario'] : []),
-        ...(!(booking.inventoryDelivered || false) ? ['Entregar inventario'] : []),
-        ...(!((booking.passengersCompleted || false)) ? ['Completar registro de pasajeros'] : []),
-        ...(booking.room?.status !== 'Limpia' ? ['Limpiar habitación'] : [])
+        ...(!(booking.inventoryVerified || false)
+          ? ["Verificar inventario"]
+          : []),
+        ...(!(booking.inventoryDelivered || false)
+          ? ["Entregar inventario"]
+          : []),
+        ...(!(booking.passengersCompleted || false)
+          ? ["Completar registro de pasajeros"]
+          : []),
+        ...(booking.room?.status !== "Limpia" ? ["Limpiar habitación"] : []),
       ],
-      
+
       // Pasos completados
       completedSteps: [
-        ...((booking.inventoryVerified || false) ? ['Inventario verificado'] : []),
-        ...((booking.inventoryDelivered || false) ? ['Inventario entregado'] : []),
-        ...((booking.passengersCompleted || false) ? ['Pasajeros registrados'] : []),
-        ...(booking.room?.status === 'Limpia' ? ['Habitación limpia'] : [])
-      ]
+        ...(booking.inventoryVerified || false
+          ? ["Inventario verificado"]
+          : []),
+        ...(booking.inventoryDelivered || false
+          ? ["Inventario entregado"]
+          : []),
+        ...(booking.passengersCompleted || false
+          ? ["Pasajeros registrados"]
+          : []),
+        ...(booking.room?.status === "Limpia" ? ["Habitación limpia"] : []),
+      ],
     };
-    
-    console.log(`✅ [CHECKIN-STATUS] Status retrieved for booking ${bookingId}`, {
-      allRequirementsMet: checkInStatus.allRequirementsMet,
-      pendingSteps: checkInStatus.pendingSteps.length,
-      completedSteps: checkInStatus.completedSteps.length
-    });
-    
+
+    console.log(
+      `✅ [CHECKIN-STATUS] Status retrieved for booking ${bookingId}`,
+      {
+        allRequirementsMet: checkInStatus.allRequirementsMet,
+        pendingSteps: checkInStatus.pendingSteps.length,
+        completedSteps: checkInStatus.completedSteps.length,
+      }
+    );
+
     res.json({
       error: false,
-      message: 'Estado de check-in obtenido exitosamente',
-      data: checkInStatus
+      message: "Estado de check-in obtenido exitosamente",
+      data: checkInStatus,
     });
-    
   } catch (error) {
-    console.error('❌ [CHECKIN-STATUS] Error:', error);
+    console.error("❌ [CHECKIN-STATUS] Error:", error);
     res.status(500).json({
       error: true,
-      message: 'Error al obtener estado de check-in',
-      details: error.message
+      message: "Error al obtener estado de check-in",
+      details: error.message,
     });
   }
 };
-
-
 
 // ⭐ AGREGAR AL FINAL DEL ARCHIVO, ANTES DEL module.exports:
 const updateCheckInProgress = async (req, res) => {
   try {
     const { bookingId } = req.params;
     const { checkInProgress } = req.body;
-    
-    console.log(`🚀 [CHECKIN-PROGRESS] Updating progress for booking: ${bookingId}`, { checkInProgress });
-    
+
+    console.log(
+      `🚀 [CHECKIN-PROGRESS] Updating progress for booking: ${bookingId}`,
+      { checkInProgress }
+    );
+
     const booking = await Booking.findByPk(bookingId);
     if (!booking) {
       return res.status(404).json({
         error: true,
-        message: 'Reserva no encontrada'
+        message: "Reserva no encontrada",
       });
     }
-    
-    await booking.update({ 
+
+    await booking.update({
       checkInProgress,
-      ...(checkInProgress && { checkInStartedAt: getColombiaTime() })
+      ...(checkInProgress && { checkInStartedAt: getColombiaTime() }),
     });
-    
-    console.log(`✅ [CHECKIN-PROGRESS] Updated booking ${bookingId} progress: ${checkInProgress}`);
-    
+
+    console.log(
+      `✅ [CHECKIN-PROGRESS] Updated booking ${bookingId} progress: ${checkInProgress}`
+    );
+
     res.json({
       error: false,
-      message: `Proceso de check-in ${checkInProgress ? 'iniciado' : 'detenido'} exitosamente`,
+      message: `Proceso de check-in ${
+        checkInProgress ? "iniciado" : "detenido"
+      } exitosamente`,
       data: {
         bookingId,
         checkInProgress: booking.checkInProgress,
-        checkInStartedAt: booking.checkInStartedAt ? formatForLogs(booking.checkInStartedAt) : null
-      }
+        checkInStartedAt: booking.checkInStartedAt
+          ? formatForLogs(booking.checkInStartedAt)
+          : null,
+      },
     });
-    
   } catch (error) {
-    console.error('❌ [CHECKIN-PROGRESS] Error:', error);
+    console.error("❌ [CHECKIN-PROGRESS] Error:", error);
     res.status(500).json({
       error: true,
-      message: 'Error al actualizar progreso de check-in',
-      details: error.message
+      message: "Error al actualizar progreso de check-in",
+      details: error.message,
+    });
+  }
+};
+
+const validateCancellation = async (req, res) => {
+  try {
+    console.log(
+      "🔍 [VALIDATE-CANCELLATION] Iniciando validación de cancelación"
+    );
+    console.log(
+      "🕐 [VALIDATE-CANCELLATION] Hora Colombia:",
+      formatForLogs(getColombiaTime())
+    );
+    console.log("📥 [VALIDATE-CANCELLATION] Parámetros:", {
+      bookingId: req.params.bookingId,
+      body: req.body,
+      user: req.user?.n_document || "No user",
+    });
+
+    const { bookingId } = req.params;
+    const { reason, validateRefund = true, requiredAmount = 0 } = req.body;
+
+    // ⭐ VALIDACIONES BÁSICAS
+    if (!bookingId) {
+      return res.status(400).json({
+        error: true,
+        message: "ID de reserva es requerido",
+      });
+    }
+
+    console.log("🔍 [VALIDATE-CANCELLATION] Buscando reserva:", bookingId);
+
+    // ⭐ OBTENER DATOS COMPLETOS DE LA RESERVA
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: Room,
+          as: "room",
+          attributes: ["roomNumber", "type", "status"],
+        },
+        {
+          model: Buyer,
+          as: "guest",
+          attributes: ["sdocno", "scostumername", "selectronicmail"],
+        },
+        {
+          model: Payment,
+          as: "payments",
+          attributes: [
+            "paymentId",
+            "amount",
+            "paymentStatus",
+            "paymentMethod",
+            "paymentDate",
+          ],
+          where: { paymentStatus: ["completed", "authorized"] },
+          required: false,
+        },
+      ],
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        error: true,
+        message: "Reserva no encontrada",
+      });
+    }
+
+    console.log("✅ [VALIDATE-CANCELLATION] Reserva encontrada:", {
+      bookingId: booking.bookingId,
+      status: booking.status,
+      checkIn: formatForLogs(booking.checkIn),
+      roomNumber: booking.room?.roomNumber,
+      guestName: booking.guest?.scostumername,
+      hasPayments: booking.payments?.length > 0,
+    });
+
+    // ⭐ VALIDAR QUE LA RESERVA PUEDA SER CANCELADA
+    if (!["confirmed", "paid", "pending"].includes(booking.status)) {
+      return res.status(400).json({
+        error: true,
+        message: `No se puede cancelar una reserva con estado: ${booking.status}`,
+        canCancel: false,
+      });
+    }
+
+    // ⭐ CALCULAR DÍAS HASTA EL CHECK-IN
+    const now = getColombiaTime();
+    const checkInDate = toColombiaTime(booking.checkIn);
+    const daysUntilCheckIn = Math.ceil(
+      (checkInDate - now) / (1000 * 60 * 60 * 24)
+    );
+
+    console.log("📅 [VALIDATE-CANCELLATION] Análisis de fechas:", {
+      now: formatForLogs(now),
+      checkIn: formatForLogs(checkInDate),
+      daysUntilCheckIn,
+      canModifyDates: daysUntilCheckIn >= 5,
+      isAfterCheckIn: daysUntilCheckIn < 0,
+    });
+
+    // ⭐ CALCULAR PAGOS REALIZADOS
+    const totalPaid =
+      booking.payments?.reduce((sum, payment) => {
+        return sum + parseFloat(payment.amount || 0);
+      }, 0) || 0;
+
+    console.log("💰 [VALIDATE-CANCELLATION] Análisis financiero:", {
+      totalAmount: booking.totalAmount,
+      totalPaid,
+      hasPayments: totalPaid > 0,
+      paymentCount: booking.payments?.length || 0,
+    });
+
+    // ⭐ DETERMINAR POLÍTICAS DE CANCELACIÓN
+    let cancellationPolicy;
+    let refundPolicy;
+    let creditVoucherPolicy;
+
+    if (daysUntilCheckIn >= 5) {
+      // Más de 5 días: Se puede cancelar con crédito
+      cancellationPolicy = {
+        canCancel: true,
+        canModifyDates: true,
+        type: "standard",
+        allowsModification: true,
+        message: "Cancelación permitida con crédito por 30 días",
+      };
+
+      refundPolicy = {
+        type: "credit_voucher",
+        amount: 0,
+        message: "No se realizan devoluciones de dinero",
+      };
+
+      creditVoucherPolicy = {
+        amount: totalPaid,
+        validUntil: now.plus({ days: 30 }).toJSDate(),
+        type: "credit_voucher",
+        message: `Crédito por $${totalPaid.toLocaleString()} válido por 30 días`,
+      };
+    } else if (daysUntilCheckIn >= 0) {
+      // Menos de 5 días pero antes del check-in: Hotel se queda con anticipo
+      cancellationPolicy = {
+        canCancel: true,
+        canModifyDates: false,
+        type: "late_cancellation",
+        allowsModification: false,
+        message: "Cancelación tardía - Hotel retiene el anticipo",
+      };
+
+      refundPolicy = {
+        type: "forfeit",
+        amount: 0,
+        message: "Hotel se queda con el anticipo pagado",
+      };
+
+      creditVoucherPolicy = {
+        amount: 0,
+        validUntil: null,
+        type: "forfeit",
+        message: "No se genera crédito por cancelación tardía",
+      };
+    } else {
+      // Después del check-in: No show
+      cancellationPolicy = {
+        canCancel: false,
+        canModifyDates: false,
+        type: "no_show",
+        allowsModification: false,
+        message: "No se puede cancelar después del check-in",
+      };
+
+      refundPolicy = {
+        type: "forfeit",
+        amount: 0,
+        message: "No show - Hotel se queda con el pago completo",
+      };
+
+      creditVoucherPolicy = {
+        amount: 0,
+        validUntil: null,
+        type: "forfeit",
+        message: "No se genera crédito por no show",
+      };
+    }
+
+    console.log("📋 [VALIDATE-CANCELLATION] Políticas aplicables:", {
+      cancellationPolicy: cancellationPolicy.type,
+      refundPolicy: refundPolicy.type,
+      creditVoucherPolicy: creditVoucherPolicy.type,
+      canCancel: cancellationPolicy.canCancel,
+    });
+
+    // ⭐ PREPARAR RESPUESTA DE VALIDACIÓN
+    const validationResult = {
+      canCancel: cancellationPolicy.canCancel,
+      booking: {
+        bookingId: booking.bookingId,
+        status: booking.status,
+        checkIn: formatColombiaDate(booking.checkIn),
+        checkOut: formatColombiaDate(booking.checkOut),
+        roomNumber: booking.room?.roomNumber,
+        guestName: booking.guest?.scostumername,
+        totalAmount: parseFloat(booking.totalAmount || 0),
+        totalPaid,
+      },
+      policies: {
+        cancellation: cancellationPolicy,
+        refund: refundPolicy,
+        creditVoucher: creditVoucherPolicy,
+        daysUntilCheckIn,
+        appliedRule:
+          daysUntilCheckIn >= 5
+            ? "Más de 5 días: Crédito por 30 días"
+            : daysUntilCheckIn >= 0
+            ? "Menos de 5 días: Hotel se queda con anticipo"
+            : "No show: Hotel se queda con anticipo",
+      },
+      financial: {
+        totalAmount: parseFloat(booking.totalAmount || 0),
+        totalPaid,
+        estimatedRefund: refundPolicy.amount || 0,
+        estimatedCredit: creditVoucherPolicy.amount || 0,
+        forfeited: refundPolicy.type === "forfeit",
+        totalAmountFormatted: `$${parseFloat(
+          booking.totalAmount || 0
+        ).toLocaleString()}`,
+        totalPaidFormatted: `$${totalPaid.toLocaleString()}`,
+        estimatedRefundFormatted: `$${(
+          refundPolicy.amount || 0
+        ).toLocaleString()}`,
+        estimatedCreditFormatted: `$${(
+          creditVoucherPolicy.amount || 0
+        ).toLocaleString()}`,
+      },
+      warnings: [],
+      errors: [],
+    };
+
+    // ⭐ AGREGAR ADVERTENCIAS SI APLICAN
+    if (!cancellationPolicy.canCancel) {
+      validationResult.errors.push("Esta reserva no puede ser cancelada");
+    }
+
+    if (daysUntilCheckIn < 5 && daysUntilCheckIn >= 0) {
+      validationResult.warnings.push(
+        "Cancelación tardía: Hotel retendrá el anticipo"
+      );
+    }
+
+    if (totalPaid === 0) {
+      validationResult.warnings.push("No hay pagos realizados para procesar");
+    }
+
+    console.log("✅ [VALIDATE-CANCELLATION] Validación completada:", {
+      bookingId: booking.bookingId,
+      canCancel: validationResult.canCancel,
+      daysUntilCheckIn,
+      totalPaid,
+      creditAmount: creditVoucherPolicy.amount || 0,
+      completedAt: formatForLogs(getColombiaTime()),
+    });
+
+    res.json({
+      error: false,
+      message: "Validación de cancelación completada",
+      data: validationResult,
+      timestamp: formatForLogs(getColombiaTime()),
+    });
+  } catch (error) {
+    console.error("❌ [VALIDATE-CANCELLATION] Error general:", error);
+    console.error(
+      "🕐 [VALIDATE-CANCELLATION] Hora del error:",
+      formatForLogs(getColombiaTime())
+    );
+
+    res.status(500).json({
+      error: true,
+      message: "Error interno al validar cancelación",
+      details: error.message,
+      timestamp: formatForLogs(getColombiaTime()),
     });
   }
 };
@@ -7056,14 +8361,16 @@ module.exports = {
   generateBill,
   updateBookingStatus,
   cancelBooking,
+  getCancellationPolicies,
+  validateCancellation,
   getOccupancyReport,
   getRevenueReport,
   getBookingByToken,
   updateOnlinePayment,
   getBookingInventoryStatus,
   getInventoryUsageReport,
-   updateInventoryStatus,
+  updateInventoryStatus,
   updatePassengersStatus,
   getCheckInStatus,
-  updateCheckInProgress
+  updateCheckInProgress,
 };
