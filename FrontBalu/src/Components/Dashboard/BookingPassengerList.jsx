@@ -226,7 +226,7 @@ Todo daño ocasionado en la habitación será cargado a su cuenta.`;
       toast.success("Pasajero actualizado");
       setEditingId(null);
       dispatch(getBookingById(selectedBooking.bookingId));
-    } catch (e) {
+    } catch {
       toast.error("Error al actualizar pasajero");
     }
   };
@@ -238,7 +238,7 @@ Todo daño ocasionado en la habitación será cargado a su cuenta.`;
         await dispatch(deleteRegistrationPass(registrationNumber));
         toast.success("Pasajero eliminado");
         dispatch(getBookingById(selectedBooking.bookingId));
-      } catch (e) {
+      } catch {
         toast.error("Error al eliminar pasajero");
       }
     }

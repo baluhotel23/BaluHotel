@@ -11,6 +11,7 @@ const bookingRoutes = require('./bookingRoutes');
 const clientRoutes = require('./clientRoutes');
 const taxxaRouter = require('./taxxaRouter');
 const webhookRouter = require('../controllers/webhook');
+const voucherRoutes = require('./voucherRoutes'); // ⭐ AGREGAR ESTA LÍNEA
 //const { registerLocalPayment } = require('../controllers/paymentController');
 const registrationPassRoutes = require('./registrationPassRoutes');
 
@@ -33,6 +34,7 @@ router.use('/bookings', bookingRoutes);
 router.use('/taxxa', taxxaRouter);
 //router.use('/payment',   registerLocalPayment);
 router.use('/registrationPass', registrationPassRoutes);
+router.use('/vouchers', voucherRoutes);
 
 // ⭐ NUEVAS RUTAS DE INVENTARIO Y LAVANDERÍA
 router.use('/laundry', laundryRoutes);

@@ -80,6 +80,7 @@ const {
   RoomCategory,
   LaundryMovement,
   CreditNote,
+  Voucher,
  
   RoomService, // ⭐ CORREGIDO: RoomService en lugar de RoomServices
   Expense
@@ -584,6 +585,37 @@ if (hasModel('CreditNote')) {
       as: 'creditNotes'
     });
   }
+
+  Voucher.belongsTo(Buyer, { 
+  foreignKey: 'guestId', 
+  as: 'guest' 
+});
+
+Voucher.belongsTo(Booking, { 
+  foreignKey: 'originalBookingId', 
+  as: 'originalBooking' 
+});
+
+Voucher.belongsTo(Booking, { 
+  foreignKey: 'usedBookingId', 
+  as: 'usedBooking' 
+});
+
+// También agregar las asociaciones inversas:
+Buyer.hasMany(Voucher, { 
+  foreignKey: 'guestId', 
+  as: 'vouchers' 
+});
+
+Booking.hasMany(Voucher, { 
+  foreignKey: 'originalBookingId', 
+  as: 'generatedVouchers' 
+});
+
+Booking.hasMany(Voucher, { 
+  foreignKey: 'usedBookingId', 
+  as: 'appliedVouchers' 
+});
 
   // CreditNote - Bill
   if (hasModel('Bill')) {

@@ -8,6 +8,10 @@ const initialState = {
     checkOut: false,
     inventory: false,
     reports: false,
+    cancellationPolicies: false,
+    cancellation: false,
+    vouchers: false,
+    voucherValidation: false,
     bills: false,
      checkInStatus: false,
     inventoryStatus: false,
@@ -16,15 +20,40 @@ const initialState = {
   },
   
   // ⭐ DATOS PRINCIPALES
-  availability: [],
-  roomTypes: [],
+  
   
   // ⭐ RESERVAS - ESTRUCTURA MEJORADA
   booking: null, // Reserva actualmente seleccionada/creada
   bookingDetails: null, // Detalles completos de la reserva
   bookings: [], // Lista de todas las reservas
-  
-  // ⭐ INVENTARIO DE RESERVAS (NUEVO)
+  availability: [],
+  roomTypes: [],
+
+  cancellation: {
+    policies: null,
+    result: null,
+    availableActions: {
+      canCancel: false,
+      canModifyDates: false,
+      canGetCredit: false,
+      willForfeitPayment: false
+    }
+  },
+  vouchers: {
+    available: [],        // Vouchers disponibles para usar
+    used: [],            // Vouchers ya utilizados
+    current: null,       // Voucher siendo procesado
+    validation: null,    // Resultado de validación
+    statistics: {
+      totalGenerated: 0,
+      totalUsed: 0,
+      totalValue: 0,
+      pendingValue: 0
+    }
+  },
+
+
+// ⭐ INVENTARIO DE RESERVAS (NUEVO)
   inventory: {
     status: null, // Estado de inventario de la reserva actual
     usage: [], // Uso de inventario por reserva
@@ -108,7 +137,11 @@ const initialState = {
     checkInStatus: null,
     inventoryStatus: null,
     passengersStatus: null,
-    checkInProgress: null
+    checkInProgress: null,
+    cancellationPolicies: null,
+    cancellation: null,
+    vouchers: null,
+    voucherValidation: null,
   },
   
   // ⭐ ESTADOS DE ÉXITO
@@ -287,14 +320,289 @@ const bookingReducer = (state = initialState, action) => {
         loading: { ...state.loading, general: true }, 
         errors: { ...state.errors, general: null } 
       };
-    case "GET_ALL_BOOKINGS_SUCCESS":
+      
+case "GET_ALL_BOOKINGS_SUCCESS": {  // ⭐ AGREGAR LLAVE DE APERTURA
+  console.log('✅ [REDUCER] GET_ALL_BOOKINGS_SUCCESS payload:', action.payload);
+  
+  // Manejar la estructura { data: { bookings: [...] } }
+  let bookingsArray = [];  // ✅ AHORA ESTÁ DENTRO DE UN BLOQUE
+  if (action.payload?.data?.bookings && Array.isArray(action.payload.data.bookings)) {
+    bookingsArray = action.payload.data.bookings;
+  } else if (Array.isArray(action.payload)) {
+    bookingsArray = action.payload;
+  }
+  
+  console.log('📋 [REDUCER] Bookings procesados:', bookingsArray.length);
+  
+  return { 
+    ...state, 
+    loading: { ...state.loading, general: false }, 
+    bookings: bookingsArray,
+    pagination: action.payload?.data?.pagination || state.pagination,
+    cache: { ...state.cache, bookingsLastFetch: Date.now() }
+  };
+} 
+
+ case "GET_CANCELLATION_POLICIES_REQUEST":
+      console.log('🔄 [REDUCER] Obteniendo políticas de cancelación...');
       return { 
         ...state, 
-        loading: { ...state.loading, general: false }, 
-        bookings: action.payload.bookings || action.payload,
-        pagination: action.payload.pagination || state.pagination,
-        cache: { ...state.cache, bookingsLastFetch: Date.now() }
+        loading: { ...state.loading, cancellationPolicies: true }, 
+        errors: { ...state.errors, cancellationPolicies: null },
+        cancellation: { ...state.cancellation, policies: null }
       };
+
+    case "GET_CANCELLATION_POLICIES_SUCCESS":
+      console.log('✅ [REDUCER] Políticas de cancelación obtenidas:', action.payload);
+      return { 
+        ...state, 
+        loading: { ...state.loading, cancellationPolicies: false },
+        cancellation: {
+          ...state.cancellation,
+          policies: action.payload.policies,
+          availableActions: {
+            canCancel: action.payload.policies?.canCancel || false,
+            canModifyDates: action.payload.policies?.canModifyDates || false,
+            canGetCredit: action.payload.policies?.refundType === 'credit_voucher',
+            willForfeitPayment: action.payload.policies?.refundType === 'forfeit'
+          }
+        },
+        errors: { ...state.errors, cancellationPolicies: null }
+      };
+
+    case "GET_CANCELLATION_POLICIES_FAILURE":
+      console.error('❌ [REDUCER] Error obteniendo políticas:', action.payload);
+      return { 
+        ...state, 
+        loading: { ...state.loading, cancellationPolicies: false }, 
+        errors: { ...state.errors, cancellationPolicies: action.payload },
+        cancellation: { ...state.cancellation, policies: null }
+      };
+
+    // CANCEL BOOKING
+    case "CANCEL_BOOKING_REQUEST":
+      console.log('🔄 [REDUCER] Procesando cancelación...');
+      return { 
+        ...state, 
+        loading: { ...state.loading, cancellation: true }, 
+        errors: { ...state.errors, cancellation: null },
+        cancellation: { ...state.cancellation, result: null }
+      };
+
+    case "CANCEL_BOOKING_SUCCESS": {
+      console.log('✅ [REDUCER] Cancelación exitosa:', action.payload);
+      
+      // Actualizar la reserva en la lista si existe
+      const updatedBookings = state.bookings.map(booking => 
+        booking.bookingId === action.payload.booking?.bookingId
+          ? { ...booking, status: 'cancelled', ...action.payload.booking }
+          : booking
+      );
+
+      return { 
+        ...state, 
+        loading: { ...state.loading, cancellation: false },
+        bookingDetails: action.payload.booking || state.bookingDetails,
+        bookings: updatedBookings,
+        cancellation: {
+          ...state.cancellation,
+          result: action.payload,
+          policies: action.payload.policies || state.cancellation.policies
+        },
+        success: { 
+          message: 'Reserva cancelada exitosamente', 
+          type: 'cancellation' 
+        },
+        errors: { ...state.errors, cancellation: null }
+      };
+    }
+
+    case "CANCEL_BOOKING_FAILURE":
+      console.error('❌ [REDUCER] Error en cancelación:', action.payload);
+      return { 
+        ...state, 
+        loading: { ...state.loading, cancellation: false }, 
+        errors: { ...state.errors, cancellation: action.payload },
+        cancellation: { ...state.cancellation, result: null }
+      };
+
+    // CLEAR CANCELLATION STATE
+    case "CLEAR_CANCELLATION_STATE":
+      console.log('🔄 [REDUCER] Limpiando estado de cancelación...');
+      return {
+        ...state,
+        cancellation: {
+          ...state.cancellation,
+          policies: null,
+          result: null,
+          availableActions: {
+            canCancel: false,
+            canModifyDates: false,
+            canGetCredit: false,
+            willForfeitPayment: false
+          }
+        },
+        errors: { ...state.errors, cancellationPolicies: null, cancellation: null }
+      };
+
+       case "GET_ALL_VOUCHERS_REQUEST":
+      console.log('🔄 [REDUCER] Obteniendo vouchers...');
+      return { 
+        ...state, 
+        loading: { ...state.loading, vouchers: true }, 
+        errors: { ...state.errors, vouchers: null }
+      };
+
+    case "GET_ALL_VOUCHERS_SUCCESS": {
+      console.log('✅ [REDUCER] Vouchers obtenidos:', action.payload);
+      
+      const { available = [], used = [], statistics = {} } = action.payload;
+      
+      return { 
+        ...state, 
+        loading: { ...state.loading, vouchers: false },
+        vouchers: {
+          ...state.vouchers,
+          available: available,
+          used: used,
+          statistics: statistics
+        },
+        errors: { ...state.errors, vouchers: null }
+      };
+    };
+
+    case "VALIDATE_CANCELLATION_REQUEST":
+      console.log('🔄 [REDUCER] Validando cancelación...');
+      return { 
+        ...state, 
+        loading: { ...state.loading, cancellation: true }, 
+        errors: { ...state.errors, cancellation: null }
+      };
+
+    case "VALIDATE_CANCELLATION_SUCCESS":
+      console.log('✅ [REDUCER] Validación de cancelación exitosa:', action.payload);
+      return { 
+        ...state, 
+        loading: { ...state.loading, cancellation: false },
+        cancellation: {
+          ...state.cancellation,
+          validation: action.payload,
+          policies: action.payload.policies,
+          availableActions: {
+            canCancel: action.payload.canCancel,
+            canModifyDates: action.payload.policies?.cancellation?.canModifyDates || false,
+            canGetCredit: action.payload.financial?.estimatedCredit > 0,
+            willForfeitPayment: action.payload.policies?.refund?.type === 'forfeit'
+          }
+        },
+        errors: { ...state.errors, cancellation: null }
+      };
+
+    case "VALIDATE_CANCELLATION_FAILURE":
+      console.error('❌ [REDUCER] Error validando cancelación:', action.payload);
+      return { 
+        ...state, 
+        loading: { ...state.loading, cancellation: false }, 
+        errors: { ...state.errors, cancellation: action.payload }
+      };
+
+    case "GET_ALL_VOUCHERS_FAILURE":
+      console.error('❌ [REDUCER] Error obteniendo vouchers:', action.payload);
+      return { 
+        ...state, 
+        loading: { ...state.loading, vouchers: false }, 
+        errors: { ...state.errors, vouchers: action.payload }
+      };
+
+    // VALIDATE VOUCHER
+    case "VALIDATE_VOUCHER_REQUEST":
+      console.log('🔄 [REDUCER] Validando voucher...');
+      return { 
+        ...state, 
+        loading: { ...state.loading, voucherValidation: true }, 
+        errors: { ...state.errors, voucherValidation: null },
+        vouchers: { ...state.vouchers, validation: null }
+      };
+
+    case "VALIDATE_VOUCHER_SUCCESS":
+      console.log('✅ [REDUCER] Voucher validado:', action.payload);
+      return { 
+        ...state, 
+        loading: { ...state.loading, voucherValidation: false },
+        vouchers: {
+          ...state.vouchers,
+          validation: action.payload,
+          current: action.payload.voucher || null
+        },
+        errors: { ...state.errors, voucherValidation: null }
+      };
+
+    case "VALIDATE_VOUCHER_FAILURE":
+      console.error('❌ [REDUCER] Error validando voucher:', action.payload);
+      return { 
+        ...state, 
+        loading: { ...state.loading, voucherValidation: false }, 
+        errors: { ...state.errors, voucherValidation: action.payload },
+        vouchers: { ...state.vouchers, validation: null, current: null }
+      };
+
+    // USE VOUCHER
+    case "USE_VOUCHER_REQUEST":
+      console.log('🔄 [REDUCER] Usando voucher...');
+      return { 
+        ...state, 
+        loading: { ...state.loading, vouchers: true }, 
+        errors: { ...state.errors, vouchers: null }
+      };
+
+    case "USE_VOUCHER_SUCCESS": {
+      console.log('✅ [REDUCER] Voucher usado exitosamente:', action.payload);
+      
+      // Mover voucher de disponible a usado
+      const voucherUsed = action.payload.voucher;
+      const updatedAvailable = state.vouchers.available.filter(
+        v => v.voucherId !== voucherUsed.voucherId
+      );
+      
+      return { 
+        ...state, 
+        loading: { ...state.loading, vouchers: false },
+        vouchers: {
+          ...state.vouchers,
+          available: updatedAvailable,
+          used: [...state.vouchers.used, { ...voucherUsed, usedAt: action.payload.usedAt }],
+          current: null,
+          validation: null
+        },
+        success: { 
+          message: `Voucher de $${voucherUsed.amount.toLocaleString()} aplicado exitosamente`, 
+          type: 'voucher_used' 
+        },
+        errors: { ...state.errors, vouchers: null }
+      };
+    }
+
+    case "USE_VOUCHER_FAILURE":
+      console.error('❌ [REDUCER] Error usando voucher:', action.payload);
+      return { 
+        ...state, 
+        loading: { ...state.loading, vouchers: false }, 
+        errors: { ...state.errors, vouchers: action.payload }
+      };
+
+    // CLEAR VOUCHER STATE
+    case "CLEAR_VOUCHER_STATE":
+      console.log('🧹 [REDUCER] Limpiando estado de vouchers...');
+      return {
+        ...state,
+        vouchers: {
+          ...state.vouchers,
+          current: null,
+          validation: null
+        },
+        errors: { ...state.errors, voucherValidation: null }
+      };
+
     case "GET_ALL_BOOKINGS_FAILURE":
       return { 
         ...state, 
@@ -619,26 +927,6 @@ case "CHECKOUT_BOOKING_FAILURE":
         errors: { ...state.errors, booking: action.payload }
       };
 
-    // ⭐ CANCEL BOOKING - OPTIMIZADO
-    case "CANCEL_BOOKING_REQUEST":
-      return { 
-        ...state, 
-        loading: { ...state.loading, booking: true }, 
-        errors: { ...state.errors, booking: null } 
-      };
-    case "CANCEL_BOOKING_SUCCESS":
-      return { 
-        ...state, 
-        loading: { ...state.loading, booking: false }, 
-        bookingDetails: action.payload,
-        success: { message: 'Reserva cancelada exitosamente', type: 'update' }
-      };
-    case "CANCEL_BOOKING_FAILURE":
-      return { 
-        ...state, 
-        loading: { ...state.loading, booking: false }, 
-        errors: { ...state.errors, booking: action.payload }
-      };
 
     // ⭐ GET OCCUPANCY REPORT - OPTIMIZADO
     case "GET_OCCUPANCY_REPORT_REQUEST":

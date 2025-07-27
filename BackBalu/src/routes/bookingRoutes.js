@@ -18,6 +18,8 @@ const {
     generateBill,
     updateBookingStatus,
     cancelBooking,
+    getCancellationPolicies,
+    validateCancellation,
     downloadBookingPdf,
     getOccupancyReport,
     getRevenueReport,
@@ -26,13 +28,15 @@ const {
     getAllBills,
     getBookingInventoryStatus,
     getInventoryUsageReport,
-      updateInventoryStatus,
+    updateInventoryStatus,
     updatePassengersStatus,
     getCheckInStatus,
-    updateCheckInProgress
+    updateCheckInProgress,
 } = require('../controllers/bookingController');
 
-// Rutas públicas (no requieren autenticación)
+// ═══════════════════════════════════════════════════════════════
+// 📋 RUTAS PÚBLICAS (no requieren autenticación)
+// ═══════════════════════════════════════════════════════════════
 router.get('/availability', checkAvailability);
 router.get('/room-types', getRoomTypes);
 router.post('/create', createBooking);
@@ -40,47 +44,63 @@ router.get('/status/:trackingToken', getBookingByToken);
 router.get('/pdf/:trackingToken', downloadBookingPdf);
 router.put('/online-payment', updateOnlinePayment);
 
-// Middleware de autenticación
+// ═══════════════════════════════════════════════════════════════
+// 🔐 MIDDLEWARE DE AUTENTICACIÓN (todas las rutas siguientes requieren login)
+// ═══════════════════════════════════════════════════════════════
 router.use(verifyToken);
 
+// ═══════════════════════════════════════════════════════════════
+// 👤 RUTAS DE USUARIOS AUTENTICADOS (clientes)
+// ═══════════════════════════════════════════════════════════════
 router.get('/user/:sdocno', getUserBookings);
-router.post('/:bookingId/cancel', cancelBooking);
-
-// Rutas para clientes y staff
-router.post('/', validateBooking, createBooking);
 router.get('/user/my-bookings/:sdocno', getUserBookings);
 
-// Middleware de staff
+// ⭐ RUTAS DE CANCELACIÓN PARA USUARIOS
+// Los usuarios pueden cancelar sus propias reservas
+router.get('/:bookingId/cancellation-policies', getCancellationPolicies);
+router.post('/:bookingId/validate-cancellation', validateCancellation); // ⭐ AGREGAR ESTA LÍNEA
+router.put('/:bookingId/cancel', cancelBooking);
+// ═══════════════════════════════════════════════════════════════
+// 🏨 MIDDLEWARE DE STAFF (todas las rutas siguientes requieren ser staff)
+// ═══════════════════════════════════════════════════════════════
 router.use(isStaff);
 
-// Rutas de gestión de reservas (solo staff)
-router.get('/facturas', getAllBills)
+// ═══════════════════════════════════════════════════════════════
+// 📊 RUTAS DE GESTIÓN PARA STAFF
+// ═══════════════════════════════════════════════════════════════
+router.get('/facturas', getAllBills);
 router.get('/reservas/all', getAllBookings);
 router.get('/:bookingId', getBookingById);
 
-// ⭐ CHECK-IN/CHECK-OUT ACTUALIZADOS
-router.put('/:bookingId/check-in', checkInGuest); // ⭐ USAR checkInGuest
+// ⭐ CHECK-IN/CHECK-OUT
+router.put('/:bookingId/check-in', checkInGuest);
 router.put('/:bookingId/check-out', checkOut);
+router.get('/:bookingId/checkin-status', getCheckInStatus);
+router.put('/:bookingId/checkin-progress', updateCheckInProgress);
 
-// ⭐ NUEVAS RUTAS DE INVENTARIO
+// ⭐ GESTIÓN DE INVENTARIO
 router.get('/:bookingId/inventory/status', getBookingInventoryStatus);
+router.put('/:bookingId/inventory-status', updateInventoryStatus);
+router.put('/:bookingId/passengers-status', updatePassengersStatus);
 
-router.post('/:bookingId/extra-charges', addExtraCharge
-);
+// ⭐ CARGOS ADICIONALES Y FACTURACIÓN
+router.post('/:bookingId/extra-charges', addExtraCharge);
 router.get('/:bookingId/bill', generateBill);
+
+// ⭐ ACTUALIZACIÓN DE ESTADO
 router.put('/:bookingId/status', updateBookingStatus);
 
-// Rutas que requieren permisos especiales
+// ═══════════════════════════════════════════════════════════════
+// 👑 RUTAS ADMINISTRATIVAS (solo owner y admin)
+// ═══════════════════════════════════════════════════════════════
+
+// ⭐ CANCELACIONES ADMINISTRATIVAS
+// Los administradores pueden cancelar cualquier reserva con permisos especiales
 router.delete('/:bookingId', allowRoles(['owner', 'admin']), cancelBooking);
 
-// Rutas de reportes (solo owner y admin)
+// ⭐ REPORTES
 router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyReport);
 router.get('/reports/revenue', allowRoles(['owner', 'admin']), getRevenueReport);
 router.get('/reports/inventory-usage', allowRoles(['owner', 'admin']), getInventoryUsageReport);
 
-
-router.get('/:bookingId/checkin-status', getCheckInStatus);
-router.put('/:bookingId/inventory-status', updateInventoryStatus);
-router.put('/:bookingId/passengers-status', updatePassengersStatus);
-router.put('/:bookingId/checkin-progress', updateCheckInProgress);
 module.exports = router;

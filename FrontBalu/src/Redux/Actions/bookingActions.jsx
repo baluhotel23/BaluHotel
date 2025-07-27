@@ -217,17 +217,35 @@ export const getBookingById = (bookingId) => async (dispatch) => {
 export const getAllBookings = (queryParams) => async (dispatch) => {
   dispatch({ type: 'GET_ALL_BOOKINGS_REQUEST' });
   try {
+    console.log('📥 [GET-ALL-BOOKINGS] Solicitando bookings con params:', queryParams);
+    
     const { data } = await api.get('/bookings/reservas/all', { params: queryParams });
-    dispatch({ type: 'GET_ALL_BOOKINGS_SUCCESS', payload: data.data });
+    
+    console.log('📊 [GET-ALL-BOOKINGS] Respuesta del backend:', {
+      hasData: !!data,
+      hasBookings: !!data?.data?.bookings,
+      bookingsCount: data?.data?.bookings?.length || 0,
+      hasPagination: !!data?.data?.pagination,
+      hasStatistics: !!data?.data?.statistics
+    });
+    
+    // ⭐ ENVIAR LA ESTRUCTURA COMPLETA AL REDUCER
+    dispatch({ 
+      type: 'GET_ALL_BOOKINGS_SUCCESS', 
+      payload: data // Enviar toda la respuesta
+    });
+    
+    return { success: true, data: data };
+    
   } catch (error) {
-    const errorMessage =
-      error.response?.data?.message || 'Error al obtener todas las reservas';
+    console.error('❌ [GET-ALL-BOOKINGS] Error:', error);
+    const errorMessage = error.response?.data?.message || 'Error al obtener todas las reservas';
     dispatch({ type: 'GET_ALL_BOOKINGS_FAILURE', payload: errorMessage });
+    return { success: false, error: errorMessage };
   }
 };
 
-// CHECK-IN (PUT /bookings/:id/checkin)
-// CHECK-IN ACTION (asegurar que esté bien implementada)
+
 // ⭐ CORREGIR LAS RUTAS PARA QUE COINCIDAN CON EL BACKEND
 export const checkIn = (bookingId, checkInData) => async (dispatch) => {
   dispatch({ type: 'CHECKIN_REQUEST' });
@@ -448,15 +466,396 @@ export const updateBookingStatus = (bookingId, statusData) => async (dispatch) =
 };
 
 // CANCEL BOOKING (PUT /bookings/:id/cancel)
+export const getCancellationPolicies = (bookingId) => async (dispatch) => {
+  dispatch({ type: 'GET_CANCELLATION_POLICIES_REQUEST' });
+  try {
+    console.log(`📋 [GET-CANCELLATION-POLICIES] Obteniendo políticas para reserva: ${bookingId}`);
+    
+    const { data } = await api.get(`/bookings/${bookingId}/cancellation-policies`);
+    
+    console.log('✅ [GET-CANCELLATION-POLICIES] Políticas obtenidas:', data.data);
+    
+    dispatch({ 
+      type: 'GET_CANCELLATION_POLICIES_SUCCESS', 
+      payload: data.data 
+    });
+    
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [GET-CANCELLATION-POLICIES] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al obtener políticas de cancelación';
+    
+    dispatch({ 
+      type: 'GET_CANCELLATION_POLICIES_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    return { success: false, error: errorMessage };
+  }
+};
+
+// CANCEL BOOKING - VERSIÓN MEJORADA (PUT /bookings/:id/cancel)
 export const cancelBooking = (bookingId, cancelData) => async (dispatch) => {
   dispatch({ type: 'CANCEL_BOOKING_REQUEST' });
   try {
-    const { data } = await api.put(`/bookings/${bookingId}/cancel`, cancelData);
-    dispatch({ type: 'CANCEL_BOOKING_SUCCESS', payload: data.data });
+    console.log(`🚨 [CANCEL-BOOKING] Cancelando reserva: ${bookingId}`, cancelData);
+    
+    // ⭐ VALIDAR DATOS DE ENTRADA
+    if (!bookingId) {
+      throw new Error('bookingId es requerido');
+    }
+    
+    if (!cancelData?.reason) {
+      throw new Error('La razón de cancelación es requerida');
+    }
+    
+    // ⭐ ESTRUCTURA DE DATOS PARA EL BACKEND
+    const requestData = {
+      reason: cancelData.reason,
+      cancelledBy: cancelData.cancelledBy || 'staff', // Usuario que cancela
+      refundRequested: cancelData.refundRequested || false,
+      notes: cancelData.notes || '',
+      // ⭐ DATOS ADICIONALES PARA EL BACKEND
+      processPartialRefund: cancelData.processPartialRefund || false,
+      generateCreditVoucher: cancelData.generateCreditVoucher || false
+    };
+    
+    console.log('📤 [CANCEL-BOOKING] Enviando datos:', requestData);
+    
+    const { data } = await api.put(`/bookings/${bookingId}/cancel`, requestData);
+    
+    console.log('✅ [CANCEL-BOOKING] Cancelación exitosa:', data.data);
+    
+    dispatch({ 
+      type: 'CANCEL_BOOKING_SUCCESS', 
+      payload: data.data 
+    });
+    
+    // ⭐ MENSAJE CONTEXTUAL SEGÚN EL RESULTADO
+    let successMessage = 'Reserva cancelada exitosamente';
+    if (data.data.creditVoucher) {
+      successMessage += ` 💳 Voucher de crédito generado: $${data.data.creditVoucher.amount.toLocaleString()}`;
+    }
+    
+    toast.success(successMessage);
+    return { success: true, data: data.data };
+    
   } catch (error) {
-    const errorMessage =
-      error.response?.data?.message || 'Error al cancelar la reserva';
-    dispatch({ type: 'CANCEL_BOOKING_FAILURE', payload: errorMessage });
+    console.error('❌ [CANCEL-BOOKING] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al cancelar la reserva';
+    
+    dispatch({ 
+      type: 'CANCEL_BOOKING_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    toast.error(`❌ ${errorMessage}`);
+    return { success: false, error: errorMessage };
+  }
+};
+
+// CLEAR CANCELLATION STATE
+export const clearCancellationState = () => (dispatch) => {
+  console.log('🧹 [CLEAR-CANCELLATION] Limpiando estado de cancelación');
+  dispatch({ type: 'CLEAR_CANCELLATION_STATE' });
+};
+
+// ⭐ NUEVAS FUNCIONES ADICIONALES PARA CANCELACIÓN
+
+// VALIDATE CANCELLATION (POST /bookings/:id/validate-cancellation)
+export const validateCancellation = (bookingId, validationData = {}) => async (dispatch) => {
+  dispatch({ type: 'VALIDATE_CANCELLATION_REQUEST' }); // ⭐ AGREGAR ESTA LÍNEA
+  
+  try {
+    console.log(`✅ [VALIDATE-CANCELLATION] Validando cancelación para reserva: ${bookingId}`);
+    
+    const { data } = await api.post(`/bookings/${bookingId}/validate-cancellation`, validationData);
+    
+    console.log('✅ [VALIDATE-CANCELLATION] Validación exitosa:', data.data);
+    
+    dispatch({ 
+      type: 'VALIDATE_CANCELLATION_SUCCESS', 
+      payload: data.data 
+    });
+    
+    return { 
+      success: true, 
+      canCancel: data.data.canCancel,
+      policies: data.data.policies,
+      estimatedRefund: data.data.financial?.estimatedRefund || 0,
+      estimatedCredit: data.data.financial?.estimatedCredit || 0,
+      warnings: data.data.warnings || []
+    };
+    
+  } catch (error) {
+    console.error('❌ [VALIDATE-CANCELLATION] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al validar cancelación';
+    
+    dispatch({ 
+      type: 'VALIDATE_CANCELLATION_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    return { 
+      success: false, 
+      error: errorMessage,
+      canCancel: false 
+    };
+  }
+};
+
+// GET CANCELLED BOOKINGS (GET /bookings/cancelled)
+export const getCancelledBookings = (queryParams = {}) => async (dispatch) => {
+  dispatch({ type: 'GET_CANCELLED_BOOKINGS_REQUEST' });
+  try {
+    console.log('📋 [GET-CANCELLED-BOOKINGS] Obteniendo reservas canceladas');
+    
+    const { data } = await api.get('/bookings/cancelled', { params: queryParams });
+    
+    console.log('✅ [GET-CANCELLED-BOOKINGS] Reservas canceladas obtenidas:', data.data?.length || 0);
+    
+    dispatch({ 
+      type: 'GET_CANCELLED_BOOKINGS_SUCCESS', 
+      payload: data.data 
+    });
+    
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [GET-CANCELLED-BOOKINGS] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al obtener reservas canceladas';
+    
+    dispatch({ 
+      type: 'GET_CANCELLED_BOOKINGS_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    return { success: false, error: errorMessage };
+  }
+};
+
+// RESTORE BOOKING (PUT /bookings/:id/restore) - En caso de cancelación accidental
+export const restoreBooking = (bookingId, restoreData = {}) => async (dispatch) => {
+  dispatch({ type: 'RESTORE_BOOKING_REQUEST' });
+  try {
+    console.log(`🔄 [RESTORE-BOOKING] Restaurando reserva: ${bookingId}`);
+    
+    const { data } = await api.put(`/bookings/${bookingId}/restore`, restoreData);
+    
+    console.log('✅ [RESTORE-BOOKING] Reserva restaurada:', data.data);
+    
+    dispatch({ 
+      type: 'RESTORE_BOOKING_SUCCESS', 
+      payload: data.data 
+    });
+    
+    toast.success('Reserva restaurada exitosamente');
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [RESTORE-BOOKING] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al restaurar la reserva';
+    
+    dispatch({ 
+      type: 'RESTORE_BOOKING_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    toast.error(`❌ ${errorMessage}`);
+    return { success: false, error: errorMessage };
+  }
+};
+
+export const getAllVouchers = (queryParams = {}) => async (dispatch) => {
+  dispatch({ type: 'GET_ALL_VOUCHERS_REQUEST' });
+  try {
+    console.log('📋 [GET-ALL-VOUCHERS] Obteniendo vouchers con params:', queryParams);
+    
+    const { data } = await api.get('/vouchers', { params: queryParams });
+    
+    console.log('✅ [GET-ALL-VOUCHERS] Vouchers obtenidos:', {
+      available: data.data?.available?.length || 0,
+      used: data.data?.used?.length || 0,
+      hasStatistics: !!data.data?.statistics
+    });
+    
+    dispatch({ 
+      type: 'GET_ALL_VOUCHERS_SUCCESS', 
+      payload: data.data 
+    });
+    
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [GET-ALL-VOUCHERS] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al obtener vouchers';
+    
+    dispatch({ 
+      type: 'GET_ALL_VOUCHERS_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    return { success: false, error: errorMessage };
+  }
+};
+
+// VALIDATE VOUCHER (POST /vouchers/validate)
+export const validateVoucher = (voucherCode, validationData = {}) => async (dispatch) => {
+  dispatch({ type: 'VALIDATE_VOUCHER_REQUEST' });
+  try {
+    console.log(`💳 [VALIDATE-VOUCHER] Validando código: ${voucherCode}`, validationData);
+    
+    if (!voucherCode?.trim()) {
+      throw new Error('Código de voucher es requerido');
+    }
+    
+    const requestData = {
+      voucherCode: voucherCode.trim().toUpperCase(),
+      bookingId: validationData.bookingId || null,
+      validateAmount: validationData.validateAmount || false,
+      requiredAmount: validationData.requiredAmount || 0
+    };
+    
+    const { data } = await api.post('/vouchers/validate', requestData);
+    
+    console.log('✅ [VALIDATE-VOUCHER] Validación exitosa:', data.data);
+    
+    dispatch({ 
+      type: 'VALIDATE_VOUCHER_SUCCESS', 
+      payload: data.data 
+    });
+    
+    if (data.data.isValid) {
+      toast.success(`💳 Voucher válido: $${data.data.voucher.amount.toLocaleString()}`);
+    } else {
+      toast.warning(`⚠️ ${data.data.reason || 'Voucher no válido'}`);
+    }
+    
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [VALIDATE-VOUCHER] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al validar voucher';
+    
+    dispatch({ 
+      type: 'VALIDATE_VOUCHER_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    toast.error(`❌ ${errorMessage}`);
+    return { success: false, error: errorMessage };
+  }
+};
+
+// USE VOUCHER (PUT /vouchers/:id/use)
+export const useVoucher = (voucherId, useData) => async (dispatch) => {
+  dispatch({ type: 'USE_VOUCHER_REQUEST' });
+  try {
+    console.log(`🎫 [USE-VOUCHER] Usando voucher: ${voucherId}`, useData);
+    
+    if (!voucherId) {
+      throw new Error('ID de voucher es requerido');
+    }
+    
+    const requestData = {
+      bookingId: useData.bookingId,
+      usedBy: useData.usedBy || 'staff',
+      notes: useData.notes || '',
+      appliedAmount: useData.appliedAmount || null
+    };
+    
+    const { data } = await api.put(`/vouchers/${voucherId}/use`, requestData);
+    
+    console.log('✅ [USE-VOUCHER] Voucher usado exitosamente:', data.data);
+    
+    dispatch({ 
+      type: 'USE_VOUCHER_SUCCESS', 
+      payload: data.data 
+    });
+    
+    toast.success(`🎉 Voucher aplicado: $${data.data.voucher.amount.toLocaleString()}`);
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [USE-VOUCHER] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al usar voucher';
+    
+    dispatch({ 
+      type: 'USE_VOUCHER_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    toast.error(`❌ ${errorMessage}`);
+    return { success: false, error: errorMessage };
+  }
+};
+
+// GET VOUCHER BY CODE (GET /vouchers/by-code/:code)
+// GET VOUCHER BY CODE (GET /vouchers/by-code/:code)
+export const getVoucherByCode = (voucherCode) => async (dispatch) => {
+  dispatch({ type: 'GET_VOUCHER_BY_CODE_REQUEST' });  // ⭐ Usar dispatch
+  
+  try {
+    console.log(`🔍 [GET-VOUCHER-BY-CODE] Buscando voucher: ${voucherCode}`);
+    
+    const { data } = await api.get(`/vouchers/by-code/${voucherCode.trim().toUpperCase()}`);
+    
+    console.log('✅ [GET-VOUCHER-BY-CODE] Voucher encontrado:', data.data);
+    
+    dispatch({ 
+      type: 'GET_VOUCHER_BY_CODE_SUCCESS', 
+      payload: data.data 
+    });
+    
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [GET-VOUCHER-BY-CODE] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Voucher no encontrado';
+    
+    dispatch({ 
+      type: 'GET_VOUCHER_BY_CODE_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    return { success: false, error: errorMessage };
+  }
+};
+
+// CLEAR VOUCHER STATE
+export const clearVoucherState = () => (dispatch) => {
+  console.log('🧹 [CLEAR-VOUCHER-STATE] Limpiando estado de vouchers');
+  dispatch({ type: 'CLEAR_VOUCHER_STATE' });
+};
+
+// GET VOUCHER STATISTICS (GET /vouchers/statistics)
+export const getVoucherStatistics = (params = {}) => async (dispatch) => {
+  dispatch({ type: 'GET_VOUCHER_STATISTICS' }); 
+  try {
+    console.log('📊 [GET-VOUCHER-STATISTICS] Obteniendo estadísticas...');
+    
+    const { data } = await api.get('/vouchers/statistics', { params });
+    
+    console.log('✅ [GET-VOUCHER-STATISTICS] Estadísticas obtenidas:', data.data);
+    
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [GET-VOUCHER-STATISTICS] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al obtener estadísticas';
+    
+    return { success: false, error: errorMessage };
   }
 };
 
@@ -914,7 +1313,7 @@ export const checkAllCheckInRequirements = (bookingId, bookingData = null) => as
     const completedSteps = [];
     const pendingSteps = [];
     
-    Object.entries(requirements).forEach(([key, requirement]) => {
+    Object.entries(requirements).forEach(([, requirement]) => {
       if (requirement.status) {
         completedSteps.push(requirement.name);
       } else {
