@@ -125,7 +125,7 @@ const ContactSection = () => {
                       <h5 className="font-bold text-gray-800">Teléfono</h5>
                       <a href="tel:+573001234567" 
                          className="text-green-600 hover:text-green-800 transition-colors font-medium">
-                        +57 311 061 010
+                        +57 311 206 1010
                       </a>
                     </div>
                   </div>
