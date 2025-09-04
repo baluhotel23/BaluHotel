@@ -5,8 +5,8 @@ module.exports = (sequelize) => {
     "Invoice",
     {
       id: {
-        type: DataTypes.INTEGER, // ✅ Cambiar de UUID a INTEGER
-        autoIncrement: true,     // ✅ Auto incremento
+        type: DataTypes.INTEGER, 
+        autoIncrement: true,     
         primaryKey: true,
         allowNull: false
       },

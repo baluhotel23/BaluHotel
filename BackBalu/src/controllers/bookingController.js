@@ -5085,7 +5085,7 @@ const checkOut = async (req, res, next) => {
   }
 };
 
-// ...existing code...
+
 
 // Helper functions
 const calculateTotalAmount = (booking) => {
