@@ -2,6 +2,7 @@ const { User } = require('../../data');
 const { CustomError } = require('../../middleware/error');
 const { catchedAsync } = require('../../utils/catchedAsync');
 const bcrypt = require('bcrypt');
+const { Op } = require('sequelize'); // ⭐ AGREGAR ESTA LÍNEA FALTANTE
 
 const getAllUsers = async (req, res) => {
     const users = await User.findAll({
