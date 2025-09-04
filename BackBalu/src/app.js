@@ -39,7 +39,13 @@ app.use(passport.initialize());
 
 // CORS Configuration - Single configuration
 app.use(cors({
-   origin: 'https://www.hotelbalu.com.co',
+  origin: [
+    'https://baluhotel-production.up.railway.app',
+    'https://hotelbalu.com.co',      // ← Dominio sin www
+    'https://www.hotelbalu.com.co',  // ← Dominio con www
+    'http://localhost:3000',         // ← Para desarrollo local
+    'http://localhost:5173'          // ← Para Vite en desarrollo
+  ],
   methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
