@@ -263,10 +263,10 @@ const ManageItems = () => {
                         }
                         className="w-full px-2 py-1 border rounded"
                       >
-                        <option value="Room">Room</option>
-                        <option value="Bathroom">Bathroom</option>
-                        <option value="Kitchen">Kitchen</option>
-                        <option value="Other">Other</option>
+                        <option value="Room">Habitación</option>
+                        <option value="Bathroom">Baño</option>
+                        <option value="Kitchen">Cocina</option>
+                        <option value="Other">Otro</option>
                       </select>
                     </td>
                     <td className="border border-gray-300 px-4 py-2">

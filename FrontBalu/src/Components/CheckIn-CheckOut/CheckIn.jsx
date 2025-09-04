@@ -811,7 +811,7 @@ const CheckIn = () => {
         </div>
 
         {/* ⭐ AGREGAR USEEFFECT DE DEBUG */}
-        {process.env.NODE_ENV === "development" && (
+        {import.meta.env.DEV && (
           <div className="bg-gray-100 p-4 rounded-lg mb-6 text-xs">
             <h4 className="font-bold mb-2">🔍 Debug Info:</h4>
             <p>Total reservas obtenidas: {allBookings.length}</p>
@@ -1275,17 +1275,24 @@ const CheckIn = () => {
                         : "🔒 Limpiar habitación primero"}
                     </button>
 
-                    <CancellationManager
-    booking={booking}
-    onCancel={(cancelledBooking) => {
-      console.log('Reserva cancelada:', cancelledBooking);
-      // Refrescar la lista de reservas
-      dispatch(getAllBookings({
-        fromDate: dateRange.from,
-        toDate: dateRange.to,
-      }));
-    }}
-  />
+                    {/* ✅ Botón de cancelación - Solo para owners */}
+                    {user?.role === 'owner' ? (
+                      <CancellationManager
+                        booking={booking}
+                        onCancel={(cancelledBooking) => {
+                          console.log('Reserva cancelada:', cancelledBooking);
+                          // Refrescar la lista de reservas
+                          dispatch(getAllBookings({
+                            fromDate: dateRange.from,
+                            toDate: dateRange.to,
+                          }));
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full px-3 py-2 text-sm bg-gray-100 text-gray-500 rounded-lg flex items-center justify-center gap-2">
+                        🔒 Solo el propietario puede cancelar reservas
+                      </div>
+                    )}
 
                     {/* ⭐ BOTÓN PARA COMPLETAR CHECK-IN - USANDO FUNCIÓN MEJORADA */}
                     {requirementsStatus.allRequirementsMet && (

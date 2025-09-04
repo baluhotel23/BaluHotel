@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { getRealPaymentSummary } from '../../utils/paymentUtils';
 import { formatCurrency } from '../../utils/checkOutUtils';
 
@@ -11,6 +12,8 @@ const BookingCardActions = ({
   onGenerateBill,
   onCheckOut,
   onEarlyCheckOut,
+  onCancelBooking,
+  userRole, // ✅ Nueva prop para el rol del usuario
   isLoading,
   loadingBills
 }) => {
@@ -48,9 +51,28 @@ const BookingCardActions = ({
   const handleGenerateBillClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log("📄 [BOOKING-CARD-ACTIONS] handleGenerateBillClick para booking:", booking.bookingId);
+    console.log("🧾 [BOOKING-CARD-ACTIONS] handleGenerateBillClick para booking:", booking.bookingId);
     onGenerateBill?.(booking);
   };
+
+  const handleCancelBookingClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // ✅ Verificar permisos de rol
+    if (userRole !== 'owner') {
+      alert('Solo el propietario puede cancelar reservas');
+      return;
+    }
+
+    if (confirm(`¿Estás seguro de cancelar la reserva #${booking.bookingId}?`)) {
+      console.log("❌ [BOOKING-CARD-ACTIONS] handleCancelBookingClick para booking:", booking.bookingId);
+      onCancelBooking?.(booking);
+    }
+  };
+
+  // ✅ Verificar si el usuario puede cancelar reservas
+  const canCancelBookings = userRole === 'owner';
 
   // ✅ Componente de botón reutilizable
   const ActionButton = ({ 
@@ -246,27 +268,29 @@ const BookingCardActions = ({
               </button>
             )}
 
-            {/* Cancelar reserva */}
-            {!['completed', 'cancelled'].includes(booking.status) && (
+            {/* Cancelar reserva - Solo para owners */}
+            {!['completed', 'cancelled'].includes(booking.status) && canCancelBookings && (
               <button
-                onClick={() => {
-                  if (confirm(`¿Estás seguro de cancelar la reserva #${booking.bookingId}?`)) {
-                    // onCancelBooking?.(booking);
-                    console.log("❌ Cancelar reserva:", booking.bookingId);
-                  }
-                }}
+                onClick={handleCancelBookingClick}
                 className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors flex items-center gap-1"
                 disabled={isLoading}
               >
                 ❌ Cancelar
               </button>
             )}
+
+            {/* Mensaje para usuarios sin permisos */}
+            {!['completed', 'cancelled'].includes(booking.status) && !canCancelBookings && (
+              <div className="px-3 py-1 text-xs bg-gray-100 text-gray-500 rounded flex items-center gap-1">
+                🔒 Solo propietario
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* ✅ Debug info en desarrollo */}
-      {process.env.NODE_ENV === 'development' && (
+      {import.meta.env.DEV && (
         <div className="bg-gray-50 border border-gray-200 rounded p-2 text-xs text-gray-600">
           <details>
             <summary className="cursor-pointer hover:text-gray-800">
@@ -337,6 +361,44 @@ export const BookingCardActionsCompact = ({
       </button>
     </div>
   );
+};
+
+// ✅ PropTypes para validación de props
+BookingCardActions.propTypes = {
+  booking: PropTypes.shape({
+    bookingId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    status: PropTypes.string.isRequired
+  }).isRequired,
+  financials: PropTypes.shape({
+    totalPendiente: PropTypes.number,
+    paymentPercentage: PropTypes.number,
+    totalPagado: PropTypes.number,
+    isFullyPaid: PropTypes.bool
+  }).isRequired,
+  daysUntilCheckOut: PropTypes.number,
+  onPaymentClick: PropTypes.func,
+  onExtraChargesClick: PropTypes.func,
+  onGenerateBill: PropTypes.func,
+  onCheckOut: PropTypes.func,
+  onEarlyCheckOut: PropTypes.func,
+  onCancelBooking: PropTypes.func,
+  userRole: PropTypes.oneOf(['owner', 'admin', 'recept']).isRequired,
+  isLoading: PropTypes.bool,
+  loadingBills: PropTypes.bool
+};
+
+BookingCardActionsCompact.propTypes = {
+  booking: PropTypes.shape({
+    bookingId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    status: PropTypes.string
+  }),
+  financials: PropTypes.shape({
+    isFullyPaid: PropTypes.bool
+  }),
+  onCheckOut: PropTypes.func,
+  onEarlyCheckOut: PropTypes.func,
+  onExtraChargesClick: PropTypes.func,
+  isLoading: PropTypes.bool
 };
 
 export default BookingCardActions;

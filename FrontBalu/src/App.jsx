@@ -116,7 +116,7 @@ const AppContent = () => {
           <Route
             path="/dashboard"
             element={
-              <PrivateRoute allowedRoles={["owner", "admin"]}>
+              <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
                 <Dashboard />
               </PrivateRoute>
             }
@@ -124,7 +124,7 @@ const AppContent = () => {
           <Route
             path="/admin/services"
             element={
-              <PrivateRoute allowedRoles={["owner", "admin"]}>
+              <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
                 <ServiceManagement />
               </PrivateRoute>
             }

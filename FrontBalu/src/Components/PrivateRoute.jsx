@@ -2,35 +2,53 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import PropTypes from 'prop-types';
 
-const PrivateRoute = ({ children, allowedRoles }) => {
+const PrivateRoute = ({ children, allowedRoles, requiredRole }) => {
   const { isAuthenticated, user } = useSelector(state => state.auth);
   const location = useLocation();
-if (user) {
-  console.log('Rol del usuario logueado:', user.role);
-  console.log('isAuthenticated:', isAuthenticated);
-  console.log('allowedRoles:', allowedRoles);
-}  // Debug: mostrar role del usuario si existe
-  if (user) {
-    console.log('Rol del usuario logueado:', user.role);
+
+  // ⭐ Debug mejorado (solo en desarrollo)
+  if (process.env.NODE_ENV === 'development' && user) {
+    console.log('🔐 [PRIVATE-ROUTE] Debug:', {
+      userRole: user.role,
+      isAuthenticated,
+      allowedRoles,
+      requiredRole,
+      path: location.pathname
+    });
   }
 
+  // ✅ Verificar autenticación
   if (!isAuthenticated) {
-    // Redirigir a login si no está autenticado
+    console.log('❌ [PRIVATE-ROUTE] No autenticado, redirigiendo a login');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Verifica que user exista y que su rol esté permitido
-  if (allowedRoles && (!user || !allowedRoles.includes(user.role))) {
-    // Redirigir a unauthorized si no tiene el rol necesario
+  // ✅ Verificar usuario existe
+  if (!user) {
+    console.log('❌ [PRIVATE-ROUTE] Usuario no encontrado en estado');
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // ✅ Verificar rol específico requerido
+  if (requiredRole && user.role !== requiredRole) {
+    console.log(`❌ [PRIVATE-ROUTE] Rol requerido: ${requiredRole}, usuario tiene: ${user.role}`);
     return <Navigate to="/unauthorized" replace />;
   }
 
+  // ✅ Verificar roles permitidos (array)
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    console.log(`❌ [PRIVATE-ROUTE] Rol no permitido. Usuario: ${user.role}, Permitidos: ${allowedRoles.join(', ')}`);
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  console.log(`✅ [PRIVATE-ROUTE] Acceso permitido para rol: ${user.role}`);
   return children;
 };
 
 PrivateRoute.propTypes = {
   children: PropTypes.node.isRequired,
-  allowedRoles: PropTypes.arrayOf(PropTypes.string)
+  allowedRoles: PropTypes.arrayOf(PropTypes.string),
+  requiredRole: PropTypes.string
 };
 
 export default PrivateRoute;

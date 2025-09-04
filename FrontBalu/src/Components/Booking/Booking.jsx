@@ -22,7 +22,7 @@ import { toast } from "react-toastify";
 import WompiPayment from "../WompiPayment";
 import { useNavigate } from "react-router-dom";
 import { canBookToday } from '../../utils/canBookToday';
-const ROOM_TYPES = ["Doble", "Triple", "Múltiple", "Pareja"];
+const ROOM_TYPES = ["Pareja/Sencilla", "Doble", "Triple", "Múltiple"];
 
 
 
