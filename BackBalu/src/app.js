@@ -14,10 +14,6 @@ process.env.TZ = 'America/Bogota';
 
 const app = express();
 
-// ⭐ OPCIONAL: Si tienes moment.js instalado
-// const moment = require('moment-timezone');
-// moment.tz.setDefault('America/Bogota');
-
 // ⭐ LOG PARA CONFIRMAR ZONA HORARIA
 console.log('🇨🇴 [SERVER] Zona horaria configurada:', process.env.TZ);
 console.log('🕐 [SERVER] Hora actual Colombia:', new Date().toLocaleString('es-CO', {
@@ -37,27 +33,41 @@ app.use('/images', express.static(path.join(__dirname, 'images')));
 app.use(morgan('dev'));
 app.use(passport.initialize());
 
-// CORS Configuration - Single configuration
+// ⭐ CORS Configuration - CONFIGURACIÓN ÚNICA Y CORREGIDA
+const allowedOrigins = [
+  'https://baluhotel-production.up.railway.app', // ⭐ AGREGADA COMA FALTANTE
+  'https://hotelbalu.com.co',      
+  'https://www.hotelbalu.com.co',  
+  'http://localhost:3000',         
+  'http://localhost:5173'          
+];
+
 app.use(cors({
-  origin: [
-    'https://baluhotel-production.up.railway.app',
-    'https://hotelbalu.com.co',      // ← Dominio sin www
-    'https://www.hotelbalu.com.co',  // ← Dominio con www
-    'http://localhost:3000',         // ← Para desarrollo local
-    'http://localhost:5173'          // ← Para Vite en desarrollo
-  ],
+  origin: function (origin, callback) {
+    // Permitir requests sin origin (mobile apps, postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('✅ [CORS] Origin permitido:', origin);
+      callback(null, true);
+    } else {
+      console.log('🚫 [CORS] Origin bloqueado:', origin);
+      callback(new Error('No permitido por CORS'), false);
+    }
+  },
   methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*'); 
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-  next();
-});
+// ❌ ELIMINAR ESTE MIDDLEWARE CONFLICTIVO:
+// app.use((req, res, next) => {
+//   res.header('Access-Control-Allow-Origin', '*'); 
+//   res.header('Access-Control-Allow-Credentials', 'true');
+//   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+//   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+//   next();
+// });
 
 // Routes
 app.use('/', routes);
