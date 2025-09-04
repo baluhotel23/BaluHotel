@@ -39,7 +39,7 @@ app.use(passport.initialize());
 
 // CORS Configuration - Single configuration
 app.use(cors({
-   origin: 'https://balu-hotel.vercel.app',
+   origin: 'https://hotelbalu.com.co',
   methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
