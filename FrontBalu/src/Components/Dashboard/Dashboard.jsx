@@ -51,7 +51,9 @@ const Dashboard = () => {
         )}
 
 
-        {(user.role === "owner" || user.role === "admin") && (
+         {(user.role === "owner" ||
+          user.role === "admin" ||
+          user.role === "recept") && (
           <div className="bg-white rounded-lg border border-yellow-500 shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">
               {" "}
@@ -116,7 +118,9 @@ const Dashboard = () => {
         )}
 
 
-{(user.role === "owner" || user.role === "admin") && (
+ {(user.role === "owner" ||
+          user.role === "admin" ||
+          user.role === "recept") && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2"> RESERVAS FINALIZADAS</h2>
             <p className="text-gray-600 mb-4"> RESERVAS FINALIZADAS </p>

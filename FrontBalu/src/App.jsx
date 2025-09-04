@@ -196,7 +196,7 @@ const AppContent = () => {
           <Route
             path="/bookings/availability"
             element={
-              <PrivateRoute allowedRoles={["owner", "admin"]}>
+              <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
                 <RoomAvailability />
               </PrivateRoute>
             }
@@ -253,7 +253,7 @@ const AppContent = () => {
           <Route
             path="/roomCheck"
             element={
-              <PrivateRoute allowedRoles={["owner"]}>
+              <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
                 <RoomDetailCheck />
               </PrivateRoute>
             }

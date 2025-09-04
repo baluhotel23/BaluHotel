@@ -19,7 +19,8 @@ const isAdmin = (req, res, next) => {
 };
 
 const isReceptionist = (req, res, next) => {
-  if (req.user.role !== 'receptionist') {
+  // Aceptar tanto 'recept' como 'receptionist' para compatibilidad
+  if (!['recept', 'receptionist'].includes(req.user.role)) {
     return res.status(403).json({
       error: true,
       message: 'Acceso permitido solo para recepcionistas'
@@ -29,7 +30,7 @@ const isReceptionist = (req, res, next) => {
 };
 
 const isStaff = (req, res, next) => {
-  const staffRoles = ['owner', 'admin', 'receptionist'];
+  const staffRoles = ['owner', 'admin', 'recept', 'receptionist'];
   if (!staffRoles.includes(req.user.role)) {
     return res.status(403).json({
       error: true,
