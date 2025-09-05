@@ -14,6 +14,18 @@ const ManageItems = () => {
   const dispatch = useDispatch();
   const inventory = useSelector((state) => state.inventory?.inventory || []);
   const [editingItem, setEditingItem] = useState(null); // Para manejar el item que se está editando
+  
+  // Función para traducir categorías del inglés al español
+  const getCategoryText = (category) => {
+    const categoryMap = {
+      'Room': 'Habitación',
+      'Bathroom': 'Baño',
+      'Kitchen': 'Cocina',
+      'Other': 'Otro'
+    };
+    return categoryMap[category] || category;
+  };
+
   useEffect(() => {
     dispatch(getAllItems());
   }, [dispatch]);
@@ -337,7 +349,7 @@ const ManageItems = () => {
                       )}
                     </td>
                     <td className="border border-gray-300 px-4 py-2">
-                      {item.category}
+                      {getCategoryText(item.category)}
                     </td>
                     <td className="border border-gray-300 px-4 py-2">
                       {item.isActive ? "Sí" : "No"}
