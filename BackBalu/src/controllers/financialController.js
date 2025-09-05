@@ -1,6 +1,12 @@
 const { Expense, Payment, Booking, Bill } = require("../data");
 const { Op } = require("sequelize");
 const { CustomError } = require("../middleware/error");
+const { 
+  parseDate, 
+  toJSDate, 
+  formatColombiaDate,
+  getColombiaDate 
+} = require('../utils/dateUtils');
 
 // Dashboard financiero (owner y admin)
 const getDashboard = async (req, res, next) => {
@@ -521,6 +527,38 @@ const getAllExpenses = async (req, res, next) => {
 const createExpense = async (req, res, next) => {
   try {
     const expenseData = req.body;
+    
+    // Asignar el usuario autenticado como creador
+    expenseData.createdBy = req.user.n_document;
+    
+    // ⭐ MANEJO CORRECTO DE LA FECHA DEL GASTO
+    if (expenseData.expenseDate) {
+      // Si viene una fecha del frontend, parserarla en zona horaria de Colombia
+      const parsedDate = parseDate(expenseData.expenseDate);
+      if (parsedDate && parsedDate.isValid) {
+        expenseData.expenseDate = toJSDate(parsedDate);
+        console.log('📅 Fecha de gasto parseada:', {
+          original: req.body.expenseDate,
+          parsed: formatColombiaDate(parsedDate),
+          jsDate: expenseData.expenseDate
+        });
+      } else {
+        console.log('⚠️ Fecha inválida recibida, usando fecha actual');
+        expenseData.expenseDate = toJSDate(getColombiaDate());
+      }
+    } else {
+      // Si no viene fecha, usar la fecha actual de Colombia
+      expenseData.expenseDate = toJSDate(getColombiaDate());
+      console.log('📅 Usando fecha actual de Colombia para gasto');
+    }
+    
+    console.log('🔍 Datos del gasto a crear:', {
+      destinatario: expenseData.destinatario,
+      amount: expenseData.amount,
+      expenseDate: expenseData.expenseDate,
+      createdBy: expenseData.createdBy
+    });
+    
     const expense = await Expense.create(expenseData);
     res.status(201).json({
       error: false,
@@ -528,6 +566,7 @@ const createExpense = async (req, res, next) => {
       message: "Gasto creado correctamente",
     });
   } catch (error) {
+    console.error('❌ Error creando gasto:', error);
     next(error);
   }
 };
@@ -536,10 +575,25 @@ const updateExpense = async (req, res, next) => {
   try {
     const { id } = req.params;
     const expenseData = req.body;
+    
+    // ⭐ MANEJO CORRECTO DE LA FECHA SI SE ESTÁ ACTUALIZANDO
+    if (expenseData.expenseDate) {
+      const parsedDate = parseDate(expenseData.expenseDate);
+      if (parsedDate && parsedDate.isValid) {
+        expenseData.expenseDate = toJSDate(parsedDate);
+        console.log('📅 Fecha de gasto actualizada:', {
+          original: req.body.expenseDate,
+          parsed: formatColombiaDate(parsedDate),
+          jsDate: expenseData.expenseDate
+        });
+      }
+    }
+    
     const expense = await Expense.findByPk(id);
     if (!expense) {
       throw new CustomError("Gasto no encontrado", 404);
     }
+    
     const updatedExpense = await expense.update(expenseData);
     res.status(200).json({
       error: false,
@@ -547,6 +601,7 @@ const updateExpense = async (req, res, next) => {
       message: "Gasto actualizado correctamente",
     });
   } catch (error) {
+    console.error('❌ Error actualizando gasto:', error);
     next(error);
   }
 };

@@ -22,7 +22,15 @@ const PurchaseList = () => {
   });
 
   useEffect(() => {
-    dispatch(fetchPurchases());
+    dispatch(fetchPurchases()).then((result) => {
+      console.log('🔍 Datos de purchase list:', result.data);
+      if (result.data) {
+        result.data.forEach((purchase, index) => {
+          console.log(`🔍 Purchase ${index}:`, purchase);
+          console.log(`🔍 Purchase items:`, purchase.items);
+        });
+      }
+    });
   }, [dispatch]);
 
   // Extraer proveedores únicos para el filtro
@@ -57,14 +65,22 @@ const PurchaseList = () => {
   const handleExcelDownload = () => {
   // Define los encabezados
   const data = [
-    ['Factura', 'Fecha', 'Proveedor', 'Total', 'Estado', 'Comprobante']
+    ['Factura', 'Fecha', 'Proveedor', 'Productos', 'Total', 'Estado', 'Comprobante']
   ];
   // Agrega las filas
   filteredPurchases.forEach(purchase => {
+    // Crear resumen de productos
+    const productsSummary = purchase.items && purchase.items.length > 0 
+      ? purchase.items.map(item => 
+          `${item.inventoryItem?.name || 'Producto'} (${item.quantity})`
+        ).join('; ')
+      : 'Sin productos';
+      
     data.push([
       purchase.invoiceNumber || 'Sin número',
       formatDate(purchase.purchaseDate),
       purchase.supplier,
+      productsSummary,
       parseFloat(purchase.totalAmount || 0).toFixed(2),
       purchase.paymentStatus,
       purchase.receiptUrl || ''
@@ -97,6 +113,13 @@ const PurchaseList = () => {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
+      // Para fechas YYYY-MM-DD, agregar tiempo local para evitar offset UTC
+      if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Crear fecha como local, no UTC
+        const [year, month, day] = dateString.split('-');
+        const localDate = new Date(year, month - 1, day);
+        return format(localDate, 'dd/MM/yyyy', { locale: es });
+      }
       return format(new Date(dateString), 'dd/MM/yyyy', { locale: es });
     } catch (e) {
       console.error("Error formateando fecha:", e);
@@ -116,6 +139,39 @@ const PurchaseList = () => {
       default:
         return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">{status}</span>;
     }
+  };
+
+  // ⭐ FUNCIÓN PARA MOSTRAR LOS ITEMS DE LA COMPRA
+  const renderPurchaseItems = (items) => {
+    if (!items || items.length === 0) {
+      return <span className="text-gray-400">Sin items</span>;
+    }
+
+    // Si hay un solo item, mostrarlo directamente
+    if (items.length === 1) {
+      const item = items[0];
+      return (
+        <div className="text-sm">
+          <div className="font-medium">{item.inventoryItem?.name || 'Producto'}</div>
+          <div className="text-gray-500">Cant: {item.quantity}</div>
+        </div>
+      );
+    }
+
+    // Si hay múltiples items, mostrar un resumen
+    return (
+      <div className="text-sm">
+        <div className="font-medium">{items.length} productos</div>
+        <div className="text-gray-500">
+          {items.slice(0, 2).map((item, index) => (
+            <div key={index}>
+              {item.inventoryItem?.name || 'Producto'} (x{item.quantity})
+            </div>
+          ))}
+          {items.length > 2 && <div>... y {items.length - 2} más</div>}
+        </div>
+      </div>
+    );
   };
 
   // ⭐ NUEVA FUNCIÓN PARA MOSTRAR EL COMPROBANTE
@@ -287,6 +343,7 @@ const PurchaseList = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factura</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Productos</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                 {/* ⭐ NUEVA COLUMNA PARA COMPROBANTE */}
@@ -305,6 +362,9 @@ const PurchaseList = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {purchase.supplier}
+                  </td>
+                  <td className="px-6 py-4">
+                    {renderPurchaseItems(purchase.items)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right font-medium">
                     ${parseFloat(purchase.totalAmount || 0).toFixed(2)}

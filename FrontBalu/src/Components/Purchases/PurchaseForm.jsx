@@ -9,6 +9,13 @@ import PurchaseItemForm from './PurchaseItemForm';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../Dashboard/DashboardLayout';
 import { openCloudinaryWidget } from '../../cloudinaryConfig';
+import { 
+  getCurrentDate, 
+  formatDateForBackend, 
+  isValidPastDate, 
+  getMaxDate, 
+  getMinDate 
+} from '../../utils/dateHelpers';
 
 const PurchaseForm = () => {
   const dispatch = useDispatch();
@@ -21,7 +28,7 @@ const PurchaseForm = () => {
   const [purchase, setPurchase] = useState({
     supplier: '',
     invoiceNumber: '',
-    purchaseDate: new Date().toISOString().split('T')[0],
+    purchaseDate: getCurrentDate(), // ⭐ Usar utilidad de fecha
     paymentMethod: 'cash',
     paymentStatus: 'paid',
     notes: '',
@@ -104,12 +111,8 @@ const PurchaseForm = () => {
       return false;
     }
     
-    // Validar que la fecha no sea futura
-    const selectedDate = new Date(purchase.purchaseDate);
-    const today = new Date();
-    today.setHours(23, 59, 59, 999); // Final del día actual
-    
-    if (selectedDate > today) {
+    // ⭐ Validar que la fecha no sea futura usando utilidad
+    if (!isValidPastDate(purchase.purchaseDate)) {
       toast.error('La fecha de compra no puede ser en el futuro');
       return false;
     }
@@ -285,7 +288,7 @@ const PurchaseForm = () => {
     const purchaseData = {
       supplier: purchase.supplier,
       invoiceNumber: purchase.invoiceNumber,
-      purchaseDate: purchase.purchaseDate,
+      purchaseDate: formatDateForBackend(purchase.purchaseDate),
       paymentMethod: purchase.paymentMethod,
       paymentStatus: purchase.paymentStatus,
       notes: purchase.notes,
@@ -357,6 +360,8 @@ const PurchaseForm = () => {
                 type="date"
                 value={purchase.purchaseDate}
                 onChange={(e) => handleInputChange('purchaseDate', e.target.value)}
+                min={getMinDate()}
+                max={getMaxDate()}
                 className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />

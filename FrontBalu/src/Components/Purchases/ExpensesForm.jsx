@@ -6,6 +6,13 @@ import { FaSave, FaTimes, FaMoneyBillWave } from 'react-icons/fa';
 import { createExpense } from '../../Redux/Actions/financialActions';
 import DashboardLayout from '../Dashboard/DashboardLayout';
 import ExpensesList from './ExpensesList';
+import { 
+  getCurrentDate, 
+  formatDateForBackend, 
+  isValidPastDate, 
+  getMaxDate, 
+  getMinDate 
+} from '../../utils/dateHelpers';
 
 
 const ExpenseForm = () => {
@@ -18,7 +25,7 @@ const ExpenseForm = () => {
   const [expense, setExpense] = useState({
     destinatario: '',
     amount: '',
-    expenseDate: new Date().toISOString().split('T')[0], // Fecha actual en formato YYYY-MM-DD
+    expenseDate: getCurrentDate(), // ⭐ Usar utilidad de fecha
     category: 'other',
     paymentMethod: 'cash',
     notes: ''
@@ -70,12 +77,8 @@ const ExpenseForm = () => {
       return false;
     }
     
-    // Validar que la fecha no sea futura
-    const selectedDate = new Date(expense.expenseDate);
-    const today = new Date();
-    today.setHours(23, 59, 59, 999); // Final del día actual
-    
-    if (selectedDate > today) {
+    // ⭐ Validar que la fecha no sea futura usando utilidad
+    if (!isValidPastDate(expense.expenseDate)) {
       toast.error('La fecha del gasto no puede ser en el futuro');
       return false;
     }
@@ -110,7 +113,7 @@ const ExpenseForm = () => {
       const expenseData = {
         destinatario: expense.destinatario,
         amount: parseFloat(expense.amount),
-        expenseDate: expense.expenseDate,
+        expenseDate: formatDateForBackend(expense.expenseDate), // ⭐ Formatear fecha correctamente
         category: expense.category,
         paymentMethod: expense.paymentMethod,
         notes: expense.notes || null,
@@ -193,6 +196,8 @@ const ExpenseForm = () => {
               value={expense.expenseDate}
               onChange={(e) => handleInputChange('expenseDate', e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              min={getMinDate()}
+              max={getMaxDate()}
               required
             />
           </div>

@@ -22,6 +22,14 @@ const PurchaseDetail = () => {
       try {
         setLoading(true);
         const result = await dispatch(fetchPurchaseDetail(id));
+        console.log('🔍 Datos de purchase detail:', result.data);
+        console.log('🔍 Items recibidos:', result.data?.items);
+        if (result.data?.items) {
+          result.data.items.forEach((item, index) => {
+            console.log(`🔍 Item ${index}:`, item);
+            console.log(`🔍 Item inventoryItem:`, item.inventoryItem);
+          });
+        }
         if (result.success) {
           setPurchase(result.data);
         } else {
@@ -101,7 +109,7 @@ const PurchaseDetail = () => {
   <DashboardLayout>
     <div className="bg-white shadow-md rounded-lg p-6 max-w-5xl mx-auto print:shadow-none print:p-0">
       <div className="flex justify-between items-center mb-6 print:hidden">
-        <Link to="/purchases" className="flex items-center text-blue-500 hover:text-blue-700">
+        <Link to="/purchaseList" className="flex items-center text-blue-500 hover:text-blue-700">
           <FaArrowLeft className="mr-2" /> Volver al listado
         </Link>
         <div className="flex space-x-3">
@@ -160,10 +168,10 @@ const PurchaseDetail = () => {
           <div>
             <h2 className="text-lg font-semibold mb-2 border-b pb-2">Resumen</h2>
             <div className="space-y-2">
-              <p><span className="font-medium">Total de Productos:</span> {purchase.PurchaseItems?.length || 0}</p>
+              <p><span className="font-medium">Total de Productos:</span> {purchase.items?.length || 0}</p>
               <p>
                 <span className="font-medium">Total Unidades:</span>{' '}
-                {purchase.PurchaseItems?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
+                {purchase.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
               </p>
               <div className="mt-4 pt-2 border-t">
                 <p className="text-xl font-bold text-gray-800">
@@ -186,15 +194,15 @@ const PurchaseDetail = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {purchase.PurchaseItems && purchase.PurchaseItems.map((item) => (
+              {purchase.items && purchase.items.length > 0 ? purchase.items.map((item) => (
                 <tr key={item.id || `item-${Math.random()}`}>
                   <td className="px-6 py-4">
                     <div>
                       <div className="font-medium text-gray-900">
-                        {item.Item?.name || item.Item?.itemName || 'Producto no disponible'}
+                        {item.inventoryItem?.name || item.BasicInventory?.name || item.Item?.name || item.Item?.itemName || item.itemName || 'Producto no disponible'}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {item.Item?.description}
+                        {item.inventoryItem?.description || item.BasicInventory?.description || item.Item?.description || item.description || ''}
                       </div>
                     </div>
                   </td>
@@ -205,10 +213,16 @@ const PurchaseDetail = () => {
                     ${parseFloat(item.price || 0).toFixed(2)}
                   </td>
                   <td className="px-6 py-4 text-right font-medium">
-                    ${parseFloat(item.total || item.quantity * item.price || 0).toFixed(2)}
+                    ${parseFloat(item.total || (item.quantity * item.price) || 0).toFixed(2)}
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
+                    No hay productos registrados para esta compra
+                  </td>
+                </tr>
+              )}
             </tbody>
             <tfoot>
               <tr className="bg-gray-50">

@@ -3,6 +3,14 @@ const { CustomError } = require('../middleware/error');
 const { catchedAsync } = require('../utils/catchedAsync');
 const { upload } = require('../middleware/multer');
 const { Op, sequelize } = require('sequelize');
+const { 
+  getColombiaTime, 
+  getColombiaDate, 
+  toColombiaTime, 
+  parseDate, 
+  formatColombiaDate,
+  toJSDate 
+} = require('../utils/dateUtils');
 
 const getInventory = async (req, res) => {
     const { category, search, inventoryType } = req.query;
@@ -169,13 +177,36 @@ const createPurchase = async (req, res) => {
   }
 
   console.log('📊 Datos de la compra a crear:');
+  
+  // ⭐ MANEJO CORRECTO DE LA FECHA DE COMPRA
+  let finalPurchaseDate;
+  if (purchaseDate) {
+    // Si viene una fecha del frontend, parserarla en zona horaria de Colombia
+    const parsedDate = parseDate(purchaseDate);
+    if (parsedDate && parsedDate.isValid) {
+      finalPurchaseDate = toJSDate(parsedDate);
+      console.log('📅 Fecha de compra parseada:', {
+        original: purchaseDate,
+        parsed: formatColombiaDate(parsedDate),
+        jsDate: finalPurchaseDate
+      });
+    } else {
+      console.log('⚠️ Fecha inválida recibida, usando fecha actual');
+      finalPurchaseDate = toJSDate(getColombiaDate());
+    }
+  } else {
+    // Si no viene fecha, usar la fecha actual de Colombia
+    finalPurchaseDate = toJSDate(getColombiaDate());
+    console.log('📅 Usando fecha actual de Colombia:', formatColombiaDate(getColombiaDate()));
+  }
+
   const purchaseData = {
     supplier,
     totalAmount: parseFloat(totalAmount),
     paymentMethod,
     paymentStatus: paymentStatus || 'pending',
     invoiceNumber: invoiceNumber || null,
-    purchaseDate: purchaseDate || new Date(),
+    purchaseDate: finalPurchaseDate, // ⭐ USAR LA FECHA CORREGIDA
     receiptUrl: finalReceiptUrl, // ⭐ USAR LA URL FINAL
     createdBy: req.user?.n_document || null,
     notes: notes || null,

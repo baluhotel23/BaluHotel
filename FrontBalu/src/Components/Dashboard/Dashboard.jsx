@@ -10,8 +10,9 @@ const Dashboard = () => {
     <DashboardLayout>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Card 1: Manage Hotels */}
-
-        {(user.role === "owner" || user.role === "recept") && (
+        {(user.role === "owner" ||
+          user.role === "admin" ||
+          user.role === "recept") && (
           <div className="bg-white border border-yellow-500 rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">DISPONIBILIDAD</h2>
             <p className="text-gray-600 mb-4">DISPONIBILIDAD</p>
@@ -22,10 +23,7 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-
-        {(user.role === "owner" ||
-          user.role === "admin" ||
-          user.role === "recept") && (
+        {(user.role === "owner" || user.role === "recept") && (
           <div className="bg-white rounded-lg border border-yellow-500 shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2"> Check In</h2>
             <p className="text-gray-600 mb-4">CkeckList antes del checkIn</p>
@@ -36,9 +34,7 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-        {(user.role === "owner" ||
-          user.role === "admin" ||
-          user.role === "recept") && (
+        {(user.role === "owner" || user.role === "recept") && (
           <div className="bg-white rounded-lg border border-yellow-500 shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2"> Check Out</h2>
             <p className="text-gray-600 mb-4">Gestion Habitación Ocupada </p>
@@ -48,12 +44,8 @@ const Dashboard = () => {
               </button>
             </Link>
           </div>
-        )}
-
-
-         {(user.role === "owner" ||
-          user.role === "admin" ||
-          user.role === "recept") && (
+        )}{" "}
+        {(user.role === "owner" || user.role === "recept") && (
           <div className="bg-white rounded-lg border border-yellow-500 shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">
               {" "}
@@ -67,7 +59,6 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-
         {user.role === "owner" && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">CARGAR INVENTARIO</h2>
@@ -92,8 +83,7 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-
-         {(user.role === "owner" || user.role === "admin") && (
+        {(user.role === "owner" || user.role === "admin") && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">TAXXA</h2>
             <p className="text-gray-600 mb-4">FACTURACION</p>
@@ -104,7 +94,6 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-
         {(user.role === "owner" || user.role === "admin") && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2"> BALANCE FINANCIERO</h2>
@@ -116,13 +105,14 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-
-
- {(user.role === "owner" ||
-          user.role === "admin" ||
+        {(user.role === "owner" ||
+          
           user.role === "recept") && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
-            <h2 className="text-xl font-semibold mb-2"> RESERVAS FINALIZADAS</h2>
+            <h2 className="text-xl font-semibold mb-2">
+              {" "}
+              RESERVAS FINALIZADAS
+            </h2>
             <p className="text-gray-600 mb-4"> RESERVAS FINALIZADAS </p>
             <Link to="/admin/completas">
               <button className=" bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded">
@@ -131,7 +121,6 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-
         {(user.role === "owner" || user.role === "admin") && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">
@@ -149,15 +138,11 @@ const Dashboard = () => {
         )}
         {(user.role === "owner" || user.role === "admin") && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
-            <h2 className="text-xl font-semibold mb-2">
-              GESTIONAR VOUCHERS
-            </h2>
-            <p className="text-gray-600 mb-4">
-              CANCELACIONES
-            </p>
+            <h2 className="text-xl font-semibold mb-2">GESTIONAR VOUCHERS</h2>
+            <p className="text-gray-600 mb-4">CANCELACIONES</p>
             <Link to="/vouchers">
               <button className="bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded">
-               VOUCHERS
+                VOUCHERS
               </button>
             </Link>
           </div>

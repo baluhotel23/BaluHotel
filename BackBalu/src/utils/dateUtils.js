@@ -257,6 +257,11 @@ const parseDate = (dateString, format = 'yyyy-MM-dd') => {
   if (!dateString) return null;
   
   try {
+    // Para fechas YYYY-MM-DD, asegurar que sean interpretadas como inicio del día en Colombia
+    if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return DateTime.fromISO(dateString + 'T00:00:00', { zone: COLOMBIA_TIMEZONE });
+    }
+    
     if (format) {
       return DateTime.fromFormat(dateString, format, { zone: COLOMBIA_TIMEZONE });
     } else {

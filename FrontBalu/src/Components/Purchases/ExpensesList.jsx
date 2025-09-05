@@ -95,6 +95,13 @@ const ExpensesList = () => {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
+      // Para fechas YYYY-MM-DD, agregar tiempo local para evitar offset UTC
+      if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Crear fecha como local, no UTC
+        const [year, month, day] = dateString.split('-');
+        const localDate = new Date(year, month - 1, day);
+        return format(localDate, 'dd/MM/yyyy', { locale: es });
+      }
       return format(new Date(dateString), 'dd/MM/yyyy', { locale: es });
     } catch (e) {
       console.error("Error formateando fecha:", e);
