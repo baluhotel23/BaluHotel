@@ -3,7 +3,7 @@ const { Op } = require('sequelize');
 
 // 🔧 CONFIGURACIÓN DE RESOLUCIÓN
 const RESOLUTION_CONFIG = {
-  from: 24,
+  from: 57, // ⚠️ AJUSTADO: Facturas 1-56 fueron manuales, comenzamos desde 57
   to: 500,
   prefix: "FVK",
   resolutionNumber: "18764093638527",
