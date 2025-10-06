@@ -1,19 +1,15 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import {
   getAllBookings,
-  updateBookingStatus,
   // ⭐ NUEVAS IMPORTACIONES OPTIMIZADAS
   updateInventoryStatus,
   updatePassengersStatus,
   checkAllCheckInRequirements,
   checkIn,
-  getBookingById,
 } from "../../Redux/Actions/bookingActions";
 import CancellationManager from '../Booking/CancellationManager';
-import CancellationAlert from '../Booking/CancellationAlert';
 import { updateRoomStatus } from "../../Redux/Actions/roomActions";
 import DashboardLayout from "../Dashboard/DashboardLayout";
 import { getRegistrationPassesByBooking } from "../../Redux/Actions/registerActions";
@@ -24,7 +20,6 @@ import { toast } from "react-toastify";
 
 const CheckIn = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
 
   // Redux selectors
@@ -44,7 +39,7 @@ const CheckIn = () => {
   });
 
   // Estados de inventario básico
-  const [checkedBookings, setCheckedBookings] = useState({});
+  const [, setCheckedBookings] = useState({});
   const [checkedBasics, setCheckedBasics] = useState({});
   const [basicsByBooking, setBasicsByBooking] = useState({});
 
@@ -111,42 +106,6 @@ const CheckIn = () => {
     }
     return room;
   }, []);
-
-  // Estado visual de pasajeros
-  const getPassengersStatus = useCallback(
-    (bookingId, requiredCount) => {
-      const registered = registrationsByBooking[bookingId]?.length || 0;
-      if (registered >= requiredCount) {
-        return {
-          status: "completed",
-          icon: "✅",
-          message: `Todos registrados (${registered}/${requiredCount})`,
-          registeredCount: registered,
-          requiredCount,
-          isComplete: true,
-        };
-      }
-      if (registered > 0) {
-        return {
-          status: "partial",
-          icon: "⏳",
-          message: `Faltan ocupantes (${registered}/${requiredCount})`,
-          registeredCount: registered,
-          requiredCount,
-          isComplete: false,
-        };
-      }
-      return {
-        status: "pending",
-        icon: "⏳",
-        message: `Pendiente (${registered}/${requiredCount})`,
-        registeredCount: registered,
-        requiredCount,
-        isComplete: false,
-      };
-    },
-    [registrationsByBooking]
-  );
 
   // Estado visual de habitación
   const getRoomStatusColor = (status) => {
@@ -332,11 +291,11 @@ const CheckIn = () => {
           );
           toast.error(`Error al confirmar entrega: ${result.error}`);
         }
-      } catch (error) {
-        console.error("❌ [CONFIRM-BASICS] Error:", error);
+      } catch (_error) {
+        console.error("❌ [CONFIRM-BASICS] Error:", _error);
         toast.error(
           `Error al confirmar la entrega de básicos: ${
-            error.message || "Desconocido"
+            _error.message || "Desconocido"
           }`
         );
       }
@@ -358,7 +317,7 @@ const CheckIn = () => {
             })
           );
         }, 1000);
-      } catch (error) {
+      } catch {
         toast.error("Error al actualizar el estado de la habitación");
       }
     },
@@ -565,11 +524,6 @@ const CheckIn = () => {
   const getBookingRequirementsStatus = useCallback(
     (booking) => {
       const room = getRoomInfo(booking);
-      const requiredGuestCount = parseInt(booking.guestCount) || 1;
-      const passengersStatus = getPassengersStatus(
-        booking.bookingId,
-        requiredGuestCount
-      );
 
       // ⭐ USAR DATOS DEL BACKEND EN LUGAR DE ESTADOS LOCALES
       const requirements = {
@@ -613,7 +567,7 @@ const CheckIn = () => {
         canCompleteCheckIn: allRequirementsMet,
       };
     },
-    [getRoomInfo, getPassengersStatus]
+    [getRoomInfo]
   );
 
   // Cerrar formulario de registro
@@ -635,14 +589,6 @@ const CheckIn = () => {
     const { name, value } = e.target;
     setDateRange((prev) => ({ ...prev, [name]: value }));
   }, []);
-
-  // Recargar pasajeros manualmente
-  const reloadPassengersForBooking = useCallback(
-    (bookingId) => {
-      dispatch(getRegistrationPassesByBooking(bookingId));
-    },
-    [dispatch]
-  );
 
   // Renders condicionales y UI
   if (isLoadingBookings) {
@@ -843,10 +789,6 @@ const CheckIn = () => {
           {bookings.map((booking) => {
             const room = getRoomInfo(booking);
             const requiredGuestCount = parseInt(booking.guestCount) || 1;
-            const passengersStatus = getPassengersStatus(
-              booking.bookingId,
-              requiredGuestCount
-            );
 
             // ⭐ USAR FUNCIÓN MEJORADA PARA OBTENER ESTADO
             const requirementsStatus = getBookingRequirementsStatus(booking);
@@ -1331,24 +1273,12 @@ const CheckIn = () => {
                         </p>
                         <ul className="text-xs text-yellow-700 space-y-1">
                           {Object.entries(requirementsStatus.requirements)
-                            .filter(([key, req]) => !req.completed)
+                            .filter(([, req]) => !req.completed)
                             .map(([key, req]) => (
                               <li key={key}>• {req.name}</li>
                             ))}
                         </ul>
                       </div>
-                    )}
-
-                    {/* Botón de recarga manual */}
-                    {passengersStatus.status === "error" && (
-                      <button
-                        className="w-full px-3 py-2 rounded text-sm text-blue-600 hover:bg-blue-50 border border-blue-200"
-                        onClick={() =>
-                          reloadPassengersForBooking(booking.bookingId)
-                        }
-                      >
-                        🔄 Reintentar carga de pasajeros
-                      </button>
                     )}
                   </div>
 

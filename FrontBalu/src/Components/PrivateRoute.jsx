@@ -6,17 +6,6 @@ const PrivateRoute = ({ children, allowedRoles, requiredRole }) => {
   const { isAuthenticated, user } = useSelector(state => state.auth);
   const location = useLocation();
 
-  // ⭐ Debug mejorado (solo en desarrollo)
-  if (process.env.NODE_ENV === 'development' && user) {
-    console.log('🔐 [PRIVATE-ROUTE] Debug:', {
-      userRole: user.role,
-      isAuthenticated,
-      allowedRoles,
-      requiredRole,
-      path: location.pathname
-    });
-  }
-
   // ✅ Verificar autenticación
   if (!isAuthenticated) {
     console.log('❌ [PRIVATE-ROUTE] No autenticado, redirigiendo a login');

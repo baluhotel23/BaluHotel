@@ -1,18 +1,17 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import PropTypes from 'prop-types';
 import { useDispatch, useSelector } from "react-redux";
 import {
   checkAvailability,
   createBooking,
   updateOnlinePayment,
 } from "../../Redux/Actions/bookingActions";
-import { calculateRoomPrice } from "../../Redux/Actions/roomActions";
 import {
   fetchBuyerByDocument,
   createBuyer,
   fetchCountries,
   fetchDepartments,
-  fetchMunicipalities,
-  validateLocation
+  fetchMunicipalities
 } from "../../Redux/Actions/taxxaActions";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -44,10 +43,16 @@ const Modal = ({ children, isOpen, onClose }) => {
   );
 };
 
+Modal.propTypes = {
+  children: PropTypes.node.isRequired,
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired
+};
+
 // ⭐ COMPONENTE DE REGISTRO DE BUYER OPTIMIZADO
 const BuyerRegistrationForm = ({ isOpen, onClose, onBuyerRegistered, initialSdocno }) => {
   const dispatch = useDispatch();
-  const { countries, departmentsCache, municipalitiesCache, loadingDepartments } = useSelector(state => state.taxxa);
+  const { departmentsCache, municipalitiesCache, loadingDepartments } = useSelector(state => state.taxxa);
 
   const [formData, setFormData] = useState({
     sdocno: initialSdocno || "",
@@ -349,6 +354,14 @@ const BuyerRegistrationForm = ({ isOpen, onClose, onBuyerRegistered, initialSdoc
     </Modal>
   );
 };
+
+BuyerRegistrationForm.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onBuyerRegistered: PropTypes.func.isRequired,
+  initialSdocno: PropTypes.string
+};
+
 function isTodayAfterLimit() {
   return !canBookToday();
 }
@@ -360,7 +373,6 @@ const Booking = () => {
   // ⭐ SELECTORES REDUX OPTIMIZADOS
   const { 
     availability = [], 
-    availabilitySummary = { total: 0, available: 0 }, 
     loading = {}, 
     errors = {} 
   } = useSelector(state => state.booking);
@@ -374,7 +386,11 @@ const Booking = () => {
   // ⭐ ESTADOS PRINCIPALES
   const [step, setStep] = useState(1);
   const [checkIn, setCheckIn] = useState(new Date());
-  const [checkOut, setCheckOut] = useState(new Date());
+  const [checkOut, setCheckOut] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow;
+  });
   const [roomType, setRoomType] = useState("");
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [adults, setAdults] = useState(1);
@@ -393,7 +409,7 @@ const Booking = () => {
   const isLoadingAvailability = loading.availability;
   const availabilityError = errors.availability;
   const totalGuests = adults + children;
-  const nights = differenceInDays(checkOut, checkIn);
+  const nights = Math.max(1, differenceInDays(checkOut, checkIn)); // ✅ Mínimo 1 noche
   const amountToPay = paymentOption === "mitad" ? Math.round(bookingTotal / 2) : bookingTotal;
 
   // ⭐ EFECTOS PRINCIPALES
@@ -417,6 +433,7 @@ const Booking = () => {
     } else {
       setTimeout(() => handleSearch(), 500);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ⭐ EFECTO PARA MANEJO DE BUYER
@@ -450,7 +467,7 @@ const Booking = () => {
   };
 
   const cleanParams = Object.fromEntries(
-    Object.entries(formattedParams).filter(([_, value]) => value !== undefined && value !== "")
+    Object.entries(formattedParams).filter(([, value]) => value !== undefined && value !== "")
   );
 
   // LOG de parámetros enviados
@@ -1073,11 +1090,11 @@ const Booking = () => {
               {paymentOption === "mitad" && (
                 <div className="mt-3 space-y-1">
                   <p className="text-sm text-gray-500">Restante al check-in: ${(bookingTotal - amountToPay).toLocaleString()}</p>
-                  <p className="text-xs text-blue-600">ℹ️ Reserva quedará en estado "confirmado" hasta completar pago</p>
+                  <p className="text-xs text-blue-600">ℹ️ Reserva quedará en estado &quot;confirmado&quot; hasta completar pago</p>
                 </div>
               )}
               {paymentOption === "total" && (
-                <p className="text-xs text-green-600 mt-2">✅ Reserva quedará "pagada" y lista para check-in físico</p>
+                <p className="text-xs text-green-600 mt-2">✅ Reserva quedará &quot;pagada&quot; y lista para check-in físico</p>
               )}
             </div>
 

@@ -35,11 +35,12 @@ app.use(passport.initialize());
 
 // ⭐ CORS Configuration - CONFIGURACIÓN ÚNICA Y CORREGIDA
 const allowedOrigins = [
-  'https://baluhotel-production.up.railway.app', // ⭐ AGREGADA COMA FALTANTE
-  'https://hotelbalu.com.co',      
-  'https://www.hotelbalu.com.co',  
-  'http://localhost:3000',         
-  'http://localhost:5173'          
+  'https://baluhotel-production.up.railway.app', // Backend Railway
+  'https://balu-hotel.vercel.app',               // ⭐ Frontend Vercel
+  'https://hotelbalu.com.co',                    // Dominio principal
+  'https://www.hotelbalu.com.co',                // Dominio con www
+  'http://localhost:3000',                       // Desarrollo local
+  'http://localhost:5173'                        // Desarrollo Vite
 ];
 
 app.use(cors({

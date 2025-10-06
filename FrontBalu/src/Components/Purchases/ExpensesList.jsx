@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import  { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { getAllExpenses, updateExpense, deleteExpense } from '../../Redux/Actions/financialActions';
 import { Link } from 'react-router-dom';
-import { FaEye, FaSearch, FaPlus, FaFilePdf, FaFileInvoice, FaEdit, FaSave, FaTimes, FaTrash } from 'react-icons/fa';
+import { FaEye, FaSearch, FaPlus, FaFilePdf, FaEdit, FaSave, FaTimes, FaTrash } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'react-toastify';
@@ -45,9 +45,6 @@ const ExpensesList = () => {
     { value: 'transfer', label: 'Transferencia' },
     { value: 'credit', label: 'Crédito' }
   ];
-
-  // Extraer categorías únicas para el filtro
-  const categories = [...new Set(expenses.filter(e => e && e.category).map(e => e.category))];
 
   // Filtrar gastos según criterios
   const filteredExpenses = expenses.filter(expense => {

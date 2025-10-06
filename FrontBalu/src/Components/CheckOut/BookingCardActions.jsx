@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { getRealPaymentSummary } from '../../utils/paymentUtils';
 import { formatCurrency } from '../../utils/checkOutUtils';
 
 const BookingCardActions = ({ 
@@ -126,6 +125,17 @@ const BookingCardActions = ({
         )}
       </button>
     );
+  };
+
+  // PropTypes para ActionButton
+  ActionButton.propTypes = {
+    onClick: PropTypes.func.isRequired,
+    disabled: PropTypes.bool,
+    loading: PropTypes.bool,
+    icon: PropTypes.string.isRequired,
+    label: PropTypes.string.isRequired,
+    color: PropTypes.oneOf(['blue', 'green', 'orange', 'purple', 'red', 'yellow']),
+    size: PropTypes.oneOf(['small', 'normal', 'large'])
   };
 
   return (
@@ -323,7 +333,6 @@ export const BookingCardActionsCompact = ({
   booking, 
   financials,
   onCheckOut, 
-  onEarlyCheckOut, 
   onExtraChargesClick,
   isLoading = false
 }) => {
@@ -396,7 +405,6 @@ BookingCardActionsCompact.propTypes = {
     isFullyPaid: PropTypes.bool
   }),
   onCheckOut: PropTypes.func,
-  onEarlyCheckOut: PropTypes.func,
   onExtraChargesClick: PropTypes.func,
   isLoading: PropTypes.bool
 };

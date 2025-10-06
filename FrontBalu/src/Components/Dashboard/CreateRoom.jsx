@@ -172,17 +172,19 @@ const CreateRoom = () => {
         : null,
     };
 
-    console.log('📤 Datos a enviar al backend:', JSON.stringify(dataToSend, null, 2));
+    console.log('📤 [CREATE-ROOM] Datos a enviar al backend:', JSON.stringify(dataToSend, null, 2));
 
     try {
       const response = await dispatch(createRoom(dataToSend));
-      console.log('📥 Respuesta del backend:', response);
+      console.log('📥 [CREATE-ROOM] Respuesta completa del dispatch:', response);
 
-      if (response && response.success === true) {
+      // ⭐ MEJORADO: Verificar múltiples condiciones de éxito
+      if (response && (response.success === true || response.error === false)) {
+        console.log('✅ [CREATE-ROOM] Habitación creada exitosamente');
         toast.success(response.message || "Habitación creada correctamente.");
         
-        console.log('✅ Habitación creada:', response.data);
-        
+        // ⭐ LIMPIAR FORMULARIO
+        console.log('🧹 [CREATE-ROOM] Limpiando formulario...');
         setFormData({
           roomNumber: "",
           priceSingle: "",
@@ -201,18 +203,16 @@ const CreateRoom = () => {
         setRoomAmenities([]);
         setSelectedAmenity("");
         setAmenityQuantity(1);
-        
-      } else if (response && response.error === true) {
-        console.error('❌ Error controlado:', response.message);
-        toast.error(response.message || "Error al crear la habitación.");
+        console.log('✅ [CREATE-ROOM] Formulario limpiado correctamente');
         
       } else {
-        console.error('❌ Respuesta inesperada:', response);
-        toast.error("Respuesta inesperada del servidor.");
+        // ⭐ Error controlado
+        console.error('❌ [CREATE-ROOM] Error controlado:', response?.message);
+        toast.error(response?.message || "Error al crear la habitación.");
       }
       
     } catch (error) {
-      console.error("❌ Error capturado en catch:", error);
+      console.error("❌ [CREATE-ROOM] Error capturado en catch:", error);
       
       if (error.response) {
         const errorMessage = error.response.data?.message || error.response.statusText;
@@ -224,6 +224,7 @@ const CreateRoom = () => {
       }
     } finally {
       setLocalLoading(false);
+      console.log('🏁 [CREATE-ROOM] Proceso de creación finalizado');
     }
   };
 
