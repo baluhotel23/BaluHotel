@@ -306,7 +306,7 @@ const CreateRoom = () => {
           </div>
         </div>
 
-        {/* ⭐ CONFIGURACIÓN DE PRECIOS */}
+       
         <div className="bg-white p-4 rounded-lg shadow-md">
           <h3 className="text-lg font-medium mb-3">Configuración de Precios</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -365,7 +365,7 @@ const CreateRoom = () => {
                 id="priceMultiple"
                 value={formData.priceMultiple}
                 onChange={handleChange}
-                required
+               
                 min="0"
                 step="0.01"
                 className="mt-1 block w-full shadow-sm border-2 rounded-md p-2"
