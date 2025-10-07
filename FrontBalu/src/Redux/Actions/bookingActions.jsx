@@ -186,6 +186,54 @@ export const createBooking = (bookingData) => {
   };
 };
 
+// ⭐ NUEVA: CREATE LOCAL BOOKING (para staff - recepcionistas)
+export const createLocalBooking = (bookingData) => {
+  return async (dispatch) => {
+    console.log('📋 [CREATE-LOCAL-BOOKING] Iniciando creación de reserva local');
+    console.log('📤 [CREATE-LOCAL-BOOKING] Datos a enviar:', bookingData);
+    
+    dispatch({ type: 'CREATE_BOOKING_REQUEST' });
+    try {
+      // ⭐ Usar endpoint protegido para staff
+      const { data } = await api.post('/bookings/create-local', bookingData);
+      
+      console.log('📨 [CREATE-LOCAL-BOOKING] Respuesta recibida:', data);
+      
+      if (data.error) {
+        console.error('❌ [CREATE-LOCAL-BOOKING] Error del servidor:', data.message);
+        dispatch({
+          type: 'CREATE_BOOKING_FAILURE',
+          payload: data.message,
+        });
+        toast.error(data.message);
+        return { success: false, message: data.message };
+      }
+      
+      console.log('✅ [CREATE-LOCAL-BOOKING] Reserva creada exitosamente');
+      dispatch({
+        type: 'CREATE_BOOKING_SUCCESS',
+        payload: data.data,
+      });
+      toast.success('Reserva local creada exitosamente desde recepción');
+      return { success: true, data: data.data };
+    } catch (error) {
+      console.error('❌ [CREATE-LOCAL-BOOKING] Error capturado:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      const errorMessage = error.response?.data?.message || error.message;
+      dispatch({
+        type: 'CREATE_BOOKING_FAILURE',
+        payload: errorMessage,
+      });
+      toast.error(errorMessage);
+      return { success: false, message: errorMessage };
+    }
+  };
+};
+
 // GET BOOKINGS OF THE USER
 export const getUserBookings = () => async (dispatch) => {
   dispatch({ type: 'GET_USER_BOOKINGS_REQUEST' });

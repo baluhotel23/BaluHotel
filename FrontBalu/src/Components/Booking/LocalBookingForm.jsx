@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   checkAvailability,
-  createBooking,
+  createLocalBooking, // ⭐ NUEVO: Para staff (endpoint protegido)
 } from "../../Redux/Actions/bookingActions";
 import { registerLocalPayment } from "../../Redux/Actions/paymentActions";
 import {
@@ -774,7 +774,8 @@ const LocalBookingForm = () => {
         : null,
     };
     try {
-      const result = await dispatch(createBooking(bookingData));
+      // ⭐ USAR createLocalBooking para staff en lugar de createBooking (público)
+      const result = await dispatch(createLocalBooking(bookingData));
 
       if (result?.success && result.data?.booking) {
         const newBookingId = result.data.booking.bookingId;

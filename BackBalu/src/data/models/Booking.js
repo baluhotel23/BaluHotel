@@ -9,12 +9,22 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     checkIn: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATEONLY, // ⭐ CAMBIADO: Solo fecha, sin hora (YYYY-MM-DD)
       allowNull: false,
+      comment: 'Fecha de check-in (solo fecha, sin hora específica)'
     },
     checkOut: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATEONLY, // ⭐ CAMBIADO: Solo fecha, sin hora (YYYY-MM-DD)
       allowNull: false,
+      comment: 'Fecha de check-out (solo fecha, sin hora específica)'
+    },
+    nights: {
+      type: DataTypes.INTEGER, // ⭐ AGREGADO: Número de noches calculadas
+      allowNull: true,
+      validate: {
+        min: 0
+      },
+      comment: 'Número de noches de la reserva (calculado automáticamente)'
     },
     status: {
       type: DataTypes.ENUM,

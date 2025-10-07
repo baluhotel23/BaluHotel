@@ -35,6 +35,18 @@ const {
   isValidDate,
 } = require("../utils/dateUtils");
 
+// ⭐ NUEVAS UTILIDADES ESPECÍFICAS PARA FECHAS DE RESERVAS
+const {
+  parseCheckInOutDate,
+  getTodayInColombia,
+  isValidCheckInDate,
+  validateDateRange,
+  calculateNights,
+  hasDateOverlap,
+  toDBFormat,
+  toISOString: dateToISOString
+} = require("../utils/bookingDateUtils");
+
 const getHotelScheduleEndpoint = async (req, res) => {
   try {
     const schedule = getHotelSchedule();
@@ -395,49 +407,57 @@ const createBooking = async (req, res, next) => {
 
     console.log("✅ [CREATE-BOOKING] Basic validations passed");
 
-    // ⭐ VALIDAR FECHAS CON UTILIDADES DE COLOMBIA - CORREGIDO
-    console.log("📅 [CREATE-BOOKING] Validating dates...");
+    // ⭐ VALIDAR FECHAS CON NUEVAS UTILIDADES ESPECÍFICAS PARA RESERVAS
+    console.log("📅 [CREATE-BOOKING] Validating dates with booking date utils...");
 
-    // 🔧 CONVERTIR A OBJETOS Date NATIVOS PARA EVITAR ERRORES
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-    const today = getColombiaTime(); // Esto retorna un DateTime de Luxon
-
-    console.log("📅 [CREATE-BOOKING] Date objects:", {
-      checkInDate: checkInDate.toISOString(),
-      checkOutDate: checkOutDate.toISOString(),
-      // 🔧 CORREGIR: Usar .toISO() para objetos DateTime de Luxon
-      today: today.toISO(), // ✅ CORRECCIÓN
-      todayFormatted: formatForLogs(today),
-      checkInFormatted: formatColombiaDate(checkInDate),
-      checkOutFormatted: formatColombiaDate(checkOutDate),
-    });
-
-    if (checkInDate >= checkOutDate) {
-      console.log(
-        "❌ [CREATE-BOOKING] Invalid date range - checkIn >= checkOut"
-      );
+    let checkInDT, checkOutDT;
+    
+    try {
+      // 🔧 PARSEAR FECHAS CORRECTAMENTE EN ZONA HORARIA DE COLOMBIA
+      checkInDT = parseCheckInOutDate(checkIn);
+      checkOutDT = parseCheckInOutDate(checkOut);
+      
+      console.log("📅 [CREATE-BOOKING] Parsed dates:", {
+        checkIn: checkInDT.toFormat('yyyy-MM-dd HH:mm:ss ZZZZ'),
+        checkOut: checkOutDT.toFormat('yyyy-MM-dd HH:mm:ss ZZZZ'),
+        checkInISO: checkInDT.toISO(),
+        checkOutISO: checkOutDT.toISO()
+      });
+    } catch (error) {
+      console.log("❌ [CREATE-BOOKING] Error parsing dates:", error.message);
       return res.status(400).json({
         error: true,
-        message: "La fecha de check-out debe ser posterior al check-in",
+        message: `Error en formato de fechas: ${error.message}`,
       });
     }
 
-    // ⭐ USAR UTILIDAD PARA COMPARAR FECHAS - CORREGIDO
-    if (isBeforeToday(checkInDate)) {
+    // 🔧 VALIDAR QUE CHECK-IN NO SEA EN EL PASADO
+    if (!isValidCheckInDate(checkInDT)) {
       console.log("❌ [CREATE-BOOKING] Invalid checkIn date - in the past");
-      console.log("📅 [CREATE-BOOKING] Date comparison Colombia:", {
-        checkInFormatted: formatColombiaDate(checkInDate),
-        todayFormatted: formatForLogs(today), // Ya está formateado correctamente
-        isPast: isBeforeToday(checkInDate),
-      });
       return res.status(400).json({
         error: true,
         message: "La fecha de check-in no puede ser anterior a hoy",
       });
     }
 
-    console.log("✅ [CREATE-BOOKING] Date validations passed");
+    // 🔧 VALIDAR RANGO DE FECHAS Y CALCULAR NOCHES
+    const rangeValidation = validateDateRange(checkInDT, checkOutDT);
+    
+    if (!rangeValidation.valid) {
+      console.log("❌ [CREATE-BOOKING] Invalid date range:", rangeValidation.error);
+      return res.status(400).json({
+        error: true,
+        message: rangeValidation.error,
+      });
+    }
+
+    const nights = rangeValidation.nights;
+    
+    console.log("✅ [CREATE-BOOKING] Date validations passed:", {
+      nights,
+      checkIn: toDBFormat(checkInDT),
+      checkOut: toDBFormat(checkOutDT)
+    });
 
     // ⭐ VERIFICAR QUE EL HUÉSPED EXISTE CON LOGS
     console.log("👤 [CREATE-BOOKING] Looking for guest with ID:", guestId);
@@ -532,28 +552,28 @@ const createBooking = async (req, res, next) => {
       }))
     );
 
+    // 🔧 VERIFICAR CONFLICTOS DE FECHAS CON NUEVA UTILIDAD
     const hasDateConflict = activeBookings.some((booking) => {
-      const bookingStart = new Date(booking.checkIn);
-      const bookingEnd = new Date(booking.checkOut);
+      // Usar la utilidad de solapamiento
+      const overlap = hasDateOverlap(
+        { checkIn: checkInDT, checkOut: checkOutDT },
+        { checkIn: booking.checkIn, checkOut: booking.checkOut }
+      );
 
-      const conflict =
-        (bookingStart <= checkOutDate && bookingEnd >= checkInDate) ||
-        (checkInDate <= bookingEnd && checkOutDate >= bookingStart);
-
-      if (conflict) {
+      if (overlap) {
         console.log(
           "⚠️ [CREATE-BOOKING] Date conflict detected with booking:",
           {
             conflictingBookingId: booking.bookingId,
-            existingCheckIn: formatColombiaDate(bookingStart),
-            existingCheckOut: formatColombiaDate(bookingEnd),
-            requestedCheckIn: formatColombiaDate(checkInDate),
-            requestedCheckOut: formatColombiaDate(checkOutDate),
+            existingCheckIn: booking.checkIn,
+            existingCheckOut: booking.checkOut,
+            requestedCheckIn: toDBFormat(checkInDT),
+            requestedCheckOut: toDBFormat(checkOutDT),
           }
         );
       }
 
-      return conflict;
+      return overlap;
     });
 
     if (hasDateConflict) {
@@ -601,8 +621,7 @@ const createBooking = async (req, res, next) => {
     if (!finalTotalPrice) {
       console.log("💰 [CREATE-BOOKING] No price provided, calculating...");
 
-      // ⭐ USAR UTILIDAD PARA CALCULAR NOCHES
-      const nights = getDaysDifference(checkInDate, checkOutDate);
+      // ⭐ USAR NUEVA UTILIDAD PARA CALCULAR NOCHES
       console.log("💰 [CREATE-BOOKING] Nights calculated:", nights);
 
       // Usar precio según cantidad de huéspedes
@@ -660,17 +679,19 @@ const createBooking = async (req, res, next) => {
     // ⭐ PREPARAR DATOS PARA CREAR LA RESERVA CON LOGS
     console.log("📝 [CREATE-BOOKING] Preparing booking data...");
 
+    // 🔧 PREPARAR DATOS CON FORMATO CORRECTO PARA LA BASE DE DATOS
     const bookingData = {
       guestId,
       roomNumber,
-      checkIn: checkInDate,
-      checkOut: checkOutDate,
+      checkIn: toDBFormat(checkInDT),     // ⭐ Usar formato correcto para DB (YYYY-MM-DD)
+      checkOut: toDBFormat(checkOutDT),   // ⭐ Usar formato correcto para DB (YYYY-MM-DD)
       guestCount,
       totalAmount: finalTotalPrice,
       status,
       notes: notes || "",
       pointOfSale: pointOfSale,
       createdBy: req.user?.n_document || null,
+      nights: nights  // ⭐ Incluir noches calculadas
     };
 
     console.log(
@@ -7722,10 +7743,11 @@ const calculateRoomCharge = (booking) => {
   return nights * booking.Room.price;
 };
 
-const calculateNights = (checkIn, checkOut) => {
-  return Math.ceil(
-    (new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24)
-  );
+// ⭐ NOTA: Esta función local está obsoleta, usar la importada de bookingDateUtils
+// Se mantiene por compatibilidad pero debería migrar a usar la importada
+const calculateNightsLocal = (checkIn, checkOut) => {
+  // Usar la utilidad importada para consistencia
+  return calculateNights(checkIn, checkOut);
 };
 
 const calculateOccupiedRoomDays = (bookings) => {

@@ -32,24 +32,45 @@ export const createStaffUser = (userData) => async (dispatch) => {
     dispatch({ type: 'CREATE_STAFF_USER_REQUEST' });
 
     try {
+        console.log('📤 [CREATE-STAFF-ACTION] Enviando datos:', userData);
+        
         const response = await api.post('/admin/users', userData);
         const data = response.data;
+
+        console.log('📨 [CREATE-STAFF-ACTION] Respuesta recibida:', {
+            status: response.status,
+            data: data
+        });
 
         if (response.status === 201 || response.status === 200) {
             dispatch({ type: 'CREATE_STAFF_USER_SUCCESS', payload: data.data });
             toast.success('Usuario staff creado correctamente.');
             return data.data;
         } else {
+            const errorMessage = data.message || data.error || "Error al crear usuario staff";
+            console.error('❌ [CREATE-STAFF-ACTION] Error del servidor:', errorMessage);
+            
             dispatch({
                 type: 'CREATE_STAFF_USER_FAILURE',
-                payload: data.error || "Error al crear usuario staff",
+                payload: errorMessage,
             });
-            toast.error(data.error || "Error al crear usuario staff.");
+            toast.error(errorMessage);
             return false;
         }
     } catch (error) {
-        dispatch({ type: 'CREATE_STAFF_USER_FAILURE', payload: error.message });
-        toast.error(error.message || "Ha ocurrido un error inesperado.");
+        console.error('❌ [CREATE-STAFF-ACTION] Error capturado:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        });
+        
+        const errorMessage = error.response?.data?.message 
+            || error.response?.data?.error 
+            || error.message 
+            || "Ha ocurrido un error inesperado.";
+        
+        dispatch({ type: 'CREATE_STAFF_USER_FAILURE', payload: errorMessage });
+        toast.error(errorMessage);
         return false;
     }
 };

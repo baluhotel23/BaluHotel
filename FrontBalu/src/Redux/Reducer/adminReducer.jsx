@@ -8,6 +8,24 @@ const initialState = {
 };
 
 const adminReducer = (state = initialState, action) => {
+    // 🔍 Log para debugging (remover en producción)
+    if (action.type.includes('CREATE_STAFF_USER')) {
+        console.log('[REDUCER] Action recibida:', {
+            type: action.type,
+            payloadType: typeof action.payload,
+            payloadLength: Array.isArray(action.payload) ? action.payload.length : 'not array',
+            timestamp: new Date().toISOString()
+        });
+        
+        if (action.type === 'CREATE_STAFF_USER_FAILURE') {
+            console.log('[REDUCER] Detalles del error:', {
+                type: action.type,
+                payloadType: typeof action.payload,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+
     switch (action.type) {
         // ⭐ REQUEST CASES (LOADING)
         case 'GET_ALL_USERS_REQUEST':

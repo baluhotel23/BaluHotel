@@ -68,6 +68,10 @@ router.use(isStaff);
 // ═══════════════════════════════════════════════════════════════
 // 📊 RUTAS DE GESTIÓN PARA STAFF
 // ═══════════════════════════════════════════════════════════════
+
+// ⭐ CREAR RESERVA LOCAL (desde recepción) - requiere autenticación como staff
+router.post('/create-local', createBooking);
+
 router.get('/facturas', getAllBills);
 router.get('/reservas/all', getAllBookings);
 router.get('/:bookingId', getBookingById);
