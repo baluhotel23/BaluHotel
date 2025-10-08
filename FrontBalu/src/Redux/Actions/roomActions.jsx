@@ -271,11 +271,24 @@ export const updateRoom = (roomNumber, roomData) => async (dispatch) => {
 export const deleteRoom = (roomNumber) => async (dispatch) => {
   dispatch({ type: 'DELETE_ROOM_REQUEST' });
   try {
+    console.log('🗑️ [DELETE-ROOM-ACTION] Enviando solicitud para habitación:', roomNumber);
     const { data } = await api.delete(`/rooms/${roomNumber}`);
+    
+    console.log('✅ [DELETE-ROOM-ACTION] Habitación eliminada:', data);
     dispatch({ type: 'DELETE_ROOM_SUCCESS', payload: data });
+    return { success: true, data };
   } catch (error) {
+    console.error('❌ [DELETE-ROOM-ACTION] Error:', {
+      status: error.response?.status,
+      message: error.response?.data?.message,
+      suggestion: error.response?.data?.suggestion
+    });
+
     const errorMessage = error.response?.data?.message || 'Error al eliminar la habitación';
     dispatch({ type: 'DELETE_ROOM_FAILURE', payload: errorMessage });
+    
+    // ⭐ LANZAR ERROR PARA QUE EL COMPONENTE LO CAPTURE
+    throw error;
   }
 };
 

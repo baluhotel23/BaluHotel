@@ -236,12 +236,35 @@ const RoomList = () => {
       window.confirm("¿Estás seguro de que deseas eliminar esta habitación?")
     ) {
       try {
+        console.log('🗑️ [DELETE-ROOM] Intentando eliminar habitación:', roomNumber);
         await dispatch(deleteRoom(roomNumber));
         dispatch(getAllRooms());
         toast.success("Habitación eliminada correctamente.");
       } catch (error) {
-        console.error("Error deleting room:", error);
-        toast.error("Error al eliminar la habitación.");
+        console.error('❌ [DELETE-ROOM] Error:', {
+          message: error.message,
+          response: error.response?.data
+        });
+
+        // ⭐ MOSTRAR MENSAJE ESPECÍFICO DEL BACKEND
+        const errorMessage = error.response?.data?.message 
+          || error.message 
+          || "Error al eliminar la habitación.";
+        
+        const suggestion = error.response?.data?.suggestion;
+
+        toast.error(errorMessage, {
+          autoClose: 5000,
+        });
+
+        // Mostrar sugerencia si existe
+        if (suggestion) {
+          setTimeout(() => {
+            toast.info(suggestion, {
+              autoClose: 7000,
+            });
+          }, 1000);
+        }
       }
     }
   };

@@ -492,21 +492,102 @@ const updateRoom = async (req, res, next) => {
 const deleteRoom = async (req, res, next) => {
   try {
     const { roomNumber } = req.params;
-    const room = await Room.findOne({ where: { roomNumber: parseInt(roomNumber, 10) } });
+    
+    console.log('🗑️ [DELETE-ROOM] Intentando eliminar habitación:', roomNumber);
+    
+    // Buscar la habitación
+    const room = await Room.findOne({ 
+      where: { roomNumber: parseInt(roomNumber, 10) },
+      include: [
+        {
+          model: Booking,
+          as: 'bookings',
+          required: false
+        },
+        {
+          model: RoomBasics,
+          as: 'inventoryConfig',
+          required: false
+        }
+      ]
+    });
+    
     if (!room) {
+      console.log('❌ [DELETE-ROOM] Habitación no encontrada:', roomNumber);
       return res.status(404).json({
         error: true,
         message: 'Habitación no encontrada'
       });
     }
 
-    await room.setServices([]);
+    // ⭐ VERIFICAR SI TIENE RESERVAS ACTIVAS
+    const activeBookings = room.bookings?.filter(booking => 
+      booking.status !== 'cancelada' && booking.status !== 'completada'
+    ) || [];
+
+    if (activeBookings.length > 0) {
+      console.log('⚠️ [DELETE-ROOM] Habitación tiene reservas activas:', activeBookings.length);
+      return res.status(400).json({
+        error: true,
+        message: `No se puede eliminar la habitación ${roomNumber} porque tiene ${activeBookings.length} reserva(s) activa(s). Cancela o completa las reservas primero.`,
+        activeBookingsCount: activeBookings.length,
+        suggestion: 'Considera marcar la habitación como "No activa" en lugar de eliminarla.'
+      });
+    }
+
+    // ⭐ VERIFICAR SI TIENE RESERVAS HISTÓRICAS
+    if (room.bookings && room.bookings.length > 0) {
+      console.log('⚠️ [DELETE-ROOM] Habitación tiene reservas históricas:', room.bookings.length);
+      return res.status(400).json({
+        error: true,
+        message: `No se puede eliminar la habitación ${roomNumber} porque tiene ${room.bookings.length} reserva(s) en el historial. Esto afectaría los registros históricos.`,
+        totalBookings: room.bookings.length,
+        suggestion: 'Considera marcar la habitación como "No activa" (isActive: false) en lugar de eliminarla.'
+      });
+    }
+
+    console.log('🔄 [DELETE-ROOM] Eliminando asociaciones...');
+
+    // ⭐ ELIMINAR ASOCIACIONES
+    // 1. Eliminar servicios asociados
+    if (room.setServices) {
+      await room.setServices([]);
+      console.log('✅ [DELETE-ROOM] Servicios eliminados');
+    }
+
+    // 2. Eliminar inventario básico (RoomBasics)
+    if (room.inventoryConfig && room.inventoryConfig.length > 0) {
+      await RoomBasics.destroy({
+        where: { roomNumber: room.roomNumber }
+      });
+      console.log('✅ [DELETE-ROOM] Inventario básico eliminado');
+    }
+
+    // 3. Eliminar la habitación
     await room.destroy();
+    console.log('✅ [DELETE-ROOM] Habitación eliminada exitosamente');
+
     res.status(200).json({
       error: false,
-      message: 'Habitación eliminada correctamente'
+      message: `Habitación ${roomNumber} eliminada correctamente`
     });
   } catch (error) {
+    console.error('❌ [DELETE-ROOM] Error:', {
+      message: error.message,
+      name: error.name,
+      original: error.original?.message
+    });
+
+    // ⭐ MANEJAR ERRORES DE CONSTRAINT DE BD
+    if (error.name === 'SequelizeForeignKeyConstraintError') {
+      return res.status(400).json({
+        error: true,
+        message: 'No se puede eliminar la habitación porque tiene relaciones activas en la base de datos',
+        suggestion: 'Marca la habitación como "No activa" (isActive: false) en lugar de eliminarla',
+        technicalDetails: error.original?.detail
+      });
+    }
+
     next(error);
   }
 };
