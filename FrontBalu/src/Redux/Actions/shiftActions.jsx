@@ -51,7 +51,11 @@ export const openShift = (shiftData) => async (dispatch) => {
 
     return response.data.shift;
   } catch (error) {
-    const errorMessage = error.response?.data?.error || 'Error al abrir turno';
+    console.error('❌ [SHIFT-ACTION] Error al abrir turno:', error);
+    console.error('📋 [SHIFT-ACTION] Response:', error.response);
+    console.error('📊 [SHIFT-ACTION] Data:', error.response?.data);
+    
+    const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Error al abrir turno';
     dispatch({
       type: OPEN_SHIFT_FAILURE,
       payload: errorMessage,

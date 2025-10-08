@@ -8,6 +8,11 @@ const path = require('path');
 const openShift = async (req, res, next) => {
   try {
     const { openingCash = 0, openingNotes } = req.body;
+    
+    console.log('🔍 [OPEN-SHIFT] req.user completo:', req.user);
+    console.log('🔍 [OPEN-SHIFT] req.user.n_document:', req.user?.n_document);
+    console.log('🔍 [OPEN-SHIFT] req.user.userId:', req.user?.userId);
+    
     const userId = req.user.n_document;
 
     console.log('🔓 [OPEN-SHIFT] Abriendo turno para usuario:', userId);

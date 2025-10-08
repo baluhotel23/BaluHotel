@@ -8,14 +8,26 @@ import { toast } from 'react-toastify';
 
 const RoomStatusDashboard = () => {
   const dispatch = useDispatch();
-  const { rooms, loading } = useSelector(state => state.room);
-  const { currentShift } = useSelector(state => state.shift);
+  const { rooms, loading } = useSelector(state => state.room || { rooms: [], loading: { rooms: false } });
+  const { currentShift } = useSelector(state => state.shift || { currentShift: null });
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
+  
+  // ⭐ EXTRAER loading.rooms como booleano
+  const isLoading = loading?.rooms || false;
 
   useEffect(() => {
-    dispatch(getAllRooms());
-    dispatch(getCurrentShift());
+    // Cargar habitaciones
+    dispatch(getAllRooms()).catch(error => {
+      console.error('Error al cargar habitaciones:', error);
+      toast.error('Error al cargar habitaciones');
+    });
+    
+    // Cargar turno actual (sin bloquear si falla)
+    dispatch(getCurrentShift()).catch(error => {
+      console.log('No hay turno activo o error al cargar:', error);
+      // No mostramos error porque es normal no tener turno activo
+    });
   }, [dispatch]);
 
   // ⭐ FUNCIÓN PARA OBTENER COLOR SEGÚN ESTADO
@@ -33,7 +45,7 @@ const RoomStatusDashboard = () => {
       case 'Mantenimiento':
         return 'bg-orange-500'; // Naranja - Mantenimiento
       case 'Para Limpiar':
-        return 'bg-blue-300'; // Azul claro - Para limpiar
+        return 'bg-blue-300'; // Azul claro - Para Ocupar
       default:
         return 'bg-gray-300';
     }
@@ -54,7 +66,7 @@ const RoomStatusDashboard = () => {
       case 'Mantenimiento':
         return '🔧';
       case 'Para Limpiar':
-        return '🧹';
+        return '🔑'; // Llave - Lista para ocupar
       default:
         return '❓';
     }
@@ -176,7 +188,7 @@ const RoomStatusDashboard = () => {
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 bg-blue-300 rounded mr-2"></div>
-              <span className="text-sm">Para Limpiar</span>
+              <span className="text-sm">Para Ocupar</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 bg-gray-400 rounded mr-2"></div>
@@ -186,7 +198,7 @@ const RoomStatusDashboard = () => {
         </div>
 
         {/* ⭐ GRID DE HABITACIONES AGRUPADAS POR TIPO */}
-        {loading ? (
+        {isLoading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
           </div>
