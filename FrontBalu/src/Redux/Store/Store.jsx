@@ -16,6 +16,7 @@ import purchaseReducer from '../Reducer/purchaseReducer';
 import financialReducer from '../Reducer/financialReducer';
 import laundryReducer from '../Reducer/laundryReducer'; // ⭐ NUEVO
 import adminReducer from '../Reducer/adminReducer'; // ⭐ NUEVO
+import shiftReducer from '../Reducers/shiftReducer'; // ⭐ NUEVO - Gestión de turnos
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -32,7 +33,8 @@ const rootReducer = combineReducers({
   registrationPass: registrationPassReducer, // ⭐ Nombre de variable corregido
   purchase: purchaseReducer,
   financial: financialReducer,
-  admin: adminReducer, 
+  admin: adminReducer,
+  shift: shiftReducer, // ⭐ NUEVO - Gestión de turnos de recepción 
 });
 
 export const store = configureStore({

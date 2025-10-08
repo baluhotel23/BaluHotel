@@ -81,9 +81,9 @@ const {
   LaundryMovement,
   CreditNote,
   Voucher,
- 
   RoomService, // ⭐ CORREGIDO: RoomService en lugar de RoomServices
-  Expense
+  Expense,
+  ReceptionShift // ⭐ NUEVO: Modelo de turnos de recepción
 } = sequelize.models;
 
 // ⭐ FUNCIÓN HELPER PARA VERIFICAR SI EL MODELO EXISTE
@@ -376,6 +376,20 @@ if (hasModel('Booking')) {
       targetKey: bookingPK,
       as: 'booking'
     });
+    
+    // ⭐ NUEVO: Payment - ReceptionShift
+    if (hasModel('ReceptionShift')) {
+      Payment.belongsTo(ReceptionShift, {
+        foreignKey: 'shiftId',
+        targetKey: 'shiftId',
+        as: 'shift'
+      });
+      ReceptionShift.hasMany(Payment, {
+        foreignKey: 'shiftId',
+        sourceKey: 'shiftId',
+        as: 'payments'
+      });
+    }
   }
 
   // Booking - RegistrationPass
@@ -406,6 +420,20 @@ if (hasModel('User')) {
       foreignKey: 'processedBy',
       sourceKey: 'n_document',
       as: 'processedPayments'
+    });
+  }
+
+  // ⭐ NUEVO: User - ReceptionShift
+  if (hasModel('ReceptionShift')) {
+    User.hasMany(ReceptionShift, {
+      foreignKey: 'userId',
+      sourceKey: 'n_document', // ⭐ PK de User es n_document
+      as: 'shifts'
+    });
+    ReceptionShift.belongsTo(User, {
+      foreignKey: 'userId',
+      targetKey: 'n_document', // ⭐ PK de User es n_document
+      as: 'user'
     });
   }
 

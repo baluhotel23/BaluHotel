@@ -66,6 +66,18 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    
+    // ⭐ ASOCIACIÓN CON TURNO DE RECEPCIÓN
+    shiftId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'ReceptionShifts',
+        key: 'shiftId'
+      },
+      comment: 'Turno de recepción en el que se procesó el pago'
+    },
+    
     // ⭐ NUEVOS CAMPOS PARA CONTROL DE GASTOS EXTRAS
     includesExtras: {
       type: DataTypes.BOOLEAN,

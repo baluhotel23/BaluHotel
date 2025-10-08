@@ -1,4 +1,4 @@
-const { DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME, DATABASE_URL } = require('../src/config/envs.js');
+const { DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME, DATABASE_URL } = require('./envs.js');
 
 module.exports = {
   development: {

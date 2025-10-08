@@ -18,6 +18,7 @@ const registrationPassRoutes = require('./registrationPassRoutes');
 // ⭐ NUEVAS RUTAS AGREGADAS
 const laundryRoutes = require('./laundryRoutes');
 const bookingInventoryRoutes = require('./bookingInventoryRoutes');
+const shiftRoutes = require('./shiftRoutes'); // ⭐ NUEVO
 
 // Rutas públicas
 router.use('/auth', authRoutes);
@@ -39,5 +40,8 @@ router.use('/vouchers', voucherRoutes);
 // ⭐ NUEVAS RUTAS DE INVENTARIO Y LAVANDERÍA
 router.use('/laundry', laundryRoutes);
 router.use('/booking-inventory', bookingInventoryRoutes);
+
+// ⭐ RUTA DE GESTIÓN DE TURNOS
+router.use('/shifts', shiftRoutes);
 
 module.exports = router;

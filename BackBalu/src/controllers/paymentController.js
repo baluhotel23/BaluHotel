@@ -265,6 +265,31 @@ const registerLocalPayment = async (req, res, next) => {
     // ⭐ MAPEAR MÉTODO DE PAGO
     const mappedPaymentMethod = mapPaymentMethod(paymentMethod);
 
+    // ⭐ OBTENER TURNO ACTIVO DEL USUARIO (si aplica)
+    let shiftId = null;
+    const physicalPaymentMethods = ['cash', 'credit_card', 'debit_card', 'transfer'];
+    
+    if (physicalPaymentMethods.includes(mappedPaymentMethod) && req.user?.n_document) {
+      try {
+        const { ReceptionShift } = require('../data');
+        const currentShift = await ReceptionShift.findOne({
+          where: {
+            userId: req.user.n_document,
+            status: 'open'
+          }
+        });
+        
+        if (currentShift) {
+          shiftId = currentShift.shiftId;
+          console.log(`💼 [REGISTER-LOCAL-PAYMENT] Asignando pago al turno ${shiftId}`);
+        } else {
+          console.log('⚠️ [REGISTER-LOCAL-PAYMENT] Usuario no tiene turno abierto, pago sin shiftId');
+        }
+      } catch (shiftError) {
+        console.log('⚠️ [REGISTER-LOCAL-PAYMENT] Error al obtener turno:', shiftError.message);
+      }
+    }
+
     // ⭐ CREAR EL REGISTRO DE PAGO
     const paymentData = {
       bookingId,
@@ -277,6 +302,7 @@ const registerLocalPayment = async (req, res, next) => {
       paymentReference: paymentReference,
       notes: notes || `Pago local ${finalPaymentType} - ${mappedPaymentMethod}`,
       processedBy: req.user?.n_document || 'staff',
+      shiftId: shiftId, // ⭐ NUEVO: Asignar shiftId si existe
       // ⭐ CAMPOS SEGÚN NUEVO MODELO
       includesExtras: includesExtras,
       isReservationPayment: isReservationPayment,

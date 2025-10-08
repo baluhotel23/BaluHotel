@@ -47,6 +47,7 @@ import ConfiguracionHotel from "./Components/Dashboard/ConfiguracionHotel";
 import CompletedBookings from "./Components/CheckOut/CompletedBookings";
 import FacturaManual from "./Components/Taxxa/FacturaManual";
 import VoucherManager from "./Components/Booking/VoucherManager";
+import RoomStatusDashboard from "./Components/Dashboard/RoomStatusDashboard"; // ⭐ NUEVO: Dashboard de habitaciones con gestión de turnos
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -174,6 +175,14 @@ const AppContent = () => {
             element={
               <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <RoomList />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/rooms-dashboard"
+            element={
+              <PrivateRoute allowedRoles={["owner", "admin", "recept"]}>
+                <RoomStatusDashboard />
               </PrivateRoute>
             }
           />
