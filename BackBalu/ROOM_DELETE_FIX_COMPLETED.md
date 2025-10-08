@@ -4,7 +4,7 @@
 
 **Ruta**: `/admin/rooms`  
 **Acción**: Eliminar habitación  
-**Error**: 
+**Error Inicial**: 
 ```
 Failed to load resource: the server responded with a status of 500 ()
 ❌ [AXIOS] Response error: {
@@ -14,37 +14,111 @@ Failed to load resource: the server responded with a status of 500 ()
 }
 ```
 
-**Síntoma**: El error no llegaba al backend (no se veía en logs)
+**Error Real del Backend**:
+```
+SequelizeDatabaseError: operator does not exist: character varying = integer
+DELETE /rooms/211 500
+```
+
+**Síntoma**: El error no llegaba al frontend con detalles específicos
 
 ---
 
 ## 🔍 Causa Raíz
 
-El error 500 ocurría debido a una **violación de restricción de clave foránea** en PostgreSQL:
+### Error Principal: Type Mismatch
 
-1. **Relación Room ↔ Booking**: 
-   - `Room.hasMany(Booking)` 
-   - `Booking.belongsTo(Room)`
-   - Foreign key: `roomNumber` en tabla `Bookings`
+El error ocurría por un **conflicto de tipos de datos**:
 
-2. **Problema**: El controller `deleteRoom` intentaba eliminar directamente la habitación sin verificar:
-   - ❌ Si tiene reservas activas
-   - ❌ Si tiene reservas históricas
-   - ❌ Si tiene restricciones de clave foránea
+```javascript
+// ❌ INCORRECTO en roomController.js
+const room = await Room.findOne({ 
+  where: { roomNumber: parseInt(roomNumber, 10) }  // Convierte a INTEGER
+});
+```
 
-3. **Resultado**: PostgreSQL rechazaba la eliminación con error de constraint, que se traducía en un genérico error 500.
+**Problema**:
+- `roomNumber` en la base de datos es `VARCHAR` (STRING)
+- `parseInt(roomNumber, 10)` convierte a `INTEGER`
+- PostgreSQL intenta: `VARCHAR = INTEGER` → ❌ Error de operador
+
+**Definición del Modelo**:
+```javascript
+// Room.js
+roomNumber: {
+  type: DataTypes.STRING,  // ⭐ Es STRING, no INTEGER
+  unique: true,
+  primaryKey: true
+}
+```
+
+### Error Secundario: Constraint Violations
+
+Adicionalmente, el controller original no verificaba:
+- ❌ Si tiene reservas activas
+- ❌ Si tiene reservas históricas
+- ❌ Si tiene restricciones de clave foránea
 
 ---
 
 ## 🛠️ Solución Implementada
 
-### Backend: Controller Mejorado
+### Fix Principal: Corrección de Tipo de Datos
 
 **Archivo**: `BackBalu/src/controllers/roomController.js`
 
-**Mejoras**:
+**ANTES** ❌:
+```javascript
+const deleteRoom = async (req, res, next) => {
+  try {
+    const { roomNumber } = req.params;
+    // ❌ parseInt convierte a INTEGER pero roomNumber es VARCHAR en BD
+    const room = await Room.findOne({ 
+      where: { roomNumber: parseInt(roomNumber, 10) }
+    });
+    
+    await room.setServices([]);
+    await room.destroy();
+    // ...
+  }
+};
+```
 
-1. ✅ **Verificación de reservas activas**:
+**DESPUÉS** ✅:
+```javascript
+const deleteRoom = async (req, res, next) => {
+  try {
+    const { roomNumber } = req.params;
+    
+    console.log('🗑️ [DELETE-ROOM] Intentando eliminar habitación:', roomNumber);
+    console.log('🗑️ [DELETE-ROOM] Tipo de roomNumber:', typeof roomNumber);
+    
+    // ✅ NO usar parseInt - roomNumber es STRING en BD
+    const room = await Room.findOne({ 
+      where: { roomNumber: roomNumber },
+      include: [
+        {
+          model: Booking,
+          as: 'bookings',
+          required: false
+        },
+        {
+          model: RoomBasics,
+          as: 'inventoryConfig',
+          required: false
+        }
+      ]
+    });
+    // ... resto de la lógica
+  }
+};
+```
+
+---
+
+### Mejoras Adicionales en el Controller
+
+**1. ✅ Verificación de reservas activas**:
    ```javascript
    const activeBookings = room.bookings?.filter(booking => 
      booking.status !== 'cancelada' && booking.status !== 'completada'
@@ -180,8 +254,9 @@ try {
 
 ```
 Usuario → Clic "Eliminar" → DELETE /rooms/211 
-  → Controller intenta room.destroy() 
-  → PostgreSQL: ❌ CONSTRAINT ERROR (FK violation)
+  → Controller: parseInt("211", 10) = 211 (INTEGER)
+  → Query: WHERE roomNumber = 211 (INTEGER)
+  → PostgreSQL: ❌ "operator does not exist: character varying = integer"
   → Error genérico 500
   → Frontend: "Error de base de datos"
 ```
@@ -190,8 +265,27 @@ Usuario → Clic "Eliminar" → DELETE /rooms/211
 
 ```
 Usuario → Clic "Eliminar" → DELETE /rooms/211 
-  → Controller verifica reservas activas
-  → ✅ Tiene 3 reservas activas
+  → Controller: roomNumber = "211" (STRING)
+  → Query: WHERE roomNumber = '211' (STRING)
+  → ✅ Encuentra habitación
+  → Verifica reservas activas
+  → ✅ No tiene reservas activas
+  → Elimina servicios asociados
+  → Elimina inventario básico (RoomBasics)
+  → Elimina habitación
+  → Response 200: "Habitación 211 eliminada correctamente"
+  → Frontend: Toast verde con éxito
+```
+
+### Caso con Reservas ✅
+
+```
+Usuario → Clic "Eliminar" → DELETE /rooms/102 
+  → Controller: roomNumber = "102" (STRING)
+  → Query: WHERE roomNumber = '102' (STRING)
+  → ✅ Encuentra habitación
+  → Verifica reservas activas
+  → ⚠️ Tiene 3 reservas activas
   → Response 400: "No se puede eliminar... tiene 3 reserva(s) activa(s)"
   → Frontend: Toast rojo con mensaje claro
   → Frontend: Toast azul con sugerencia: "Marca como No activa"

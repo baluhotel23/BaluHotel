@@ -494,10 +494,11 @@ const deleteRoom = async (req, res, next) => {
     const { roomNumber } = req.params;
     
     console.log('🗑️ [DELETE-ROOM] Intentando eliminar habitación:', roomNumber);
+    console.log('🗑️ [DELETE-ROOM] Tipo de roomNumber:', typeof roomNumber);
     
-    // Buscar la habitación
+    // ⭐ BUSCAR LA HABITACIÓN (roomNumber es STRING en BD)
     const room = await Room.findOne({ 
-      where: { roomNumber: parseInt(roomNumber, 10) },
+      where: { roomNumber: roomNumber }, // No usar parseInt - roomNumber es STRING
       include: [
         {
           model: Booking,
