@@ -22,10 +22,10 @@ router.use(verifyToken);
 router.use(isStaff);
 
 // Rutas para RegistrationPass
-router.post("/", allowRoles(['owner', 'admin', 'receptionist']), createRegistrationPass); // Crear un nuevo registro - ⭐ Recepcionista puede crear
-router.get("/", allowRoles(['owner', 'admin', 'receptionist']), getAllRegistrationPasses); // Obtener todos los registros - ⭐ Recepcionista puede ver
-router.get("/:bookingId", allowRoles(['owner', 'admin', 'receptionist']), getRegistrationPassesByBooking); // Obtener registros por bookingId - ⭐ Recepcionista puede ver
-router.put("/:registrationNumber", allowRoles(['owner', 'admin', 'receptionist']), updateRegistrationPass); // Actualizar un registro - ⭐ Recepcionista puede actualizar
+router.post("/", allowRoles(['owner', 'admin', 'receptionist', 'recept']), createRegistrationPass); // Crear un nuevo registro - ⭐ Recepcionista puede crear
+router.get("/", allowRoles(['owner', 'admin', 'receptionist', 'recept']), getAllRegistrationPasses); // Obtener todos los registros - ⭐ Recepcionista puede ver
+router.get("/:bookingId", allowRoles(['owner', 'admin', 'receptionist', 'recept']), getRegistrationPassesByBooking); // Obtener registros por bookingId - ⭐ Recepcionista puede ver
+router.put("/:registrationNumber", allowRoles(['owner', 'admin', 'receptionist', 'recept']), updateRegistrationPass); // Actualizar un registro - ⭐ Recepcionista puede actualizar
 router.delete("/:registrationNumber", allowRoles(['owner', 'admin']), deleteRegistrationPass); // Eliminar un registro - Solo admin/owner
 
 

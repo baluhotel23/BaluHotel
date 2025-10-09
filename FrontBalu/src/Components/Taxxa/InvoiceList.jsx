@@ -163,25 +163,78 @@ const InvoiceList = () => {
                       ${parseFloat(invoice.totalAmount).toLocaleString()}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">CUFE:</span>
-                    <span className="text-xs font-mono">{invoice.cufe?.slice(0, 20)}...</span>
+                  
+                  {/* CUFE Completo con botón de copiar */}
+                  <div className="border-t pt-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-gray-600 font-medium">CUFE:</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(invoice.cufe || '');
+                          toast.success('CUFE copiado al portapapeles');
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-xs"
+                        title="Copiar CUFE"
+                      >
+                        📋 Copiar
+                      </button>
+                    </div>
+                    <p className="text-xs font-mono bg-gray-50 p-2 rounded break-all">
+                      {invoice.cufe || 'No disponible'}
+                    </p>
                   </div>
-                  <div className="flex justify-between">
+
+                  {/* QR Code */}
+                  {invoice.qrCode && (
+                    <div className="border-t pt-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-gray-600 font-medium">QR Code:</span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(invoice.qrCode);
+                            toast.success('QR Code copiado al portapapeles');
+                          }}
+                          className="text-blue-600 hover:text-blue-800 text-xs"
+                          title="Copiar QR Code"
+                        >
+                          📋 Copiar
+                        </button>
+                      </div>
+                      <p className="text-xs font-mono bg-gray-50 p-2 rounded break-all">
+                        {invoice.qrCode}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between border-t pt-2">
                     <span className="text-gray-600">Enviada:</span>
                     <span>{new Date(invoice.sentToTaxxaAt).toLocaleDateString('es-CO')}</span>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setSelectedInvoice(invoice);
-                    setShowCreditNoteModal(true);
-                  }}
-                  className="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                >
-                  📝 Crear Nota de Crédito
-                </button>
+                {/* Botones de acción */}
+                <div className="space-y-2">
+                  {invoice.pdfUrl && (
+                    <a
+                      href={invoice.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full px-4 py-2 bg-blue-600 text-white text-center rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      📄 Descargar PDF
+                    </a>
+                  )}
+                  
+                  <button
+                    onClick={() => {
+                      setSelectedInvoice(invoice);
+                      setShowCreditNoteModal(true);
+                    }}
+                    className="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                  >
+                    📝 Crear Nota de Crédito
+                  </button>
+                </div>
               </div>
             ))}
           </div>

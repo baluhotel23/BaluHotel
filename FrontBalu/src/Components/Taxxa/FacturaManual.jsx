@@ -26,8 +26,7 @@ const FacturaManual = () => {
   const [items, setItems] = useState([{ 
     description: '', 
     quantity: 1, 
-    unitPrice: 0, 
-    taxRate: 19 
+    unitPrice: 0
   }]);
   const [notes, setNotes] = useState('');
 
@@ -133,7 +132,7 @@ const FacturaManual = () => {
         description: item.description.trim(),
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
-        taxRate: Number(item.taxRate || 19)
+        taxRate: 0 // ⭐ HOTELES EXENTOS DE IVA - Siempre 0%
       })), 
       notes: notes.trim() || 'Factura manual'
     };
@@ -144,7 +143,7 @@ const FacturaManual = () => {
     
     if (result && result.success) {
       // Limpiar formulario tras éxito
-      setItems([{ description: '', quantity: 1, unitPrice: 0, taxRate: 19 }]);
+      setItems([{ description: '', quantity: 1, unitPrice: 0 }]);
       setNotes('');
       setDocumentInput('');
       setActiveTab('buyer');

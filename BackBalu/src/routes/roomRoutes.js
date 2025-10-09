@@ -48,24 +48,24 @@ router.put('/:roomNumber', allowRoles(['owner', 'admin']), updateRoom);
 router.delete('/:roomNumber', allowRoles(['owner', 'admin']), deleteRoom);
 
 // MANTENIMIENTO Y ESTADO
-router.put('/status/:roomNumber', allowRoles(['owner', 'admin', 'receptionist']), updateRoomStatus);
+router.put('/status/:roomNumber', allowRoles(['owner', 'admin', 'receptionist', 'recept']), updateRoomStatus);
 
 // AMENITIES Y SERVICIOS
-router.get('/:roomNumber/amenities', allowRoles(['owner', 'admin', 'receptionist']), getRoomAmenities);
+router.get('/:roomNumber/amenities', allowRoles(['owner', 'admin', 'receptionist', 'recept']), getRoomAmenities);
 router.put('/:roomNumber/amenities', allowRoles(['owner', 'admin']), updateRoomAmenities);
-router.get('/:roomNumber/services', allowRoles(['owner', 'admin', 'receptionist']), getRoomServices);
+router.get('/:roomNumber/services', allowRoles(['owner', 'admin', 'receptionist', 'recept']), getRoomServices);
 router.put('/:roomNumber/services', allowRoles(['owner', 'admin']), updateRoomServices);
 
 // BÁSICOS DE HABITACIÓN E INVENTARIO
-router.get('/basicos/:roomNumber', allowRoles(['owner', 'admin', 'receptionist']), getRoomBasics);
+router.get('/basicos/:roomNumber', allowRoles(['owner', 'admin', 'receptionist', 'recept']), getRoomBasics);
 
 // ⭐ NUEVAS RUTAS DE INVENTARIO
-router.get('/:roomNumber/inventory/check', allowRoles(['owner', 'admin', 'receptionist']), checkInventoryAvailability);
+router.get('/:roomNumber/inventory/check', allowRoles(['owner', 'admin', 'receptionist', 'recept']), checkInventoryAvailability);
 router.get('/:roomNumber/inventory/history', allowRoles(['owner', 'admin']), getRoomInventoryHistory);
 
 // REPORTES Y ANÁLISIS
 router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyReport);
 router.get('/reports/revenue', allowRoles(['owner', 'admin']), getRevenueByRoomType);
-router.get('/reports/preparation-status/:roomNumber', allowRoles(['owner', 'admin', 'receptionist']), getRoomPreparationStatus);
+router.get('/reports/preparation-status/:roomNumber', allowRoles(['owner', 'admin', 'receptionist', 'recept']), getRoomPreparationStatus);
 
 module.exports = router;
