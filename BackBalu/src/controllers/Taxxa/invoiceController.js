@@ -2,7 +2,7 @@ const { Invoice, Bill, Booking, Buyer, SellerData } = require('../../data');
 const { Op } = require('sequelize');
 
 // 📋 VERSIÓN SIMPLIFICADA PARA DEBUGGING
-const it getAllInvoicesSimple = async (req, res) => {
+const getAllInvoicesSimple = async (req, res) => {
   try {
     console.log('📋 [INVOICE-CONTROLLER] Obteniendo facturas (versión simple)');
     
@@ -14,7 +14,7 @@ const it getAllInvoicesSimple = async (req, res) => {
 
     const offset = (page - 1) * limit;
     
-    // 🔧 CONSULTA CON BILL PARA OBTENER CUFE Y QRCODE
+   
     const { count, rows: invoices } = await Invoice.findAndCountAll({
       where: {
         status: status
