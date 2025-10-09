@@ -183,11 +183,11 @@ const FacturaManual = () => {
     const subtotal = items.reduce((sum, item) => {
       return sum + (item.quantity * item.unitPrice);
     }, 0);
-    const tax = subtotal * 0.19; // 19% IVA
+    // ⭐ Las reservas de hotel NO llevan IVA (exentas de impuestos)
     return { 
       subtotal: Math.round(subtotal * 100) / 100, 
-      tax: Math.round(tax * 100) / 100, 
-      total: Math.round((subtotal + tax) * 100) / 100 
+      tax: 0, 
+      total: Math.round(subtotal * 100) / 100 
     };
   }, [items]);
 
@@ -425,8 +425,8 @@ const FacturaManual = () => {
                     <td className="border border-gray-300 p-3 text-right">${totals.subtotal.toLocaleString()}</td>
                   </tr>
                   <tr>
-                    <td colSpan="3" className="border border-gray-300 p-3 text-right">IVA (19%):</td>
-                    <td className="border border-gray-300 p-3 text-right">${totals.tax.toLocaleString()}</td>
+                    <td colSpan="3" className="border border-gray-300 p-3 text-right">IVA:</td>
+                    <td className="border border-gray-300 p-3 text-right">Exento (0%)</td>
                   </tr>
                   <tr className="text-lg bg-green-100">
                     <td colSpan="3" className="border border-gray-300 p-3 text-right font-bold">Total:</td>

@@ -39,6 +39,7 @@ const CreateRoom = () => {
     image_url: [],
     isPromo: false,
     promotionPrice: "",
+    showPromotionPublic: false, // ⭐ NUEVO: Control de visibilidad en web pública
   });
 
   // ⭐ EFECTOS
@@ -198,6 +199,7 @@ const CreateRoom = () => {
           image_url: [],
           isPromo: false,
           promotionPrice: "",
+          showPromotionPublic: false, // ⭐ Resetear visibilidad de promoción
         });
         setImages([]);
         setRoomAmenities([]);
@@ -437,6 +439,27 @@ const CreateRoom = () => {
                 <p className="text-xs text-gray-500 mt-1">
                   El precio promocional anula los precios regulares cuando está
                   activo
+                </p>
+
+                {/* ⭐ NUEVO: Checkbox para mostrar en web pública */}
+                <div className="flex items-center mt-3 p-2 bg-blue-50 rounded border border-blue-200">
+                  <input
+                    type="checkbox"
+                    name="showPromotionPublic"
+                    id="showPromotionPublic"
+                    checked={formData.showPromotionPublic}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor="showPromotionPublic"
+                    className="ml-2 block text-sm font-medium text-blue-800"
+                  >
+                    📢 Mostrar esta promoción en la página web pública
+                  </label>
+                </div>
+                <p className="text-xs text-gray-600 mt-1">
+                  Si está desmarcado, la promoción solo se aplicará internamente pero no se mostrará a clientes en la web
                 </p>
               </div>
             )}

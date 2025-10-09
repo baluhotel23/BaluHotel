@@ -17,6 +17,7 @@ const BookingPassengerList = () => {
   const [bookingIdInput, setBookingIdInput] = useState("");
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true); // ⭐ NUEVO: Para diferenciar carga inicial
 
   // Edición de pasajero
   const [editingId, setEditingId] = useState(null);
@@ -28,18 +29,35 @@ const BookingPassengerList = () => {
 
   const bookingDetails = useSelector((state) => state.booking.bookingDetails);
 
+  // ⭐ MEJORADO: Carga inicial cuando viene con bookingId en URL
   useEffect(() => {
     if (bookingId) {
+      console.log("📋 [PASSENGER-LIST] Cargando reserva desde URL:", bookingId);
       setBookingIdInput(bookingId);
       setLoading(true);
+      setInitialLoad(true);
+      
       dispatch(getBookingById(bookingId))
-        .finally(() => setLoading(false));
+        .then(() => {
+          console.log("✅ [PASSENGER-LIST] Reserva cargada exitosamente");
+        })
+        .catch((error) => {
+          console.error("❌ [PASSENGER-LIST] Error cargando reserva:", error);
+          toast.error(`Error al cargar la reserva: ${error.message}`);
+        })
+        .finally(() => {
+          setLoading(false);
+          setInitialLoad(false);
+        });
+    } else {
+      setInitialLoad(false);
     }
   }, [bookingId, dispatch]); 
 
-
+  // ⭐ MEJORADO: Actualizar selectedBooking cuando bookingDetails cambia
   useEffect(() => {
     if (bookingDetails) {
+      console.log("📊 [PASSENGER-LIST] Actualizando booking seleccionado:", bookingDetails.bookingId);
       setSelectedBooking(bookingDetails);
     }
   }, [bookingDetails]);
@@ -256,8 +274,26 @@ Todo daño ocasionado en la habitación será cargado a su cuenta.`;
           Listado de Pasajeros por Reserva
         </h2>
 
-        {/* Búsqueda de reserva */}
-        {!bookingId && (
+        {/* ⭐ SPINNER DE CARGA INICIAL */}
+        {initialLoad && (
+          <div className="flex flex-col items-center justify-center min-h-[400px] bg-white rounded-lg shadow-lg p-8">
+            <div className="relative">
+              <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <span className="text-2xl">📋</span>
+              </div>
+            </div>
+            <p className="mt-6 text-lg font-semibold text-gray-700">
+              Cargando información de la reserva...
+            </p>
+            <p className="mt-2 text-sm text-gray-500">
+              Reserva #{bookingId}
+            </p>
+          </div>
+        )}
+
+        {/* Búsqueda de reserva - Solo si no viene con bookingId en URL */}
+        {!bookingId && !initialLoad && (
         <div className="mb-6 bg-white p-4 rounded-lg shadow">
           <div className="flex gap-4 items-end">
             <div className="flex-1">
@@ -275,14 +311,22 @@ Todo daño ocasionado en la habitación será cargado a su cuenta.`;
             <button
               onClick={handleSearchBooking}
               disabled={loading}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
             >
-              {loading ? "Buscando..." : "Buscar"}
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Buscando...
+                </span>
+              ) : (
+                "Buscar"
+              )}
             </button>
           </div>
         </div>
 )}
-        {selectedBooking && (
+        {/* ⭐ CONTENIDO PRINCIPAL - Solo mostrar si no está en carga inicial */}
+        {!initialLoad && selectedBooking && (
           <div className="mb-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">
@@ -502,6 +546,41 @@ Todo daño ocasionado en la habitación será cargado a su cuenta.`;
                 </p>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ⭐ MENSAJE DE ERROR - No se encontró la reserva */}
+        {!initialLoad && !loading && !selectedBooking && bookingId && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-8 text-center">
+            <div className="text-6xl mb-4">⚠️</div>
+            <h3 className="text-2xl font-bold text-red-800 mb-2">
+              Reserva No Encontrada
+            </h3>
+            <p className="text-red-600 mb-4">
+              No se pudo encontrar la reserva con ID: <strong>#{bookingId}</strong>
+            </p>
+            <p className="text-sm text-gray-600 mb-6">
+              Por favor, verifica que el ID de la reserva sea correcto y que exista en el sistema.
+            </p>
+            <button
+              onClick={() => window.history.back()}
+              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
+            >
+              ← Volver
+            </button>
+          </div>
+        )}
+
+        {/* ⭐ MENSAJE CUANDO NO HAY BÚSQUEDA ACTIVA */}
+        {!initialLoad && !loading && !selectedBooking && !bookingId && !bookingIdInput && (
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-8 text-center">
+            <div className="text-6xl mb-4">📋</div>
+            <h3 className="text-xl font-semibold text-blue-800 mb-2">
+              Ingresa un ID de Reserva
+            </h3>
+            <p className="text-blue-600">
+              Busca una reserva para ver el listado de pasajeros y generar el PDF.
+            </p>
           </div>
         )}
       </div>

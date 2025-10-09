@@ -39,6 +39,7 @@ const RoomList = () => {
     available: false,
     isPromo: false,
     promotionPrice: null,
+    showPromotionPublic: false, // ⭐ NUEVO
     status: null,
     isActive: true,
   });
@@ -68,6 +69,7 @@ const RoomList = () => {
         available: editingRoom.available,
         isPromo: editingRoom.isPromo,
         promotionPrice: editingRoom.promotionPrice,
+        showPromotionPublic: editingRoom.showPromotionPublic || false, // ⭐ NUEVO
         status: editingRoom.status,
         isActive: editingRoom.isActive,
       });
@@ -215,6 +217,7 @@ const RoomList = () => {
         promotionPrice: formData.promotionPrice
           ? parseFloat(formData.promotionPrice)
           : null,
+        showPromotionPublic: formData.showPromotionPublic || false, // ⭐ NUEVO
         basicInventories: formData.basicInventories.map((inventory) => ({
           id: inventory.id,
           quantity: inventory.RoomBasics.quantity,
@@ -680,28 +683,63 @@ const RoomList = () => {
                               <span className="ml-2 text-sm">Es promocional</span>
                             </label>
                             {formData.isPromo && (
-                              <div className="relative">
-                                <label className="block text-xs text-gray-500 mb-1">Precio Promocional</label>
-                                <span className="absolute left-3 top-6 text-gray-500">$</span>
-                                <input
-                                  type="number"
-                                  name="promotionPrice"
-                                  value={formData.promotionPrice || ""}
-                                  onChange={handleChange}
-                                  className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
-                                  placeholder="90000"
-                                />
-                              </div>
+                              <>
+                                <div className="relative">
+                                  <label className="block text-xs text-gray-500 mb-1">Precio Promocional</label>
+                                  <span className="absolute left-3 top-6 text-gray-500">$</span>
+                                  <input
+                                    type="number"
+                                    name="promotionPrice"
+                                    value={formData.promotionPrice || ""}
+                                    onChange={handleChange}
+                                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
+                                    placeholder="90000"
+                                  />
+                                </div>
+                                
+                                {/* ⭐ NUEVO: Checkbox para publicar en web */}
+                                <div className="flex items-center mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                  <input
+                                    type="checkbox"
+                                    name="showPromotionPublic"
+                                    id={`showPromotionPublic-${room.roomNumber}`}
+                                    checked={formData.showPromotionPublic}
+                                    onChange={handleChange}
+                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                  />
+                                  <label
+                                    htmlFor={`showPromotionPublic-${room.roomNumber}`}
+                                    className="ml-2 block text-sm font-medium text-blue-800 cursor-pointer"
+                                  >
+                                    📢 Publicar promoción en la web pública
+                                  </label>
+                                </div>
+                                <p className="text-xs text-gray-600 mt-1 ml-1">
+                                  Si está desmarcado, la promoción solo estará disponible internamente
+                                </p>
+                              </>
                             )}
                           </div>
                         ) : (
                           room.isPromo && (
-                            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg space-y-2">
                               <div className="flex items-center justify-between">
                                 <span className="text-yellow-800 font-medium">🏷️ Precio Promocional</span>
                                 <span className="text-yellow-900 font-bold text-lg">
                                   ${parseFloat(room.promotionPrice || 0).toLocaleString()}
                                 </span>
+                              </div>
+                              {/* ⭐ Mostrar estado de publicación */}
+                              <div className="flex items-center text-xs">
+                                {room.showPromotionPublic ? (
+                                  <span className="flex items-center text-green-700 bg-green-100 px-2 py-1 rounded">
+                                    ✅ Visible en web pública
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                                    🔒 Solo uso interno
+                                  </span>
+                                )}
                               </div>
                             </div>
                           )

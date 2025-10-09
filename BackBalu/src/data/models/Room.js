@@ -49,6 +49,11 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(10, 2),
       comment: "Precio promocional que anula los precios regulares"
     },
+    showPromotionPublic: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: "Mostrar promoción en la web pública (solo si owner lo activa explícitamente)"
+    },
 
     image_url: {
       type: DataTypes.ARRAY(DataTypes.STRING),

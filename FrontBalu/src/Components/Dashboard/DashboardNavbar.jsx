@@ -20,14 +20,14 @@ const DashboardNavbar = () => {
   return (
     <nav className="bg-gray-800 p-4 fixed top-0 left-0 w-full z-10">
       <div className="container mx-auto flex justify-between items-center">
-        <Link to="/dashboard" className="text-white text-lg font-semibold">Dashboard</Link>
+        <Link to="/dashboard" className="text-white text-lg font-semibold">Panel</Link>
         <div className="flex space-x-4">
           {location.pathname !== '/dashboard' && (
             <Link to="/dashboard" className="text-gray-300 hover:text-white">Inicio</Link>
           )}
           <button onClick={handleBack} className="text-gray-300 hover:text-white">Volver</button>
           <Link to="/" className="text-gray-300 hover:text-white">Web</Link>
-          <button onClick={handleLogout} className="text-gray-300 hover:text-white">Logout</button>
+          <button onClick={handleLogout} className="text-gray-300 hover:text-white">Cierre de sesión</button>
         </div>
       </div>
     </nav>

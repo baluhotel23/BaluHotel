@@ -8,6 +8,7 @@ import {
   removeStock,
 } from "../../Redux/Actions/inventoryActions";
 import { toast } from "react-toastify";
+import DashboardLayout from "./DashboardLayout"; // ⭐ NUEVO
 import { FaEdit, FaTrash, FaBoxOpen } from "react-icons/fa";
 
 const ManageItems = () => {
@@ -120,20 +121,21 @@ const ManageItems = () => {
   const isInventoryEmpty = filteredInventory.length === 0;
 
   return (
-    <div className="max-w-full overflow-x-auto p-4 bg-white shadow-md rounded-lg">
-      {isInventoryEmpty ? (
-        // Mostrar mensaje cuando no hay items en el inventario
-        <div className="text-center py-12">
-          <FaBoxOpen className="mx-auto text-4xl text-gray-400 mb-4" />
-          <h3 className="text-xl font-medium text-gray-600 mb-2">
-            No hay elementos en el inventario
-          </h3>
-          <p className="text-gray-500 mb-4">
-            Para comenzar, crea un nuevo elemento usando el formulario de la
-            izquierda.
-          </p>
-        </div>
-      ) : (
+    <DashboardLayout>
+      <div className="max-w-full overflow-x-auto p-4 bg-white shadow-md rounded-lg">
+        {isInventoryEmpty ? (
+          // Mostrar mensaje cuando no hay items en el inventario
+          <div className="text-center py-12">
+            <FaBoxOpen className="mx-auto text-4xl text-gray-400 mb-4" />
+            <h3 className="text-xl font-medium text-gray-600 mb-2">
+              No hay elementos en el inventario
+            </h3>
+            <p className="text-gray-500 mb-4">
+              Para comenzar, crea un nuevo elemento usando el formulario de la
+              izquierda.
+            </p>
+          </div>
+        ) : (
         // Mostrar tabla cuando hay items
         <table className="w-full border-collapse border border-gray-300 text-sm">
           <thead>
@@ -389,7 +391,8 @@ const ManageItems = () => {
           </tbody>
         </table>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 

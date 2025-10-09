@@ -515,7 +515,12 @@ const Booking = () => {
         ? (totalGuests - 3) * parseFloat(selectedRoom.pricePerExtraGuest || 0) 
         : 0;
 
-      const finalPrice = selectedRoom.isPromo && selectedRoom.promotionPrice
+      // ⭐ Solo aplicar precio promocional si está habilitado para web pública
+      const canUsePromotion = selectedRoom.isPromo && 
+                               selectedRoom.promotionPrice && 
+                               selectedRoom.showPromotionPublic;
+
+      const finalPrice = canUsePromotion
         ? parseFloat(selectedRoom.promotionPrice)
         : basePrice + extraCharges;
 
@@ -526,7 +531,7 @@ const Booking = () => {
         nights,
         guestCount: totalGuests,
         extraGuestCharges: extraCharges,
-        isPromotion: selectedRoom.isPromo && selectedRoom.promotionPrice,
+        isPromotion: canUsePromotion,
       };
 
       setBookingTotal(totalAmount);
@@ -804,11 +809,11 @@ const Booking = () => {
                               👥 Capacidad: {room.maxGuests} personas
                             </p>
                             <div className="text-sm text-green-600 space-y-1">
-                              <p>💰 Desde: ${parseFloat(room.priceSingle || 0).toLocaleString()} (1 huésped)</p>
-                              <p>💰 Hasta: ${parseFloat(room.priceMultiple || 0).toLocaleString()} (3+ huéspedes)</p>
-                              {room.isPromo && room.promotionPrice && (
-                                <p className="text-yellow-600 font-bold">
-                                  🎉 ¡Oferta! ${parseFloat(room.promotionPrice).toLocaleString()}
+                              <p>💰 Desde: ${parseFloat(room.priceSingle || 0).toLocaleString()} por noche</p>
+                              {/* ⭐ Mostrar promoción solo si owner la hizo pública */}
+                              {room.isPromo && room.promotionPrice && room.showPromotionPublic && (
+                                <p className="text-yellow-600 font-bold text-lg">
+                                  🎉 ¡Oferta Especial! ${parseFloat(room.promotionPrice).toLocaleString()} por noche
                                 </p>
                               )}
                             </div>

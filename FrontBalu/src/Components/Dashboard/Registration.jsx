@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { createRegistrationPass } from "../../Redux/Actions/registerActions";
 import { toast } from "react-toastify";
+import DashboardLayout from "./DashboardLayout"; // ⭐ NUEVO
 
 function Registration({ 
   bookingId, 
@@ -144,20 +145,21 @@ function Registration({
   const pasajerosDisponibles = guestCount - registeredPassengers.length - passengers.length;
 
   return (
-    <div className="bg-white p-6 rounded-lg">
-      {/* ⭐ INFORMACIÓN DE LA RESERVA - SIN PEDIR bookingId */}
-      <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h3 className="font-bold mb-3 text-blue-800">📋 Información de la reserva #{bookingId}:</h3>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="font-medium text-blue-700">Huéspedes permitidos:</span>
-            <span className="ml-2 font-bold">{guestCount}</span>
-          </div>
-          <div>
-            <span className="font-medium text-blue-700">Ya registrados:</span>
-            <span className="ml-2 font-bold text-green-600">{registeredPassengers.length}</span>
-          </div>
-          <div>
+    <DashboardLayout>
+      <div className="bg-white p-6 rounded-lg">
+        {/* ⭐ INFORMACIÓN DE LA RESERVA - SIN PEDIR bookingId */}
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h3 className="font-bold mb-3 text-blue-800">📋 Información de la reserva #{bookingId}:</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="font-medium text-blue-700">Huéspedes permitidos:</span>
+              <span className="ml-2 font-bold">{guestCount}</span>
+            </div>
+            <div>
+              <span className="font-medium text-blue-700">Ya registrados:</span>
+              <span className="ml-2 font-bold text-green-600">{registeredPassengers.length}</span>
+            </div>
+            <div>
             <span className="font-medium text-blue-700">Por agregar:</span>
             <span className="ml-2 font-bold text-yellow-600">{passengers.length}</span>
           </div>
@@ -441,7 +443,8 @@ function Registration({
           )}
         </div>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
 

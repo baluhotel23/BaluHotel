@@ -11,6 +11,7 @@ import LoadingSpinner from "./LoadingSpinner";
 import EmptyState from "./EmptyState";
 import { getCheckOutBadge } from "../../utils/checkOutUtils";
 import { getRealPaymentSummary } from "../../utils/paymentUtils";
+import DashboardLayout from "../Dashboard/DashboardLayout";
 
 const CheckOut = () => {
   const {
@@ -347,7 +348,8 @@ const CheckOut = () => {
   }, [showExtraCharges, selectedBookingForExtras]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <DashboardLayout>
+      <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <CheckOutHeader statistics={statistics} />
       
@@ -529,6 +531,7 @@ const CheckOut = () => {
         />
       )}
     </div>
+    </DashboardLayout>
   );
 };
 
