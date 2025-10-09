@@ -2,7 +2,7 @@ const { Invoice, Bill, Booking, Buyer, SellerData } = require('../../data');
 const { Op } = require('sequelize');
 
 // 📋 VERSIÓN SIMPLIFICADA PARA DEBUGGING
-const getAllInvoicesSimple = async (req, res) => {
+const it getAllInvoicesSimple = async (req, res) => {
   try {
     console.log('📋 [INVOICE-CONTROLLER] Obteniendo facturas (versión simple)');
     
