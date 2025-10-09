@@ -320,11 +320,11 @@ const PaymentAndReceipt = ({
 
       doc.setFontSize(8);
       doc.setFont(undefined, 'normal');
-      doc.text("NIT: 123.456.789-0", pageWidth / 2, currentY, { align: "center" });
+      doc.text("NIT: 1121881455", pageWidth / 2, currentY, { align: "center" });
       currentY += 15;
-      doc.text("Calle 123 #45-67, Ciudad", pageWidth / 2, currentY, { align: "center" });
+      doc.text("Calle 8 # 8 -56,  Restrepo -Meta", pageWidth / 2, currentY, { align: "center" });
       currentY += 15;
-      doc.text("Tel: (123) 456-7890", pageWidth / 2, currentY, { align: "center" });
+      doc.text("Tel: 3112061010", pageWidth / 2, currentY, { align: "center" });
       currentY += 25;
 
       // 🧾 INFORMACIÓN DEL RECIBO
