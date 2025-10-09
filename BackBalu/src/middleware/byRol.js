@@ -42,7 +42,12 @@ const isStaff = (req, res, next) => {
 
 const allowRoles = (roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    // ⭐ Normalizar roles: 'recept' y 'receptionist' son equivalentes
+    const normalizedRoles = roles.map(role => 
+      role === 'receptionist' ? ['recept', 'receptionist'] : [role]
+    ).flat();
+    
+    if (!normalizedRoles.includes(req.user.role)) {
       return res.status(403).json({
         error: true,
         message: 'No tienes permisos para realizar esta acción'

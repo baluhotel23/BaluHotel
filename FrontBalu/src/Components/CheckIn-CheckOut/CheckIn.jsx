@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   getAllBookings,
   // ⭐ NUEVAS IMPORTACIONES OPTIMIZADAS
@@ -18,8 +18,31 @@ import Registration from "../Dashboard/Registration";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
 
+// ⭐ COMPONENTE MODAL
+const Modal = ({ children, isOpen, onClose, title }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
+          >
+            <span className="text-2xl text-gray-500">×</span>
+          </button>
+        </div>
+        <div className="flex-1 p-6 overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  );
+};
+
 const CheckIn = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate(); // ⭐ Hook para navegación
   const { user } = useSelector((state) => state.auth);
 
   // Redux selectors
@@ -32,10 +55,10 @@ const CheckIn = () => {
     (state) => state.registrationPass || {}
   );
 
-  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [showPassengerModal, setShowPassengerModal] = useState(null); // ⭐ Modal para registro de pasajeros
   const [dateRange, setDateRange] = useState({
-    from: dayjs().format("YYYY-MM-DD"),
-    to: dayjs().add(7, "days").format("YYYY-MM-DD"), // ✅ 7 días después
+    from: dayjs().format("YYYY-MM-DD"), // ⭐ Ambas del día actual
+    to: dayjs().format("YYYY-MM-DD"),   // ⭐ Ambas del día actual
   });
 
   // Estados de inventario básico
@@ -307,17 +330,27 @@ const CheckIn = () => {
     async (roomNumber, status) => {
       if (!roomNumber || roomNumber === "Sin asignar") return;
       try {
-        await dispatch(updateRoomStatus(roomNumber, { status }));
-        toast.success(`Habitación ${roomNumber} marcada como ${status}`);
-        setTimeout(() => {
-          dispatch(
-            getAllBookings({
-              fromDate: dateRange.from,
-              toDate: dateRange.to,
-            })
-          );
-        }, 1000);
-      } catch {
+        const result = await dispatch(updateRoomStatus(roomNumber, { status }));
+        
+        // ⭐ Verificar si el resultado fue exitoso
+        if (result && result.success) {
+          toast.success(`Habitación ${roomNumber} marcada como lista para ocupar`);
+          setTimeout(() => {
+            dispatch(
+              getAllBookings({
+                fromDate: dateRange.from,
+                toDate: dateRange.to,
+              })
+            );
+          }, 1000);
+        } else if (result && result.status === 403) {
+          // ⭐ Error de permisos
+          toast.error("No tienes permisos para realizar esta acción. Contacta al administrador.");
+        } else {
+          toast.error(result?.error || "Error al actualizar el estado de la habitación");
+        }
+      } catch (error) {
+        console.error("Error en handlePreparation:", error);
         toast.error("Error al actualizar el estado de la habitación");
       }
     },
@@ -334,9 +367,6 @@ const CheckIn = () => {
           `👥 [PASSENGERS-SUCCESS] Completando registro para reserva: ${bookingId}`,
           passengers
         );
-
-        // ⭐ CERRAR FORMULARIO PRIMERO
-        setSelectedBooking(null);
 
         // ⭐ ACTUALIZAR EL BACKEND CON LA ACTION MEJORADA
         const result = await dispatch(
@@ -366,8 +396,13 @@ const CheckIn = () => {
 
           toast.success(
             `👥✅ Pasajeros registrados para reserva ${bookingId}.`,
-            { autoClose: 5000 }
+            { autoClose: 3000 }
           );
+
+          // ⭐ NAVEGAR AL LISTADO DE PASAJEROS PARA DESCARGAR PDF
+          setTimeout(() => {
+            navigate(`/dashboard/booking-passengers/${bookingId}`);
+          }, 1500);
         } else {
           console.error(
             "❌ [PASSENGERS-SUCCESS] Error al actualizar backend:",
@@ -384,7 +419,7 @@ const CheckIn = () => {
         );
       }
     },
-    [dispatch, dateRange]
+    [dispatch, dateRange, navigate]
   );
 
   // ⭐ NUEVA: VERIFICAR REQUISITOS DE CHECK-IN
@@ -568,21 +603,6 @@ const CheckIn = () => {
       };
     },
     [getRoomInfo]
-  );
-
-  // Cerrar formulario de registro
-  const handleCloseRegistration = useCallback(
-    (bookingId) => {
-      setSelectedBooking(null);
-      const booking = bookings.find((b) => b.bookingId === bookingId);
-      if (booking) {
-        const room = getRoomInfo(booking);
-        if (room.roomNumber && room.roomNumber !== "Sin asignar") {
-          dispatch(updateRoomStatus(room.roomNumber, { status: "Ocupada" }));
-        }
-      }
-    },
-    [bookings, dispatch, getRoomInfo]
   );
 
   const handleDateChange = useCallback((e) => {
@@ -835,7 +855,7 @@ const CheckIn = () => {
                         Reserva #{booking.bookingId}
                       </p>
                       <span className="inline-block mt-1 px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">
-                        🔄 {booking.status || "Pendiente"} → Check-in
+                        🔄 {booking.status === 'confirmed' ? 'confirmada' : booking.status || "Pendiente"} → Check-in
                       </span>
                       {room.roomNumber === "Sin asignar" && (
                         <span className="block mt-1 px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
@@ -1180,8 +1200,8 @@ const CheckIn = () => {
                       {room.roomNumber === "Sin asignar"
                         ? "🚫 Habitación no asignada"
                         : requirementsStatus.requirements.roomClean.completed
-                        ? "✅ Habitación limpia"
-                        : "🧹 Marcar como limpia"}
+                        ? "✅ Lista para ocupar"
+                        : "🏨 Marcar como lista para ocupar"}
                     </button>
 
                     {/* Botón de registrar ocupantes */}
@@ -1199,13 +1219,7 @@ const CheckIn = () => {
                           .completed ||
                         !requirementsStatus.requirements.roomClean.completed
                       }
-                      onClick={() =>
-                        setSelectedBooking(
-                          selectedBooking === booking.bookingId
-                            ? null
-                            : booking.bookingId
-                        )
-                      }
+                      onClick={() => setShowPassengerModal(booking.bookingId)}
                     >
                       {requirementsStatus.requirements.passengersCompleted
                         .completed
@@ -1288,33 +1302,29 @@ const CheckIn = () => {
                   </div>
                 </div>
 
-                {/* Formulario de registro de ocupantes */}
-                {selectedBooking === booking.bookingId && (
-                  <div className="border-t border-gray-200 bg-gray-50">
-                    <div className="p-6">
-                      <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        👥 Registro de Ocupantes
-                      </h4>
-                      <Registration
-                        bookingId={booking.bookingId}
-                        existingPassengers={
-                          registrationsByBooking[booking.bookingId] || []
-                        }
-                        guestCount={booking.guestCount || 1}
-                        booking={booking}
-                        onSuccess={(passengers) =>
-                          handlePassengerRegistrationSuccess(
-                            booking.bookingId,
-                            passengers
-                          )
-                        }
-                        onClose={() =>
-                          handleCloseRegistration(booking.bookingId)
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* ⭐ MODAL de registro de ocupantes */}
+                <Modal
+                  isOpen={showPassengerModal === booking.bookingId}
+                  onClose={() => setShowPassengerModal(null)}
+                  title={`👥 Registro de Ocupantes - Reserva #${booking.bookingId}`}
+                >
+                  <Registration
+                    bookingId={booking.bookingId}
+                    existingPassengers={
+                      registrationsByBooking[booking.bookingId] || []
+                    }
+                    guestCount={booking.guestCount || 1}
+                    booking={booking}
+                    onSuccess={(passengers) => {
+                      handlePassengerRegistrationSuccess(
+                        booking.bookingId,
+                        passengers
+                      );
+                      setShowPassengerModal(null); // Cerrar modal
+                    }}
+                    onClose={() => setShowPassengerModal(null)}
+                  />
+                </Modal>
               </div>
             );
           })}

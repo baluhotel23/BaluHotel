@@ -16,6 +16,16 @@ const RoomStatusDashboard = () => {
   // ⭐ EXTRAER loading.rooms como booleano
   const isLoading = loading?.rooms || false;
 
+  // ⭐ VALIDAR QUE rooms SIEMPRE SEA UN ARRAY
+  const validRooms = Array.isArray(rooms) ? rooms : [];
+
+  console.log('🏠 [ROOM-DASHBOARD] Estado de rooms:', {
+    rooms,
+    esArray: Array.isArray(rooms),
+    cantidad: validRooms.length,
+    tipo: typeof rooms
+  });
+
   useEffect(() => {
     // Cargar habitaciones
     dispatch(getAllRooms()).catch(error => {
@@ -87,7 +97,7 @@ const RoomStatusDashboard = () => {
   };
 
   // ⭐ ORDENAR HABITACIONES POR NÚMERO (sin agrupar por tipo)
-  const sortedRooms = [...rooms].sort((a, b) => {
+  const sortedRooms = [...validRooms].sort((a, b) => {
     // Ordenar numéricamente por roomNumber
     const numA = parseInt(a.roomNumber);
     const numB = parseInt(b.roomNumber);
@@ -96,11 +106,38 @@ const RoomStatusDashboard = () => {
 
   // ⭐ ESTADÍSTICAS RÁPIDAS (solo 3 estados)
   const stats = {
-    total: rooms.length,
-    disponibles: rooms.filter(r => getNormalizedStatus(r) === 'Disponible').length,
-    ocupadas: rooms.filter(r => getNormalizedStatus(r) === 'Ocupada').length,
-    reservadas: rooms.filter(r => getNormalizedStatus(r) === 'Reservada').length
+    total: validRooms.length,
+    disponibles: validRooms.filter(r => getNormalizedStatus(r) === 'Disponible').length,
+    ocupadas: validRooms.filter(r => getNormalizedStatus(r) === 'Ocupada').length,
+    reservadas: validRooms.filter(r => getNormalizedStatus(r) === 'Reservada').length
   };
+
+  // ⭐ MOSTRAR LOADING O MENSAJE SI NO HAY HABITACIONES
+  if (isLoading && validRooms.length === 0) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando habitaciones...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!isLoading && validRooms.length === 0) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <p className="text-gray-600 text-xl mb-4">⚠️ No hay habitaciones disponibles</p>
+            <p className="text-gray-500">Por favor, crea habitaciones desde el panel de administración</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -306,7 +343,6 @@ const RoomStatusDashboard = () => {
           <ShiftModal
             isOpen={showShiftModal}
             onClose={() => setShowShiftModal(false)}
-            currentShift={currentShift}
           />
         )}
       </div>

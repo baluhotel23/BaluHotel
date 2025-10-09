@@ -19,6 +19,7 @@ import {
 
 const initialState = {
   currentShift: null,
+  summary: null, // ⭐ NUEVO: Almacenar summary separado
   shiftHistory: {
     shifts: [],
     pagination: {
@@ -67,7 +68,8 @@ const shiftReducer = (state = initialState, action) => {
       return {
         ...state,
         loading: false,
-        currentShift: action.payload,
+        currentShift: action.payload?.shift || action.payload,
+        summary: action.payload?.summary || null, // ⭐ NUEVO
         error: null,
       };
     case GET_CURRENT_SHIFT_FAILURE:

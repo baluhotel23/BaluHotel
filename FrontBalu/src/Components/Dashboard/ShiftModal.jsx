@@ -3,9 +3,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { openShift, closeShift, getCurrentShift, generateShiftPDF } from '../../Redux/Actions/shiftActions';
 import { toast } from 'react-toastify';
 
-const ShiftModal = ({ isOpen, onClose, currentShift }) => {
+const ShiftModal = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
-  const { loading } = useSelector(state => state.shift);
+  const { loading, currentShift, summary } = useSelector(state => state.shift); // ⭐ Agregar summary
   
   // ⭐ ESTADOS PARA FORMULARIOS
   const [openingCash, setOpeningCash] = useState('');
@@ -13,22 +13,32 @@ const ShiftModal = ({ isOpen, onClose, currentShift }) => {
   const [openingNotes, setOpeningNotes] = useState('');
   const [closingNotes, setClosingNotes] = useState('');
   const [showClosingForm, setShowClosingForm] = useState(false);
+  const [pdfDownloaded, setPdfDownloaded] = useState(false); // ⭐ NUEVO: Controlar si se descargó el PDF
 
   // ⭐ CALCULAR DIFERENCIA DE CAJA
-  const cashDifference = currentShift && closingCash
-    ? parseFloat(closingCash) - parseFloat(currentShift.expectedCash || 0)
+  const cashDifference = summary && closingCash
+    ? parseFloat(closingCash) - parseFloat(summary.expectedCash || 0)
     : 0;
 
+  // ⭐ CARGAR TURNO ACTUAL AL ABRIR EL MODAL
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      // Cargar turno actual cuando se abre el modal
+      console.log('🔄 [SHIFT-MODAL] Modal abierto, cargando turno actual...');
+      dispatch(getCurrentShift()).then((data) => {
+        console.log('📊 [SHIFT-MODAL] Turno cargado:', data?.shift);
+        console.log('📊 [SHIFT-MODAL] Summary cargado:', data?.summary);
+      });
+    } else {
       // Limpiar formularios al cerrar
       setOpeningCash('');
       setClosingCash('');
       setOpeningNotes('');
       setClosingNotes('');
       setShowClosingForm(false);
+      setPdfDownloaded(false); // ⭐ Resetear estado de PDF
     }
-  }, [isOpen]);
+  }, [isOpen, dispatch]);
 
   // ⭐ MANEJAR APERTURA DE TURNO
   const handleOpenShift = async (e) => {
@@ -40,14 +50,25 @@ const ShiftModal = ({ isOpen, onClose, currentShift }) => {
     }
 
     try {
-      await dispatch(openShift({
+      const result = await dispatch(openShift({
         openingCash: parseFloat(openingCash),
         openingNotes
       }));
       
-      toast.success('✅ Turno abierto exitosamente');
-      onClose();
-      dispatch(getCurrentShift()); // Refrescar turno actual
+      // ⭐ Verificar resultado
+      if (result.success) {
+        toast.success('✅ Turno abierto exitosamente');
+        onClose();
+        dispatch(getCurrentShift()); // Refrescar turno actual
+      } else if (result.isShiftAlreadyOpen) {
+        // ⭐ Caso específico: turno ya abierto
+        toast.warning('⚠️ Ya tienes un turno abierto. Mostrando resumen...');
+        // ⭐ NO cerrar el modal, refrescar para mostrar el turno actual
+        await dispatch(getCurrentShift()); // Refrescar para que currentShift se actualice
+        // El componente se renderizará automáticamente con el resumen
+      } else {
+        toast.error(result.error || 'Error al abrir turno');
+      }
     } catch (error) {
       toast.error(error.message || 'Error al abrir turno');
     }
@@ -62,8 +83,16 @@ const ShiftModal = ({ isOpen, onClose, currentShift }) => {
       return;
     }
 
+    if (!currentShift || !currentShift.shiftId) {
+      toast.error('❌ No se encontró el turno activo. Por favor recarga la página.');
+      return;
+    }
+
     try {
+      console.log('🔒 [CLOSE-SHIFT-MODAL] Enviando cierre con shiftId:', currentShift.shiftId);
+      
       await dispatch(closeShift({
+        shiftId: currentShift.shiftId, // ⭐ AGREGAR shiftId
         closingCash: parseFloat(closingCash),
         closingNotes
       }));
@@ -80,13 +109,18 @@ const ShiftModal = ({ isOpen, onClose, currentShift }) => {
   const handleDownloadPDF = async () => {
     try {
       await dispatch(generateShiftPDF(currentShift.shiftId));
-      toast.success('📄 Descargando reporte PDF...');
-    } catch (error) {
+      setPdfDownloaded(true); // ⭐ Marcar como descargado
+      toast.success('📄 PDF descargado. Ahora puedes cerrar el turno.');
+    } catch {
       toast.error('Error al generar PDF');
     }
   };
 
   if (!isOpen) return null;
+
+  // ⭐ DEBUG: Ver estado actual
+  console.log('🎨 [SHIFT-MODAL] Renderizando modal. currentShift:', currentShift);
+  console.log('🎨 [SHIFT-MODAL] loading:', loading);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -198,25 +232,25 @@ const ShiftModal = ({ isOpen, onClose, currentShift }) => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Efectivo:</span>
                     <span className="font-semibold text-green-600">
-                      ${parseFloat(currentShift.totalCashSales || 0).toLocaleString()}
+                      ${parseFloat(summary?.totalCashSales || 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Tarjetas:</span>
                     <span className="font-semibold text-blue-600">
-                      ${parseFloat(currentShift.totalCardSales || 0).toLocaleString()}
+                      ${parseFloat(summary?.totalCardSales || 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Transferencias:</span>
                     <span className="font-semibold text-purple-600">
-                      ${parseFloat(currentShift.totalTransferSales || 0).toLocaleString()}
+                      ${parseFloat(summary?.totalTransferSales || 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="border-t pt-2 flex justify-between">
                     <span className="font-semibold text-gray-700">Total Ventas:</span>
                     <span className="font-bold text-orange-600 text-lg">
-                      ${parseFloat(currentShift.totalSales || 0).toLocaleString()}
+                      ${parseFloat(summary?.totalSales || 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -228,19 +262,19 @@ const ShiftModal = ({ isOpen, onClose, currentShift }) => {
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <p className="text-2xl font-bold text-green-600">
-                      {currentShift.checkInsProcessed || 0}
+                      {summary?.checkInsProcessed || 0}
                     </p>
                     <p className="text-xs text-gray-600">Check-ins</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-red-600">
-                      {currentShift.checkOutsProcessed || 0}
+                      {summary?.checkOutsProcessed || 0}
                     </p>
                     <p className="text-xs text-gray-600">Check-outs</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-blue-600">
-                      {currentShift.bookingsCreated || 0}
+                      {summary?.bookingsCreated || 0}
                     </p>
                     <p className="text-xs text-gray-600">Reservas</p>
                   </div>
@@ -252,7 +286,7 @@ const ShiftModal = ({ isOpen, onClose, currentShift }) => {
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-yellow-800">Efectivo Esperado en Caja:</span>
                   <span className="text-2xl font-bold text-yellow-700">
-                    ${parseFloat(currentShift.expectedCash || 0).toLocaleString()}
+                    ${parseFloat(summary?.expectedCash || 0).toLocaleString()}
                   </span>
                 </div>
                 <p className="text-xs text-yellow-700 mt-1">
@@ -260,17 +294,36 @@ const ShiftModal = ({ isOpen, onClose, currentShift }) => {
                 </p>
               </div>
 
+              {/* ⭐ MENSAJE INFORMATIVO - DESCARGAR PDF */}
+              {!pdfDownloaded && (
+                <div className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    ℹ️ <strong>Importante:</strong> Debes descargar el PDF del turno antes de cerrarlo.
+                  </p>
+                </div>
+              )}
+
               {/* Botones de acción */}
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={handleDownloadPDF}
-                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded transition-colors"
+                  className={`flex-1 font-semibold py-3 rounded transition-colors ${
+                    pdfDownloaded 
+                      ? 'bg-green-500 hover:bg-green-600 text-white' 
+                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                  }`}
                 >
-                  📄 Descargar PDF
+                  {pdfDownloaded ? '✅ PDF Descargado' : '📄 Descargar PDF'}
                 </button>
                 <button
                   onClick={() => setShowClosingForm(true)}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded transition-colors"
+                  disabled={!pdfDownloaded}
+                  className={`flex-1 font-semibold py-3 rounded transition-colors ${
+                    pdfDownloaded 
+                      ? 'bg-red-500 hover:bg-red-600 text-white cursor-pointer' 
+                      : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  }`}
+                  title={!pdfDownloaded ? 'Primero debes descargar el PDF del turno' : 'Cerrar turno'}
                 >
                   🔒 Cerrar Turno
                 </button>
@@ -300,12 +353,12 @@ const ShiftModal = ({ isOpen, onClose, currentShift }) => {
                 <div className="flex justify-between mb-2">
                   <span className="text-gray-700">Efectivo Esperado:</span>
                   <span className="font-bold text-gray-800">
-                    ${parseFloat(currentShift.expectedCash || 0).toLocaleString()}
+                    ${parseFloat(summary?.expectedCash || 0).toLocaleString()}
                   </span>
                 </div>
                 <p className="text-xs text-gray-600">
                   (Caja inicial: ${parseFloat(currentShift.openingCash || 0).toLocaleString()} + 
-                  Ventas efectivo: ${parseFloat(currentShift.totalCashSales || 0).toLocaleString()})
+                  Ventas efectivo: ${parseFloat(summary?.totalCashSales || 0).toLocaleString()})
                 </p>
               </div>
 

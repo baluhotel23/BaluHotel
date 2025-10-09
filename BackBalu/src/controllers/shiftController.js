@@ -50,7 +50,7 @@ const openShift = async (req, res, next) => {
 
     // Obtener información del usuario
     const user = await User.findByPk(userId, {
-      attributes: ['userId', 'name', 'email', 'role']
+      attributes: ['n_document', 'first_name', 'last_name', 'email', 'role']
     });
 
     res.status(201).json({
@@ -84,7 +84,7 @@ const getCurrentShift = async (req, res, next) => {
         {
           model: User,
           as: 'user',
-          attributes: ['userId', 'name', 'email', 'role']
+          attributes: ['n_document', 'first_name', 'last_name', 'email', 'role']
         }
       ],
       order: [['openedAt', 'DESC']]
@@ -201,6 +201,8 @@ const calculateShiftSummary = async (shiftId) => {
     }
 
     // ⭐ OBTENER TODOS LOS PAGOS DEL TURNO
+    console.log(`📊 [CALCULATE-SUMMARY] Buscando pagos para turno: ${shiftId}`);
+    
     const payments = await Payment.findAll({
       where: {
         shiftId,
@@ -220,6 +222,17 @@ const calculateShiftSummary = async (shiftId) => {
         }
       ]
     });
+
+    console.log(`💰 [CALCULATE-SUMMARY] Pagos encontrados: ${payments.length}`);
+    if (payments.length > 0) {
+      console.log(`💰 [CALCULATE-SUMMARY] Detalle:`, payments.map(p => ({
+        paymentId: p.paymentId,
+        amount: p.amount,
+        method: p.paymentMethod,
+        status: p.paymentStatus,
+        shiftId: p.shiftId
+      })));
+    }
 
     // ⭐ INICIALIZAR CONTADORES
     let totalCashSales = 0;
@@ -252,6 +265,10 @@ const calculateShiftSummary = async (shiftId) => {
 
     const totalSales = totalCashSales + totalCardSales + totalTransferSales;
     const totalTransactions = payments.length;
+
+    // ⭐ CALCULAR EFECTIVO ESPERADO EN CAJA
+    const expectedCash = parseFloat(shift.openingCash || 0) + totalCashSales;
+    console.log(`💵 [CALCULATE-SUMMARY] Efectivo esperado: Caja inicial $${shift.openingCash} + Ventas efectivo $${totalCashSales} = $${expectedCash}`);
 
     // ⭐ CONTAR CHECK-INS Y CHECK-OUTS DEL TURNO
     const checkInsProcessed = await Booking.count({
@@ -292,6 +309,7 @@ const calculateShiftSummary = async (shiftId) => {
       checkInsProcessed,
       checkOutsProcessed,
       bookingsCreated,
+      expectedCash, // ⭐ NUEVO: Efectivo esperado (caja inicial + ventas efectivo)
       payments
     };
 
@@ -324,7 +342,7 @@ const getShiftHistory = async (req, res, next) => {
         {
           model: User,
           as: 'user',
-          attributes: ['userId', 'name', 'email', 'role']
+          attributes: ['n_document', 'first_name', 'last_name', 'email', 'role']
         }
       ],
       order: [['openedAt', 'DESC']],
@@ -358,7 +376,7 @@ const getShiftReport = async (req, res, next) => {
         {
           model: User,
           as: 'user',
-          attributes: ['userId', 'name', 'email', 'role']
+          attributes: ['n_document', 'first_name', 'last_name', 'email', 'role']
         }
       ]
     });
@@ -396,7 +414,7 @@ const generateShiftPDF = async (req, res, next) => {
         {
           model: User,
           as: 'user',
-          attributes: ['userId', 'name', 'email', 'role']
+          attributes: ['n_document', 'first_name', 'last_name', 'email', 'role']
         }
       ]
     });
@@ -433,7 +451,7 @@ const generateShiftPDF = async (req, res, next) => {
 
     // ⭐ INFORMACIÓN DEL RECEPCIONISTA
     doc.fontSize(14).text('Recepcionista:', { underline: true });
-    doc.fontSize(11).text(`Nombre: ${shift.user.name}`);
+    doc.fontSize(11).text(`Nombre: ${shift.user.first_name} ${shift.user.last_name}`);
     doc.text(`Email: ${shift.user.email}`);
     doc.moveDown();
 

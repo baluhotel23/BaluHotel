@@ -36,11 +36,11 @@ const Dashboard = () => {
         )}
         {(user.role === "owner" || user.role === "admin" || user.role === "recept") && (
           <div className="bg-white rounded-lg border border-orange-500 shadow-md p-6 hover:shadow-lg transition duration-300">
-            <h2 className="text-xl font-semibold mb-2">🏨 Dashboard Habitaciones</h2>
+            <h2 className="text-xl font-semibold mb-2">🏨 Gestión Turnos</h2>
             <p className="text-gray-600 mb-4">Vista de habitaciones y gestión de turnos</p>
             <Link to="/admin/rooms-dashboard">
               <button className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:from-orange-600 hover:to-yellow-600 font-bold py-2 px-4 rounded">
-                VER DASHBOARD
+                Ingresar
               </button>
             </Link>
           </div>

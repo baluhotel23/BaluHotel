@@ -21,6 +21,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../Dashboard/DashboardLayout";
 import RoomStatusGrid from "./RoomStatusGrid";
+import jsPDF from "jspdf"; // ⭐ IMPORTAR jsPDF
 
 // =============================
 // CONSTANTES
@@ -500,7 +501,7 @@ const LocalBookingForm = () => {
       tomorrow.setDate(tomorrow.getDate() + 1);
       return tomorrow;
     })(),
-    roomType: ROOM_TYPES[0],
+    roomType: "", // Vacío = todas las habitaciones
   });
 
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -528,6 +529,7 @@ const LocalBookingForm = () => {
 
   const [uiState, setUiState] = useState({
     showBuyerPopup: false,
+    showBookingModal: false, // ⭐ NUEVO: Modal de detalles de reserva
     currentStep: "search", // search, booking, payment
   });
 
@@ -685,7 +687,11 @@ const LocalBookingForm = () => {
     }
 
     setSelectedRoom(room);
-    setUiState((prev) => ({ ...prev, currentStep: "booking" }));
+    setUiState((prev) => ({ 
+      ...prev, 
+      currentStep: "booking",
+      showBookingModal: true // ⭐ ABRIR MODAL
+    }));
     toast.success(`Habitación ${room.roomNumber} seleccionada.`);
   }, []);
 
@@ -794,14 +800,22 @@ const LocalBookingForm = () => {
             amount: totalAmount,
             showPaymentForm: true,
           }));
-          setUiState((prev) => ({ ...prev, currentStep: "payment" }));
+          setUiState((prev) => ({ 
+            ...prev, 
+            currentStep: "payment",
+            showBookingModal: false // ⭐ CERRAR MODAL DE BOOKING
+          }));
         } else if (confirmationOption === "pay50Percent") {
           setPaymentState((prev) => ({
             ...prev,
             amount: totalAmount * 0.5,
             showPaymentForm: true,
           }));
-          setUiState((prev) => ({ ...prev, currentStep: "payment" }));
+          setUiState((prev) => ({ 
+            ...prev, 
+            currentStep: "payment",
+            showBookingModal: false // ⭐ CERRAR MODAL DE BOOKING
+          }));
         } else {
           toast.info("Reserva confirmada. Pago pendiente para check-in.");
           handleResetForm();
@@ -855,6 +869,24 @@ const LocalBookingForm = () => {
           );
         }
 
+        // ⭐ GENERAR RECIBO PDF
+        generatePaymentReceipt({
+          paymentId: result.data?.paymentId || Date.now(),
+          bookingId: bookingState.createdBookingId,
+          amount: paymentState.amount,
+          paymentMethod: paymentState.method,
+          paymentType: isFullPayment ? "full" : "partial",
+          remainingAmount: isFullPayment ? 0 : remainingAmount,
+          totalAmount: bookingState.totalAmount,
+          guestName: guestInfo.buyerName,
+          guestDocument: guestInfo.buyerSdocno,
+          roomNumber: selectedRoom?.roomNumber,
+          roomType: selectedRoom?.type,
+          checkIn: searchParams.checkIn,
+          checkOut: searchParams.checkOut,
+          nights: differenceInDays(searchParams.checkOut, searchParams.checkIn),
+        });
+
         handleResetForm();
 
         setTimeout(() => {
@@ -869,7 +901,174 @@ const LocalBookingForm = () => {
     } finally {
       setPaymentState((prev) => ({ ...prev, processing: false }));
     }
-  }, [bookingState, paymentState, dispatch, navigate]);
+  }, [bookingState, paymentState, dispatch, navigate, guestInfo, selectedRoom, searchParams]);
+
+  // ⭐ FUNCIÓN PARA GENERAR RECIBO PDF
+  const generatePaymentReceipt = (paymentDetails) => {
+    try {
+      const doc = new jsPDF({
+        unit: "pt",
+        format: [226.77, 839.28], // Formato ticket térmico
+      });
+
+      const date = format(new Date(), "dd/MM/yyyy HH:mm:ss");
+      const receiptNumber = `#${paymentDetails.paymentId}`;
+      const pageWidth = doc.internal.pageSize.width;
+      let currentY = 30;
+
+      // 🎨 HEADER DEL HOTEL
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.text("BALU HOTEL", pageWidth / 2, currentY, { align: "center" });
+      currentY += 25;
+
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      doc.text("NIT: 123.456.789-0", pageWidth / 2, currentY, { align: "center" });
+      currentY += 15;
+      doc.text("Calle 123 #45-67, Ciudad", pageWidth / 2, currentY, { align: "center" });
+      currentY += 15;
+      doc.text("Tel: (123) 456-7890", pageWidth / 2, currentY, { align: "center" });
+      currentY += 25;
+
+      // 🧾 INFORMACIÓN DEL RECIBO
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text(`RECIBO DE PAGO ${receiptNumber}`, pageWidth / 2, currentY, { align: "center" });
+      currentY += 20;
+
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Fecha: ${date}`, pageWidth / 2, currentY, { align: "center" });
+      currentY += 25;
+
+      // 🎯 LÍNEA SEPARADORA
+      const separator = "=".repeat(35);
+      doc.text(separator, pageWidth / 2, currentY, { align: "center" });
+      currentY += 20;
+
+      // 👤 DATOS DEL HUÉSPED
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.text("DATOS DEL HUESPED:", 15, currentY);
+      currentY += 15;
+
+      doc.setFont(undefined, 'normal');
+      doc.text(`Nombre: ${paymentDetails.guestName}`, 15, currentY);
+      currentY += 12;
+      doc.text(`Documento: ${paymentDetails.guestDocument}`, 15, currentY);
+      currentY += 15;
+
+      // 🏨 DATOS DE LA RESERVA
+      doc.setFont(undefined, 'bold');
+      doc.text("DATOS DE LA RESERVA:", 15, currentY);
+      currentY += 15;
+
+      doc.setFont(undefined, 'normal');
+      const roomInfo = `${paymentDetails.roomType} - ${paymentDetails.roomNumber}`;
+      doc.text(`Habitacion: ${roomInfo}`, 15, currentY);
+      currentY += 12;
+
+      doc.text(`Reserva #: ${paymentDetails.bookingId}`, 15, currentY);
+      currentY += 12;
+
+      doc.text(`Check-in: ${format(paymentDetails.checkIn, "dd/MM/yyyy")}`, 15, currentY);
+      currentY += 12;
+
+      doc.text(`Check-out: ${format(paymentDetails.checkOut, "dd/MM/yyyy")}`, 15, currentY);
+      currentY += 12;
+
+      doc.text(`Noches: ${paymentDetails.nights}`, 15, currentY);
+      currentY += 15;
+
+      // 💰 SECCIÓN DE PAGO
+      doc.text("-".repeat(35), pageWidth / 2, currentY, { align: "center" });
+      currentY += 15;
+
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(10);
+      doc.text("DETALLE DE PAGO", pageWidth / 2, currentY, { align: "center" });
+      currentY += 15;
+
+      doc.text("-".repeat(35), pageWidth / 2, currentY, { align: "center" });
+      currentY += 10;
+
+      // 📊 DESGLOSE DEL PAGO
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      
+      doc.text("Total reserva:", 15, currentY);
+      doc.text(`$${paymentDetails.totalAmount.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      currentY += 15;
+
+      // Método de pago
+      const paymentMethodLabels = {
+        'cash': 'Efectivo',
+        'credit_card': 'Tarjeta de Credito',
+        'debit_card': 'Tarjeta Debito',
+        'transfer': 'Transferencia Bancaria',
+      };
+      
+      doc.setFont(undefined, 'bold');
+      doc.text("PAGO RECIBIDO:", 15, currentY);
+      currentY += 12;
+
+      doc.setFont(undefined, 'normal');
+      doc.text(`Metodo: ${paymentMethodLabels[paymentDetails.paymentMethod] || paymentDetails.paymentMethod}`, 15, currentY);
+      currentY += 12;
+
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text("Monto pagado:", 15, currentY);
+      doc.text(`$${paymentDetails.amount.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+      currentY += 15;
+
+      // Estado del pago
+      if (paymentDetails.paymentType === 'full') {
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        const fullPaymentText = "✓ PAGO COMPLETO";
+        doc.text(fullPaymentText, pageWidth / 2, currentY, { align: "center" });
+        currentY += 12;
+        
+        doc.setFont(undefined, 'normal');
+        doc.text("Reserva totalmente pagada", pageWidth / 2, currentY, { align: "center" });
+      } else {
+        doc.setFontSize(8);
+        doc.text("Saldo pendiente:", 15, currentY);
+        doc.text(`$${paymentDetails.remainingAmount.toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
+        currentY += 15;
+
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        const partialPaymentText = "⚠ PAGO PARCIAL";
+        doc.text(partialPaymentText, pageWidth / 2, currentY, { align: "center" });
+      }
+
+      currentY += 20;
+
+      // 📝 FOOTER
+      doc.text("=".repeat(35), pageWidth / 2, currentY, { align: "center" });
+      currentY += 15;
+
+      doc.setFontSize(7);
+      doc.setFont(undefined, 'normal');
+      doc.text("Gracias por su preferencia", pageWidth / 2, currentY, { align: "center" });
+      currentY += 12;
+      doc.text("Conserve este recibo", pageWidth / 2, currentY, { align: "center" });
+      currentY += 12;
+      doc.text("www.baluhotel.com", pageWidth / 2, currentY, { align: "center" });
+
+      // 💾 GUARDAR PDF
+      const fileName = `recibo_pago_${paymentDetails.bookingId}_${Date.now()}.pdf`;
+      doc.save(fileName);
+      
+      toast.success(`📄 Recibo generado: ${fileName}`);
+    } catch (error) {
+      console.error("Error generando recibo:", error);
+      toast.error("Error al generar el recibo PDF");
+    }
+  };
 
   const handleResetForm = useCallback(() => {
     setSelectedRoom(null);
@@ -894,6 +1093,7 @@ const LocalBookingForm = () => {
     });
     setUiState({
       showBuyerPopup: false,
+      showBookingModal: false, // ⭐ CERRAR MODAL
       currentStep: "search",
     });
 
@@ -904,7 +1104,7 @@ const LocalBookingForm = () => {
     setSearchParams({
       checkIn: today,
       checkOut: tomorrow,
-      roomType: ROOM_TYPES[0],
+      roomType: "", // Vacío = todas las habitaciones
     });
   }, []);
 
@@ -979,6 +1179,7 @@ const LocalBookingForm = () => {
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
+                  <option value="">🏨 Todas las habitaciones</option>
                   {ROOM_TYPES.map((type) => (
                     <option key={type} value={type}>
                       {type}
@@ -1033,18 +1234,16 @@ const LocalBookingForm = () => {
             </div>
           )}
 
-          {/* Sección 3: Detalles de Reserva */}
-          {selectedRoom && !bookingState.createdBookingId && (
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="bg-purple-100 p-2 rounded-lg">
-                  <span className="text-2xl">📋</span>
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800">
-                  3. Detalles - Habitación {selectedRoom.roomNumber}
-                </h2>
-              </div>
-
+          {/* Sección 3: Detalles de Reserva - AHORA EN MODAL */}
+          <Modal
+            isOpen={uiState.showBookingModal && selectedRoom && !bookingState.createdBookingId}
+            onClose={() => {
+              setUiState((prev) => ({ ...prev, showBookingModal: false }));
+              setSelectedRoom(null);
+            }}
+            title={`📋 Detalles de Reserva - Habitación ${selectedRoom?.roomNumber || ''}`}
+          >
+            <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Información del Huésped */}
                 <div className="space-y-4">
@@ -1136,7 +1335,7 @@ const LocalBookingForm = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Habitación:</span>
                       <span className="font-semibold">
-                        {selectedRoom.roomNumber} ({selectedRoom.type})
+                        {selectedRoom?.roomNumber} ({selectedRoom?.type})
                       </span>
                     </div>
                     {selectedRoom?.isPromo && selectedRoom?.promotionPrice && (
@@ -1260,31 +1459,42 @@ const LocalBookingForm = () => {
                     )}
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Opciones de Pago
-                  </label>
-                  <select
-                    value={bookingState.confirmationOption}
-                    onChange={(e) =>
-                      setBookingState((prev) => ({
-                        ...prev,
-                        confirmationOption: e.target.value,
-                      }))
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    {CONFIRMATION_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
 
-              <div className="mt-8 text-center">
+              {/* Opciones de Pago */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Opciones de Pago
+                </label>
+                <select
+                  value={bookingState.confirmationOption}
+                  onChange={(e) =>
+                    setBookingState((prev) => ({
+                      ...prev,
+                      confirmationOption: e.target.value,
+                    }))
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {CONFIRMATION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Botones de Acción */}
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  onClick={() => {
+                    setUiState((prev) => ({ ...prev, showBookingModal: false }));
+                    setSelectedRoom(null);
+                  }}
+                  className="flex-1 px-6 py-3 bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  ❌ Cancelar
+                </button>
                 <button
                   onClick={handleCreateBooking}
                   disabled={
@@ -1293,32 +1503,67 @@ const LocalBookingForm = () => {
                     totalGuests === 0 ||
                     guestInfo.adults < 1
                   }
-                  className="bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-4 px-8 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-200 transform hover:-translate-y-0.5 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 transform hover:-translate-y-0.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ✅ Confirmar y Crear Reserva
                 </button>
               </div>
             </div>
-          )}
+          </Modal>
 
-          {/* Sección 4: Pago */}
-          {paymentState.showPaymentForm && bookingState.createdBookingId && (
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="bg-green-100 p-2 rounded-lg">
-                  <span className="text-2xl">💳</span>
+          {/* Sección 4: Pago - AHORA EN MODAL */}
+          <Modal
+            isOpen={paymentState.showPaymentForm && bookingState.createdBookingId}
+            onClose={() => {
+              if (!paymentState.processing) {
+                setPaymentState((prev) => ({ ...prev, showPaymentForm: false }));
+              }
+            }}
+            title={`💳 Registrar Pago - Reserva #${bookingState.createdBookingId}`}
+          >
+            <div className="space-y-6">
+              {/* Resumen de la reserva */}
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-blue-800 mb-3">📋 Resumen de Reserva</h4>
+                <div className="space-y-2 text-sm text-gray-700">
+                  <div className="flex justify-between">
+                    <span>Habitación:</span>
+                    <span className="font-medium">{selectedRoom?.roomNumber} ({selectedRoom?.type})</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Huésped:</span>
+                    <span className="font-medium">{guestInfo.buyerName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Documento:</span>
+                    <span className="font-medium">{guestInfo.buyerSdocno}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Check-in:</span>
+                    <span className="font-medium">{format(searchParams.checkIn, "dd/MM/yyyy")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Check-out:</span>
+                    <span className="font-medium">{format(searchParams.checkOut, "dd/MM/yyyy")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Noches:</span>
+                    <span className="font-medium">{differenceInDays(searchParams.checkOut, searchParams.checkIn)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-lg pt-2 border-t border-blue-200">
+                    <span>Total Reserva:</span>
+                    <span className="text-green-600">${bookingState.totalAmount.toLocaleString()} COP</span>
+                  </div>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-800">
-                  4. Registrar Pago - Reserva #{bookingState.createdBookingId}
-                </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Monto a Pagar (Total: $
-                    {bookingState.totalAmount.toLocaleString()})
-                  </label>
+              {/* Formulario de pago */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  💰 Monto a Pagar
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600 font-medium">$</span>
                   <input
                     type="number"
                     value={paymentState.amount}
@@ -1328,47 +1573,91 @@ const LocalBookingForm = () => {
                         amount: parseFloat(e.target.value) || 0,
                       }))
                     }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Ingrese el monto"
+                    disabled={paymentState.processing}
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Método de Pago
-                  </label>
-                  <select
-                    value={paymentState.method}
-                    onChange={(e) =>
+                  <button
+                    onClick={() =>
                       setPaymentState((prev) => ({
                         ...prev,
-                        method: e.target.value,
+                        amount: bookingState.totalAmount,
                       }))
                     }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="px-3 py-2 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
+                    disabled={paymentState.processing}
                   >
-                    {PAYMENT_METHODS.map((method) => (
-                      <option key={method.value} value={method.value}>
-                        {method.label}
-                      </option>
-                    ))}
-                  </select>
+                    Máximo
+                  </button>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Máximo: ${bookingState.totalAmount.toLocaleString()}
+                  {paymentState.amount < bookingState.totalAmount && paymentState.amount > 0 && (
+                    <div className="text-orange-600 mt-1">
+                      ⚠️ Pago parcial - Pendiente: ${(bookingState.totalAmount - paymentState.amount).toLocaleString()}
+                    </div>
+                  )}
+                  {paymentState.amount === bookingState.totalAmount && paymentState.amount > 0 && (
+                    <div className="text-green-600 mt-1">
+                      ✅ Pago completo
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="text-center">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  💳 Método de Pago
+                </label>
+                <select
+                  value={paymentState.method}
+                  onChange={(e) =>
+                    setPaymentState((prev) => ({
+                      ...prev,
+                      method: e.target.value,
+                    }))
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={paymentState.processing}
+                >
+                  {PAYMENT_METHODS.map((method) => (
+                    <option key={method.value} value={method.value}>
+                      {method.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  onClick={() => {
+                    if (!paymentState.processing) {
+                      setPaymentState((prev) => ({ ...prev, showPaymentForm: false }));
+                    }
+                  }}
+                  disabled={paymentState.processing}
+                  className="flex-1 px-6 py-3 bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50"
+                >
+                  ❌ Cancelar
+                </button>
                 <button
                   onClick={handleProcessPayment}
-                  disabled={paymentState.processing}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold py-3 px-8 rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 transform hover:-translate-y-0.5 shadow-lg disabled:opacity-50"
+                  disabled={paymentState.processing || !paymentState.amount || paymentState.amount <= 0}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 transform hover:-translate-y-0.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {paymentState.processing
-                    ? "⏳ Procesando..."
-                    : "💳 Registrar Pago"}
+                  {paymentState.processing ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Procesando...
+                    </div>
+                  ) : (
+                    `💳 Pagar $${parseFloat(paymentState.amount || 0).toLocaleString()}`
+                  )}
                 </button>
               </div>
             </div>
-          )}
+          </Modal>
 
           {/* Componentes Auxiliares */}
           <BuyerRegistrationForm

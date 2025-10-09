@@ -298,9 +298,11 @@ export const updateRoomStatus = (roomNumber, statusData) => async (dispatch) => 
   try {
     const { data } = await api.put(`/rooms/status/${roomNumber}`, statusData);
     dispatch({ type: 'UPDATE_ROOM_STATUS_SUCCESS', payload: data });
+    return { success: true, data }; // ⭐ Retornar éxito
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al actualizar el estado de la habitación';
     dispatch({ type: 'UPDATE_ROOM_STATUS_FAILURE', payload: errorMessage });
+    return { success: false, error: errorMessage, status: error.response?.status }; // ⭐ Retornar error con status
   }
 };
 

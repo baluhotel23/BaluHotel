@@ -44,23 +44,38 @@ export const openShift = (shiftData) => async (dispatch) => {
       config
     );
 
+    console.log('✅ [OPEN-SHIFT] Response completo:', response.data);
+
+    // ⭐ El backend devuelve { error: false, data: { shift, user } }
+    const shift = response.data.data?.shift || response.data.shift;
+
     dispatch({
       type: OPEN_SHIFT_SUCCESS,
-      payload: response.data.shift,
+      payload: shift,
     });
 
-    return response.data.shift;
+    return { success: true, shift };
   } catch (error) {
     console.error('❌ [SHIFT-ACTION] Error al abrir turno:', error);
     console.error('📋 [SHIFT-ACTION] Response:', error.response);
     console.error('📊 [SHIFT-ACTION] Data:', error.response?.data);
     
-    const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Error al abrir turno';
+    const errorData = error.response?.data || {};
+    const errorMessage = errorData.message || 'Error al abrir turno';
+    
     dispatch({
       type: OPEN_SHIFT_FAILURE,
       payload: errorMessage,
     });
-    throw new Error(errorMessage);
+    
+    // ⭐ Retornar objeto con información completa del error
+    return {
+      success: false,
+      error: errorMessage,
+      status: error.response?.status,
+      data: errorData.data, // Info adicional (ej: turno existente)
+      isShiftAlreadyOpen: errorMessage.includes('Ya tienes un turno abierto')
+    };
   }
 };
 
@@ -77,16 +92,27 @@ export const getCurrentShift = () => async (dispatch) => {
     };
 
     const response = await axios.get(`${API_URL}/shifts/current`, config);
+    
+    console.log('✅ [GET-CURRENT-SHIFT] Response completo:', response.data);
+
+    // ⭐ El backend devuelve { error: false, data: { shift, summary } }
+    const responseData = response.data.data || response.data;
+    const shiftData = responseData.shift || response.data.shift;
+    const summary = responseData.summary || null;
+
+    console.log('📊 [GET-CURRENT-SHIFT] Shift:', shiftData);
+    console.log('📊 [GET-CURRENT-SHIFT] Summary:', summary);
 
     dispatch({
       type: GET_CURRENT_SHIFT_SUCCESS,
-      payload: response.data.shift,
+      payload: { shift: shiftData, summary },
     });
 
-    return response.data.shift;
+    return { shift: shiftData, summary };
   } catch (error) {
     // Si no hay turno activo, no es un error crítico
     if (error.response?.status === 404) {
+      console.log('ℹ️ [GET-CURRENT-SHIFT] No hay turno activo (404)');
       dispatch({
         type: GET_CURRENT_SHIFT_SUCCESS,
         payload: null,

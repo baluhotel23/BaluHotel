@@ -48,6 +48,7 @@ import CompletedBookings from "./Components/CheckOut/CompletedBookings";
 import FacturaManual from "./Components/Taxxa/FacturaManual";
 import VoucherManager from "./Components/Booking/VoucherManager";
 import RoomStatusDashboard from "./Components/Dashboard/RoomStatusDashboard"; // ⭐ NUEVO: Dashboard de habitaciones con gestión de turnos
+import ShiftReminder from "./Components/Dashboard/ShiftReminder"; // ⭐ NUEVO: Recordatorio de turno para recepcionistas
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -95,6 +96,7 @@ const AppContent = () => {
   return (
     <>
       <ToastContainer />
+      <ShiftReminder /> {/* ⭐ NUEVO: Recordatorio de turno para recepcionistas */}
       <Navbar />
       <div className="pt-16">
         <Routes>

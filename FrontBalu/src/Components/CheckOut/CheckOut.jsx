@@ -227,9 +227,10 @@ const CheckOut = () => {
       }
 
       console.log("🔧 [CHECKOUT-CLICK] Llamando a handleCheckOut...");
+      console.log("📤 [CHECKOUT-CLICK] Enviando bookingId:", targetBooking.bookingId);
       
-      // Llamar a la función de checkout del hook
-      const result = handleCheckOut(targetBooking);
+      // ⭐ CORREGIDO: Pasar solo bookingId, no el objeto completo
+      const result = handleCheckOut(targetBooking.bookingId);
       
       console.log("✅ [CHECKOUT-CLICK] handleCheckOut ejecutado, resultado:", result);
       

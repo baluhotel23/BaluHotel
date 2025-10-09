@@ -147,13 +147,30 @@ export const useCheckOutLogic = () => {
     discountReason = "",
     forceExpiredCheckout = false
   ) => {
+    console.log("🔍 [HANDLE-CHECKOUT] Parámetros recibidos:", {
+      bookingId,
+      bookingIdType: typeof bookingId,
+      customCheckOutDate,
+      discountAmount,
+      discountReason,
+      forceExpiredCheckout
+    });
+
     if (!bookingId) {
       toast.error("❌ ID de reserva requerido");
       return;
     }
 
     const targetBooking = bookings.find(b => b.bookingId === bookingId);
+    console.log("🔍 [HANDLE-CHECKOUT] Buscando reserva en array local:", {
+      bookingId,
+      encontrada: !!targetBooking,
+      totalBookings: bookings.length,
+      bookingIdsDisponibles: bookings.map(b => ({ id: b.bookingId, tipo: typeof b.bookingId }))
+    });
+
     if (!targetBooking) {
+      console.error("❌ [HANDLE-CHECKOUT] Reserva no encontrada en array local");
       toast.error("❌ Reserva no encontrada");
       return;
     }
@@ -212,6 +229,13 @@ export const useCheckOutLogic = () => {
         checkOutData.actualCheckOut = customCheckOutDate;
         checkOutData.isEarlyCheckOut = new Date(customCheckOutDate) < new Date(targetBooking.checkOut);
       }
+
+      console.log("📤 [HANDLE-CHECKOUT] Enviando al backend:", {
+        bookingId,
+        bookingIdType: typeof bookingId,
+        checkOutData,
+        endpoint: `/bookings/${bookingId}/check-out`
+      });
 
       const result = await dispatch(checkOut(bookingId, checkOutData));
       
