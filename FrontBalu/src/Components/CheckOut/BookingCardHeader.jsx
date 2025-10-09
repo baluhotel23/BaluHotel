@@ -11,7 +11,11 @@ import {
 import { getRealPaymentSummary } from '../../utils/paymentUtils';
 
 const BookingCardHeader = ({ booking, onViewDetails }) => {
-  // 🔍 LOG 1: Booking completo
+  // � LOG CRÍTICO - INICIO DEL COMPONENTE
+  console.group('🏨 ========== BOOKING CARD HEADER ==========');
+  console.log('🔍 [BOOKING-CARD-HEADER] Booking completo recibido:', booking);
+  
+  // �🔍 LOG 1: Booking completo
   console.log('📋 [BOOKING-CARD-HEADER] Booking recibido:', {
     bookingId: booking?.bookingId,
     checkIn: booking?.checkIn,
@@ -104,6 +108,17 @@ const BookingCardHeader = ({ booking, onViewDetails }) => {
     daysUntil,
     calculation: isValidCheckOutDate ? `(${checkOutDate.getTime()} - ${today.getTime()}) / 86400000` : 'N/A'
   });
+
+  // 🔍 LOG 6: Valores que se van a renderizar
+  console.log('🎨 [BOOKING-CARD-HEADER] RENDERIZANDO:', {
+    'Nombre a mostrar': guestName,
+    'Email a mostrar': guestEmail,
+    'Documento a mostrar': guestDocument,
+    'Teléfono a mostrar': guestPhone,
+    'Días hasta checkout': daysUntil,
+    'CheckOut válido?': isValidCheckOutDate
+  });
+  console.groupEnd();
 
   return (
     <div className="border-b border-gray-200 pb-4 mb-4">

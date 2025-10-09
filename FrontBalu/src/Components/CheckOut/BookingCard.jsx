@@ -14,10 +14,28 @@ const BookingCard = ({
   isLoading,
   loadingBills
 }) => {
+  // 🔍 LOG: Booking completo
+  console.log('🏨 [BOOKING-CARD] Booking recibido:', {
+    bookingId: booking.bookingId,
+    checkOut: booking.checkOut,
+    guest: booking.guest,
+    room: booking.room
+  });
+
   // Memoizar cálculos pesados
   const financials = useMemo(() => getRealPaymentSummary(booking), [booking]);
-  const daysUntilCheckOut = useMemo(() => getDaysUntilCheckOut(booking.checkOut), [booking.checkOut, getDaysUntilCheckOut]);
-  const checkOutBadge = useMemo(() => getCheckOutBadge(daysUntilCheckOut), [daysUntilCheckOut, getCheckOutBadge]);
+  const daysUntilCheckOut = useMemo(() => {
+    const days = getDaysUntilCheckOut(booking.checkOut);
+    console.log('📅 [BOOKING-CARD] Días calculados:', {
+      bookingId: booking.bookingId,
+      checkOut: booking.checkOut,
+      daysUntilCheckOut: days
+    });
+    return days;
+  }, [booking.checkOut, booking.bookingId, getDaysUntilCheckOut]);
+  
+  // ✅ CORREGIDO: getCheckOutBadge espera el objeto booking completo, no los días
+  const checkOutBadge = useMemo(() => getCheckOutBadge(booking), [booking, getCheckOutBadge]);
 
   // Handler unificado para el botón principal (pago o checkout)
   const handleMainActionClick = (e) => {
@@ -89,7 +107,7 @@ const BookingCard = ({
               </div>
               <div className="flex items-center gap-2">
                 <span>👤</span>
-                <span>{booking.guest?.name || 'Huésped no especificado'}</span>
+                <span>{booking.guest?.scostumername || booking.guest?.name || 'Huésped no especificado'}</span>
               </div>
             </div>
           </div>
