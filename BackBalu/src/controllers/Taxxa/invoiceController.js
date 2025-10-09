@@ -40,6 +40,8 @@ const getAllInvoicesSimple = async (req, res) => {
       taxAmount: invoice.taxAmount,
       netAmount: invoice.netAmount,
       cufe: invoice.cufe,
+      qrCode: invoice.qrCode, // ⭐ AGREGAR CAMPO QR CODE
+      pdfUrl: invoice.pdfUrl, // ⭐ AGREGAR CAMPO PDF URL
       status: invoice.status,
       sentToTaxxaAt: invoice.sentToTaxxaAt,
       orderReference: invoice.orderReference,
@@ -173,6 +175,8 @@ const getAllInvoices = async (req, res) => {
         taxAmount: invoiceData.taxAmount,
         netAmount: invoiceData.netAmount,
         cufe: invoiceData.cufe,
+        qrCode: invoiceData.qrCode, // ⭐ AGREGAR CAMPO QR CODE
+        pdfUrl: invoiceData.pdfUrl, // ⭐ AGREGAR CAMPO PDF URL
         status: invoiceData.status,
         sentToTaxxaAt: invoiceData.sentToTaxxaAt,
         orderReference: invoiceData.orderReference,
