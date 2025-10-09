@@ -23,7 +23,7 @@ const getAllInvoicesSimple = async (req, res) => {
         model: Bill,
         as: 'bill',
         required: false,
-        attributes: ['cufe', 'qrCode', 'pdfUrl'] // ⭐ Solo los campos necesarios
+        attributes: ['cufe', 'qrCode'] // ⭐ Solo CUFE y QR CODE (pdfUrl no existe en Bill)
       }],
       order: [['sentToTaxxaAt', 'DESC']],
       limit: parseInt(limit),
@@ -49,7 +49,6 @@ const getAllInvoicesSimple = async (req, res) => {
         netAmount: invoiceData.netAmount,
         cufe: invoiceData.bill?.cufe || invoiceData.cufe, // ⭐ TRAER DE BILL PRIMERO
         qrCode: invoiceData.bill?.qrCode || invoiceData.qrCode, // ⭐ TRAER DE BILL PRIMERO
-        pdfUrl: invoiceData.bill?.pdfUrl || invoiceData.pdfUrl, // ⭐ TRAER DE BILL PRIMERO
         status: invoiceData.status,
         sentToTaxxaAt: invoiceData.sentToTaxxaAt,
         orderReference: invoiceData.orderReference,
@@ -185,7 +184,6 @@ const getAllInvoices = async (req, res) => {
         netAmount: invoiceData.netAmount,
         cufe: invoiceData.bill?.cufe || invoiceData.cufe, // ⭐ TRAER DE BILL PRIMERO
         qrCode: invoiceData.bill?.qrCode || invoiceData.qrCode, // ⭐ TRAER DE BILL PRIMERO
-        pdfUrl: invoiceData.bill?.pdfUrl || invoiceData.pdfUrl, // ⭐ TRAER DE BILL PRIMERO
         status: invoiceData.status,
         sentToTaxxaAt: invoiceData.sentToTaxxaAt,
         orderReference: invoiceData.orderReference,

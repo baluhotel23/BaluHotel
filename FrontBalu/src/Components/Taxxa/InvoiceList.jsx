@@ -15,13 +15,10 @@ const InvoiceList = () => {
     description: ''
   });
 
-  const { invoices = [], loading = false, error = null } = useSelector((state) => {
-    return {
-      invoices: state.taxxa.invoices || [],
-      loading: state.taxxa.loadingInvoices || false,
-      error: state.taxxa.invoicesError || null
-    };
-  });
+  // ⭐ OPTIMIZADO: Selectores separados para evitar recreación de objeto
+  const invoices = useSelector((state) => state.taxxa?.invoices || []);
+  const loading = useSelector((state) => state.taxxa?.loadingInvoices || false);
+  const error = useSelector((state) => state.taxxa?.invoicesError || null);
 
   const loadInvoices = async () => {
     try {
