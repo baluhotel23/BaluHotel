@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+/* eslint-disable react/prop-types */
+import  { useState } from 'react';
 import { formatDate } from '../../utils/checkOutUtils';
 
 const BookingCardPassengers = ({ 
@@ -12,7 +13,7 @@ const BookingCardPassengers = ({
   disabled = false 
 }) => {
   const [showAllPassengers, setShowAllPassengers] = useState(false);
-  const [showPassengerForm, setShowPassengerForm] = useState(false);
+  //const [showPassengerForm, setShowPassengerForm] = useState(false);
 
   if (!booking) {
     return (

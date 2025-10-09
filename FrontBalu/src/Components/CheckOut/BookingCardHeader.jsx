@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import React from 'react';
 import { 
   getCheckOutBadge, 
@@ -10,6 +11,15 @@ import {
 import { getRealPaymentSummary } from '../../utils/paymentUtils';
 
 const BookingCardHeader = ({ booking, onViewDetails }) => {
+  // 🔍 LOG 1: Booking completo
+  console.log('📋 [BOOKING-CARD-HEADER] Booking recibido:', {
+    bookingId: booking?.bookingId,
+    checkIn: booking?.checkIn,
+    checkOut: booking?.checkOut,
+    guest: booking?.guest,
+    room: booking?.room
+  });
+
   // Calcular información financiera
   const financials = getRealPaymentSummary(booking);
   
@@ -18,14 +28,82 @@ const BookingCardHeader = ({ booking, onViewDetails }) => {
   const statusBadge = getBookingStatusBadge(booking.status);
   const paymentBadge = getPaymentStatusBadge(financials);
 
-  // Información del huésped
+  // Información del huésped - con múltiples fallbacks
   const guestInfo = booking.guest || {};
   const roomInfo = booking.room || {};
+  
+  // 🔍 LOG 2: Datos extraídos
+  console.log('👤 [BOOKING-CARD-HEADER] Datos del huésped:', {
+    guestInfo,
+    scostumername: guestInfo.scostumername,
+    selectronicmail: guestInfo.selectronicmail,
+    sdocno: guestInfo.sdocno,
+    stelephone: guestInfo.stelephone
+  });
+  
+  // Obtener nombre del huésped con múltiples opciones de fallback
+  const guestName = guestInfo.scostumername 
+    || guestInfo.name 
+    || guestInfo.firstName 
+    || booking.buyerName
+    || booking.guestName
+    || 'Huésped no especificado';
+  
+  // Obtener email con fallback
+  const guestEmail = guestInfo.selectronicmail 
+    || guestInfo.email 
+    || booking.email 
+    || 'Sin email';
+  
+  // Obtener documento con fallback
+  const guestDocument = guestInfo.sdocno 
+    || guestInfo.documentNumber 
+    || booking.documentNumber 
+    || 'No especificado';
+  
+  // Obtener teléfono con fallback
+  const guestPhone = guestInfo.stelephone 
+    || guestInfo.phone 
+    || booking.phoneNumber 
+    || 'No especificado';
+
+  // 🔍 LOG 3: Valores finales del huésped
+  console.log('✅ [BOOKING-CARD-HEADER] Valores finales:', {
+    guestName,
+    guestEmail,
+    guestDocument,
+    guestPhone
+  });
 
   // Calcular días hasta check-out
   const today = new Date();
+  today.setHours(0, 0, 0, 0); // Resetear hora para cálculo correcto de días
+  
   const checkOutDate = new Date(booking.checkOut);
-  const daysUntil = Math.ceil((checkOutDate - today) / (1000 * 60 * 60 * 24));
+  checkOutDate.setHours(0, 0, 0, 0); // Resetear hora para cálculo correcto de días
+  
+  // 🔍 LOG 4: Cálculo de fechas
+  console.log('📅 [BOOKING-CARD-HEADER] Cálculo de fechas:', {
+    bookingCheckOut: booking.checkOut,
+    checkOutDate: checkOutDate.toString(),
+    checkOutTimestamp: checkOutDate.getTime(),
+    isValidDate: !isNaN(checkOutDate.getTime()),
+    today: today.toString(),
+    todayTimestamp: today.getTime()
+  });
+  
+  // Validar que la fecha sea válida
+  const isValidCheckOutDate = booking.checkOut && !isNaN(checkOutDate.getTime());
+  const daysUntil = isValidCheckOutDate 
+    ? Math.ceil((checkOutDate - today) / (1000 * 60 * 60 * 24))
+    : null;
+
+  // 🔍 LOG 5: Resultado final del cálculo
+  console.log('🔢 [BOOKING-CARD-HEADER] Días hasta checkout:', {
+    isValidCheckOutDate,
+    daysUntil,
+    calculation: isValidCheckOutDate ? `(${checkOutDate.getTime()} - ${today.getTime()}) / 86400000` : 'N/A'
+  });
 
   return (
     <div className="border-b border-gray-200 pb-4 mb-4">
@@ -89,15 +167,15 @@ const BookingCardHeader = ({ booking, onViewDetails }) => {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
             <span className="text-blue-600 font-semibold text-lg">
-              {(guestInfo.scostumername || 'G').charAt(0).toUpperCase()}
+              {guestName.charAt(0).toUpperCase()}
             </span>
           </div>
           <div>
             <div className="font-medium text-gray-900">
-              {guestInfo.scostumername || 'Huésped sin nombre'}
+              {guestName}
             </div>
             <div className="text-sm text-gray-500">
-              {guestInfo.selectronicmail || 'Sin email'}
+              {guestEmail}
             </div>
           </div>
         </div>
@@ -106,13 +184,13 @@ const BookingCardHeader = ({ booking, onViewDetails }) => {
           <div className="text-sm">
             <span className="font-medium text-gray-700">Documento:</span>
             <span className="ml-2 text-gray-900">
-              {guestInfo.sdocno || 'No especificado'}
+              {guestDocument}
             </span>
           </div>
           <div className="text-sm">
             <span className="font-medium text-gray-700">Teléfono:</span>
             <span className="ml-2 text-gray-900">
-              {guestInfo.stelephone || booking.phoneNumber || 'No especificado'}
+              {guestPhone}
             </span>
           </div>
         </div>
@@ -149,7 +227,7 @@ const BookingCardHeader = ({ booking, onViewDetails }) => {
             </div>
             <div className="text-sm">
               <span className="font-medium">Check-out:</span>
-              <div className={`${daysUntil <= 0 ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
+              <div className={`${isValidCheckOutDate && daysUntil <= 0 ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
                 {formatDate(booking.checkOut, { includeTime: true, relative: false })}
               </div>
             </div>
@@ -231,7 +309,7 @@ const BookingCardHeader = ({ booking, onViewDetails }) => {
       {/* Alertas especiales */}
       <div className="mt-3 space-y-2">
         {/* Alerta de check-out vencido */}
-        {daysUntil < 0 && (
+        {isValidCheckOutDate && daysUntil < 0 && (
           <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
             <span className="text-red-500">🚨</span>
             <span className="text-red-700 text-sm font-medium">
@@ -241,7 +319,7 @@ const BookingCardHeader = ({ booking, onViewDetails }) => {
         )}
 
         {/* Alerta de check-out hoy */}
-        {daysUntil === 0 && (
+        {isValidCheckOutDate && daysUntil === 0 && (
           <div className="flex items-center gap-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
             <span className="text-orange-500">⏰</span>
             <span className="text-orange-700 text-sm font-medium">
@@ -264,7 +342,7 @@ const BookingCardHeader = ({ booking, onViewDetails }) => {
         )}
 
         {/* Información de estadía extendida */}
-        {daysUntil > 7 && (
+        {isValidCheckOutDate && daysUntil > 7 && (
           <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
             <span className="text-blue-500">📅</span>
             <span className="text-blue-700 text-sm">
