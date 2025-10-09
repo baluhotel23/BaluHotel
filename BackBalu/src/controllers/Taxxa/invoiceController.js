@@ -14,42 +14,51 @@ const it getAllInvoicesSimple = async (req, res) => {
 
     const offset = (page - 1) * limit;
     
-    // 🔧 CONSULTA SIN INCLUDES PRIMERO
+    // 🔧 CONSULTA CON BILL PARA OBTENER CUFE Y QRCODE
     const { count, rows: invoices } = await Invoice.findAndCountAll({
       where: {
         status: status
       },
+      include: [{
+        model: Bill,
+        as: 'bill',
+        required: false,
+        attributes: ['cufe', 'qrCode', 'pdfUrl'] // ⭐ Solo los campos necesarios
+      }],
       order: [['sentToTaxxaAt', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
     });
 
-    console.log(`✅ [INVOICE-CONTROLLER] ${invoices.length} facturas encontradas (sin relaciones)`);
+    console.log(`✅ [INVOICE-CONTROLLER] ${invoices.length} facturas encontradas (con Bill para CUFE/QR)`);
 
     // 🔧 FORMATEAR RESPUESTA BÁSICA
-    const formattedInvoices = invoices.map(invoice => ({
-      id: invoice.id,
-      billId: invoice.billId,
-      documentType: invoice.documentType,
-      prefix: invoice.prefix,
-      invoiceSequentialNumber: invoice.invoiceSequentialNumber,
-      fullInvoiceNumber: `${invoice.prefix}${invoice.invoiceSequentialNumber}`,
-      buyerName: invoice.buyerName,
-      buyerEmail: invoice.buyerEmail,
-      totalAmount: invoice.totalAmount,
-      taxAmount: invoice.taxAmount,
-      netAmount: invoice.netAmount,
-      cufe: invoice.cufe,
-      qrCode: invoice.qrCode, // ⭐ AGREGAR CAMPO QR CODE
-      pdfUrl: invoice.pdfUrl, // ⭐ AGREGAR CAMPO PDF URL
-      status: invoice.status,
-      sentToTaxxaAt: invoice.sentToTaxxaAt,
-      orderReference: invoice.orderReference,
-      hasCreditNote: invoice.hasCreditNote || false,
-      creditNoteAmount: invoice.creditNoteAmount || 0,
-      createdAt: invoice.createdAt,
-      updatedAt: invoice.updatedAt
-    }));
+    const formattedInvoices = invoices.map(invoice => {
+      const invoiceData = invoice.toJSON();
+      return {
+        id: invoiceData.id,
+        billId: invoiceData.billId,
+        documentType: invoiceData.documentType,
+        prefix: invoiceData.prefix,
+        invoiceSequentialNumber: invoiceData.invoiceSequentialNumber,
+        fullInvoiceNumber: `${invoiceData.prefix}${invoiceData.invoiceSequentialNumber}`,
+        buyerName: invoiceData.buyerName,
+        buyerEmail: invoiceData.buyerEmail,
+        totalAmount: invoiceData.totalAmount,
+        taxAmount: invoiceData.taxAmount,
+        netAmount: invoiceData.netAmount,
+        cufe: invoiceData.bill?.cufe || invoiceData.cufe, // ⭐ TRAER DE BILL PRIMERO
+        qrCode: invoiceData.bill?.qrCode || invoiceData.qrCode, // ⭐ TRAER DE BILL PRIMERO
+        pdfUrl: invoiceData.bill?.pdfUrl || invoiceData.pdfUrl, // ⭐ TRAER DE BILL PRIMERO
+        status: invoiceData.status,
+        sentToTaxxaAt: invoiceData.sentToTaxxaAt,
+        orderReference: invoiceData.orderReference,
+        hasCreditNote: invoiceData.hasCreditNote || false,
+        creditNoteAmount: invoiceData.creditNoteAmount || 0,
+        createdAt: invoiceData.createdAt,
+        updatedAt: invoiceData.updatedAt
+      };
+    });
 
     const totalPages = Math.ceil(count / limit);
 
@@ -174,9 +183,9 @@ const getAllInvoices = async (req, res) => {
         totalAmount: invoiceData.totalAmount,
         taxAmount: invoiceData.taxAmount,
         netAmount: invoiceData.netAmount,
-        cufe: invoiceData.cufe,
-        qrCode: invoiceData.qrCode, // ⭐ AGREGAR CAMPO QR CODE
-        pdfUrl: invoiceData.pdfUrl, // ⭐ AGREGAR CAMPO PDF URL
+        cufe: invoiceData.bill?.cufe || invoiceData.cufe, // ⭐ TRAER DE BILL PRIMERO
+        qrCode: invoiceData.bill?.qrCode || invoiceData.qrCode, // ⭐ TRAER DE BILL PRIMERO
+        pdfUrl: invoiceData.bill?.pdfUrl || invoiceData.pdfUrl, // ⭐ TRAER DE BILL PRIMERO
         status: invoiceData.status,
         sentToTaxxaAt: invoiceData.sentToTaxxaAt,
         orderReference: invoiceData.orderReference,
