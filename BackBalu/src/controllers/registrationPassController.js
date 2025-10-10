@@ -6,6 +6,7 @@ const {
   formatForDetailedLogs,
   toColombiaTime 
 } = require('../utils/dateUtils');
+const PDFDocument = require('pdfkit');
 
 // Crear un nuevo registro de pasajero
 const createRegistrationPass = async (req, res) => {
@@ -255,7 +256,9 @@ const updateRegistrationPass = async (req, res) => {
       idIssuingPlace, 
       foreignIdOrPassport, 
       address, 
-      phoneNumber 
+      phoneNumber,
+      vehicleType,
+      vehiclePlate
     } = req.body;
 
     console.log(`📝 Actualizando pasajero ${registrationNumber} a las:`, formatForLogs(getColombiaTime()));
@@ -286,6 +289,8 @@ const updateRegistrationPass = async (req, res) => {
       foreignIdOrPassport,
       address,
       phoneNumber,
+      vehicleType,
+      vehiclePlate,
       lastModified: getColombiaTime(), // ⭐ AGREGAR CAMPO DE ÚLTIMA MODIFICACIÓN
     };
 
@@ -424,10 +429,56 @@ const getRegistrationPassesByBooking = async (req, res) => {
   }
 };
 
+// Nuevo: Generar PDF de lista de pasajeros
+const downloadPassengerListPdf = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const registrationPasses = await RegistrationPass.findAll({
+      where: { bookingId },
+      order: [['checkInDate', 'ASC']]
+    });
+    if (!registrationPasses.length) {
+      return res.status(404).json({ error: true, message: 'No se encontraron registros de pasajeros' });
+    }
+    const doc = new PDFDocument({ margin: 50 });
+    let buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+      const pdfData = Buffer.concat(buffers);
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename=passenger_list_${bookingId}.pdf`,
+        'Content-Length': pdfData.length
+      });
+      res.end(pdfData);
+    });
+    // Cabecera
+    doc.fontSize(18).text(`Lista de Pasajeros - Reserva ${bookingId}`, { align: 'center' });
+    doc.moveDown();
+    // Tabla de pasajeros
+    doc.fontSize(12);
+    registrationPasses.forEach((pass, idx) => {
+      doc.text(`${idx + 1}. Nombre: ${pass.name}`, { continued: false });
+      doc.text(`   Nacionalidad: ${pass.nationality}`);
+      doc.text(`   Documento: ${pass.idNumber}`);
+      doc.text(`   Teléfono: ${pass.phoneNumber || 'N/A'}`);
+      if (pass.vehicleType || pass.vehiclePlate) {
+        doc.text(`   Vehículo: ${pass.vehicleType || 'N/A'} - Placa: ${pass.vehiclePlate || 'N/A'}`);
+      }
+      doc.moveDown(0.5);
+    });
+    doc.end();
+  } catch (error) {
+    console.error('Error generando PDF de lista de pasajeros:', error);
+    res.status(500).json({ error: true, message: 'Error al generar PDF', details: error.message });
+  }
+};
+
 module.exports = {
   createRegistrationPass,
   getAllRegistrationPasses,
   updateRegistrationPass,
   deleteRegistrationPass,
-  getRegistrationPassesByBooking
+  getRegistrationPassesByBooking,
+  downloadPassengerListPdf
 };
