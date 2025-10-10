@@ -605,20 +605,41 @@ const updateRoomStatus = async (req, res, next) => {
         message: 'Habitación no encontrada'
       });
     }
-    const validStatuses = ["Limpia", "Ocupada", "Mantenimiento", "Reservada"];
+    
+    // ✅ INCLUYENDO "Para Limpiar" EN LOS ESTADOS VÁLIDOS
+    const validStatuses = ["Limpia", "Ocupada", "Mantenimiento", "Reservada", "Para Limpiar"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         error: true,
         message: 'Estado inválido'
       });
     }
-    const updatedRoom = await room.update({ status });
+
+    // ✅ DETERMINAR DISPONIBILIDAD BASADA EN EL ESTADO
+    let available = false;
+    switch (status) {
+      case "Limpia":
+        available = true; // Solo habitaciones limpias están disponibles para reservar
+        break;
+      case "Ocupada":
+      case "Reservada":
+      case "Para Limpiar":
+      case "Mantenimiento":
+        available = false; // Todos los demás estados hacen que la habitación no esté disponible
+        break;
+    }
+
+    console.log(`🏨 [UPDATE-ROOM-STATUS] Habitación ${roomNumber}: ${room.status} → ${status}, available: ${room.available} → ${available}`);
+
+    const updatedRoom = await room.update({ status, available });
+    
     res.status(200).json({
       error: false,
       data: updatedRoom,
-      message: 'Estado de la habitación actualizado correctamente'
+      message: `Estado de habitación actualizado: ${status} (${available ? 'Disponible' : 'No disponible'})`
     });
   } catch (error) {
+    console.error('❌ [UPDATE-ROOM-STATUS] Error:', error);
     next(error);
   }
 };
