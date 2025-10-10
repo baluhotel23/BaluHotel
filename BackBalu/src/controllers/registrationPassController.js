@@ -49,6 +49,9 @@ const createRegistrationPass = async (req, res) => {
       return res.status(404).json({ error: true, message: "Reserva no encontrada" });
     }
 
+    // ⭐ CONTAR REGISTROS DE PASAJERO EXISTENTES PARA ESTA RESERVA
+    const existingCount = await RegistrationPass.count({ where: { bookingId } });
+
     // ⭐ ACCEDER AL ROOM CON EL ALIAS CORRECTO Y USAR FECHA DE COLOMBIA
     const roomNumber = booking.room?.roomNumber || booking.roomNumber;
     const checkInDate = toColombiaTime(booking.checkIn || getColombiaDate());
@@ -74,16 +77,24 @@ const createRegistrationPass = async (req, res) => {
             checkInTime: passenger.checkInTime,
             registrationDateTime: getColombiaTime(), // ⭐ FECHA/HORA DE REGISTRO
             ...passenger,
+            vehicleType,
+            vehiclePlate
           });
         })
       );
+
+      // ⭐ ACTUALIZAR ESTADO DE HABITACIÓN SI ES EL PRIMER PASAJERO
+      if (existingCount === 0 && createdPassengers.length) {
+        await booking.room.update({ status: 'Ocupada' });
+        console.log(`🔄 Estado de habitación ${roomNumber} cambiado a Ocupada automáticamente`);
+      }
 
       console.log(`✅ ${createdPassengers.length} pasajeros creados exitosamente a las ${formatForLogs(getColombiaTime())}`);
     } else {
       // ⭐ CREAR UN SOLO PASAJERO CON FECHA DE COLOMBIA
       console.log("👤 Creando pasajero único:", name);
       
-      await RegistrationPass.create({
+      const newPass = await RegistrationPass.create({
         bookingId,
         roomNumber,
         checkInDate,
@@ -101,7 +112,15 @@ const createRegistrationPass = async (req, res) => {
         foreignIdOrPassport,
         address,
         phoneNumber,
+        vehicleType,
+        vehiclePlate
       });
+
+      // ⭐ ACTUALIZAR ESTADO DE HABITACIÓN SI ES EL PRIMER PASAJERO
+      if (existingCount === 0) {
+        await booking.room.update({ status: 'Ocupada' });
+        console.log(`🔄 Estado de habitación ${roomNumber} cambiado a Ocupada automáticamente`);
+      }
 
       console.log(`✅ Pasajero único creado exitosamente a las ${formatForLogs(getColombiaTime())}`);
     }
