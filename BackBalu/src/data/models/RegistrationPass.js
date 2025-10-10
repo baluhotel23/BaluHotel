@@ -63,6 +63,14 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    vehicleType: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    vehiclePlate: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     bookingId: {
       type: DataTypes.INTEGER,
       allowNull: false,

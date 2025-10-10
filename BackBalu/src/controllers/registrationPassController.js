@@ -29,6 +29,8 @@ const createRegistrationPass = async (req, res) => {
       foreignIdOrPassport,
       address,
       phoneNumber,
+      vehicleType,
+      vehiclePlate,
     } = req.body;
 
     if (!bookingId) {
