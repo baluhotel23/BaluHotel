@@ -83,6 +83,12 @@ const getAllRooms = async (req, res, next) => {
             as: 'RoomBasics'
           },
         },
+        {
+          model: Booking,
+          as: 'bookings',
+          attributes: ['bookingId', 'guestName', 'checkIn', 'checkOut', 'status'],
+          required: false,
+        },
       ],
       order: [['roomNumber', 'ASC']]
     });

@@ -40,6 +40,33 @@ const RoomStatusDashboard = () => {
     });
   }, [dispatch]);
 
+  // ⭐ FUNCIÓN PARA OBTENER PRÓXIMAS RESERVAS DE UNA HABITACIÓN
+  const getUpcomingBookings = (room) => {
+    if (!room || !room.bookings || !Array.isArray(room.bookings)) return [];
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return room.bookings
+      .filter(booking => {
+        const checkIn = new Date(booking.checkIn);
+        return checkIn >= today && (booking.status === 'Confirmada' || booking.status === 'Pendiente');
+      })
+      .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn))
+      .slice(0, 3); // Máximo 3 próximas reservas
+  };
+
+  // ⭐ FUNCIÓN PARA FORMATEAR FECHA
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Sin fecha';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-CO', { 
+      day: '2-digit', 
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
   // ⭐ FUNCIÓN PARA NORMALIZAR ESTADO (solo 3 estados)
   const getNormalizedStatus = (room) => {
     if (!room.isActive) return 'Inactiva';
