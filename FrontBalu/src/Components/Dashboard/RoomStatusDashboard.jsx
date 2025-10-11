@@ -287,7 +287,7 @@ const RoomStatusDashboard = () => {
                             <div className="font-semibold mb-1">📅 Próximas reservas:</div>
                             {upcomingBookings.map((booking, idx) => (
                               <div key={idx} className="text-[10px] opacity-90">
-                                • {formatDate(booking.checkIn)} - {booking.guestName || 'Sin nombre'}
+                                • {formatDate(booking.checkIn)} - Reserva #{booking.bookingId}
                               </div>
                             ))}
                           </div>

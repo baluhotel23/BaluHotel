@@ -27,7 +27,7 @@ const getAllRooms = async (req, res, next) => {
 
     // 🆕 Obtener todas las bookings activas de una sola vez (query simple sin Op)
     const allBookings = await Booking.findAll({
-      attributes: ['bookingId', 'guestName', 'checkIn', 'checkOut', 'status', 'roomNumber']
+      attributes: ['bookingId', 'guestId', 'checkIn', 'checkOut', 'status', 'roomNumber', 'guestCount']
     });
 
     // 🆕 Filtrar solo las bookings relevantes en memoria
@@ -44,7 +44,8 @@ const getAllRooms = async (req, res, next) => {
       }
       bookingsByRoom[roomNum].push({
         bookingId: booking.bookingId,
-        guestName: booking.guestName,
+        guestId: booking.guestId,
+        guestCount: booking.guestCount,
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
         status: booking.status
