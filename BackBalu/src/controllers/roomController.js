@@ -31,6 +31,9 @@ const getAllRooms = async (req, res, next) => {
       order: [['roomNumber', 'ASC']]
     });
 
+    // Log para verificar si bookings viene en la respuesta
+    console.log('✅ Primera habitación con bookings:', JSON.stringify(rooms[0]?.toJSON(), null, 2));
+
     res.json({
       error: false,
       data: rooms,
