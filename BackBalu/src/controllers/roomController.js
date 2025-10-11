@@ -25,31 +25,31 @@ const getAllRooms = async (req, res, next) => {
       order: [['roomNumber', 'ASC']]
     });
 
-    // 🆕 Obtener todas las bookings de una sola vez
+    // 🆕 Obtener todas las bookings activas de una sola vez (query simple sin Op)
     const allBookings = await Booking.findAll({
-      attributes: ['bookingId', 'guestName', 'checkIn', 'checkOut', 'status', 'roomNumber'],
-      where: {
-        status: {
-          [Op.in]: ['confirmed', 'pending', 'checked-in']
-        }
-      }
+      attributes: ['bookingId', 'guestName', 'checkIn', 'checkOut', 'status', 'roomNumber']
     });
 
+    // 🆕 Filtrar solo las bookings relevantes en memoria
+    const activeBookings = allBookings.filter(b => 
+      b.status === 'confirmed' || b.status === 'pending' || b.status === 'checked-in'
+    );
+
     // 🆕 Agrupar bookings por roomNumber
-    const bookingsByRoom = allBookings.reduce((acc, booking) => {
+    const bookingsByRoom = {};
+    activeBookings.forEach(booking => {
       const roomNum = booking.roomNumber;
-      if (!acc[roomNum]) {
-        acc[roomNum] = [];
+      if (!bookingsByRoom[roomNum]) {
+        bookingsByRoom[roomNum] = [];
       }
-      acc[roomNum].push({
+      bookingsByRoom[roomNum].push({
         bookingId: booking.bookingId,
         guestName: booking.guestName,
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
         status: booking.status
       });
-      return acc;
-    }, {});
+    });
 
     // 🆕 Agregar bookings a cada room
     const roomsWithBookings = rooms.map(room => {
