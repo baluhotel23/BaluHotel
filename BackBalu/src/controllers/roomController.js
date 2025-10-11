@@ -21,22 +21,46 @@ const getAllRooms = async (req, res, next) => {
             as: 'RoomBasics'
           },
         },
-        {
-          model: Booking,
-          as: 'bookings',
-          attributes: ['bookingId', 'guestName', 'checkIn', 'checkOut', 'status'],
-          required: false,
-        },
       ],
       order: [['roomNumber', 'ASC']]
     });
 
-    // Log para verificar si bookings viene en la respuesta
-    console.log('✅ Primera habitación con bookings:', JSON.stringify(rooms[0]?.toJSON(), null, 2));
+    // 🆕 Obtener todas las bookings de una sola vez
+    const allBookings = await Booking.findAll({
+      attributes: ['bookingId', 'guestName', 'checkIn', 'checkOut', 'status', 'roomNumber'],
+      where: {
+        status: {
+          [Op.in]: ['confirmed', 'pending', 'checked-in']
+        }
+      }
+    });
+
+    // 🆕 Agrupar bookings por roomNumber
+    const bookingsByRoom = allBookings.reduce((acc, booking) => {
+      const roomNum = booking.roomNumber;
+      if (!acc[roomNum]) {
+        acc[roomNum] = [];
+      }
+      acc[roomNum].push({
+        bookingId: booking.bookingId,
+        guestName: booking.guestName,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        status: booking.status
+      });
+      return acc;
+    }, {});
+
+    // 🆕 Agregar bookings a cada room
+    const roomsWithBookings = rooms.map(room => {
+      const roomData = room.toJSON();
+      roomData.bookings = bookingsByRoom[room.roomNumber] || [];
+      return roomData;
+    });
 
     res.json({
       error: false,
-      data: rooms,
+      data: roomsWithBookings,
       message: 'Habitaciones obtenidas exitosamente'
     });
   } catch (error) {
