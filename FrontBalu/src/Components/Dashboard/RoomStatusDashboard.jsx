@@ -245,11 +245,29 @@ const RoomStatusDashboard = () => {
                     <div className="text-xs opacity-90">{getNormalizedStatus(room)}</div>
                   </div>
                   
-                  {/* ⭐ TOOLTIP AL HOVER */}
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10">
-                    <div>{room.type}</div>
+                  {/* ⭐ TOOLTIP AL HOVER CON PRÓXIMAS RESERVAS */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-2 px-3 z-10 min-w-max">
+                    <div className="font-semibold">{room.type}</div>
                     <div>Max: {room.maxGuests} huéspedes</div>
                     {room.isPromo && <div className="text-yellow-300">⭐ Promoción</div>}
+                    
+                    {/* Próximas reservas */}
+                    {(() => {
+                      const upcomingBookings = getUpcomingBookings(room);
+                      if (upcomingBookings.length > 0) {
+                        return (
+                          <div className="mt-2 pt-2 border-t border-gray-700">
+                            <div className="font-semibold mb-1">📅 Próximas reservas:</div>
+                            {upcomingBookings.map((booking, idx) => (
+                              <div key={idx} className="text-[10px] opacity-90">
+                                • {formatDate(booking.checkIn)} - {booking.guestName || 'Sin nombre'}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </button>
               ))}

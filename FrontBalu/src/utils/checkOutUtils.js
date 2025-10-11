@@ -6,8 +6,20 @@
 export const getCheckOutBadge = (booking) => {
   if (!booking) return { type: 'unknown', text: 'Sin información', color: 'gray' };
 
-  const today = new Date();
+  // ⭐ USAR HORA DE COLOMBIA (UTC-5)
+  const getColombiaDate = () => {
+    const now = new Date();
+    // Convertir a hora de Colombia (UTC-5)
+    const colombiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+    colombiaTime.setHours(0, 0, 0, 0); // Resetear a medianoche
+    return colombiaTime;
+  };
+  
+  const today = getColombiaDate();
+  
   const checkOutDate = new Date(booking.checkOut);
+  checkOutDate.setHours(0, 0, 0, 0); // Resetear a medianoche
+  
   const diffTime = checkOutDate - today;
   const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
