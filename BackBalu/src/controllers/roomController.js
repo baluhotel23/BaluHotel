@@ -4,68 +4,6 @@ const { Op } = require("sequelize");
 // Obtener todas las habitaciones
 const getAllRooms = async (req, res, next) => {
   try {
-    console.log('🚀 INICIANDO getAllRooms...');
-    
-    // ⭐ PASO 1: Verificar modelos disponibles
-    console.log('📋 Modelos disponibles:', Object.keys(require('../data').sequelize.models));
-    
-    // ⭐ PASO 2: Verificar asociaciones de Room
-    const { Room, Service, BasicInventory } = require('../data');
-    console.log('🔍 Asociaciones de Room:', Object.keys(Room.associations || {}));
-    console.log('🔍 Asociaciones de Service:', Object.keys(Service.associations || {}));
-    console.log('🔍 Asociaciones de BasicInventory:', Object.keys(BasicInventory.associations || {}));
-    
-    // ⭐ PASO 3: Probar query básica primero
-    console.log('🔄 Intentando query básica sin includes...');
-    const basicRooms = await Room.findAll({
-      attributes: ['roomNumber', 'type', 'description'],
-      limit: 2
-    });
-    console.log('✅ Query básica exitosa:', basicRooms.length, 'habitaciones encontradas');
-    
-    // ⭐ PASO 4: Probar solo con Services
-    console.log('🔄 Probando solo con Services...');
-    try {
-      const roomsWithServices = await Room.findAll({
-        include: [
-          {
-            model: Service,
-            as: 'Services',
-            attributes: ['serviceId', 'name'],
-            through: { attributes: [] },
-          }
-        ],
-        limit: 1
-      });
-      console.log('✅ Query con Services exitosa:', roomsWithServices.length);
-    } catch (serviceError) {
-      console.log('❌ Error con Services:', serviceError.message);
-    }
-    
-    // ⭐ PASO 5: Probar solo con BasicInventories
-    console.log('🔄 Probando solo con BasicInventories...');
-    try {
-      const roomsWithInventory = await Room.findAll({
-        include: [
-          {
-            model: BasicInventory,
-            as: 'BasicInventories',
-            attributes: ['id', 'name'],
-            through: { 
-              attributes: ['quantity'],
-              as: 'RoomBasics'
-            },
-          }
-        ],
-        limit: 1
-      });
-      console.log('✅ Query con BasicInventories exitosa:', roomsWithInventory.length);
-    } catch (inventoryError) {
-      console.log('❌ Error con BasicInventories:', inventoryError.message);
-    }
-    
-    // ⭐ PASO 6: Intentar query completa
-    console.log('🔄 Intentando query completa...');
     const rooms = await Room.findAll({
       include: [
         {
@@ -92,8 +30,6 @@ const getAllRooms = async (req, res, next) => {
       ],
       order: [['roomNumber', 'ASC']]
     });
-
-    console.log('✅ Query completa exitosa:', rooms.length, 'habitaciones con relaciones');
 
     res.json({
       error: false,
