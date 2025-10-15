@@ -304,25 +304,36 @@ const RoomStatusDashboard = () => {
 
         {/* ⭐ MODAL DE DETALLES DE HABITACIÓN */}
         {selectedRoom && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-2xl font-bold text-gray-800">
-                  Habitación {selectedRoom.roomNumber}
-                </h3>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Header fijo */}
+              <div className="flex justify-between items-start p-6 border-b bg-gradient-to-r from-orange-500 to-orange-600">
+                <div>
+                  <h3 className="text-2xl font-bold text-white">
+                    Habitación {selectedRoom.roomNumber}
+                  </h3>
+                  <span className={`inline-block mt-2 px-3 py-1 rounded text-xs font-medium ${
+                    getNormalizedStatus(selectedRoom) === 'Disponible' ? 'bg-green-100 text-green-800' :
+                    getNormalizedStatus(selectedRoom) === 'Reservada' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {getNormalizedStatus(selectedRoom)}
+                  </span>
+                </div>
                 <button
                   onClick={() => setSelectedRoom(null)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-white hover:text-gray-200 text-2xl font-bold"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="space-y-3">
+              {/* Contenido scrolleable */}
+              <div className="flex-1 overflow-y-auto p-6">
                 <div>
                   <span className="font-semibold">Estado: </span>
                   <span className={`px-3 py-1 rounded text-white ${getStatusColor(selectedRoom)}`}>
-                    {selectedRoom.status}
+                    {getNormalizedStatus(selectedRoom)}
                   </span>
                 </div>
 
@@ -360,21 +371,93 @@ const RoomStatusDashboard = () => {
                     <p className="text-gray-600 text-sm">{selectedRoom.description}</p>
                   </div>
                 )}
+
+                {/* ⭐ SECCIÓN DE RESERVAS */}
+                {(() => {
+                  const upcomingBookings = getUpcomingBookings(selectedRoom);
+                  const allBookings = selectedRoom.bookings || [];
+                  const activeBooking = allBookings.find(b => 
+                    b.status === 'Confirmada' || b.status === 'Pendiente' || b.status === 'checked_in'
+                  );
+
+                  if (activeBooking || upcomingBookings.length > 0) {
+                    return (
+                      <div className="border-t pt-3 mt-3">
+                        <span className="font-semibold block mb-2">📅 Reservas:</span>
+                        
+                        {/* Reserva actual/activa */}
+                        {activeBooking && (
+                          <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-2">
+                            <div className="text-sm">
+                              <div className="font-medium text-blue-800">
+                                Reserva #{activeBooking.bookingId} - {activeBooking.status}
+                              </div>
+                              <div className="text-gray-700 mt-1">
+                                <strong>Check-in:</strong> {formatDate(activeBooking.checkIn)}
+                              </div>
+                              <div className="text-gray-700">
+                                <strong>Check-out:</strong> {formatDate(activeBooking.checkOut)}
+                              </div>
+                              {activeBooking.guest && (
+                                <div className="text-gray-600 mt-1 text-xs">
+                                  👤 {activeBooking.guest.scostumername || 'Sin nombre'}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Próximas reservas */}
+                        {upcomingBookings.length > 0 && (
+                          <div>
+                            <div className="text-xs font-medium text-gray-600 mb-1">
+                              Próximas ({upcomingBookings.length}):
+                            </div>
+                            <div className="space-y-1">
+                              {upcomingBookings.map((booking, idx) => (
+                                <div key={idx} className="bg-gray-50 border border-gray-200 rounded p-2 text-xs">
+                                  <div className="font-medium">Reserva #{booking.bookingId}</div>
+                                  <div className="text-gray-600">
+                                    {formatDate(booking.checkIn)} → {formatDate(booking.checkOut)}
+                                  </div>
+                                  {booking.guest && (
+                                    <div className="text-gray-500 text-[10px]">
+                                      👤 {booking.guest.scostumername || 'Sin nombre'}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div className="border-t pt-3 mt-3">
+                      <div className="text-sm text-gray-500 text-center py-2">
+                        Sin reservas activas o próximas
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
-              <div className="mt-6 flex gap-2">
+              {/* Footer fijo con botones */}
+              <div className="border-t p-4 bg-gray-50 flex gap-2">
                 <button
                   onClick={() => {
                     // TODO: Navegar a detalles de la habitación
                     toast.info('Funcionalidad en desarrollo');
                   }}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded transition-colors"
                 >
-                  Ver Detalles
+                  Ver Detalles Completos
                 </button>
                 <button
                   onClick={() => setSelectedRoom(null)}
-                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded"
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded transition-colors"
                 >
                   Cerrar
                 </button>

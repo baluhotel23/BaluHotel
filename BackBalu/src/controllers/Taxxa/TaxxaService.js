@@ -952,15 +952,29 @@ const createCreditNote = async (req, res) => {
 
     // 🔧 BUSCAR FACTURA ORIGINAL CON DEBUG
     console.log('🔍 [STEP 4] Buscando factura original ID:', originalInvoiceId);
+    console.log('🔍 [STEP 4] Tipo de originalInvoiceId:', typeof originalInvoiceId);
     
     let originalInvoice;
     try {
+      // ⭐ PRIMERO BUSCAR SIN RESTRICCIONES PARA VER SI EXISTE (incluye soft-deleted)
+      const invoiceCheck = await Invoice.findByPk(originalInvoiceId, { paranoid: false });
+      console.log('🔍 [STEP 4] Factura encontrada (sin filtros):', invoiceCheck ? {
+        id: invoiceCheck.id,
+        status: invoiceCheck.status,
+        cufe: invoiceCheck.cufe,
+        prefix: invoiceCheck.prefix,
+        number: invoiceCheck.invoiceSequentialNumber,
+        deletedAt: invoiceCheck.deletedAt
+      } : 'NO ENCONTRADA');
+
+      // ⭐ AHORA BUSCAR CON CONDICIONES MÁS FLEXIBLES (incluye soft-deleted)
       originalInvoice = await Invoice.findOne({
         where: { 
-          id: originalInvoiceId,
-          status: 'sent',
-          cufe: { [Op.not]: null }
-        }
+          id: originalInvoiceId
+          // ⭐ ELIMINAR RESTRICCIONES DE status y cufe para debug
+          // Validaremos esto después manualmente
+        },
+        paranoid: false // ⭐ INCLUIR FACTURAS SOFT-DELETED
       });
       console.log('✅ [STEP 4] Query ejecutada exitosamente');
     } catch (dbError) {
@@ -973,29 +987,77 @@ const createCreditNote = async (req, res) => {
     }
 
     if (!originalInvoice) {
-      console.log('❌ [STEP 4] Factura original no encontrada');
+      console.log('❌ [STEP 4] Factura original no encontrada con ID:', originalInvoiceId);
       return res.status(404).json({
-        message: 'Factura fiscal original no encontrada, no está enviada o no tiene CUFE válido',
+        message: `Factura fiscal con ID ${originalInvoiceId} no encontrada`,
         success: false,
       });
     }
 
-    if (!originalInvoice.cufe) {
-      console.log('❌ [STEP 4] CUFE no válido');
+    // ⭐ VALIDAR ESTADO
+    if (originalInvoice.status !== 'sent') {
+      console.log('❌ [STEP 4] Factura no está en estado "sent":', originalInvoice.status);
+      return res.status(400).json({
+        message: `La factura debe estar en estado "sent". Estado actual: ${originalInvoice.status}`,
+        success: false,
+      });
+    }
+
+    // 🔧 OBTENER BILL PRIMERO PARA VERIFICAR CUFE
+    console.log('🔍 [STEP 4.5] Obteniendo Bill para verificar CUFE...');
+    let bill;
+    try {
+      bill = await Bill.findOne({
+        where: { idBill: originalInvoice.billId }
+      });
+      
+      if (!bill) {
+        console.log('❌ [STEP 4.5] Bill no encontrado');
+        return res.status(404).json({
+          message: 'Bill asociado a la factura no encontrado',
+          success: false,
+        });
+      }
+      
+      console.log('✅ [STEP 4.5] Bill encontrado:', {
+        idBill: bill.idBill,
+        cufeInBill: bill.cufe ? 'Sí' : 'No'
+      });
+    } catch (billError) {
+      console.error('❌ [STEP 4.5] Error buscando Bill:', billError.message);
+      return res.status(500).json({
+        message: 'Error al buscar Bill',
+        success: false,
+        error: billError.message
+      });
+    }
+
+    // ⭐ VALIDAR CUFE (buscar en invoice o en bill)
+    const cufeToUse = originalInvoice.cufe || bill.cufe;
+    
+    if (!cufeToUse) {
+      console.log('❌ [STEP 4] CUFE no encontrado ni en Invoice ni en Bill');
       return res.status(400).json({
         message: 'La factura original no tiene CUFE válido, no se puede crear nota de crédito',
         success: false,
       });
     }
 
+    // ⭐ Si el CUFE está en Bill pero no en Invoice, actualizarlo
+    if (!originalInvoice.cufe && bill.cufe) {
+      console.log('🔧 [STEP 4] Sincronizando CUFE de Bill a Invoice...');
+      await originalInvoice.update({ cufe: bill.cufe });
+      console.log('✅ [STEP 4] CUFE sincronizado');
+    }
+
     console.log(`✅ [STEP 4] Factura original encontrada: ${originalInvoice.getFullInvoiceNumber()}`);
-    console.log(`🔍 CUFE de la factura original: ${originalInvoice.cufe}`);
+    console.log(`🔍 CUFE de la factura original: ${cufeToUse}`);
 
     // 🔧 OBTENER DATOS RELACIONADOS CON DEBUG
     console.log('🔍 [STEP 5] Obteniendo datos relacionados...');
     
-    let bill;
     try {
+      // Recargar bill con todas las relaciones
       bill = await Bill.findOne({
         where: { idBill: originalInvoice.billId },
         include: [

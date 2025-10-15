@@ -185,8 +185,8 @@ module.exports = (sequelize) => {
       status: 'sent',
       sentToTaxxaAt: new Date(),
       taxxaResponse: taxxaResponse,
-      cufe: taxxaResponse.scufe || taxxaResponse.cufe,
-      taxxaTransactionId: taxxaResponse.stransactionid || taxxaResponse.transactionId
+      cufe: taxxaResponse.jret?.scufe || taxxaResponse.scufe || taxxaResponse.cufe,
+      taxxaTransactionId: taxxaResponse.jret?.rtaxxadocument || taxxaResponse.stransactionid || taxxaResponse.transactionId
     });
   };
 
