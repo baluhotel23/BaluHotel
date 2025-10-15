@@ -1083,21 +1083,55 @@ const createCreditNote = async (req, res) => {
       });
     }
 
-    if (!bill || !bill.booking || !bill.booking.guest) {
-      console.log('❌ [STEP 5] Datos relacionados no encontrados');
-      console.log('  - bill exists:', !!bill);
-      console.log('  - booking exists:', !!bill?.booking);
-      console.log('  - guest exists:', !!bill?.booking?.guest);
+    if (!bill) {
+      console.log('❌ [STEP 5] Bill no encontrado');
       return res.status(404).json({
-        message: 'Datos relacionados no encontrados (bill/booking/guest)',
+        message: 'Bill asociado a la factura no encontrado',
         success: false,
       });
     }
 
-    console.log('✅ [STEP 5] Datos relacionados obtenidos');
+    console.log('✅ [STEP 5] Bill obtenido');
 
-    const booking = bill.booking;
-    const buyer = bill.booking.guest;
+    // 🔍 DETERMINAR SI ES FACTURA MANUAL O DE RESERVA
+    const isManualInvoice = bill.billType === 'manual' || !bill.bookingId;
+    console.log(`📋 Tipo de factura: ${isManualInvoice ? 'MANUAL' : 'RESERVA'}`);
+
+    let buyer;
+    let booking = null;
+
+    if (isManualInvoice) {
+      // Para facturas manuales, buscar buyer directamente
+      console.log('🔍 [STEP 5.1] Buscando buyer para factura manual...');
+      buyer = await Buyer.findOne({
+        where: { sdocno: originalInvoice.buyerId }
+      });
+
+      if (!buyer) {
+        console.log('❌ [STEP 5.1] Buyer no encontrado');
+        return res.status(404).json({
+          message: 'Comprador no encontrado',
+          success: false,
+        });
+      }
+      console.log('✅ [STEP 5.1] Buyer obtenido:', buyer.scostumername);
+    } else {
+      // Para facturas de reserva, validar booking y guest
+      if (!bill.booking || !bill.booking.guest) {
+        console.log('❌ [STEP 5] Datos de reserva no encontrados');
+        console.log('  - booking exists:', !!bill?.booking);
+        console.log('  - guest exists:', !!bill?.booking?.guest);
+        return res.status(404).json({
+          message: 'Datos de reserva no encontrados (booking/guest)',
+          success: false,
+        });
+      }
+      booking = bill.booking;
+      buyer = bill.booking.guest;
+      console.log('✅ [STEP 5] Datos de reserva obtenidos');
+    }
+
+    console.log('✅ [STEP 5] Datos relacionados obtenidos exitosamente');
 
     // Continuar con el resto del proceso...
     console.log('🔍 [STEP 6] Proceso continúa...');

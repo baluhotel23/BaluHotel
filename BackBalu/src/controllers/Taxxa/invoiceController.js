@@ -120,7 +120,7 @@ const getAllInvoices = async (req, res) => {
             model: Booking,
             as: 'booking',
             required: false,
-            attributes: ['bookingId', 'roomNumber', 'checkInDate', 'checkOutDate']
+            attributes: ['bookingId', 'roomNumber', 'checkIn', 'checkOut']
           }
         ] : []
       });
