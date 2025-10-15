@@ -7113,6 +7113,19 @@ const cancelBooking = async (req, res) => {
           description:
             "Crédito válido por 30 días calendario para nueva reserva",
         };
+      } else {
+        // Sin pagos previos
+        refundPolicy = {
+          type: "no_payment",
+          amount: 0,
+          reason: "No había pagos realizados",
+        };
+
+        creditVoucherPolicy = {
+          type: "no_payment",
+          amount: 0,
+          description: "No aplica crédito porque no había pagos",
+        };
       }
     } else if (daysUntilCheckIn >= 0) {
       // ⚠️ CANCELACIÓN CON MENOS DE 5 DÍAS

@@ -50,7 +50,7 @@ const RoomStatusDashboard = () => {
     return room.bookings
       .filter(booking => {
         const checkIn = new Date(booking.checkIn);
-        return checkIn >= today && (booking.status === 'Confirmada' || booking.status === 'Pendiente');
+        return checkIn >= today && (booking.status === 'confirmed' || booking.status === 'pending');
       })
       .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn))
       .slice(0, 3); // Máximo 3 próximas reservas
@@ -377,7 +377,7 @@ const RoomStatusDashboard = () => {
                   const upcomingBookings = getUpcomingBookings(selectedRoom);
                   const allBookings = selectedRoom.bookings || [];
                   const activeBooking = allBookings.find(b => 
-                    b.status === 'Confirmada' || b.status === 'Pendiente' || b.status === 'checked_in'
+                    b.status === 'confirmed' || b.status === 'pending' || b.status === 'checked-in'
                   );
 
                   if (activeBooking || upcomingBookings.length > 0) {
