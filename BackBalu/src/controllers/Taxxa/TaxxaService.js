@@ -134,11 +134,12 @@ const createInvoice = async (req, res) => {
     console.log('=== Construyendo documento para Taxxa (estructura corregida) ===');
 
     // 🔧 CALCULAR TOTALES PRIMERO
+    // ⭐ HOSPEDAJE NO LLEVA IVA - Total = Base
     const baseAmount = parseFloat(bill.reservationAmount);
     const extraAmount = parseFloat(bill.extraChargesAmount) || 0;
     const totalBase = baseAmount + extraAmount;
-    const taxAmount = parseFloat(bill.taxAmount) || 0;
-    const totalWithTax = totalBase + taxAmount;
+    const taxAmount = 0; // ⭐ SIN IVA para servicios de hospedaje
+    const totalWithTax = totalBase; // ⭐ Total = Base (sin IVA)
 
     // 🔧 MAPEAR TIPOS DE DOCUMENTO
     const mapDocTypeToText = (code) => {
@@ -222,14 +223,14 @@ const createInvoice = async (req, res) => {
               wunitcode: "und",
               sstandarditemidentification: `SERV001-${booking.roomNumber}`,
               sstandardidentificationcode: "999",
-              nunitprice: totalBase, // 🔴 USAR totalBase COMO EN EL EJEMPLO
+              nunitprice: totalBase,
               nusertotal: totalBase,
               nquantity: 1,
               jtax: {
                 jiva: {
-                  nrate: taxAmount > 0 ? 19 : 0,
+                  nrate: 0, // ⭐ SIN IVA - Servicios de hospedaje exentos
                   sname: "IVA",
-                  namount: taxAmount,
+                  namount: 0, // ⭐ Monto de IVA = 0
                   nbaseamount: totalBase
                 }
               }
@@ -312,9 +313,9 @@ const createInvoice = async (req, res) => {
         nquantity: 1,
         jtax: {
           jiva: {
-            nrate: 19, // IVA para extras
+            nrate: 0, // ⭐ SIN IVA - Servicios adicionales del hotel también exentos
             sname: "IVA",
-            namount: extraAmount * 0.19,
+            namount: 0, // ⭐ Monto de IVA = 0
             nbaseamount: extraAmount
           }
         }
@@ -458,13 +459,13 @@ const createManualInvoice = async (req, res) => {
     }
 
     // 🔧 CALCULAR TOTALES
+    // ⭐ SIN IVA - Los servicios de hospedaje y adicionales están exentos
     const subtotal = items.reduce((sum, item) => {
       return sum + (parseFloat(item.quantity) * parseFloat(item.unitPrice));
     }, 0);
     
-    const taxRate = 0.19; // 19% IVA
-    const taxAmount = subtotal * taxRate;
-    const totalAmount = subtotal + taxAmount;
+    const taxAmount = 0; // ⭐ Sin IVA para servicios de hotel
+    const totalAmount = subtotal; // ⭐ Total = Subtotal (sin IVA)
 
     console.log('💰 Totales calculados:', { subtotal, taxAmount, totalAmount });
 
@@ -574,6 +575,7 @@ const createManualInvoice = async (req, res) => {
     // ⭐ ADAPTAR TU ESTRUCTURA EXISTENTE PARA ITEMS MANUALES
     const jdocumentitems = {};
     items.forEach((item, index) => {
+      const itemSubtotal = parseFloat(item.quantity) * parseFloat(item.unitPrice);
       jdocumentitems[index.toString()] = {
         jextrainfo: {
           sbarcode: `MANUAL-${index + 1}`
@@ -583,14 +585,14 @@ const createManualInvoice = async (req, res) => {
         sstandarditemidentification: `MANUAL-ITEM-${index + 1}`,
         sstandardidentificationcode: "999",
         nunitprice: parseFloat(item.unitPrice),
-        nusertotal: parseFloat(item.quantity) * parseFloat(item.unitPrice),
+        nusertotal: itemSubtotal,
         nquantity: parseFloat(item.quantity),
         jtax: {
           jiva: {
-            nrate: item.taxRate || 19,
+            nrate: 0, // ⭐ SIN IVA por defecto (servicios de hotel)
             sname: "IVA",
-            namount: (parseFloat(item.quantity) * parseFloat(item.unitPrice)) * ((item.taxRate || 19) / 100),
-            nbaseamount: parseFloat(item.quantity) * parseFloat(item.unitPrice)
+            namount: 0, // ⭐ Monto de IVA = 0
+            nbaseamount: itemSubtotal
           }
         }
       };
