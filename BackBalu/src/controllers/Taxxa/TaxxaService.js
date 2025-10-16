@@ -2,6 +2,7 @@ const { SellerData, User, Buyer, Booking, Bill, Invoice, CreditNote } = require(
 const { generateToken, sendDocument } = require('./taxxaUtils');
 const { createInvoiceWithNumber, cancelInvoice, getNextInvoiceNumber } = require('./invoiceNumberController');
 const { Op } = require('sequelize');
+const { getColombiaDate, formatColombiaDate, getColombiaDateTime } = require('../../utils/dateUtils');
 
 
 const createInvoice = async (req, res) => {
@@ -166,7 +167,10 @@ const createInvoice = async (req, res) => {
       return `${num.toLocaleString()} pesos`;
     };
 
-    const currentDate = new Date().toISOString().split('T')[0]; // "2025-06-22"
+    // 🔧 USAR HORA DE COLOMBIA (UTC-5) EN LUGAR DE UTC
+    const colombiaDateTime = getColombiaDateTime();
+    const currentDate = formatColombiaDate(getColombiaDate()); // "2025-10-15"
+    const currentTime = colombiaDateTime.toFormat('HH:mm:ss'); // "20:36:51"
 
     // 🆕 ESTRUCTURA CORREGIDA SEGÚN TU PROYECTO QUE FUNCIONA
     const documentBody = {
@@ -570,7 +574,8 @@ const createManualInvoice = async (req, res) => {
       return `${Math.round(num).toLocaleString()} pesos colombianos`;
     };
 
-    const currentDate = new Date().toISOString().split('T')[0];
+    // 🔧 USAR HORA DE COLOMBIA (UTC-5) EN LUGAR DE UTC
+    const currentDate = formatColombiaDate(getColombiaDate()); // "2025-10-15"
 
     // ⭐ ADAPTAR TU ESTRUCTURA EXISTENTE PARA ITEMS MANUALES
     const jdocumentitems = {};
