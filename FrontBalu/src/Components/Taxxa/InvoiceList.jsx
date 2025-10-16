@@ -227,10 +227,23 @@ const InvoiceList = () => {
                       setSelectedInvoice(invoice);
                       setShowCreditNoteModal(true);
                     }}
-                    className="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                    disabled={invoice.hasCreditNote}
+                    className={`w-full px-4 py-2 rounded-md transition-colors ${
+                      invoice.hasCreditNote
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-red-600 text-white hover:bg-red-700'
+                    }`}
+                    title={invoice.hasCreditNote ? 'Esta factura ya tiene nota de crédito' : 'Crear nota de crédito'}
                   >
-                    📝 Crear Nota de Crédito
+                    {invoice.hasCreditNote ? '✅ Nota de Crédito Creada' : '📝 Crear Nota de Crédito'}
                   </button>
+                  
+                  {/* Mostrar información de la nota de crédito si existe */}
+                  {invoice.hasCreditNote && invoice.creditNoteAmount > 0 && (
+                    <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                      <strong>Nota de Crédito:</strong> ${parseFloat(invoice.creditNoteAmount).toLocaleString()}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
