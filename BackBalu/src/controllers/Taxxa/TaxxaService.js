@@ -1223,7 +1223,7 @@ const createCreditNote = async (req, res) => {
           tissuedate: currentDate,
           tduedate: currentDate,
           
-          sbillingreference: {
+          jbillingreference: {
             sdocumentreferenceid: originalInvoice.getFullInvoiceNumber(),
             suuid: cufeToUse,
             tissuedate: formatColombiaDate(new Date(originalInvoice.createdAt))
