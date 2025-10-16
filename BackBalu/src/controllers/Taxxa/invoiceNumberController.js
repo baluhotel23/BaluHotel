@@ -1,7 +1,7 @@
 const { Invoice, sequelize } = require('../../data'); // ✅ Importar sequelize desde data
 const { Op } = require('sequelize');
 
-// 🔧 CONFIGURACIÓN DE RESOLUCIÓN
+
 const RESOLUTION_CONFIG = {
   from: 57, // ⚠️ AJUSTADO: Facturas 1-56 fueron manuales, comenzamos desde 57
   to: 500,
