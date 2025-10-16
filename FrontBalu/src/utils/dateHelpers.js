@@ -8,12 +8,25 @@
  * @returns {Date} Fecha en zona horaria de Colombia
  */
 export const getColombiaDate = () => {
-  // Crear fecha en UTC y ajustar a Colombia (UTC-5)
+  // Obtener la hora actual en UTC
   const now = new Date();
-  const colombiaOffset = -5 * 60; // Colombia está en UTC-5
-  const localOffset = now.getTimezoneOffset(); // Offset del navegador
-  const colombiaTime = new Date(now.getTime() + (localOffset - colombiaOffset) * 60000);
-  return colombiaTime;
+  
+  // Convertir a string ISO y extraer partes de fecha/hora en UTC
+  const utcString = now.toISOString();
+  
+  // Crear fecha desde UTC y ajustar a Colombia (-5 horas)
+  const utcDate = new Date(utcString);
+  const colombiaTime = new Date(utcDate.getTime() - (5 * 60 * 60 * 1000));
+  
+  // Crear un objeto Date "local" con los valores de Colombia
+  const year = colombiaTime.getUTCFullYear();
+  const month = colombiaTime.getUTCMonth();
+  const day = colombiaTime.getUTCDate();
+  const hours = colombiaTime.getUTCHours();
+  const minutes = colombiaTime.getUTCMinutes();
+  const seconds = colombiaTime.getUTCSeconds();
+  
+  return new Date(year, month, day, hours, minutes, seconds);
 };
 
 /**
