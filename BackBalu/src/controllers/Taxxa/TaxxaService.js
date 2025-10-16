@@ -1163,7 +1163,7 @@ const createCreditNote = async (req, res) => {
     // 🔍 [STEP 8] Crear nota de crédito en la base de datos
     console.log('🔍 [STEP 8] Creando registro de nota de crédito...');
     
-    createdCreditNote = await CreditNote.create({
+    const creditNoteData = {
       originalInvoiceId: originalInvoice.id,
       billId: bill.idBill,
       creditNoteSequentialNumber: creditNoteSequential,
@@ -1181,7 +1181,19 @@ const createCreditNote = async (req, res) => {
       description: description || `Nota de crédito para factura ${originalInvoice.getFullInvoiceNumber()}`,
       status: 'pending', // ⭐ PENDING hasta que se envíe a TAXXA
       sentToTaxxaAt: null
-    });
+    };
+    
+    console.log('📋 [DEBUG] Datos para crear nota de crédito:', JSON.stringify(creditNoteData, null, 2));
+    
+    try {
+      createdCreditNote = await CreditNote.create(creditNoteData);
+    } catch (createError) {
+      console.error('❌ [STEP 8] Error al crear nota de crédito en BD');
+      console.error('  - Error name:', createError.name);
+      console.error('  - Error message:', createError.message);
+      console.error('  - Errors array:', JSON.stringify(createError.errors, null, 2));
+      throw createError;
+    }
 
     console.log('✅ [STEP 8] Nota de crédito creada en BD');
     console.log('  - ID:', createdCreditNote.id);
