@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controller/invoiceControllers');
+const controller = require('../controllers/Taxxa/invoiceController');
 //const taxxaController = require('../controller/Taxxa/TaxxaService');
 
 // Ruta para obtener todas las facturas
