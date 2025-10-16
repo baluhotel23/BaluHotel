@@ -1138,22 +1138,68 @@ const createCreditNote = async (req, res) => {
 
     console.log('✅ [STEP 5] Datos relacionados obtenidos exitosamente');
 
-    // Continuar con el resto del proceso...
-    console.log('🔍 [STEP 6] Proceso continúa...');
+    // 🔍 [STEP 6] Obtener siguiente número secuencial para nota de crédito
+    console.log('🔍 [STEP 6] Obteniendo siguiente número de nota de crédito...');
+    
+    const lastCreditNote = await CreditNote.findOne({
+      order: [['creditNoteSequentialNumber', 'DESC']],
+    });
 
-    // ⚡ RESPUESTA TEMPORAL PARA TESTING
-    console.log('🧪 [TESTING] Enviando respuesta de prueba exitosa...');
+    const nextSequential = lastCreditNote
+      ? parseInt(lastCreditNote.creditNoteSequentialNumber) + 1
+      : 1;
+    
+    const creditNoteSequential = nextSequential.toString();
+    console.log('  - Número secuencial:', creditNoteSequential);
+
+    // 🔍 [STEP 7] Obtener datos del vendedor
+    console.log('🔍 [STEP 7] Obteniendo datos del vendedor...');
+    const seller = await SellerData.findOne();
+    
+    if (!seller) {
+      console.log('❌ [STEP 7] No se encontró información del vendedor');
+      return res.status(404).json({
+        message: 'Datos del vendedor no encontrados',
+        success: false,
+      });
+    }
+    console.log('✅ [STEP 7] Vendedor obtenido:', seller.scostumername);
+
+    // 🔍 [STEP 8] Crear nota de crédito en la base de datos
+    console.log('🔍 [STEP 8] Creando registro de nota de crédito...');
+    
+    createdCreditNote = await CreditNote.create({
+      originalInvoiceId: originalInvoice.id,
+      billId: bill.idBill,
+      creditNoteSequentialNumber: creditNoteSequential,
+      creditNoteNumber: `NC${creditNoteSequential}`,
+      prefix: 'NC',
+      buyerId: buyer.sdocno,
+      buyerName: buyer.scostumername,
+      buyerEmail: buyer.selectronicmail || '',
+      sellerId: seller.sdocno,
+      sellerName: seller.scostumername,
+      creditReason: creditReason,
+      creditAmount: parseFloat(amount),
+      taxAmount: 0, // Sin IVA para hotel
+      totalAmount: parseFloat(amount),
+      description: description || `Nota de crédito para factura ${originalInvoice.getFullInvoiceNumber()}`,
+      status: 'sent',
+      sentToTaxxaAt: new Date()
+    });
+
+    console.log('✅ [STEP 8] Nota de crédito creada exitosamente');
+    console.log('  - ID:', createdCreditNote.id);
+    console.log('  - Número:', createdCreditNote.creditNoteNumber);
     
     return res.status(200).json({
-      message: 'Proceso de nota de crédito iniciado correctamente (TESTING)',
+      message: 'Nota de crédito creada exitosamente',
       success: true,
-      debug: {
-        step: 'STEP 6 - Datos validados correctamente',
-        originalInvoiceFound: true,
-        relatedDataFound: true,
-        originalInvoiceNumber: originalInvoice.getFullInvoiceNumber(),
-        billId: bill.idBill,
-        buyerName: buyer.scostumername
+      creditNote: {
+        id: createdCreditNote.id,
+        creditNoteNumber: createdCreditNote.creditNoteNumber,
+        creditAmount: createdCreditNote.creditAmount,
+        originalInvoice: originalInvoice.getFullInvoiceNumber()
       }
     });
 
