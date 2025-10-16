@@ -1,4 +1,4 @@
-const { Invoice, Bill, Booking, Buyer, SellerData } = require('../../data');
+const { Invoice, Bill, Booking, Buyer, SellerData, CreditNote } = require('../../data');
 const { Op } = require('sequelize');
 
 // 📋 VERSIÓN SIMPLIFICADA PARA DEBUGGING
@@ -154,6 +154,14 @@ const getAllInvoices = async (req, res) => {
       console.warn('⚠️ Asociación Invoice.buyer no encontrada');
     }
 
+    // ⭐ Agregar CreditNote para verificar si la factura tiene nota de crédito
+    includes.push({
+      model: CreditNote,
+      as: 'creditNotes',
+      required: false,
+      attributes: ['id', 'creditAmount', 'creditReason', 'sentToTaxxaAt']
+    });
+
     console.log(`🔧 Usando ${includes.length} includes en la consulta`);
 
     const { count, rows: invoices } = await Invoice.findAndCountAll({
@@ -169,6 +177,11 @@ const getAllInvoices = async (req, res) => {
     // 🔧 FORMATEAR RESPUESTA
     const formattedInvoices = invoices.map(invoice => {
       const invoiceData = invoice.toJSON();
+      
+      // ⭐ Verificar si tiene notas de crédito
+      const creditNotes = invoiceData.creditNotes || [];
+      const hasCreditNote = creditNotes.length > 0;
+      const creditNoteAmount = creditNotes.reduce((sum, cn) => sum + parseFloat(cn.creditAmount || 0), 0);
       
       return {
         id: invoiceData.id,
@@ -187,8 +200,9 @@ const getAllInvoices = async (req, res) => {
         status: invoiceData.status,
         sentToTaxxaAt: invoiceData.sentToTaxxaAt,
         orderReference: invoiceData.orderReference,
-        hasCreditNote: invoiceData.hasCreditNote || false,
-        creditNoteAmount: invoiceData.creditNoteAmount || 0,
+        hasCreditNote: hasCreditNote, // ⭐ CALCULADO DESDE creditNotes
+        creditNoteAmount: creditNoteAmount, // ⭐ SUMA DE TODAS LAS NOTAS DE CRÉDITO
+        creditNotes: creditNotes, // ⭐ INCLUIR DETALLES DE NOTAS DE CRÉDITO
         
         // ⭐ DATOS DE RELACIONES (si existen)
         booking: invoiceData.bill?.booking ? {
