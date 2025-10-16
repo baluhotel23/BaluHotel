@@ -1179,7 +1179,7 @@ const createCreditNote = async (req, res) => {
       taxAmount: 0,
       totalAmount: parseFloat(amount),
       description: description || `Nota de crédito para factura ${originalInvoice.getFullInvoiceNumber()}`,
-      status: 'pending', // ⭐ PENDING hasta que se envíe a TAXXA
+      status: 'pending', 
       sentToTaxxaAt: null
     };
     
