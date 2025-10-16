@@ -1214,7 +1214,8 @@ const createCreditNote = async (req, res) => {
           wenvironment: "prod",
           wdocumenttype: "CreditNote",
           wdocumenttypecode: "91",
-          scustomizationid: "20",
+          woperationtype: "20", // ⭐ Corregido: era scustomizationid
+          sdocsubtype: creditReason, // ⭐ Agregado: código del motivo
           wcurrency: "COP",
           
           sdocumentprefix: createdCreditNote.prefix,
@@ -1224,13 +1225,10 @@ const createCreditNote = async (req, res) => {
           tduedate: currentDate,
           
           jbillingreference: {
-            sdocumentreferenceid: originalInvoice.getFullInvoiceNumber(),
-            suuid: cufeToUse,
-            tissuedate: formatColombiaDate(new Date(originalInvoice.createdAt))
+            sbillingreferenceid: originalInvoice.getFullInvoiceNumber(), // ⭐ Corregido nombre
+            sbillingreferenceissuedate: formatColombiaDate(new Date(originalInvoice.createdAt)), // ⭐ Corregido nombre
+            sbillingreferenceuuid: cufeToUse // ⭐ Corregido nombre
           },
-          
-          sdiscrepancyresponsecode: creditReason,
-          sdiscrepancyresponsedescription: description || `Nota de crédito para factura ${originalInvoice.getFullInvoiceNumber()}`,
           
           wpaymentmeans: 1,
           wpaymentmethod: "10",
