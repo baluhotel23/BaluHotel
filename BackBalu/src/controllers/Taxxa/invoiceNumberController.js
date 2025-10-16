@@ -1,4 +1,4 @@
-const { Invoice, sequelize } = require('../../data'); // ✅ Importar sequelize desde data
+const { Invoice, CreditNote, sequelize } = require('../../data'); // ✅ Importar sequelize y CreditNote desde data
 const { Op } = require('sequelize');
 
 
@@ -25,31 +25,47 @@ const logResolutionConfig = () => {
  */
 const getNextInvoiceNumber = async () => {
   try {
-    console.log('🔢 Obteniendo siguiente número de Invoice...');
+    console.log('🔢 Obteniendo siguiente número (Invoices + CreditNotes)...');
 
-    // 🔧 BUSCAR EL ÚLTIMO NÚMERO USADO (CUALQUIER ESTADO)
+    // 🔧 BUSCAR EL ÚLTIMO NÚMERO USADO EN INVOICES
     const lastInvoice = await Invoice.findOne({
       where: {
         invoiceSequentialNumber: { [Op.ne]: null }
-        // ✅ Eliminar filtro por status - considerar TODOS los números usados
       },
       order: [
         [sequelize.cast(sequelize.col('invoiceSequentialNumber'), 'INTEGER'), 'DESC']
-      ], // ✅ Ordenar numéricamente, no alfabéticamente
+      ],
       attributes: ['invoiceSequentialNumber', 'status', 'createdAt']
     });
 
-    let nextNumber;
+    // 🔧 BUSCAR EL ÚLTIMO NÚMERO USADO EN CREDITNOTES
+    const lastCreditNote = await CreditNote.findOne({
+      where: {
+        creditNoteSequentialNumber: { [Op.ne]: null }
+      },
+      order: [
+        [sequelize.cast(sequelize.col('creditNoteSequentialNumber'), 'INTEGER'), 'DESC']
+      ],
+      attributes: ['creditNoteSequentialNumber', 'status', 'createdAt']
+    });
 
-    if (lastInvoice && lastInvoice.invoiceSequentialNumber) {
-      const lastNumber = parseInt(lastInvoice.invoiceSequentialNumber);
+    let nextNumber;
+    
+    // Obtener el mayor número entre Invoices y CreditNotes
+    const lastInvoiceNumber = lastInvoice ? parseInt(lastInvoice.invoiceSequentialNumber) : 0;
+    const lastCreditNoteNumber = lastCreditNote ? parseInt(lastCreditNote.creditNoteSequentialNumber) : 0;
+    const lastNumber = Math.max(lastInvoiceNumber, lastCreditNoteNumber);
+
+    if (lastNumber > 0) {
       nextNumber = lastNumber + 1;
       
-      console.log(`📊 Último número usado: ${lastNumber} (estado: ${lastInvoice.status})`);
-      console.log(`🔢 Siguiente número calculado: ${nextNumber}`);
+      console.log(`📊 Último número en Invoices: ${lastInvoiceNumber} (estado: ${lastInvoice?.status || 'N/A'})`);
+      console.log(`� Último número en CreditNotes: ${lastCreditNoteNumber} (estado: ${lastCreditNote?.status || 'N/A'})`);
+      console.log(`📊 Último número usado (mayor): ${lastNumber}`);
+      console.log(`�🔢 Siguiente número calculado: ${nextNumber}`);
     } else {
       nextNumber = RESOLUTION_CONFIG.from;
-      console.log('📊 No hay invoices previos');
+      console.log('📊 No hay documentos previos');
       console.log(`🔢 Comenzando desde el número inicial: ${nextNumber}`);
     }
 
@@ -58,16 +74,23 @@ const getNextInvoiceNumber = async () => {
       throw new Error(`❌ Se ha alcanzado el límite de la resolución. Número ${nextNumber} excede el máximo ${RESOLUTION_CONFIG.to}`);
     }
 
-    // 🔧 VERIFICAR DISPONIBILIDAD REAL
+    // 🔧 VERIFICAR DISPONIBILIDAD REAL EN AMBAS TABLAS
     const existingInvoice = await Invoice.findOne({
       where: { 
         invoiceSequentialNumber: nextNumber.toString()
-        // ✅ No filtrar por status - si existe, está ocupado
       }
     });
 
-    if (existingInvoice) {
-      console.warn(`⚠️ Número ${nextNumber} ya está en uso (estado: ${existingInvoice.status})`);
+    const existingCreditNote = await CreditNote.findOne({
+      where: { 
+        creditNoteSequentialNumber: nextNumber.toString()
+      }
+    });
+
+    if (existingInvoice || existingCreditNote) {
+      console.warn(`⚠️ Número ${nextNumber} ya está en uso`);
+      if (existingInvoice) console.warn(`  - Encontrado en Invoices (estado: ${existingInvoice.status})`);
+      if (existingCreditNote) console.warn(`  - Encontrado en CreditNotes (estado: ${existingCreditNote.status})`);
       console.log('🔍 Buscando siguiente número disponible...');
       return await findNextAvailableNumber(nextNumber);
     }
@@ -86,8 +109,8 @@ const findNextAvailableNumber = async (startFrom) => {
   try {
     console.log(`🔍 Buscando número disponible desde: ${startFrom}`);
     
-    // ✅ OBTENER TODOS LOS NÚMEROS USADOS DE UNA VEZ
-    const usedNumbers = await Invoice.findAll({
+    // ✅ OBTENER TODOS LOS NÚMEROS USADOS DE INVOICES
+    const usedInvoiceNumbers = await Invoice.findAll({
       attributes: ['invoiceSequentialNumber'],
       where: {
         invoiceSequentialNumber: { [Op.ne]: null }
@@ -95,9 +118,20 @@ const findNextAvailableNumber = async (startFrom) => {
       raw: true
     });
 
-    const usedSet = new Set(
-      usedNumbers.map(inv => parseInt(inv.invoiceSequentialNumber))
-    );
+    // ✅ OBTENER TODOS LOS NÚMEROS USADOS DE CREDITNOTES
+    const usedCreditNoteNumbers = await CreditNote.findAll({
+      attributes: ['creditNoteSequentialNumber'],
+      where: {
+        creditNoteSequentialNumber: { [Op.ne]: null }
+      },
+      raw: true
+    });
+
+    // Combinar ambos conjuntos
+    const usedSet = new Set([
+      ...usedInvoiceNumbers.map(inv => parseInt(inv.invoiceSequentialNumber)),
+      ...usedCreditNoteNumbers.map(cn => parseInt(cn.creditNoteSequentialNumber))
+    ]);
 
     // ✅ BUSCAR PRIMER NÚMERO DISPONIBLE EN EL RANGO
     for (let i = startFrom; i <= RESOLUTION_CONFIG.to; i++) {
