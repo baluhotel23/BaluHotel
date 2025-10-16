@@ -21,6 +21,7 @@ import { toast } from "react-toastify";
 import WompiPayment from "../WompiPayment";
 import { useNavigate } from "react-router-dom";
 import { canBookToday } from '../../utils/canBookToday';
+import { getColombiaDate, getTomorrowDate } from '../../utils/dateHelpers';
 const ROOM_TYPES = ["Pareja/Sencilla", "Doble", "Triple", "Múltiple"];
 
 
@@ -385,12 +386,8 @@ const Booking = () => {
 
   // ⭐ ESTADOS PRINCIPALES
   const [step, setStep] = useState(1);
-  const [checkIn, setCheckIn] = useState(new Date());
-  const [checkOut, setCheckOut] = useState(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
-  });
+  const [checkIn, setCheckIn] = useState(getColombiaDate());
+  const [checkOut, setCheckOut] = useState(() => getTomorrowDate());
   const [roomType, setRoomType] = useState("");
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [adults, setAdults] = useState(1);

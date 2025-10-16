@@ -1,16 +1,41 @@
 /**
  * Utilidades de fecha para el frontend que son consistentes con el backend
+ * Usa zona horaria de Colombia (America/Bogota, UTC-5)
  */
 
 /**
- * Obtener fecha actual en formato YYYY-MM-DD (zona horaria local)
+ * Obtener fecha/hora actual en Colombia (UTC-5)
+ * @returns {Date} Fecha en zona horaria de Colombia
+ */
+export const getColombiaDate = () => {
+  // Crear fecha en UTC y ajustar a Colombia (UTC-5)
+  const now = new Date();
+  const colombiaOffset = -5 * 60; // Colombia está en UTC-5
+  const localOffset = now.getTimezoneOffset(); // Offset del navegador
+  const colombiaTime = new Date(now.getTime() + (localOffset - colombiaOffset) * 60000);
+  return colombiaTime;
+};
+
+/**
+ * Obtener fecha actual en formato YYYY-MM-DD (zona horaria de Colombia)
  * @returns {string} Fecha en formato YYYY-MM-DD
  */
 export const getCurrentDate = () => {
-  const now = new Date();
-  // Ajustar a zona horaria local para evitar problemas de UTC
-  const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
-  return localDate.toISOString().split('T')[0];
+  const colombiaDate = getColombiaDate();
+  const year = colombiaDate.getFullYear();
+  const month = String(colombiaDate.getMonth() + 1).padStart(2, '0');
+  const day = String(colombiaDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Obtener fecha de mañana en Colombia
+ * @returns {Date} Fecha de mañana
+ */
+export const getTomorrowDate = () => {
+  const tomorrow = getColombiaDate();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow;
 };
 
 /**

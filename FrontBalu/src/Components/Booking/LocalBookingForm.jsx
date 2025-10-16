@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../Dashboard/DashboardLayout";
 import RoomStatusGrid from "./RoomStatusGrid";
 import jsPDF from "jspdf"; // ⭐ IMPORTAR jsPDF
+import { getColombiaDate, getTomorrowDate } from '../../utils/dateHelpers';
 
 // =============================
 // CONSTANTES
@@ -495,12 +496,8 @@ const LocalBookingForm = () => {
 
   // ⭐ ESTADOS PRINCIPALES
   const [searchParams, setSearchParams] = useState({
-    checkIn: new Date(),
-    checkOut: (() => {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      return tomorrow;
-    })(),
+    checkIn: getColombiaDate(),
+    checkOut: getTomorrowDate(),
     roomType: "", // Vacío = todas las habitaciones
   });
 
