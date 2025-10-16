@@ -155,12 +155,19 @@ const getAllInvoices = async (req, res) => {
     }
 
     // ⭐ Agregar CreditNote para verificar si la factura tiene nota de crédito
-    includes.push({
-      model: CreditNote,
-      as: 'creditNotes',
-      required: false,
-      attributes: ['id', 'creditAmount', 'creditReason', 'sentToTaxxaAt']
-    });
+    if (CreditNote && Invoice.associations && Invoice.associations.creditNotes) {
+      console.log('✅ Asociación Invoice.creditNotes encontrada');
+      includes.push({
+        model: CreditNote,
+        as: 'creditNotes',
+        required: false,
+        attributes: ['id', 'creditAmount', 'creditReason', 'sentToTaxxaAt']
+      });
+    } else {
+      console.warn('⚠️ Asociación Invoice.creditNotes NO encontrada o CreditNote no disponible');
+      console.warn('CreditNote modelo:', CreditNote ? 'EXISTE' : 'NO EXISTE');
+      console.warn('Invoice.associations.creditNotes:', Invoice.associations?.creditNotes ? 'EXISTE' : 'NO EXISTE');
+    }
 
     console.log(`🔧 Usando ${includes.length} includes en la consulta`);
 
