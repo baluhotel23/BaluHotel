@@ -1138,19 +1138,14 @@ const createCreditNote = async (req, res) => {
 
     console.log('✅ [STEP 5] Datos relacionados obtenidos exitosamente');
 
-    // 🔍 [STEP 6] Obtener siguiente número secuencial para nota de crédito
-    console.log('🔍 [STEP 6] Obteniendo siguiente número de nota de crédito...');
+    // 🔍 [STEP 6] Obtener siguiente número secuencial (COMPARTIDO con facturas)
+    console.log('🔍 [STEP 6] Obteniendo siguiente número secuencial...');
     
-    const lastCreditNote = await CreditNote.findOne({
-      order: [['creditNoteSequentialNumber', 'DESC']],
-    });
-
-    const nextSequential = lastCreditNote
-      ? parseInt(lastCreditNote.creditNoteSequentialNumber) + 1
-      : 1;
-    
+    // ⭐ USAR LA MISMA FUNCIÓN QUE FACTURAS - Comparte numeración
+    const nextSequential = await getNextInvoiceNumber();
     const creditNoteSequential = nextSequential.toString();
-    console.log('  - Número secuencial:', creditNoteSequential);
+    
+    console.log('  - Número secuencial (compartido con facturas):', creditNoteSequential);
 
     // 🔍 [STEP 7] Obtener datos del vendedor
     console.log('🔍 [STEP 7] Obteniendo datos del vendedor...');
@@ -1181,27 +1176,216 @@ const createCreditNote = async (req, res) => {
       sellerName: seller.scostumername,
       creditReason: creditReason,
       creditAmount: parseFloat(amount),
-      taxAmount: 0, // Sin IVA para hotel
+      taxAmount: 0,
       totalAmount: parseFloat(amount),
       description: description || `Nota de crédito para factura ${originalInvoice.getFullInvoiceNumber()}`,
-      status: 'sent',
-      sentToTaxxaAt: new Date()
+      status: 'pending', // ⭐ PENDING hasta que se envíe a TAXXA
+      sentToTaxxaAt: null
     });
 
-    console.log('✅ [STEP 8] Nota de crédito creada exitosamente');
+    console.log('✅ [STEP 8] Nota de crédito creada en BD');
     console.log('  - ID:', createdCreditNote.id);
     console.log('  - Número:', createdCreditNote.creditNoteNumber);
-    
-    return res.status(200).json({
-      message: 'Nota de crédito creada exitosamente',
-      success: true,
-      creditNote: {
-        id: createdCreditNote.id,
-        creditNoteNumber: createdCreditNote.creditNoteNumber,
-        creditAmount: createdCreditNote.creditAmount,
-        originalInvoice: originalInvoice.getFullInvoiceNumber()
+
+    // 🆕 [STEP 9] CONSTRUIR DOCUMENTO PARA TAXXA
+    console.log('🔍 [STEP 9] Construyendo documento de nota de crédito para TAXXA...');
+
+    const mapDocTypeToText = (code) => {
+      const mapping = {
+        11: "RC", 12: "TI", 13: "CC", 21: "CE", 22: "CD",
+        31: "NIT", 41: "PA", 42: "PEP", 50: "NIT", 91: "NUIP"
+      };
+      return mapping[code] || "CC";
+    };
+
+    const numberToWords = (num) => {
+      return `${Math.round(num).toLocaleString()} pesos colombianos`;
+    };
+
+    const currentDate = formatColombiaDate(getColombiaDate());
+
+    const creditNoteDocument = {
+      sMethod: 'classTaxxa.fjDocumentAdd',
+      jParams: {
+        wVersionUBL: "2.1",
+        wenvironment: "prod",
+        jDocument: {
+          wversionubl: "2.1",
+          wenvironment: "prod",
+          wdocumenttype: "CreditNote",
+          wdocumenttypecode: "91",
+          scustomizationid: "20",
+          wcurrency: "COP",
+          
+          sdocumentprefix: createdCreditNote.prefix,
+          sdocumentsuffix: parseInt(createdCreditNote.creditNoteSequentialNumber),
+          
+          tissuedate: currentDate,
+          tduedate: currentDate,
+          
+          sbillingreference: {
+            sdocumentreferenceid: originalInvoice.getFullInvoiceNumber(),
+            suuid: cufeToUse,
+            tissuedate: formatColombiaDate(new Date(originalInvoice.createdAt))
+          },
+          
+          sdiscrepancyresponsecode: creditReason,
+          sdiscrepancyresponsedescription: description || `Nota de crédito para factura ${originalInvoice.getFullInvoiceNumber()}`,
+          
+          wpaymentmeans: 1,
+          wpaymentmethod: "10",
+          
+          nlineextensionamount: parseFloat(amount),
+          ntaxexclusiveamount: parseFloat(amount),
+          ntaxinclusiveamount: parseFloat(amount),
+          npayableamount: parseFloat(amount),
+          
+          sorderreference: `NC-${originalInvoice.getFullInvoiceNumber()}`,
+          snotes: description || '',
+          snotetop: "",
+          
+          jextrainfo: {
+            ntotalinvoicepayment: parseFloat(amount),
+            stotalinvoicewords: numberToWords(amount),
+            iitemscount: "1"
+          },
+          
+          jdocumentitems: {
+            "0": {
+              jextrainfo: {
+                sbarcode: `NC-ITEM-${createdCreditNote.creditNoteSequentialNumber}`
+              },
+              sdescription: description || `Ajuste por nota de crédito - Factura ${originalInvoice.getFullInvoiceNumber()}`,
+              wunitcode: "und",
+              sstandarditemidentification: `NC-${createdCreditNote.creditNoteSequentialNumber}`,
+              sstandardidentificationcode: "999",
+              nunitprice: parseFloat(amount),
+              nusertotal: parseFloat(amount),
+              nquantity: 1,
+              jtax: {
+                jiva: {
+                  nrate: 0,
+                  sname: "IVA",
+                  namount: 0,
+                  nbaseamount: parseFloat(amount)
+                }
+              }
+            }
+          },
+          
+          jbuyer: {
+            wlegalorganizationtype: buyer.wlegalorganizationtype || "person",
+            scostumername: buyer.scostumername,
+            stributaryidentificationkey: "O-1",
+            stributaryidentificationname: "IVA",
+            sfiscalresponsibilities: buyer.sfiscalresponsibilities || "R-99-PN",
+            sfiscalregime: "48",
+            jpartylegalentity: {
+              wdoctype: mapDocTypeToText(buyer.wdoctype),
+              sdocno: buyer.sdocno,
+              scorporateregistrationschemename: buyer.scostumername
+            },
+            jcontact: {
+              scontactperson: buyer.scontactperson || buyer.scostumername,
+              selectronicmail: buyer.selectronicmail,
+              stelephone: buyer.stelephone?.replace(/^\+57/, '') || "3000000000",
+              ...(buyer.jregistrationaddress && {
+                jregistrationaddress: buyer.jregistrationaddress
+              })
+            }
+          },
+          
+          jseller: {
+            wlegalorganizationtype: seller.wlegalorganizationtype === "person" ? "person" : "company",
+            sfiscalresponsibilities: seller.sfiscalresponsibilities,
+            sdocno: seller.sdocno,
+            sdoctype: mapDocTypeToText(seller.sdoctype),
+            ssellername: seller.scostumername,
+            ssellerbrand: seller.ssellerbrand || seller.scostumername,
+            scontactperson: seller.scontactperson?.trim(),
+            saddresszip: seller.spostalcode || "00000",
+            wdepartmentcode: seller.registration_wdepartmentcode || "11",
+            wtowncode: seller.registration_wprovincecode || "11001",
+            scityname: seller.registration_scityname || seller.scity,
+            jcontact: {
+              selectronicmail: seller.selectronicmail,
+              jregistrationaddress: {
+                wdepartmentcode: seller.registration_wdepartmentcode || "11",
+                sdepartmentname: seller.registration_sdepartmentname || "Cundinamarca",
+                scityname: seller.registration_scityname || seller.scity,
+                saddressline1: seller.registration_saddressline1 || seller.saddress,
+                scountrycode: seller.registration_scountrycode || "CO",
+                wprovincecode: seller.registration_wprovincecode || "11",
+                szip: seller.registration_szip || seller.spostalcode || "00000"
+              }
+            }
+          }
+        }
       }
-    });
+    };
+
+    console.log('✅ [STEP 9] Documento construido');
+
+    // 🆕 [STEP 10] GENERAR TOKEN Y ENVIAR A TAXXA
+    console.log('🔍 [STEP 10] Generando token...');
+    const token = await generateToken();
+
+    if (!token) {
+      await createdCreditNote.destroy();
+      throw new Error('No se pudo generar el token de autenticación');
+    }
+
+    const taxxaPayload = {
+      stoken: token,
+      jApi: creditNoteDocument
+    };
+
+    console.log('📤 [STEP 10] Enviando nota de crédito a TAXXA...');
+    const taxxaResponse = await sendDocument(taxxaPayload);
+
+    if (taxxaResponse && taxxaResponse.rerror === 0) {
+      console.log('✅ [STEP 10] Nota de crédito enviada exitosamente a TAXXA');
+
+      let qrCode = null;
+      if (taxxaResponse?.jret?.sqr) {
+        const match = taxxaResponse.jret.sqr.match(/https?:\/\/[^\s]+/);
+        if (match) {
+          qrCode = match[0];
+        }
+      }
+
+      await createdCreditNote.update({
+        status: 'sent',
+        sentToTaxxaAt: new Date(),
+        cufe: taxxaResponse.jApiResponse?.cufe || taxxaResponse.scufe || taxxaResponse.jret?.scufe,
+        taxxaResponse: taxxaResponse,
+        qrCode: qrCode
+      });
+
+      return res.status(200).json({
+        message: 'Nota de crédito creada y enviada a TAXXA exitosamente',
+        success: true,
+        creditNote: {
+          id: createdCreditNote.id,
+          creditNoteNumber: createdCreditNote.creditNoteNumber,
+          creditAmount: createdCreditNote.creditAmount,
+          originalInvoice: originalInvoice.getFullInvoiceNumber(),
+          cufe: taxxaResponse.jApiResponse?.cufe || taxxaResponse.scufe || taxxaResponse.jret?.scufe,
+          qrCode: qrCode,
+          sentAt: createdCreditNote.sentToTaxxaAt
+        }
+      });
+
+    } else {
+      console.error('❌ [STEP 10] Error en respuesta de TAXXA:', taxxaResponse);
+      
+      await createdCreditNote.update({
+        status: 'failed',
+        taxxaResponse: taxxaResponse
+      });
+      
+      throw new Error(`Error en la respuesta de TAXXA: ${taxxaResponse?.smessage || JSON.stringify(taxxaResponse)}`);
+    }
 
   } catch (error) {
     console.error('=== Error en el proceso de nota de crédito ===');
