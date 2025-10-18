@@ -102,6 +102,21 @@ const getCurrentShift = async (req, res, next) => {
     const summary = await calculateShiftSummary(currentShift.shiftId);
 
     console.log('✅ [GET-CURRENT-SHIFT] Turno encontrado:', currentShift.shiftId);
+    console.log('📊 [GET-CURRENT-SHIFT] Usuario:', {
+      userId: currentShift.userId,
+      user: currentShift.user ? {
+        name: `${currentShift.user.first_name} ${currentShift.user.last_name}`,
+        email: currentShift.user.email
+      } : 'NO USER INCLUDED'
+    });
+    console.log('📊 [GET-CURRENT-SHIFT] Summary:', {
+      totalCashSales: summary.totalCashSales,
+      totalCardSales: summary.totalCardSales,
+      totalTransferSales: summary.totalTransferSales,
+      cashTransactions: summary.cashTransactions,
+      cardTransactions: summary.cardTransactions,
+      transferTransactions: summary.transferTransactions
+    });
 
     res.json({
       error: false,
@@ -389,6 +404,25 @@ const getShiftReport = async (req, res, next) => {
     }
 
     const summary = await calculateShiftSummary(shiftId);
+
+    // ⭐ DEBUG: Ver datos completos antes de enviar
+    console.log('📊 [GET-SHIFT-REPORT] Shift encontrado:', {
+      shiftId: shift.shiftId,
+      userId: shift.userId,
+      user: shift.user ? {
+        name: `${shift.user.first_name} ${shift.user.last_name}`,
+        email: shift.user.email
+      } : 'NO USER'
+    });
+    
+    console.log('📊 [GET-SHIFT-REPORT] Summary:', {
+      totalCashSales: summary.totalCashSales,
+      totalCardSales: summary.totalCardSales,
+      totalTransferSales: summary.totalTransferSales,
+      cashTransactions: summary.cashTransactions,
+      cardTransactions: summary.cardTransactions,
+      transferTransactions: summary.transferTransactions
+    });
 
     res.json({
       error: false,
