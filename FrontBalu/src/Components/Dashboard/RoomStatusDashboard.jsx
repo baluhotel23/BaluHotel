@@ -189,12 +189,20 @@ const RoomStatusDashboard = () => {
                 <p className="text-xs text-gray-500">
                   Desde: {new Date(currentShift.openedAt).toLocaleString('es-CO')}
                 </p>
-                <button
-                  onClick={() => setShowShiftModal(true)}
-                  className="mt-2 w-full bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
-                >
-                  Cerrar Turno
-                </button>
+                <div className="mt-2 space-y-2">
+                  <button
+                    onClick={() => setShowShiftModal(true)}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm font-semibold"
+                  >
+                    📊 Ver Resumen
+                  </button>
+                  <button
+                    onClick={() => setShowShiftModal(true)}
+                    className="w-full bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                  >
+                    🔒 Cerrar Turno
+                  </button>
+                </div>
               </div>
             ) : (
               <div>

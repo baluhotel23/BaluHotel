@@ -129,7 +129,11 @@ const ShiftModal = ({ isOpen, onClose }) => {
         {/* ⭐ ENCABEZADO */}
         <div className="bg-orange-500 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
           <h2 className="text-2xl font-bold">
-            {currentShift ? 'Cerrar Turno' : 'Abrir Turno'}
+            {!currentShift 
+              ? 'Abrir Turno' 
+              : showClosingForm 
+                ? 'Cerrar Turno' 
+                : 'Resumen del Turno'}
           </h2>
           <button
             onClick={onClose}
@@ -206,9 +210,32 @@ const ShiftModal = ({ isOpen, onClose }) => {
           {/* ⭐ RESUMEN Y CIERRE DE TURNO */}
           {currentShift && !showClosingForm && (
             <div className="space-y-4">
+              {/* ⭐ Información del Recepcionista */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-800 mb-2">👤 Recepcionista</h3>
+                <div className="text-sm text-blue-900">
+                  {currentShift.user?.first_name && currentShift.user?.last_name ? (
+                    <p className="font-semibold text-lg">
+                      {currentShift.user.first_name} {currentShift.user.last_name}
+                    </p>
+                  ) : (
+                    <p className="font-semibold text-lg">
+                      {currentShift.user?.email || 'Usuario no disponible'}
+                    </p>
+                  )}
+                  <p className="text-xs text-blue-700 mt-1">
+                    {currentShift.user?.email}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Rol: {currentShift.user?.role === 'owner' ? 'Propietario' : 
+                          currentShift.user?.role === 'admin' ? 'Administrador' : 'Recepcionista'}
+                  </p>
+                </div>
+              </div>
+
               {/* Resumen del turno */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-700 mb-3">Resumen del Turno</h3>
+                <h3 className="font-semibold text-gray-700 mb-3">📋 Información del Turno</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-gray-600">Apertura:</p>
@@ -232,19 +259,19 @@ const ShiftModal = ({ isOpen, onClose }) => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Efectivo:</span>
                     <span className="font-semibold text-green-600">
-                      ${parseFloat(summary?.totalCashSales || 0).toLocaleString()}
+                      ${parseFloat(summary?.totalCashSales || 0).toLocaleString()} ({summary?.cashTransactions || 0})
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Tarjetas:</span>
                     <span className="font-semibold text-blue-600">
-                      ${parseFloat(summary?.totalCardSales || 0).toLocaleString()}
+                      ${parseFloat(summary?.totalCardSales || 0).toLocaleString()} ({summary?.cardTransactions || 0})
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Transferencias:</span>
                     <span className="font-semibold text-purple-600">
-                      ${parseFloat(summary?.totalTransferSales || 0).toLocaleString()}
+                      ${parseFloat(summary?.totalTransferSales || 0).toLocaleString()} ({summary?.transferTransactions || 0})
                     </span>
                   </div>
                   <div className="border-t pt-2 flex justify-between">
@@ -255,6 +282,73 @@ const ShiftModal = ({ isOpen, onClose }) => {
                   </div>
                 </div>
               </div>
+
+              {/* ⭐ NUEVO: Detalle de Transacciones */}
+              {summary?.payments && summary.payments.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-700 mb-3">📋 Detalle de Transacciones ({summary.payments.length})</h4>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {summary.payments.map((payment) => {
+                      const methodColors = {
+                        cash: 'bg-green-100 text-green-800',
+                        credit_card: 'bg-blue-100 text-blue-800',
+                        debit_card: 'bg-blue-100 text-blue-800',
+                        transfer: 'bg-purple-100 text-purple-800'
+                      };
+
+                      const methodNames = {
+                        cash: 'Efectivo',
+                        credit_card: 'Tarjeta Crédito',
+                        debit_card: 'Tarjeta Débito',
+                        transfer: 'Transferencia'
+                      };
+
+                      const paymentTypeNames = {
+                        full: 'Pago Total',
+                        partial: 'Pago Parcial',
+                        deposit: 'Anticipo'
+                      };
+
+                      return (
+                        <div key={payment.paymentId} className="border-l-4 border-orange-500 bg-gray-50 p-3 rounded">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-xs px-2 py-1 rounded font-semibold ${methodColors[payment.paymentMethod] || 'bg-gray-100 text-gray-800'}`}>
+                                  {methodNames[payment.paymentMethod] || payment.paymentMethod}
+                                </span>
+                                <span className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-700">
+                                  {paymentTypeNames[payment.paymentType] || payment.paymentType}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                Habitación: <span className="font-semibold">{payment.booking?.roomNumber || 'N/A'}</span>
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(payment.paymentDate).toLocaleString('es-CO', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                              {payment.notes && (
+                                <p className="text-xs text-gray-500 mt-1 italic">{payment.notes}</p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-gray-800">
+                                ${parseFloat(payment.amount).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Actividades */}
               <div className="bg-white border border-gray-200 rounded-lg p-4">
