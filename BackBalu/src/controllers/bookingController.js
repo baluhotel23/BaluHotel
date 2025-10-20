@@ -3268,7 +3268,7 @@ const getAllBookings = async (req, res, next) => {
   try {
     const {
       page = 1,
-      limit = 10,
+      limit = null, // ⭐ NULL = sin paginación, devolver TODAS las reservas
       status,
       roomNumber,
       guestId,
@@ -3279,7 +3279,7 @@ const getAllBookings = async (req, res, next) => {
 
     console.log("🔍 [GET-ALL-BOOKINGS] Parámetros:", {
       page,
-      limit,
+      limit: limit || 'ALL (sin paginación)',
       status,
       roomNumber,
       guestId,
@@ -3406,7 +3406,7 @@ const getAllBookings = async (req, res, next) => {
     }
 
     // ⭐ MODIFICACIÓN PRINCIPAL: Agregar attributes para incluir los nuevos campos
-    const { count, rows } = await Booking.findAndCountAll({
+    const queryOptions = {
       where,
       include: includeOptions,
       // ⭐ AGREGAR ATTRIBUTES CON LOS NUEVOS CAMPOS
@@ -3443,10 +3443,16 @@ const getAllBookings = async (req, res, next) => {
         [{ model: Payment, as: "payments" }, "paymentDate", "DESC"],
         [{ model: ExtraCharge, as: "extraCharges" }, "chargeDate", "DESC"],
       ],
-      limit: parseInt(limit),
-      offset: (parseInt(page) - 1) * parseInt(limit),
       distinct: true,
-    });
+    };
+
+    // ⭐ SOLO PAGINAR SI SE ESPECIFICA LIMIT
+    if (limit) {
+      queryOptions.limit = parseInt(limit);
+      queryOptions.offset = (parseInt(page) - 1) * parseInt(limit);
+    }
+
+    const { count, rows } = await Booking.findAndCountAll(queryOptions);
 
     // 🔧 FUNCIÓN HELPER PARA PROCESAR DATOS FINANCIEROS
     const processBookingFinancials = (bookingData) => {
