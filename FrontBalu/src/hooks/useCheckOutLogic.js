@@ -77,27 +77,52 @@ export const useCheckOutLogic = () => {
     });
 
     let filteredBookings = allBookings.filter((booking) => {
-      // ⭐ NUEVA LÓGICA: Verificar pagos pendientes ANTES de excluir completed
+      // ⭐ EXCLUIR CANCELADAS SIEMPRE
+      if (booking.status === "cancelled") return false;
+
+      // ⭐ CALCULAR SI ESTÁ EN FECHA DE CHECK-IN O VENCIDA
+      const today = new Date();
+      const checkInDate = new Date(booking.checkIn);
+      const checkOutDate = new Date(booking.checkOut);
+      const isCheckInToday = checkInDate.toDateString() === today.toDateString();
+      const isPastCheckIn = checkInDate < today; // Ya pasó el check-in
+      const isInStayPeriod = isPastCheckIn && checkOutDate >= today; // Está en período de estadía
+      const isPastCheckOut = checkOutDate < today; // Ya pasó el checkout (vencida)
+
+      // ⭐ VERIFICAR PAGOS PENDIENTES
       const financials = getRealPaymentSummary(booking);
       const hasFinancialIssues = financials.totalPendiente > 0;
       
-      // ⭐ EXCLUIR "completed" solo si NO tiene pagos pendientes
-      if (booking.status === "completed" && !hasFinancialIssues) return false;
-
-      // ⭐ INCLUIR si:
-      const readyForCheckOut = booking.status === "checked-in";
-      const needsPaymentProcessing = ["confirmed", "paid"].includes(booking.status);
-      const isCompletedWithPending = booking.status === "completed" && hasFinancialIssues;
-      const isOverdue = booking.bookingStatus?.isOverdue || 
-        getDaysUntilCheckOut(booking.checkOut) < 0;
-
-      const shouldInclude = readyForCheckOut || needsPaymentProcessing || isCompletedWithPending || isOverdue;
-      
-      if (shouldInclude) {
-        console.log(`✅ [CHECK-OUT] Incluir #${booking.bookingId} (${booking.status})`);
+      // ⭐ REGLA 1: CHECKED-IN (huésped en habitación) - SIEMPRE MOSTRAR
+      if (booking.status === "checked-in") {
+        console.log(`✅ [CHECK-OUT] Incluir #${booking.bookingId} - checked-in (huésped en habitación)`);
+        return true;
       }
 
-      return shouldInclude;
+      // ⭐ REGLA 2: COMPLETED con pagos pendientes - MOSTRAR
+      if (booking.status === "completed" && hasFinancialIssues) {
+        console.log(`✅ [CHECK-OUT] Incluir #${booking.bookingId} - completed con saldo pendiente`);
+        return true;
+      }
+
+      // ⭐ REGLA 3: COMPLETED sin pendientes - NO MOSTRAR (va a CompletedBookings)
+      if (booking.status === "completed" && !hasFinancialIssues) {
+        return false;
+      }
+
+      // ⭐ REGLA 4: PAID o CONFIRMED en fecha de check-in o vencidas - MOSTRAR
+      if (["confirmed", "paid"].includes(booking.status)) {
+        if (isCheckInToday || isInStayPeriod || isPastCheckOut) {
+          console.log(`✅ [CHECK-OUT] Incluir #${booking.bookingId} - ${booking.status} (hoy es check-in o vencida)`);
+          return true;
+        } else {
+          console.log(`❌ [CHECK-OUT] Excluir #${booking.bookingId} - ${booking.status} (check-in futuro: ${checkInDate.toLocaleDateString()})`);
+          return false;
+        }
+      }
+
+      // ⭐ EXCLUIR TODO LO DEMÁS
+      return false;
     });
 
     console.log("📊 [CHECK-OUT] Resultado del filtro:", {

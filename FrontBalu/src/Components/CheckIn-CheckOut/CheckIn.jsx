@@ -82,27 +82,53 @@ const CheckIn = () => {
   // Memoizar bookings filtrados
   const bookings = useMemo(() => {
     if (!Array.isArray(allBookings)) return [];
-    const validStatuses = ["pending", "confirmed", "paid"];
+    
     return allBookings.filter((booking) => {
-      // Usar campos del backend en lugar de estados locales
+      // ⭐ EXCLUIR: Reservas que ya hicieron check-in
+      if (booking.status === "checked-in") {
+        console.log(`❌ [CHECK-IN] Excluir #${booking.bookingId} - ya hizo check-in (debe ir a CheckOut)`);
+        return false;
+      }
+
+      // ⭐ EXCLUIR: Reservas completadas
+      if (booking.status === "completed") {
+        console.log(`❌ [CHECK-IN] Excluir #${booking.bookingId} - ya completada (debe ir a CompletedBookings)`);
+        return false;
+      }
+
+      // ⭐ EXCLUIR: Reservas canceladas
+      if (booking.status === "cancelled") {
+        console.log(`❌ [CHECK-IN] Excluir #${booking.bookingId} - cancelada`);
+        return false;
+      }
+
+      // ⭐ SOLO INCLUIR: pending, confirmed, paid
+      const validStatuses = ["pending", "confirmed", "paid"];
+      if (!validStatuses.includes(booking.status)) {
+        return false;
+      }
+
+      // ⭐ VERIFICAR REQUISITOS DE CHECK-IN
       const isRoomClean =
         (booking.room?.status || booking.Room?.status) === "Limpia";
       const isInventoryVerified = booking.inventoryVerified === true;
       const isInventoryDelivered = booking.inventoryDelivered === true;
       const isPassengersCompleted = booking.passengersCompleted === true;
-      const hasValidStatus =
-        validStatuses.includes(booking.status) || !booking.status;
 
-      // Una reserva se muestra si:
-      // - Tiene estado válido Y
-      // - No cumple ALGUNA de las condiciones para check-in
-      return (
-        hasValidStatus &&
-        (!isRoomClean ||
-          !isInventoryVerified ||
-          !isInventoryDelivered ||
-          !isPassengersCompleted)
-      );
+      // ⭐ MOSTRAR si tiene estado válido Y no cumple ALGÚN requisito
+      // (Una vez que cumple TODOS los requisitos, desaparece porque se hace check-in)
+      const needsPreparation = !isRoomClean ||
+        !isInventoryVerified ||
+        !isInventoryDelivered ||
+        !isPassengersCompleted;
+
+      if (needsPreparation) {
+        console.log(`✅ [CHECK-IN] Incluir #${booking.bookingId} - ${booking.status} (pendiente de preparación)`);
+        return true;
+      } else {
+        console.log(`❌ [CHECK-IN] Excluir #${booking.bookingId} - ${booking.status} (ya listo para check-in, debe completarse)`);
+        return false;
+      }
     });
   }, [allBookings]);
 

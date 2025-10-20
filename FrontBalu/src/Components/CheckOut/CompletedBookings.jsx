@@ -22,11 +22,22 @@ const CompletedBookings = () => {
   });
   const [sortBy, setSortBy] = useState("completedAt");
 
-  // ✅ FILTRAR SOLO RESERVAS COMPLETADAS
+  // ✅ FILTRAR SOLO RESERVAS COMPLETADAS CON CHECKOUT REAL
   const completedBookings = useMemo(() => {
-    let filteredBookings = allBookings.filter((booking) => 
-      booking.status === "completed"
-    );
+    let filteredBookings = allBookings.filter((booking) => {
+      // ⭐ DEBE tener status "completed"
+      if (booking.status !== "completed") return false;
+      
+      // ⭐ IDEALMENTE debe tener actualCheckOut (checkout real)
+      // Pero no lo hacemos obligatorio por compatibilidad con datos antiguos
+      if (booking.actualCheckOut) {
+        console.log(`✅ [COMPLETED] Incluir #${booking.bookingId} - completed con actualCheckOut`);
+      } else {
+        console.log(`⚠️ [COMPLETED] Incluir #${booking.bookingId} - completed sin actualCheckOut (datos antiguos)`);
+      }
+      
+      return true;
+    });
 
     // ✅ APLICAR FILTROS ADICIONALES
     if (filters.roomNumber) {
