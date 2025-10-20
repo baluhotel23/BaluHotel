@@ -80,13 +80,9 @@ export const useCheckOutLogic = () => {
       // ⭐ EXCLUIR CANCELADAS SIEMPRE
       if (booking.status === "cancelled") return false;
 
-      // ⭐ CALCULAR SI ESTÁ EN FECHA DE CHECK-IN O VENCIDA
+      // ⭐ CALCULAR SI ESTÁ VENCIDA (pasó el checkout sin hacer check-in)
       const today = new Date();
-      const checkInDate = new Date(booking.checkIn);
       const checkOutDate = new Date(booking.checkOut);
-      const isCheckInToday = checkInDate.toDateString() === today.toDateString();
-      const isPastCheckIn = checkInDate < today; // Ya pasó el check-in
-      const isInStayPeriod = isPastCheckIn && checkOutDate >= today; // Está en período de estadía
       const isPastCheckOut = checkOutDate < today; // Ya pasó el checkout (vencida)
 
       // ⭐ VERIFICAR PAGOS PENDIENTES
@@ -110,13 +106,16 @@ export const useCheckOutLogic = () => {
         return false;
       }
 
-      // ⭐ REGLA 4: PAID o CONFIRMED en fecha de check-in o vencidas - MOSTRAR
+      // ⭐ REGLA 4: PAID o CONFIRMED - SOLO SI ESTÁN VENCIDAS (no hicieron check-in a tiempo)
+      // NO mostrar si es hoy o está en período normal - esas deben ir a CheckIn
       if (["confirmed", "paid"].includes(booking.status)) {
-        if (isCheckInToday || isInStayPeriod || isPastCheckOut) {
-          console.log(`✅ [CHECK-OUT] Incluir #${booking.bookingId} - ${booking.status} (hoy es check-in o vencida)`);
+        // Solo mostrar si ya pasó la fecha de check-out (vencida sin check-in)
+        if (isPastCheckOut) {
+          console.log(`✅ [CHECK-OUT] Incluir #${booking.bookingId} - ${booking.status} VENCIDA (checkout era ${checkOutDate.toLocaleDateString()})`);
           return true;
         } else {
-          console.log(`❌ [CHECK-OUT] Excluir #${booking.bookingId} - ${booking.status} (check-in futuro: ${checkInDate.toLocaleDateString()})`);
+          // Check-in hoy o futuro = debe ir a CheckIn, no a CheckOut
+          console.log(`❌ [CHECK-OUT] Excluir #${booking.bookingId} - ${booking.status} (debe completar check-in primero)`);
           return false;
         }
       }

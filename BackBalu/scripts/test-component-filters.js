@@ -75,7 +75,7 @@ async function testComponentFilters() {
       // ===== FILTRO CHECK-OUT =====
       // 1. checked-in (siempre)
       // 2. completed con pendientes
-      // 3. paid/confirmed en fecha o vencidas
+      // 3. paid/confirmed SOLO si están VENCIDAS (pasó checkout sin hacer check-in)
       if (booking.status === "checked-in") {
         checkOutBookings.push({
           ...booking,
@@ -86,11 +86,11 @@ async function testComponentFilters() {
           ...booking,
           reason: `completed con saldo pendiente: $${totalPendiente.toLocaleString()}`
         });
-      } else if (["confirmed", "paid"].includes(booking.status) && 
-                 (isCheckInToday || isInStayPeriod || isPastCheckOut)) {
+      } else if (["confirmed", "paid"].includes(booking.status) && isPastCheckOut) {
+        // SOLO si ya pasó el checkout (vencida sin hacer check-in)
         checkOutBookings.push({
           ...booking,
-          reason: `${booking.status} - ${isPastCheckOut ? 'VENCIDA' : isCheckInToday ? 'Check-in HOY' : 'En período de estadía'}`
+          reason: `${booking.status} - VENCIDA (checkout era ${checkOutDate.toLocaleDateString()})`
         });
       }
 
