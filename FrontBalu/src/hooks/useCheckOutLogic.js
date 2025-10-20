@@ -20,6 +20,20 @@ export const useCheckOutLogic = () => {
     taxxaStatus = null,
   } = useSelector((state) => state.booking || {});
 
+  // ⭐ LOG DE DEPURACIÓN
+  useEffect(() => {
+    console.log("📊 [CHECK-OUT] Estado Redux actualizado:", {
+      totalBookings: allBookings?.length || 0,
+      bookingsType: Array.isArray(allBookings) ? 'array' : typeof allBookings,
+      loading,
+      firstBooking: allBookings?.[0] ? {
+        id: allBookings[0].bookingId,
+        status: allBookings[0].status,
+        room: allBookings[0].roomNumber
+      } : null
+    });
+  }, [allBookings, loading]);
+
   // Estados
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showExtraCharges, setShowExtraCharges] = useState(false);
@@ -57,6 +71,11 @@ export const useCheckOutLogic = () => {
 
   // Bookings filtradas y ordenadas
   const bookings = useMemo(() => {
+    console.log("🔍 [CHECK-OUT] Aplicando filtro a reservas:", {
+      totalInput: allBookings?.length || 0,
+      isArray: Array.isArray(allBookings)
+    });
+
     let filteredBookings = allBookings.filter((booking) => {
       // ⭐ NUEVA LÓGICA: Verificar pagos pendientes ANTES de excluir completed
       const financials = getRealPaymentSummary(booking);
@@ -72,7 +91,19 @@ export const useCheckOutLogic = () => {
       const isOverdue = booking.bookingStatus?.isOverdue || 
         getDaysUntilCheckOut(booking.checkOut) < 0;
 
-      return readyForCheckOut || needsPaymentProcessing || isCompletedWithPending || isOverdue;
+      const shouldInclude = readyForCheckOut || needsPaymentProcessing || isCompletedWithPending || isOverdue;
+      
+      if (shouldInclude) {
+        console.log(`✅ [CHECK-OUT] Incluir #${booking.bookingId} (${booking.status})`);
+      }
+
+      return shouldInclude;
+    });
+
+    console.log("📊 [CHECK-OUT] Resultado del filtro:", {
+      input: allBookings?.length || 0,
+      output: filteredBookings.length,
+      statuses: filteredBookings.map(b => b.status)
     });
 
     // Aplicar filtros
@@ -133,16 +164,18 @@ export const useCheckOutLogic = () => {
 
   // Funciones de acción
   const loadBookings = useCallback(async () => {
+    console.log("🔄 [CHECK-OUT] Cargando reservas...");
     setIsLoading(true);
     try {
-      await dispatch(getAllBookings({ includeInventory: false, ...filters }));
+      const result = await dispatch(getAllBookings({ includeInventory: false }));
+      console.log("✅ [CHECK-OUT] Reservas cargadas desde Redux:", result);
     } catch (error) {
-      console.error("Error loading bookings:", error);
+      console.error("❌ [CHECK-OUT] Error loading bookings:", error);
       toast.error("Error al cargar las reservas");
     } finally {
       setIsLoading(false);
     }
-  }, [dispatch, filters]);
+  }, [dispatch]);
 
   // ✅ FUNCIÓN COMPLETA DE CHECK-OUT CON SOPORTE PARA DESCUENTOS
   const handleCheckOut = useCallback(async (
