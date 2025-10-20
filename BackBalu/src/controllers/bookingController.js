@@ -7038,6 +7038,39 @@ const cancelBooking = async (req, res) => {
       });
     }
 
+    // ⭐⭐ NUEVA VALIDACIÓN: PREVENIR CANCELACIÓN DE RESERVAS COMPLETAMENTE PAGADAS
+    // Calcular pagos primero para validar
+    const totalPaidForValidation =
+      booking.payments?.reduce((sum, payment) => {
+        return sum + parseFloat(payment.amount || 0);
+      }, 0) || 0;
+
+    // Si está completamente pagada y no es modificación de fechas, NO permitir cancelación
+    const isFullyPaid = totalPaidForValidation >= parseFloat(booking.totalAmount || 0);
+    const isAdminForceCancel = req.body.forceCancel === true && req.user?.role === 'owner';
+    
+    if (isFullyPaid && requestType === "cancellation" && !isAdminForceCancel) {
+      console.log("⛔ [CANCEL-BOOKING] Intento de cancelar reserva completamente pagada");
+      return res.status(400).json({
+        error: true,
+        message: "No se puede cancelar una reserva que está completamente pagada",
+        data: {
+          currentStatus: booking.status,
+          totalAmount: booking.totalAmount,
+          totalPaid: totalPaidForValidation,
+          suggestion: "Si el huésped ya no se hospedará, debe hacer el checkout o modificar las fechas",
+          note: "Para cancelaciones administrativas forzadas, contacte al administrador del sistema"
+        },
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    if (isFullyPaid && requestType === "cancellation" && isAdminForceCancel) {
+      console.log("⚠️ [CANCEL-BOOKING] Cancelación administrativa forzada de reserva pagada");
+      console.log("   Usuario:", req.user?.n_document);
+      console.log("   Rol:", req.user?.role);
+    }
+
     // ⭐ CALCULAR DÍAS HASTA EL CHECK-IN
     const now = getColombiaTime();
     const checkInDate = toColombiaTime(booking.checkIn);
