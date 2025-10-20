@@ -64,6 +64,22 @@ const BookingCardActions = ({
       return;
     }
 
+    // ⭐ NUEVA VALIDACIÓN: No permitir cancelar si está completamente pagada
+    if (financials.isFullyPaid) {
+      alert(
+        '❌ No se puede cancelar una reserva que está completamente pagada.\n\n' +
+        '💡 Si el huésped no se hospedará, debe hacer el checkout primero.\n' +
+        'Si necesita modificar las fechas, use la opción de modificación.'
+      );
+      console.warn("⛔ [BOOKING-CARD-ACTIONS] Intento de cancelar reserva pagada:", {
+        bookingId: booking.bookingId,
+        totalPaid: financials.totalPaid,
+        totalAmount: financials.totalAmount,
+        isFullyPaid: financials.isFullyPaid
+      });
+      return;
+    }
+
     if (confirm(`¿Estás seguro de cancelar la reserva #${booking.bookingId}?`)) {
       console.log("❌ [BOOKING-CARD-ACTIONS] handleCancelBookingClick para booking:", booking.bookingId);
       onCancelBooking?.(booking);
@@ -72,6 +88,9 @@ const BookingCardActions = ({
 
   // ✅ Verificar si el usuario puede cancelar reservas
   const canCancelBookings = userRole === 'owner';
+  
+  // ⭐ NUEVA VALIDACIÓN: No mostrar botón de cancelar si está completamente pagada
+  const canShowCancelButton = canCancelBookings && !financials.isFullyPaid;
 
   // ✅ Componente de botón reutilizable
   const ActionButton = ({ 
@@ -278,8 +297,8 @@ const BookingCardActions = ({
               </button>
             )}
 
-            {/* Cancelar reserva - Solo para owners */}
-            {!['completed', 'cancelled'].includes(booking.status) && canCancelBookings && (
+            {/* Cancelar reserva - Solo para owners y si NO está completamente pagada */}
+            {!['completed', 'cancelled'].includes(booking.status) && canShowCancelButton && (
               <button
                 onClick={handleCancelBookingClick}
                 className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors flex items-center gap-1"
@@ -289,10 +308,14 @@ const BookingCardActions = ({
               </button>
             )}
 
-            {/* Mensaje para usuarios sin permisos */}
-            {!['completed', 'cancelled'].includes(booking.status) && !canCancelBookings && (
-              <div className="px-3 py-1 text-xs bg-gray-100 text-gray-500 rounded flex items-center gap-1">
-                🔒 Solo propietario
+            {/* Mensaje para usuarios sin permisos o reservas pagadas */}
+            {!['completed', 'cancelled'].includes(booking.status) && !canShowCancelButton && (
+              <div className="px-3 py-1 text-xs bg-gray-100 text-gray-500 rounded flex items-center gap-1" title={
+                financials.isFullyPaid 
+                  ? "No se puede cancelar una reserva completamente pagada" 
+                  : "Solo el propietario puede cancelar reservas"
+              }>
+                {financials.isFullyPaid ? '🔒 Pagada completa' : '🔒 Solo propietario'}
               </div>
             )}
           </div>

@@ -135,15 +135,47 @@ const CancellationManager = ({
   const isCancelled = booking.status === 'cancelled';
   const isCheckedIn = ['checked-in', 'completed'].includes(booking.status);
 
+  // ⭐ NUEVA VALIDACIÓN: Verificar si está completamente pagada
+  const totalPaid = booking.payments?.reduce((sum, payment) => {
+    if (payment.paymentStatus === 'authorized' || payment.paymentStatus === 'completed') {
+      return sum + parseFloat(payment.amount || 0);
+    }
+    return sum;
+  }, 0) || 0;
+  
+  const isFullyPaid = totalPaid >= parseFloat(booking.totalAmount || 0);
+
   // ⭐ CALCULAR DÍAS HASTA CHECK-IN
   const daysUntilCheckIn = dayjs(booking.checkIn).diff(dayjs(), 'days');
-  const canCancel = !isCancelled && !isCheckedIn && daysUntilCheckIn >= 0;
+  
+  // ⭐ NUEVA LÓGICA: No permitir cancelar si está completamente pagada
+  const canCancel = !isCancelled && !isCheckedIn && daysUntilCheckIn >= 0 && !isFullyPaid;
+  
+  // ⭐ MENSAJE DE ERROR ESPECÍFICO
+  const getCancelBlockReason = () => {
+    if (isCancelled) return 'Ya cancelada';
+    if (isCheckedIn) return 'Ya registrada entrada/salida';
+    if (isFullyPaid) return 'Completamente pagada - debe hacer checkout';
+    if (daysUntilCheckIn < 0) return 'No se puede cancelar';
+    return '';
+  };
 
   // ⭐ RENDERIZAR TRIGGER BUTTON SI NO SE PROPORCIONA
   const renderTrigger = () => {
     if (trigger) {
       return React.cloneElement(trigger, { onClick: handleOpenCancellation });
     }
+
+    // Determinar mensaje de tooltip
+    const tooltipMessage = !canCancel 
+      ? (isCancelled 
+          ? 'Ya cancelada' 
+          : isCheckedIn 
+            ? 'Ya registrada entrada/salida' 
+            : isFullyPaid
+              ? 'Completamente pagada - debe hacer checkout'
+              : 'No se puede cancelar')
+      : 'Cancelar reserva';
 
     return (
       <button
@@ -154,13 +186,9 @@ const CancellationManager = ({
             ? 'bg-red-600 text-white hover:bg-red-700'
             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
         }`}
-        title={
-          !canCancel 
-            ? (isCancelled ? 'Ya cancelada' : isCheckedIn ? 'Ya registrada' : 'No se puede cancelar')
-            : 'Cancelar reserva'
-        }
+        title={tooltipMessage}
       >
-        {isCancelled ? '🚫 Cancelada' : '🚨 Cancelar'}
+        {isCancelled ? '🚫 Cancelada' : isFullyPaid ? '� Pagada' : '🚨 Cancelar'}
       </button>
     );
   };

@@ -58,16 +58,21 @@ export const useCheckOutLogic = () => {
   // Bookings filtradas y ordenadas
   const bookings = useMemo(() => {
     let filteredBookings = allBookings.filter((booking) => {
-      if (booking.status === "completed") return false;
+      // ⭐ NUEVA LÓGICA: Verificar pagos pendientes ANTES de excluir completed
+      const financials = getRealPaymentSummary(booking);
+      const hasFinancialIssues = financials.totalPendiente > 0;
+      
+      // ⭐ EXCLUIR "completed" solo si NO tiene pagos pendientes
+      if (booking.status === "completed" && !hasFinancialIssues) return false;
 
+      // ⭐ INCLUIR si:
       const readyForCheckOut = booking.status === "checked-in";
       const needsPaymentProcessing = ["confirmed", "paid"].includes(booking.status);
-      const hasFinancialIssues = booking.status === "completed" && 
-        getRealPaymentSummary(booking).totalPendiente > 0;
+      const isCompletedWithPending = booking.status === "completed" && hasFinancialIssues;
       const isOverdue = booking.bookingStatus?.isOverdue || 
         getDaysUntilCheckOut(booking.checkOut) < 0;
 
-      return readyForCheckOut || needsPaymentProcessing || hasFinancialIssues || isOverdue;
+      return readyForCheckOut || needsPaymentProcessing || isCompletedWithPending || isOverdue;
     });
 
     // Aplicar filtros
