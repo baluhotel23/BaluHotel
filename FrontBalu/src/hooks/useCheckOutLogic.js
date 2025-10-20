@@ -69,7 +69,7 @@ export const useCheckOutLogic = () => {
     return daysUntil;
   }, [getDaysUntilCheckOut]);
 
-  // Bookings filtradas y ordenadas
+  // ⭐ Bookings filtradas y ordenadas con lógica corregida
   const bookings = useMemo(() => {
     console.log("🔍 [CHECK-OUT] Aplicando filtro a reservas:", {
       totalInput: allBookings?.length || 0,
