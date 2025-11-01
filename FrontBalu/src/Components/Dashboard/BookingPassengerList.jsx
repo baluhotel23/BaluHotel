@@ -87,7 +87,7 @@ const BookingPassengerList = () => {
     }
 
     const img = new Image();
-    img.src = "/logo2.png";
+    img.src = "/LogoBALUOk.png";
     img.onload = () => {
       const doc = new jsPDF({
         orientation: "landscape",
