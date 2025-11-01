@@ -1,7 +1,7 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInstagram, faFacebook, faWhatsapp } from '@fortawesome/free-brands-svg-icons';
-import image from '../assets/LogoBALUOk.png';
+import image from '../assets/hotel2.png';
 import BookingSearchForm from './Booking/BookingSearchForm';
 
 function Header() {
