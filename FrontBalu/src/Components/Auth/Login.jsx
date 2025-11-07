@@ -55,7 +55,7 @@ const Login = () => {
         <div>
           <img
             className="mx-auto h-20 w-auto"
-            src="/logo.jpeg"
+            src="/logo2.png"
             alt="Your Logo"
           />
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
