@@ -1,4 +1,4 @@
-const { ReceptionShift, Payment, Booking, User } = require('../data');
+const { ReceptionShift, Payment, Booking, User, Room } = require('../data');
 const { Op } = require('sequelize');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
@@ -523,6 +523,61 @@ const generateShiftPDF = async (req, res, next) => {
     doc.fontSize(11).text(`Check-ins: ${summary.checkInsProcessed}`);
     doc.text(`Check-outs: ${summary.checkOutsProcessed}`);
     doc.text(`Reservas creadas: ${summary.bookingsCreated}`);
+    doc.moveDown();
+
+    // ⭐ ESTADO DE HABITACIONES
+    doc.fontSize(14).text('Estado de Habitaciones al Cierre:', { underline: true });
+    doc.moveDown(0.5);
+
+    // Obtener todas las habitaciones
+    const rooms = await Room.findAll({
+      order: [['roomNumber', 'ASC']]
+    });
+
+    // Obtener todas las reservas activas y futuras
+    const allBookings = await Booking.findAll({
+      where: {
+        status: {
+          [Op.in]: ['checked-in', 'confirmed', 'paid']
+        }
+      },
+      attributes: ['bookingId', 'roomNumber', 'status', 'checkIn', 'checkOut', 'guestCount'],
+      order: [['checkIn', 'ASC']]
+    });
+
+    // Agrupar reservas por habitación
+    const bookingsByRoom = {};
+    allBookings.forEach(booking => {
+      const roomNum = booking.roomNumber;
+      if (!bookingsByRoom[roomNum]) {
+        bookingsByRoom[roomNum] = [];
+      }
+      bookingsByRoom[roomNum].push(booking);
+    });
+
+    // Generar reporte por habitación
+    rooms.forEach(room => {
+      const roomBookings = bookingsByRoom[room.roomNumber] || [];
+      const checkedInBooking = roomBookings.find(b => b.status === 'checked-in');
+      const futureBookings = roomBookings.filter(b => b.status === 'confirmed' || b.status === 'paid');
+
+      let statusText = '';
+      
+      if (checkedInBooking) {
+        // Habitación ocupada
+        statusText = `Hab. ${room.roomNumber}: OCUPADA - ${checkedInBooking.guestCount} huésped(es) - Check-out: ${new Date(checkedInBooking.checkOut).toLocaleDateString('es-CO')}`;
+      } else if (futureBookings.length > 0) {
+        // Habitación reservada
+        const nextBooking = futureBookings[0];
+        statusText = `Hab. ${room.roomNumber}: RESERVADA - Check-in: ${new Date(nextBooking.checkIn).toLocaleDateString('es-CO')} - ${nextBooking.guestCount} huésped(es)`;
+      } else {
+        // Habitación disponible
+        statusText = `Hab. ${room.roomNumber}: ${room.status.toUpperCase()}`;
+      }
+
+      doc.fontSize(10).text(statusText);
+    });
+    
     doc.moveDown();
 
     // ⭐ NOTAS
