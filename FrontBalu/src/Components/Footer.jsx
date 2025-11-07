@@ -149,8 +149,14 @@ const Footer = () => {
                         </div>
 
                         <div className="flex items-center space-x-2 text-gray-400 text-sm">
-                        
-                            <span>Code Desarrolladores</span>
+                            <a 
+                                href="https://wa.me/573502142082" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="hover:text-yellow-400 transition-colors duration-300"
+                            >
+                                Code Desarrolladores Web
+                            </a>
                         </div>
 
                         <div className="text-gray-400 text-sm">

@@ -477,6 +477,17 @@ const generateShiftPDF = async (req, res, next) => {
     const stream = fs.createWriteStream(filePath);
     doc.pipe(stream);
 
+    // ⭐ LOGO EN EL ENCABEZADO
+    const logoPath = path.join(__dirname, '../assets/LogoBALUOk.png');
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, {
+        fit: [100, 100],
+        align: 'center',
+        valign: 'top'
+      });
+      doc.moveDown(0.5);
+    }
+
     // ⭐ ENCABEZADO
     doc.fontSize(20).text('REPORTE DE TURNO - RECEPCIÓN', { align: 'center' });
     doc.moveDown();
@@ -555,7 +566,17 @@ const generateShiftPDF = async (req, res, next) => {
       bookingsByRoom[roomNum].push(booking);
     });
 
-    // Generar reporte por habitación
+    // Contadores para el resumen
+    const statusCounts = {
+      ocupadas: 0,
+      reservadas: 0,
+      limpias: 0,
+      paraLimpiar: 0,
+      mantenimiento: 0
+    };
+
+    // Generar reporte por habitación y contar estados
+    const roomReports = [];
     rooms.forEach(room => {
       const roomBookings = bookingsByRoom[room.roomNumber] || [];
       const checkedInBooking = roomBookings.find(b => b.status === 'checked-in');
@@ -565,17 +586,45 @@ const generateShiftPDF = async (req, res, next) => {
       
       if (checkedInBooking) {
         // Habitación ocupada
+        statusCounts.ocupadas++;
         statusText = `Hab. ${room.roomNumber}: OCUPADA - ${checkedInBooking.guestCount} huésped(es) - Check-out: ${new Date(checkedInBooking.checkOut).toLocaleDateString('es-CO')}`;
       } else if (futureBookings.length > 0) {
         // Habitación reservada
+        statusCounts.reservadas++;
         const nextBooking = futureBookings[0];
         statusText = `Hab. ${room.roomNumber}: RESERVADA - Check-in: ${new Date(nextBooking.checkIn).toLocaleDateString('es-CO')} - ${nextBooking.guestCount} huésped(es)`;
       } else {
-        // Habitación disponible
+        // Habitación disponible - contar por estado actual
+        if (room.status === 'Limpia') statusCounts.limpias++;
+        else if (room.status === 'Para Limpiar') statusCounts.paraLimpiar++;
+        else if (room.status === 'Mantenimiento') statusCounts.mantenimiento++;
+        
         statusText = `Hab. ${room.roomNumber}: ${room.status.toUpperCase()}`;
       }
 
-      doc.fontSize(10).text(statusText);
+      roomReports.push(statusText);
+    });
+
+    // ⭐ RESUMEN DE ESTADOS
+    doc.fontSize(11).fillColor('blue').text('Resumen:', { continued: false });
+    doc.fillColor('black');
+    
+    const summaryParts = [];
+    if (statusCounts.ocupadas > 0) summaryParts.push(`Ocupadas: ${statusCounts.ocupadas}`);
+    if (statusCounts.reservadas > 0) summaryParts.push(`Reservadas: ${statusCounts.reservadas}`);
+    if (statusCounts.limpias > 0) summaryParts.push(`Limpias: ${statusCounts.limpias}`);
+    if (statusCounts.paraLimpiar > 0) summaryParts.push(`Para Limpiar: ${statusCounts.paraLimpiar}`);
+    if (statusCounts.mantenimiento > 0) summaryParts.push(`Mantenimiento: ${statusCounts.mantenimiento}`);
+    
+    doc.fontSize(10).text(summaryParts.join(' | '));
+    doc.moveDown(0.5);
+
+    // ⭐ LISTADO DETALLADO
+    doc.fontSize(10).fillColor('gray').text('Detalle por habitación:', { continued: false });
+    doc.fillColor('black').moveDown(0.3);
+    
+    roomReports.forEach(report => {
+      doc.fontSize(9).text(report);
     });
     
     doc.moveDown();
