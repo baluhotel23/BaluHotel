@@ -56,6 +56,8 @@ const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
+    console.log('🔐 [LOGIN] Intento de login:', { email });
+
     const user = await User.findOne({ 
     where: { 
         email,
@@ -65,12 +67,29 @@ const login = async (req, res, next) => {
     });
 
     if (!user) {
+      console.log('❌ [LOGIN] Usuario no encontrado o inactivo:', { email });
       throw new CustomError('Credenciales inválidas', 400);
     }
 
+    console.log('👤 [LOGIN] Usuario encontrado:', {
+      n_document: user.n_document,
+      email: user.email,
+      role: user.role,
+      passwordHash: user.password?.substring(0, 20) + '...'
+    });
+
     // Verificar la contraseña
     const validPassword = await bcrypt.compare(password, user.password);
+    
+    console.log('🔑 [LOGIN] Verificación de contraseña:', {
+      email: user.email,
+      passwordProvided: password?.substring(0, 3) + '***',
+      hashInDB: user.password?.substring(0, 20) + '...',
+      isValid: validPassword
+    });
+
     if (!validPassword) {
+      console.log('❌ [LOGIN] Contraseña inválida para:', { email });
       throw new CustomError('Credenciales inválidas', 400);
     }
 
@@ -82,6 +101,12 @@ const login = async (req, res, next) => {
 
     // Usar el método toJSON definido en el modelo
     const userResponse = user.toJSON();
+
+    console.log('✅ [LOGIN] Login exitoso:', {
+      n_document: user.n_document,
+      email: user.email,
+      role: user.role
+    });
 
     res.json({
       error: false,
