@@ -139,7 +139,7 @@ const createStaffUser = async (req, res) => {
 const updateUser = async (req, res) => {
     const { n_document } = req.params;
     console.log("ID recibido para updateUser:", n_document);
-    const { email, role, ...updateData } = req.body;
+    const { email, role, password, ...updateData } = req.body;
 
     const user = await User.findByPk(n_document);
     if (!user) {
@@ -155,19 +155,33 @@ const updateUser = async (req, res) => {
     }
 
     // Validar rol si se está actualizando
-    if (role && !['admin', 'recept'].includes(role)) {
+    if (role && !['admin', 'recept', 'owner'].includes(role)) {
         throw new CustomError('Rol no válido para staff', 400);
     }
 
-    await user.update({
+    // ⭐ HASHEAR LA CONTRASEÑA SI SE ESTÁ ACTUALIZANDO
+    const dataToUpdate = {
         ...updateData,
         email,
         role,
-        updatedBy: req.user.id
-    });
+        updatedBy: req.user?.id || req.user?.n_document
+    };
+
+    if (password) {
+        console.log('🔐 [UPDATE-USER] Hasheando nueva contraseña para usuario:', n_document);
+        dataToUpdate.password = await bcrypt.hash(password, 10);
+    }
+
+    await user.update(dataToUpdate);
 
     const userResponse = { ...user.toJSON() };
     delete userResponse.password;
+
+    console.log('✅ [UPDATE-USER] Usuario actualizado exitosamente:', {
+        n_document: userResponse.n_document,
+        email: userResponse.email,
+        passwordChanged: !!password
+    });
 
     res.json({
         error: false,
