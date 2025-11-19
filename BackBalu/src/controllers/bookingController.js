@@ -99,7 +99,10 @@ const checkAvailability = async (req, res) => {
     });
 
     const where = {};
-    if (roomType) where.type = roomType;
+    if (roomType) {
+      // Mapear "Pareja/Sencilla" a "Pareja" para compatibilidad con el ENUM
+      where.type = roomType === "Pareja/Sencilla" ? "Pareja" : roomType;
+    }
 
     const rooms = await Room.findAll({
       where,
