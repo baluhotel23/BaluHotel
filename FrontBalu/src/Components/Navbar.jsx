@@ -58,13 +58,13 @@ function Navbar() {
           <div className="flex items-center space-x-4">
             {/* Social Media Icons */}
             <div className="flex space-x-3">
-              <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-yellow-600 transition-colors duration-300">
+              <a href="https://www.instagram.com/baluhotel23?igsh=MWdjbTh4ZGcxc3ptaw==" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-yellow-600 transition-colors duration-300">
                 <FontAwesomeIcon icon={faInstagram} size="sm" />
               </a>
-              <a href="https://www.facebook.com" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-yellow-600 transition-colors duration-300">
+              <a href="https://www.facebook.com/share/17SDSUw3Yv/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-yellow-600 transition-colors duration-300">
                 <FontAwesomeIcon icon={faFacebook} size="sm" />
               </a>
-              <a href="https://wa.me/1234567890" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-yellow-600 transition-colors duration-300">
+              <a href="https://wa.me/573001234567" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-yellow-600 transition-colors duration-300">
                 <FontAwesomeIcon icon={faWhatsapp} size="sm" />
               </a>
             </div>

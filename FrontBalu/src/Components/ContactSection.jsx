@@ -159,11 +159,11 @@ const ContactSection = () => {
               <div className="p-6 rounded-2xl shadow-lg border-2 border-yellow-600 hover:shadow-xl transition-all duration-300">
                 <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">🌟 Síguenos en redes sociales</h4>
                 <div className="flex justify-center space-x-6">
-                  <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer" 
+                  <a href="https://www.instagram.com/baluhotel23?igsh=MWdjbTh4ZGcxc3ptaw==" target="_blank" rel="noopener noreferrer" 
                      className="bg-gradient-to-r from-pink-500 to-purple-600 p-4 rounded-full text-white hover:shadow-lg transform hover:scale-110 transition-all duration-300">
                     <FontAwesomeIcon icon={faInstagram} size="lg" />
                   </a>
-                  <a href="https://www.facebook.com" target="_blank" rel="noopener noreferrer" 
+                  <a href="https://www.facebook.com/share/17SDSUw3Yv/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" 
                      className="bg-blue-600 p-4 rounded-full text-white hover:shadow-lg transform hover:scale-110 transition-all duration-300">
                     <FontAwesomeIcon icon={faFacebook} size="lg" />
                   </a>
