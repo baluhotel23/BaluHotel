@@ -4290,10 +4290,14 @@ const checkInGuest = async (req, res, next) => {
     try {
       const updateData = {
         status: "checked-in",
+        actualCheckIn: getColombiaTime().toJSDate(), // ⭐ AGREGAR actualCheckIn
       };
 
       await booking.update(updateData);
-      console.log("✅ [CHECK-IN-GUEST] Estado de reserva actualizado");
+      console.log("✅ [CHECK-IN-GUEST] Estado de reserva actualizado", {
+        status: updateData.status,
+        actualCheckIn: formatForLogs(updateData.actualCheckIn)
+      });
     } catch (bookingUpdateError) {
       console.error(
         "❌ [CHECK-IN-GUEST] Error al actualizar reserva:",

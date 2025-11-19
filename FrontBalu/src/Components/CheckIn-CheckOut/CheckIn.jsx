@@ -427,7 +427,7 @@ const CheckIn = () => {
 
           // ⭐ NAVEGAR AL LISTADO DE PASAJEROS PARA DESCARGAR PDF
           setTimeout(() => {
-            navigate(`/dashboard/booking-passengers/${bookingId}`);
+            navigate(`/admin/PassengerList/${bookingId}`);
           }, 1500);
         } else {
           console.error(
