@@ -1262,10 +1262,13 @@ export const checkAllCheckInRequirements = (bookingId, bookingData = null) => as
       booking = bookingResult.data;
     }
     
+    // ⭐ OBTENER EL ESTADO DE LA HABITACIÓN DE FORMA SEGURA
+    const roomStatus = booking.room?.status || booking.Room?.status || booking.roomStatus || 'Sin estado';
+    
     console.log('🔍 [CHECKIN-REQUIREMENTS] Analizando reserva:', {
       bookingId: booking.bookingId,
       status: booking.status,
-      roomStatus: booking.room?.status || booking.Room?.status,
+      roomStatus: roomStatus,
       inventoryVerified: booking.inventoryVerified,
       inventoryDelivered: booking.inventoryDelivered,
       passengersCompleted: booking.passengersCompleted
@@ -1275,7 +1278,7 @@ export const checkAllCheckInRequirements = (bookingId, bookingData = null) => as
     const requirements = {
       // 1. Habitación debe estar limpia
       roomClean: {
-        status: (booking.room?.status || booking.Room?.status) === 'Limpia',
+        status: roomStatus === 'Limpia',
         name: 'Habitación limpia',
         priority: 1
       },
