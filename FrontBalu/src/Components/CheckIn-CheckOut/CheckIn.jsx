@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
@@ -115,20 +116,15 @@ const CheckIn = () => {
       const isInventoryDelivered = booking.inventoryDelivered === true;
       const isPassengersCompleted = booking.passengersCompleted === true;
 
-      // ⭐ MOSTRAR si tiene estado válido Y no cumple ALGÚN requisito
-      // (Una vez que cumple TODOS los requisitos, desaparece porque se hace check-in)
-      const needsPreparation = !isRoomClean ||
-        !isInventoryVerified ||
-        !isInventoryDelivered ||
-        !isPassengersCompleted;
-
-      if (needsPreparation) {
-        console.log(`✅ [CHECK-IN] Incluir #${booking.bookingId} - ${booking.status} (pendiente de preparación)`);
-        return true;
-      } else {
-        console.log(`❌ [CHECK-IN] Excluir #${booking.bookingId} - ${booking.status} (ya listo para check-in, debe completarse)`);
-        return false;
-      }
+      // ⭐ SIEMPRE MOSTRAR reservas con status válido (pending, confirmed, paid)
+      // Estas son las que están en proceso de check-in
+      console.log(`✅ [CHECK-IN] Incluir #${booking.bookingId} - ${booking.status}`, {
+        roomClean: isRoomClean,
+        inventoryVerified: isInventoryVerified,
+        inventoryDelivered: isInventoryDelivered,
+        passengersCompleted: isPassengersCompleted
+      });
+      return true;
     });
   }, [allBookings]);
 
