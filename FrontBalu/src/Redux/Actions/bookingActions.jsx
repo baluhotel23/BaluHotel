@@ -1299,14 +1299,10 @@ export const checkAllCheckInRequirements = (bookingId, bookingData = null) => as
         status: booking.passengersCompleted === true,
         name: 'Completar registro de pasajeros',
         priority: 4
-      },
-      
-      // 5. Reserva debe estar pagada (nuevo requisito)
-      paymentCompleted: {
-        status: ['paid', 'checked-in'].includes(booking.status),
-        name: 'Pago completado',
-        priority: 0
       }
+      
+      // ⭐ NOTA: El pago NO es requisito obligatorio para check-in
+      // Los huéspedes pueden pagar durante la estadía o al hacer checkout
     };
     
     // ⭐ CALCULAR PASOS COMPLETADOS Y PENDIENTES
