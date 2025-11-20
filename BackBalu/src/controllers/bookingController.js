@@ -3960,7 +3960,12 @@ const checkInGuest = async (req, res, next) => {
       actualPaymentsCount: booking.payments?.length || 0,
     });
 
-    // ✅ VALIDACIÓN CORREGIDA: Permitir check-in si está en estado "paid" O tiene 50% pagado
+    // ⭐ VALIDACIÓN DE PAGO DESHABILITADA
+    // El hotel permite check-in sin pago completo, ya que pueden cobrar durante la estadía o al checkout
+    console.log("ℹ️ [CHECK-IN-GUEST] Validación de pago omitida (permitido por política del hotel)");
+    
+    // ✅ CÓDIGO ANTERIOR COMENTADO - El pago NO es requisito para check-in
+    /*
     if (!forceCheckIn && booking.status !== "paid" && paymentPercentage < 50) {
       console.log(
         "❌ [CHECK-IN-GUEST] Pago insuficiente para reserva no marcada como 'paid'"
@@ -3981,8 +3986,9 @@ const checkInGuest = async (req, res, next) => {
         timestamp: formatForLogs(getColombiaTime()),
       });
     }
+    */
 
-    console.log("✅ [CHECK-IN-GUEST] Validación de pagos exitosa");
+    console.log("✅ [CHECK-IN-GUEST] Validación de pagos omitida (permitido sin pago)");
 
     // ⭐ VERIFICAR SI YA TIENE INVENTARIO ASIGNADO
     console.log("📦 [CHECK-IN-GUEST] Verificando inventario existente...");
