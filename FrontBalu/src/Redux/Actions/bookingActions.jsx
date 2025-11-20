@@ -1359,7 +1359,7 @@ export const checkAllCheckInRequirements = (bookingId, bookingData = null) => as
       requirements,
       // ⭐ INFORMACIÓN ADICIONAL ÚTIL
       nextSteps: orderedPendingSteps.slice(0, 2), // Próximos 2 pasos
-      canStartCheckIn: requirements.paymentCompleted.status && requirements.roomClean.status,
+      canStartCheckIn: requirements.roomClean.status, // Solo necesita habitación limpia para empezar
       estimatedTimeToComplete: orderedPendingSteps.length * 5, // 5 min por paso estimado
       lastUpdated: new Date().toISOString()
     };
