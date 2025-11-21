@@ -174,6 +174,15 @@ module.exports = (sequelize) => {
       },
       {
         fields: ['openedAt']
+      },
+      {
+        // ⭐ ÍNDICE ÚNICO: Previene múltiples turnos abiertos por usuario
+        unique: true,
+        fields: ['userId', 'status'],
+        where: {
+          status: 'open'
+        },
+        name: 'unique_open_shift_per_user'
       }
     ]
   });

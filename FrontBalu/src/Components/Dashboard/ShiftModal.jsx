@@ -68,7 +68,13 @@ const ShiftModal = ({ isOpen, onClose }) => {
         dispatch(getCurrentShift()); // Refrescar turno actual
       } else if (result.isShiftAlreadyOpen) {
         // ⭐ Caso específico: turno ya abierto
-        toast.warning('⚠️ Ya tienes un turno abierto. Mostrando resumen...');
+        const existingShiftInfo = result.data?.existingShift 
+          ? ` (Turno #${result.data.existingShift})` 
+          : '';
+        toast.warning(
+          `⚠️ ${result.error || 'Ya tienes un turno abierto'}${existingShiftInfo}\n\nDebes cerrarlo manualmente para abrir uno nuevo.`,
+          { autoClose: 5000 }
+        );
         // ⭐ NO cerrar el modal, refrescar para mostrar el turno actual
         await dispatch(getCurrentShift()); // Refrescar para que currentShift se actualice
         // El componente se renderizará automáticamente con el resumen

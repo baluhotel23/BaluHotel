@@ -26,13 +26,20 @@ const openShift = async (req, res, next) => {
     });
 
     if (existingOpenShift) {
+      const openedSince = new Date(existingOpenShift.openedAt).toLocaleString('es-CO', {
+        timeZone: 'America/Bogota',
+        dateStyle: 'short',
+        timeStyle: 'short'
+      });
+      
       console.log('⚠️ [OPEN-SHIFT] Usuario ya tiene un turno abierto:', existingOpenShift.shiftId);
       return res.status(400).json({
         error: true,
-        message: 'Ya tienes un turno abierto. Debes cerrarlo antes de abrir uno nuevo.',
+        message: `Ya tienes un turno abierto desde ${openedSince}. Debes cerrarlo manualmente antes de abrir uno nuevo.`,
         data: {
           existingShift: existingOpenShift.shiftId,
-          openedAt: existingOpenShift.openedAt
+          openedAt: existingOpenShift.openedAt,
+          openingCash: existingOpenShift.openingCash
         }
       });
     }
@@ -140,11 +147,10 @@ const closeShift = async (req, res, next) => {
 
     console.log('🔒 [CLOSE-SHIFT] Cerrando turno:', shiftId);
 
-    // ⭐ BUSCAR EL TURNO
+    // ⭐ BUSCAR EL TURNO Y VERIFICAR PERMISOS
     const shift = await ReceptionShift.findOne({
       where: {
         shiftId,
-        userId,
         status: 'open'
       }
     });
@@ -153,6 +159,15 @@ const closeShift = async (req, res, next) => {
       return res.status(404).json({
         error: true,
         message: 'Turno no encontrado o ya está cerrado'
+      });
+    }
+
+    // ⭐ VERIFICAR QUE SOLO EL DUEÑO DEL TURNO PUEDA CERRARLO
+    if (shift.userId !== userId) {
+      console.log('⚠️ [CLOSE-SHIFT] Usuario diferente intenta cerrar turno:', { shiftOwner: shift.userId, requestUser: userId });
+      return res.status(403).json({
+        error: true,
+        message: 'Solo el usuario que abrió el turno puede cerrarlo'
       });
     }
 
