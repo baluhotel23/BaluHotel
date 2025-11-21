@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isTokenExpired } from '../utils/tokenManager';
+import { isTokenExpired } from '../../utils/tokenManager';
 
 const TokenValidator = () => {
   const navigate = useNavigate();
