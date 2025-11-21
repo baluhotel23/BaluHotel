@@ -113,13 +113,13 @@ async function fixProblematicBookings() {
         await sequelize.query(`
           UPDATE "Rooms"
           SET 
-            "status" = 'Para Limpiar',
-            "available" = false
+            "status" = NULL,
+            "available" = true
           WHERE "roomNumber" = :roomNumber
         `, {
           replacements: { roomNumber: booking.roomNumber }
         });
-        console.log(`   🏨 Habitación ${booking.roomNumber} marcada como Para Limpiar`);
+        console.log(`   🏨 Habitación ${booking.roomNumber} marcada como Disponible (NULL)`);
       } else if (newStatus === 'paid') {
         await sequelize.query(`
           UPDATE "Rooms"

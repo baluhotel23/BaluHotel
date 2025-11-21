@@ -97,7 +97,6 @@ export const checkAvailability = (params) => async (dispatch) => {
             total: processedRooms.length,
             available: availableCount,
             occupied: processedRooms.filter(r => r.status === 'Ocupada').length,
-            cleaning: processedRooms.filter(r => r.status === 'Para Limpiar').length,
             maintenance: processedRooms.filter(r => r.status === 'Mantenimiento').length
           },
           filters: params,
@@ -1276,32 +1275,25 @@ export const checkAllCheckInRequirements = (bookingId, bookingData = null) => as
     
     // ⭐ VERIFICAR CADA REQUISITO INDIVIDUALMENTE
     const requirements = {
-      // 1. Habitación debe estar limpia
-      roomClean: {
-        status: roomStatus === 'Limpia',
-        name: 'Habitación limpia',
-        priority: 1
-      },
-      
-      // 2. Inventario verificado
+      // 1. Inventario verificado
       inventoryVerified: {
         status: booking.inventoryVerified === true,
         name: 'Verificar inventario',
-        priority: 2
+        priority: 1
       },
       
-      // 3. Inventario entregado
+      // 2. Inventario entregado
       inventoryDelivered: {
         status: booking.inventoryDelivered === true,
         name: 'Entregar inventario',
-        priority: 3
+        priority: 2
       },
       
-      // 4. Registro de pasajeros completado
+      // 3. Registro de pasajeros completado
       passengersCompleted: {
         status: booking.passengersCompleted === true,
         name: 'Completar registro de pasajeros',
-        priority: 4
+        priority: 3
       }
       
       // ⭐ NOTA: El pago NO es requisito obligatorio para check-in
@@ -1359,7 +1351,6 @@ export const checkAllCheckInRequirements = (bookingId, bookingData = null) => as
       requirements,
       // ⭐ INFORMACIÓN ADICIONAL ÚTIL
       nextSteps: orderedPendingSteps.slice(0, 2), // Próximos 2 pasos
-      canStartCheckIn: requirements.roomClean.status, // Solo necesita habitación limpia para empezar
       estimatedTimeToComplete: orderedPendingSteps.length * 5, // 5 min por paso estimado
       lastUpdated: new Date().toISOString()
     };

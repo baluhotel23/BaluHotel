@@ -181,7 +181,7 @@ const markRoomAsClean = async (req, res) => {
 
     res.json({
         error: false,
-        message: 'Habitación marcada como limpia',
+        message: 'Habitación marcada como disponible',
         data: room
     });
 };

@@ -315,7 +315,6 @@ const RoomList = () => {
       occupied: "bg-red-100 text-red-800",
       maintenance: "bg-yellow-100 text-yellow-800",
       cleaning: "bg-blue-100 text-blue-800",
-      "Para Limpiar": "bg-orange-100 text-orange-800",
       out_of_order: "bg-gray-100 text-gray-800",
     };
     return statusColors[status] || "bg-gray-100 text-gray-800";
@@ -566,7 +565,6 @@ const RoomList = () => {
                               <option value="available">Disponible</option>
                               <option value="occupied">Ocupada</option>
                               <option value="maintenance">Mantenimiento</option>
-                              <option value="Para Limpiar">Para Limpiar</option>
                               <option value="out_of_order">Fuera de servicio</option>
                             </select>
                           </div>

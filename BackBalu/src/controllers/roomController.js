@@ -576,26 +576,25 @@ const updateRoomStatus = async (req, res, next) => {
       });
     }
     
-    // ✅ INCLUYENDO "Para Limpiar" EN LOS ESTADOS VÁLIDOS
-    const validStatuses = ["Limpia", "Ocupada", "Mantenimiento", "Reservada", "Para Limpiar"];
+    // ✅ VALIDAR ESTADOS - NULL significa disponible
+    const validStatuses = [null, "Ocupada", "Mantenimiento", "Reservada"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         error: true,
-        message: 'Estado inválido'
+        message: 'Estado inválido. Use: null (disponible), Ocupada, Mantenimiento, o Reservada'
       });
     }
 
     // ✅ DETERMINAR DISPONIBILIDAD BASADA EN EL ESTADO
     let available = false;
     switch (status) {
-      case "Limpia":
-        available = true; // Solo habitaciones limpias están disponibles para reservar
+      case null:
+        available = true; // NULL = Habitación disponible
         break;
       case "Ocupada":
       case "Reservada":
-      case "Para Limpiar":
       case "Mantenimiento":
-        available = false; // Todos los demás estados hacen que la habitación no esté disponible
+        available = false; // Habitación no disponible
         break;
     }
 

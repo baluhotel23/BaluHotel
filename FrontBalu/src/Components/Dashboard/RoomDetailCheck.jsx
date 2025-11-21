@@ -257,13 +257,6 @@ function RoomDetailCheck() {
           <h4 className="text-md font-bold">Actualizar Estado</h4>
           <button
             type="button"
-            onClick={() => handleUpdateStatus("Limpia")}
-            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mr-2"
-          >
-            Marcar como Limpia
-          </button>
-          <button
-            type="button"
             onClick={() => handleUpdateStatus("Mantenimiento")}
             className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 mr-2"
           >

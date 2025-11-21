@@ -570,8 +570,7 @@ const generateShiftPDF = async (req, res, next) => {
     const statusCounts = {
       ocupadas: 0,
       reservadas: 0,
-      limpias: 0,
-      paraLimpiar: 0,
+      disponibles: 0,
       mantenimiento: 0
     };
 
@@ -595,11 +594,13 @@ const generateShiftPDF = async (req, res, next) => {
         statusText = `Hab. ${room.roomNumber}: RESERVADA - Check-in: ${new Date(nextBooking.checkIn).toLocaleDateString('es-CO')} - ${nextBooking.guestCount} huésped(es)`;
       } else {
         // Habitación disponible - contar por estado actual
-        if (room.status === 'Limpia') statusCounts.limpias++;
-        else if (room.status === 'Para Limpiar') statusCounts.paraLimpiar++;
-        else if (room.status === 'Mantenimiento') statusCounts.mantenimiento++;
-        
-        statusText = `Hab. ${room.roomNumber}: ${room.status.toUpperCase()}`;
+        if (room.status === 'Mantenimiento') {
+          statusCounts.mantenimiento++;
+          statusText = `Hab. ${room.roomNumber}: MANTENIMIENTO`;
+        } else {
+          statusCounts.disponibles++;
+          statusText = `Hab. ${room.roomNumber}: DISPONIBLE`;
+        }
       }
 
       roomReports.push(statusText);
@@ -612,8 +613,7 @@ const generateShiftPDF = async (req, res, next) => {
     const summaryParts = [];
     if (statusCounts.ocupadas > 0) summaryParts.push(`Ocupadas: ${statusCounts.ocupadas}`);
     if (statusCounts.reservadas > 0) summaryParts.push(`Reservadas: ${statusCounts.reservadas}`);
-    if (statusCounts.limpias > 0) summaryParts.push(`Limpias: ${statusCounts.limpias}`);
-    if (statusCounts.paraLimpiar > 0) summaryParts.push(`Para Limpiar: ${statusCounts.paraLimpiar}`);
+    if (statusCounts.disponibles > 0) summaryParts.push(`Disponibles: ${statusCounts.disponibles}`);
     if (statusCounts.mantenimiento > 0) summaryParts.push(`Mantenimiento: ${statusCounts.mantenimiento}`);
     
     doc.fontSize(10).text(summaryParts.join(' | '));

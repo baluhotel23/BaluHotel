@@ -15,7 +15,7 @@ const testRooms = [
     pricePerExtraGuest: 15000,
     description: 'Habitación doble con vista al jardín',
     maxGuests: 2,
-    status: 'Limpia',
+    status: null, // Disponible
     isActive: true,
     isPromo: false
   },
@@ -28,7 +28,7 @@ const testRooms = [
     pricePerExtraGuest: 20000,
     description: 'Habitación triple espaciosa',
     maxGuests: 3,
-    status: 'Limpia',
+    status: null, // Disponible
     isActive: true,
     isPromo: false
   },
@@ -55,7 +55,7 @@ const testRooms = [
     pricePerExtraGuest: 15000,
     description: 'Habitación doble económica',
     maxGuests: 2,
-    status: 'Limpia',
+    status: null, // Disponible
     isActive: true,
     isPromo: false
   },
@@ -81,7 +81,7 @@ const testRooms = [
     pricePerExtraGuest: 15000,
     description: 'Habitación doble con balcón',
     maxGuests: 2,
-    status: 'Limpia',
+    status: null, // Disponible
     isActive: true,
     isPromo: true,
     promotionPrice: 70000
@@ -108,7 +108,7 @@ const testRooms = [
     pricePerExtraGuest: 25000,
     description: 'Suite Premium para parejas con jacuzzi',
     maxGuests: 2,
-    status: 'Limpia',
+    status: null, // Disponible
     isActive: true,
     isPromo: false
   },
@@ -134,7 +134,7 @@ const testRooms = [
     pricePerExtraGuest: 35000,
     description: 'Habitación familiar deluxe hasta 6 personas',
     maxGuests: 6,
-    status: 'Limpia',
+    status: null, // Disponible
     isActive: true,
     isPromo: true,
     promotionPrice: 130000

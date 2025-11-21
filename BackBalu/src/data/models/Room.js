@@ -67,8 +67,10 @@ module.exports = (sequelize) => {
     },
     status: {
       type: DataTypes.ENUM,
-      values: ["Limpia", "Ocupada", "Mantenimiento", "Reservada", "Para Limpiar"],
-      defaultValue: "Para Limpiar"
+      values: ["Ocupada", "Mantenimiento", "Reservada"],
+      allowNull: true,
+      defaultValue: null,
+      comment: "NULL = Disponible, Ocupada = En uso, Mantenimiento = Fuera de servicio, Reservada = Tiene reserva futura"
     },
 
     maxGuests: {

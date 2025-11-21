@@ -71,8 +71,8 @@ const RoomStatusDashboard = () => {
   const getNormalizedStatus = (room) => {
     if (!room.isActive) return 'Inactiva';
     
-    // Agrupar todos los estados disponibles
-    if (room.status === 'Disponible' || room.status === 'Limpia' || room.status === 'Para Limpiar') {
+    // NULL o sin estado = Disponible
+    if (!room.status || room.status === 'Disponible') {
       return 'Disponible';
     }
     
