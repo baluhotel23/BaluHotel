@@ -4,8 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import {
   getAllBookings,
-  // ⭐ NUEVAS IMPORTACIONES OPTIMIZADAS
-  updateInventoryStatus,
+  // ⭐ Inventario se maneja automáticamente en backend
   updatePassengersStatus,
   checkAllCheckInRequirements,
   checkIn,
@@ -14,7 +13,7 @@ import CancellationManager from '../Booking/CancellationManager';
 import { updateRoomStatus } from "../../Redux/Actions/roomActions";
 import DashboardLayout from "../Dashboard/DashboardLayout";
 import { getRegistrationPassesByBooking } from "../../Redux/Actions/registerActions";
-import { removeStock } from "../../Redux/Actions/inventoryActions";
+// ⭐ Inventario se descuenta automáticamente en check-in (backend)
 import Registration from "../Dashboard/Registration";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
@@ -62,11 +61,6 @@ const CheckIn = () => {
     to: dayjs().format("YYYY-MM-DD"),   // ⭐ Ambas del día actual
   });
 
-  // Estados de inventario básico
-  const [, setCheckedBookings] = useState({});
-  const [checkedBasics, setCheckedBasics] = useState({});
-  const [basicsByBooking, setBasicsByBooking] = useState({});
-
   const isLoadingBookings = loading.general || false;
   const bookingError = errors.general || null;
 
@@ -110,8 +104,6 @@ const CheckIn = () => {
       }
 
       // ⭐ VERIFICAR REQUISITOS DE CHECK-IN
-      const isRoomClean =
-        (booking.room?.status || booking.Room?.status) === "Limpia";
       const isInventoryVerified = booking.inventoryVerified === true;
       const isInventoryDelivered = booking.inventoryDelivered === true;
       const isPassengersCompleted = booking.passengersCompleted === true;
@@ -119,7 +111,6 @@ const CheckIn = () => {
       // ⭐ SIEMPRE MOSTRAR reservas con status válido (pending, confirmed, paid)
       // Estas son las que están en proceso de check-in
       console.log(`✅ [CHECK-IN] Incluir #${booking.bookingId} - ${booking.status}`, {
-        roomClean: isRoomClean,
         inventoryVerified: isInventoryVerified,
         inventoryDelivered: isInventoryDelivered,
         passengersCompleted: isPassengersCompleted
@@ -154,93 +145,40 @@ const CheckIn = () => {
 
   // Estado visual de habitación
   const getRoomStatusColor = (status) => {
-    if (status === "Limpia")
+    if (!status || status === "Disponible")
       return "bg-green-100 text-green-700 border-green-200";
     if (status === "Ocupada")
       return "bg-blue-100 text-blue-700 border-blue-200";
-    if (status === "Sucia") return "bg-red-100 text-red-700 border-red-200";
+    if (status === "Mantenimiento") 
+      return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    if (status === "Reservada") 
+      return "bg-purple-100 text-purple-700 border-purple-200";
     return "bg-gray-100 text-gray-700 border-gray-200";
   };
 
-  // Inventario: cargar básicos
-  // Inventario: cargar básicos
+  // ⭐ CARGAR INVENTARIO BÁSICO (SOLO INFO - Sin checkboxes)
   const handleLoadBasics = useCallback(
     async (booking) => {
       try {
         console.log(
-          `📦 [LOAD-BASICS] Iniciando verificación para reserva: ${booking.bookingId}`
+          `📦 [LOAD-BASICS] Mostrando info de inventario para reserva: ${booking.bookingId}`
         );
 
         const room = getRoomInfo(booking);
-        const bookingId = booking.bookingId;
         const loadedBasics = room.BasicInventories || [];
 
         if (loadedBasics && loadedBasics.length > 0) {
-          // ⭐ ACTUALIZAR ESTADO LOCAL PRIMERO
-          setCheckedBookings((prev) => ({ ...prev, [bookingId]: true }));
-          setBasicsByBooking((prev) => ({
-            ...prev,
-            [bookingId]: loadedBasics.map((basic) => ({
-              id: basic.id,
-              name: basic.name,
-              description: basic.description,
-              quantity: basic.RoomBasics?.quantity || 0,
-              currentStock: basic.currentStock,
-            })),
-          }));
-          setCheckedBasics((prev) => ({
-            ...prev,
-            [bookingId]: loadedBasics.reduce((acc, basic) => {
-              acc[basic.id] = false;
-              return acc;
-            }, {}),
-          }));
-
-          // ⭐ ACTUALIZAR EL BACKEND CON LA ACTION MEJORADA
-          const result = await dispatch(
-            updateInventoryStatus(bookingId, {
-              inventoryVerified: true,
-              inventoryVerifiedAt: new Date().toISOString(),
-            })
+          const itemsList = loadedBasics.map((basic) => 
+            `${basic.name} (${basic.RoomBasics?.quantity || 0})`
+          ).join(", ");
+          
+          toast.info(
+            `📦 Inventario: ${itemsList}. Se descontará automáticamente en check-in.`,
+            { duration: 5000 }
           );
-
-          if (result.success) {
-            console.log("✅ [LOAD-BASICS] Inventario verificado en backend");
-
-            // ⭐ REFRESCAR DATOS PARA SINCRONIZAR
-            await dispatch(
-              getAllBookings({
-                fromDate: dateRange.from,
-                toDate: dateRange.to,
-              })
-            );
-
-            toast.success(
-              `📦✅ Inventario básico verificado para reserva ${bookingId}`
-            );
-          } else {
-            console.error(
-              "❌ [LOAD-BASICS] Error al actualizar backend:",
-              result.error
-            );
-            toast.error(`Error al verificar inventario: ${result.error}`);
-
-            // ⭐ REVERTIR ESTADO LOCAL SI FALLA EL BACKEND
-            setCheckedBookings((prev) => ({ ...prev, [bookingId]: false }));
-            setBasicsByBooking((prev) => {
-              const updated = { ...prev };
-              delete updated[bookingId];
-              return updated;
-            });
-            setCheckedBasics((prev) => {
-              const updated = { ...prev };
-              delete updated[bookingId];
-              return updated;
-            });
-          }
         } else {
           toast.info(
-            `ℹ️ No hay inventario básico configurado para la habitación ${room.roomNumber}`
+            `ℹ️ No hay inventario básico configurado para habitación ${room.roomNumber}`
           );
         }
       } catch (error) {
@@ -250,134 +188,10 @@ const CheckIn = () => {
         );
       }
     },
-    [getRoomInfo, dispatch, dateRange]
+    [getRoomInfo]
   );
 
-  // Inventario: marcar/unmarcar básico
-  const handleCheckBasic = useCallback((bookingId, basicId) => {
-    setCheckedBasics((prev) => ({
-      ...prev,
-      [bookingId]: {
-        ...prev[bookingId],
-        [basicId]: !prev[bookingId]?.[basicId],
-      },
-    }));
-  }, []);
-
-  // Inventario: confirmar entrega
-  // ⭐ INVENTARIO: CONFIRMAR ENTREGA - MEJORADO
-  const handleConfirmBasics = useCallback(
-    async (bookingId) => {
-      try {
-        console.log(
-          `📤 [CONFIRM-BASICS] Iniciando entrega para reserva: ${bookingId}`
-        );
-
-        const checked = checkedBasics[bookingId];
-        const bookingBasics = basicsByBooking[bookingId] || [];
-        const basicsToRemove = bookingBasics.filter(
-          (item) => checked?.[item.id]
-        );
-
-        if (basicsToRemove.length === 0) {
-          toast.warning(
-            "⚠️ Seleccione al menos un básico para confirmar la entrega."
-          );
-          return;
-        }
-
-        // ⭐ PROCESAR DESCUENTO DE STOCK
-        for (const basic of basicsToRemove) {
-          const result = await dispatch(removeStock(basic.id, basic.quantity));
-          if (result && result.error) {
-            toast.error(
-              `❌ Error al descontar ${basic.name}: ${result.message}`
-            );
-            return;
-          }
-        }
-
-        // ⭐ ACTUALIZAR ESTADO LOCAL
-        setCheckedBasics((prev) => ({
-          ...prev,
-          [bookingId]: Object.keys(prev[bookingId] || {}).reduce((acc, key) => {
-            acc[key] = true;
-            return acc;
-          }, {}),
-        }));
-
-        // ⭐ ACTUALIZAR EL BACKEND CON LA ACTION MEJORADA
-        const result = await dispatch(
-          updateInventoryStatus(bookingId, {
-            inventoryDelivered: true,
-            inventoryDeliveredAt: new Date().toISOString(),
-            inventoryDeliveredBy: user?.n_document || "staff",
-          })
-        );
-
-        if (result.success) {
-          console.log("✅ [CONFIRM-BASICS] Inventario entregado en backend");
-
-          // ⭐ REFRESCAR RESERVAS
-          await dispatch(
-            getAllBookings({
-              fromDate: dateRange.from,
-              toDate: dateRange.to,
-            })
-          );
-
-          toast.success(
-            `📤✅ Inventario básico entregado para la reserva ${bookingId} exitosamente.`
-          );
-        } else {
-          console.error(
-            "❌ [CONFIRM-BASICS] Error al actualizar backend:",
-            result.error
-          );
-          toast.error(`Error al confirmar entrega: ${result.error}`);
-        }
-      } catch (_error) {
-        console.error("❌ [CONFIRM-BASICS] Error:", _error);
-        toast.error(
-          `Error al confirmar la entrega de básicos: ${
-            _error.message || "Desconocido"
-          }`
-        );
-      }
-    },
-    [checkedBasics, basicsByBooking, dispatch, dateRange, user]
-  );
-  // Marcar habitación como limpia
-  const handlePreparation = useCallback(
-    async (roomNumber, status) => {
-      if (!roomNumber || roomNumber === "Sin asignar") return;
-      try {
-        const result = await dispatch(updateRoomStatus(roomNumber, { status }));
-        
-        // ⭐ Verificar si el resultado fue exitoso
-        if (result && result.success) {
-          toast.success(`Habitación ${roomNumber} marcada como lista para ocupar`);
-          setTimeout(() => {
-            dispatch(
-              getAllBookings({
-                fromDate: dateRange.from,
-                toDate: dateRange.to,
-              })
-            );
-          }, 1000);
-        } else if (result && result.status === 403) {
-          // ⭐ Error de permisos
-          toast.error("No tienes permisos para realizar esta acción. Contacta al administrador.");
-        } else {
-          toast.error(result?.error || "Error al actualizar el estado de la habitación");
-        }
-      } catch (error) {
-        console.error("Error en handlePreparation:", error);
-        toast.error("Error al actualizar el estado de la habitación");
-      }
-    },
-    [dispatch, dateRange.from, dateRange.to]
-  );
+  // ⭐ FUNCIONES DE CHECKBOX ELIMINADAS - Inventario se descuenta automáticamente en check-in
 
   // Registro de pasajeros: éxito
   // Registro de pasajeros: éxito
@@ -578,27 +392,11 @@ const CheckIn = () => {
   );
 
   // ⭐ NUEVA: OBTENER ESTADO INTELIGENTE DE REQUISITOS
+  // ⭐ VALIDAR REQUISITOS DE CHECK-IN (SIMPLIFICADO)
   const getBookingRequirementsStatus = useCallback(
     (booking) => {
-      const room = getRoomInfo(booking);
-
-      // ⭐ USAR DATOS DEL BACKEND EN LUGAR DE ESTADOS LOCALES
+      // ⭐ SOLO VALIDAR PASAJEROS - Inventario se maneja automáticamente
       const requirements = {
-        roomClean: {
-          completed: room.status === "Limpia",
-          name: "Habitación limpia",
-          icon: room.status === "Limpia" ? "✅" : "🧹",
-        },
-        inventoryVerified: {
-          completed: booking.inventoryVerified === true,
-          name: "Inventario verificado",
-          icon: booking.inventoryVerified === true ? "✅" : "📦",
-        },
-        inventoryDelivered: {
-          completed: booking.inventoryDelivered === true,
-          name: "Inventario entregado",
-          icon: booking.inventoryDelivered === true ? "✅" : "📤",
-        },
         passengersCompleted: {
           completed: booking.passengersCompleted === true,
           name: "Pasajeros registrados",
@@ -624,7 +422,7 @@ const CheckIn = () => {
         canCompleteCheckIn: allRequirementsMet,
       };
     },
-    [getRoomInfo]
+    []
   );
 
   const handleDateChange = useCallback((e) => {
@@ -856,9 +654,7 @@ const CheckIn = () => {
               pagoColor = "bg-red-100 text-red-700";
             }
 
-            // ⭐ USAR DATOS DEL BACKEND PARA INVENTARIO
-            const inventoryLoaded = booking.inventoryVerified === true;
-            const inventoryDelivered = booking.inventoryDelivered === true;
+            // ⭐ Inventario básico de la habitación
             const inventoryItems = room.BasicInventories || [];
 
             return (
@@ -1023,127 +819,50 @@ const CheckIn = () => {
                   )}
                 </div>
 
-                {/* ⭐ INVENTARIO BÁSICO - COMPLETAMENTE ACTUALIZADO */}
+                {/* ⭐ INVENTARIO BÁSICO - SIMPLIFICADO (Sin checkboxes) */}
                 <div className="px-6 py-4">
                   <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
                     📦 Inventario básico
                   </h4>
 
-                  {/* Estado basado en backend */}
-                  {inventoryLoaded && inventoryDelivered ? (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg mb-4">
-                      <p className="text-sm text-green-800 font-medium flex items-center gap-2">
-                        ✅ Inventario completado
-                      </p>
-                      {booking.inventoryVerifiedAt &&
-                        booking.inventoryDeliveredAt && (
-                          <p className="text-xs text-green-700 mt-1">
-                            Verificado:{" "}
-                            {new Date(
-                              booking.inventoryVerifiedAt
-                            ).toLocaleString("es-CO")}
-                            <br />
-                            Entregado:{" "}
-                            {new Date(
-                              booking.inventoryDeliveredAt
-                            ).toLocaleString("es-CO")}
-                            {booking.inventoryDeliveredBy &&
-                              ` por ${booking.inventoryDeliveredBy}`}
-                          </p>
-                        )}
-                    </div>
-                  ) : inventoryLoaded && !inventoryDelivered ? (
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-                      <p className="text-sm text-yellow-800 font-medium flex items-center gap-2">
-                        ⏳ Inventario verificado, pendiente entrega
-                      </p>
-                      {inventoryItems.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-xs text-yellow-700 mb-2">
-                            Selecciona elementos para entregar:
-                          </p>
-                          <div className="space-y-1">
-                            {inventoryItems.map((item) => (
-                              <label
-                                key={item.id}
-                                className="flex items-center gap-2 text-xs"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    checkedBasics[booking.bookingId]?.[
-                                      item.id
-                                    ] || false
-                                  }
-                                  onChange={() =>
-                                    handleCheckBasic(booking.bookingId, item.id)
-                                  }
-                                  className="w-3 h-3 text-blue-600 rounded"
-                                />
-                                <span>
-                                  {item.name} (Qty:{" "}
-                                  {item.RoomBasics?.quantity || 0})
-                                </span>
-                              </label>
-                            ))}
-                          </div>
+                  {/* Info automática */}
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                    <p className="text-sm text-blue-800 font-medium flex items-center gap-2">
+                      ℹ️ Se descontará automáticamente al completar check-in
+                    </p>
+                  </div>
+
+                  {/* Lista de items */}
+                  {inventoryItems.length > 0 ? (
+                    <div className="space-y-2 mb-4">
+                      {inventoryItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-3 p-2 rounded-md bg-gray-50"
+                        >
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span className="text-sm text-gray-700">
+                            {item.name}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-auto">
+                            Cantidad: {item.RoomBasics?.quantity || 0}
+                          </span>
                         </div>
-                      )}
+                      ))}
                     </div>
                   ) : (
-                    <div className="space-y-2 mb-4">
-                      {inventoryItems.length > 0 ? (
-                        inventoryItems.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50"
-                          >
-                            <div className="w-4 h-4 bg-gray-200 rounded"></div>
-                            <span className="text-sm text-gray-700">
-                              {item.name}
-                            </span>
-                            <span className="text-xs text-gray-500 ml-auto">
-                              Qty: {item.RoomBasics?.quantity || 0}
-                            </span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-2 text-gray-500 text-sm">
-                          No hay inventario básico configurado para esta
-                          habitación
-                        </div>
-                      )}
+                    <div className="p-3 text-gray-500 text-sm bg-gray-50 rounded-md mb-4">
+                      ℹ️ No hay inventario básico configurado
                     </div>
                   )}
 
-                  {/* Botones de inventario */}
-                  <div className="flex gap-2">
-                    <button
-                      className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        inventoryLoaded
-                          ? "bg-green-500 text-white cursor-not-allowed"
-                          : "bg-yellow-500 text-white hover:bg-yellow-600"
-                      }`}
-                      onClick={() => handleLoadBasics(booking)}
-                      disabled={inventoryLoaded}
-                    >
-                      {inventoryLoaded ? "✅ Verificado" : "🔍 Verificar"}
-                    </button>
-
-                    {inventoryLoaded && inventoryItems.length > 0 && (
-                      <button
-                        className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                          inventoryDelivered
-                            ? "bg-green-500 text-white cursor-not-allowed"
-                            : "bg-blue-600 text-white hover:bg-blue-700"
-                        }`}
-                        onClick={() => handleConfirmBasics(booking.bookingId)}
-                        disabled={inventoryDelivered}
-                      >
-                        {inventoryDelivered ? "✅ Entregado" : "📤 Entregar"}
-                      </button>
-                    )}
-                  </div>
+                  {/* Botón para cargar/ver inventario */}
+                  <button
+                    className="w-full px-3 py-2 rounded-md text-sm font-medium transition-colors bg-blue-100 text-blue-700 hover:bg-blue-200"
+                    onClick={() => handleLoadBasics(booking)}
+                  >
+                    🔍 Ver inventario básico
+                  </button>
                 </div>
 
                 {/* ⭐ PROGRESO VISUAL - USANDO requirementsStatus */}
@@ -1202,55 +921,26 @@ const CheckIn = () => {
                 {/* ⭐ BOTONES DE ACCIÓN - ACTUALIZADOS */}
                 <div className="p-6 border-t border-gray-100">
                   <div className="grid grid-cols-1 gap-3">
-                    {/* Botón de limpiar habitación */}
-                    <button
-                      className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                        requirementsStatus.requirements.roomClean.completed
-                          ? "bg-green-500 text-white cursor-not-allowed"
-                          : room.roomNumber === "Sin asignar"
-                          ? "bg-gray-400 text-gray-700 cursor-not-allowed"
-                          : "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md transform hover:-translate-y-0.5"
-                      }`}
-                      disabled={
-                        requirementsStatus.requirements.roomClean.completed ||
-                        room.roomNumber === "Sin asignar"
-                      }
-                      onClick={() =>
-                        handlePreparation(room.roomNumber, "Limpia")
-                      }
-                    >
-                      {room.roomNumber === "Sin asignar"
-                        ? "🚫 Habitación no asignada"
-                        : requirementsStatus.requirements.roomClean.completed
-                        ? "✅ Lista para ocupar"
-                        : "🏨 Marcar como lista para ocupar"}
-                    </button>
-
                     {/* Botón de registrar ocupantes */}
                     <button
                       className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
                         requirementsStatus.requirements.passengersCompleted
                           .completed
                           ? "bg-green-500 text-white cursor-not-allowed"
-                          : requirementsStatus.requirements.roomClean.completed
-                          ? "bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md transform hover:-translate-y-0.5"
-                          : "bg-gray-400 text-gray-700 cursor-not-allowed"
+                          : "bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md transform hover:-translate-y-0.5"
                       }`}
                       disabled={
                         requirementsStatus.requirements.passengersCompleted
-                          .completed ||
-                        !requirementsStatus.requirements.roomClean.completed
+                          .completed
                       }
                       onClick={() => setShowPassengerModal(booking.bookingId)}
                     >
                       {requirementsStatus.requirements.passengersCompleted
                         .completed
                         ? "✅ Todos registrados"
-                        : requirementsStatus.requirements.roomClean.completed
-                        ? `👥 Registrar ocupantes (${
+                        : `👥 Registrar ocupantes (${
                             booking.registrationPasses?.length || 0
-                          }/${requiredGuestCount})`
-                        : "🔒 Limpiar habitación primero"}
+                          }/${requiredGuestCount})`}
                     </button>
 
                     {/* ✅ Botón de cancelación - Solo para owners */}

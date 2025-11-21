@@ -3603,8 +3603,7 @@ const getAllBookings = async (req, res, next) => {
         // ⭐ ESTADO CALCULADO
         allRequirementsMet:
           (bookingData.inventoryDelivered || false) &&
-          (bookingData.passengersCompleted || false) &&
-          booking.room?.status === "Limpia",
+          (bookingData.passengersCompleted || false),
         // ⭐ PASOS COMPLETADOS
         completedSteps: [
           ...(bookingData.inventoryVerified || false
@@ -3616,7 +3615,6 @@ const getAllBookings = async (req, res, next) => {
           ...(bookingData.passengersCompleted || false
             ? ["Pasajeros registrados"]
             : []),
-          ...(booking.room?.status === "Limpia" ? ["Habitación limpia"] : []),
         ],
         // ⭐ PASOS PENDIENTES
         pendingSteps: [
@@ -3629,7 +3627,6 @@ const getAllBookings = async (req, res, next) => {
           ...(!(bookingData.passengersCompleted || false)
             ? ["Completar registro de pasajeros"]
             : []),
-          ...(booking.room?.status !== "Limpia" ? ["Limpiar habitación"] : []),
         ],
       };
 
@@ -4290,6 +4287,52 @@ const checkInGuest = async (req, res, next) => {
       forceCheckIn,
     });
 
+    // ⭐ DESCONTAR INVENTARIO BÁSICO AUTOMÁTICAMENTE
+    console.log("📦 [CHECK-IN-GUEST] Descontando inventario básico automáticamente...");
+    
+    if (booking.room.BasicInventories && booking.room.BasicInventories.length > 0) {
+      console.log(`📦 [CHECK-IN-GUEST] Items en inventario básico: ${booking.room.BasicInventories.length}`);
+      
+      for (const item of booking.room.BasicInventories) {
+        const requiredQty = item.RoomBasics.quantity;
+        const itemName = item.name;
+        
+        try {
+          // Determinar stock disponible según tipo
+          let availableQty = 0;
+          if (item.inventoryType === "reusable") {
+            availableQty = item.cleanStock;
+          } else {
+            availableQty = item.currentStock;
+          }
+          
+          console.log(`📦 [CHECK-IN-GUEST] ${itemName}: requiere ${requiredQty}, disponible ${availableQty}`);
+          
+          // Descontar stock
+          if (availableQty >= requiredQty) {
+            if (item.inventoryType === "reusable") {
+              await item.update({
+                cleanStock: item.cleanStock - requiredQty,
+              });
+            } else {
+              await item.update({
+                currentStock: item.currentStock - requiredQty,
+              });
+            }
+            
+            console.log(`✅ [CHECK-IN-GUEST] ${itemName}: ${requiredQty} unidades descontadas automáticamente`);
+          } else {
+            console.log(`⚠️ [CHECK-IN-GUEST] ${itemName}: Stock insuficiente (disponible: ${availableQty}, requerido: ${requiredQty})`);
+          }
+        } catch (inventoryError) {
+          console.error(`❌ [CHECK-IN-GUEST] Error al descontar ${itemName}:`, inventoryError);
+          // No bloquear el check-in por errores de inventario
+        }
+      }
+    } else {
+      console.log("ℹ️ [CHECK-IN-GUEST] No hay inventario básico configurado para esta habitación");
+    }
+
     // ⭐ ACTUALIZAR ESTADO DE LA RESERVA
     console.log("🔄 [CHECK-IN-GUEST] Actualizando estado de reserva...");
 
@@ -4297,12 +4340,18 @@ const checkInGuest = async (req, res, next) => {
       const updateData = {
         status: "checked-in",
         actualCheckIn: getColombiaTime().toJSDate(), // ⭐ AGREGAR actualCheckIn
+        inventoryVerified: true,
+        inventoryVerifiedAt: getColombiaTime().toJSDate(),
+        inventoryDelivered: true,
+        inventoryDeliveredAt: getColombiaTime().toJSDate(),
+        inventoryDeliveredBy: req.user?.n_document || "system",
       };
 
       await booking.update(updateData);
       console.log("✅ [CHECK-IN-GUEST] Estado de reserva actualizado", {
         status: updateData.status,
-        actualCheckIn: formatForLogs(updateData.actualCheckIn)
+        actualCheckIn: formatForLogs(updateData.actualCheckIn),
+        inventoryAutoDeducted: true
       });
     } catch (bookingUpdateError) {
       console.error(
@@ -4945,11 +4994,11 @@ const checkOut = async (req, res, next) => {
 
     await booking.update(bookingUpdateData);
 
-    // ✅ ACTUALIZAR ESTADO DE LA HABITACIÓN
+    // ✅ ACTUALIZAR ESTADO DE LA HABITACIÓN - Dejarla disponible
     if (booking.room) {
       await booking.room.update({
-        status: "Para Limpiar",
-        available: false,
+        status: null, // NULL = Disponible
+        available: true,
       });
     }
 
@@ -6779,8 +6828,8 @@ const updateBookingStatus = async (req, res) => {
 
       try {
         const roomUpdateData = {
-          status: status === "cancelled" ? "Limpia" : "Para Limpiar",
-          available: status === "cancelled" ? true : false,
+          status: null, // NULL = Disponible (tanto para canceladas como completadas)
+          available: true,
         };
 
         await booking.room.update(roomUpdateData);
@@ -7340,7 +7389,7 @@ const cancelBooking = async (req, res) => {
     if (requestType !== "date_change" && booking.room) {
       try {
         await booking.room.update({
-          status: "Limpia",
+          status: null, // NULL = Disponible
           available: true,
         });
         console.log(
@@ -7519,7 +7568,7 @@ const cancelBooking = async (req, res) => {
             roomNumber: booking.room.roomNumber,
             type: booking.room.type,
             statusAfterCancellation:
-              requestType === "date_change" ? booking.room.status : "Limpia",
+              requestType === "date_change" ? booking.room.status : null,
             available: requestType !== "date_change",
           }
         : null,
@@ -7912,8 +7961,7 @@ const updatePassengersStatus = async (req, res) => {
     // Verificar si está listo para check-in completo
     const isReadyForCheckIn =
       booking.inventoryDelivered &&
-      passengersCompleted &&
-      booking.room?.status === "Limpia";
+      passengersCompleted;
 
     if (isReadyForCheckIn && !booking.checkInReadyAt) {
       await booking.update({
@@ -8010,7 +8058,6 @@ const getCheckInStatus = async (req, res) => {
 
       // Estado de habitación
       roomStatus: booking.room?.status || "unknown",
-      roomClean: booking.room?.status === "Limpia",
 
       // Estado general
       checkInProgress: booking.checkInProgress || false,
@@ -8021,8 +8068,7 @@ const getCheckInStatus = async (req, res) => {
       // Verificaciones
       allRequirementsMet:
         (booking.inventoryDelivered || false) &&
-        (booking.passengersCompleted || false) &&
-        booking.room?.status === "Limpia",
+        (booking.passengersCompleted || false),
 
       // Pasos pendientes
       pendingSteps: [
@@ -8035,7 +8081,6 @@ const getCheckInStatus = async (req, res) => {
         ...(!(booking.passengersCompleted || false)
           ? ["Completar registro de pasajeros"]
           : []),
-        ...(booking.room?.status !== "Limpia" ? ["Limpiar habitación"] : []),
       ],
 
       // Pasos completados
@@ -8049,7 +8094,6 @@ const getCheckInStatus = async (req, res) => {
         ...(booking.passengersCompleted || false
           ? ["Pasajeros registrados"]
           : []),
-        ...(booking.room?.status === "Limpia" ? ["Habitación limpia"] : []),
       ],
     };
 
