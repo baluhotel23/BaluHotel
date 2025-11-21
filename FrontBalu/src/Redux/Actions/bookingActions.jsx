@@ -1268,36 +1268,21 @@ export const checkAllCheckInRequirements = (bookingId, bookingData = null) => as
       bookingId: booking.bookingId,
       status: booking.status,
       roomStatus: roomStatus,
-      inventoryVerified: booking.inventoryVerified,
-      inventoryDelivered: booking.inventoryDelivered,
       passengersCompleted: booking.passengersCompleted
     });
     
-    // ⭐ VERIFICAR CADA REQUISITO INDIVIDUALMENTE
+    // ⭐ SOLO VERIFICAR PASAJEROS - Inventario se descuenta automáticamente
     const requirements = {
-      // 1. Inventario verificado
-      inventoryVerified: {
-        status: booking.inventoryVerified === true,
-        name: 'Verificar inventario',
-        priority: 1
-      },
-      
-      // 2. Inventario entregado
-      inventoryDelivered: {
-        status: booking.inventoryDelivered === true,
-        name: 'Entregar inventario',
-        priority: 2
-      },
-      
-      // 3. Registro de pasajeros completado
+      // Registro de pasajeros completado (ÚNICO REQUISITO)
       passengersCompleted: {
         status: booking.passengersCompleted === true,
         name: 'Completar registro de pasajeros',
-        priority: 3
+        priority: 1
       }
       
       // ⭐ NOTA: El pago NO es requisito obligatorio para check-in
       // Los huéspedes pueden pagar durante la estadía o al hacer checkout
+      // ⭐ INVENTARIO: Se descuenta automáticamente al completar check-in
     };
     
     // ⭐ CALCULAR PASOS COMPLETADOS Y PENDIENTES
