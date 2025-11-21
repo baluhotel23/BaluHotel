@@ -10,6 +10,7 @@ import { ToastContainer } from "react-toastify";
 // Importa tus componentes
 import Login from "./Components/Auth/Login";
 import Register from "./Components/Auth/Register";
+import TokenValidator from "./Components/Auth/TokenValidator";
 import Dashboard from "./Components/Dashboard/Dashboard";
 import RoomsSection from "./Components/Rooms/RoomsSection";
 import NotFound from "./Components/NotFound";
@@ -96,6 +97,7 @@ const AppContent = () => {
   return (
     <>
       <ToastContainer />
+      <TokenValidator /> {/* ⭐ NUEVO: Validador de token automático */}
       <ShiftReminder /> {/* ⭐ NUEVO: Recordatorio de turno para recepcionistas */}
       <Navbar />
       <div className="pt-16">

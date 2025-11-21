@@ -22,6 +22,7 @@ export const register = (userData) => async (dispatch) => {
     // Se asume que el response incluye token y datos de usuario
     dispatch(registerSuccess(data));
     localStorage.setItem('token', data.token);
+    localStorage.setItem('refreshToken', data.refreshToken); // ⭐ NUEVO
     return data;
   } catch (error) {
     const errMsg = error.response?.data?.message || 'Error en el registro';
@@ -36,23 +37,23 @@ export const login = (credentials) => async (dispatch) => {
     dispatch(loginRequest());
     const { data } = await api.post('/auth/login', credentials);
     console.log('Respuesta de login:', data); // Debug: imprime la respuesta
-     dispatch(loginSuccess(data.data));
+     dispatch(loginSuccess(data.data));
     localStorage.setItem('token', data.data.token);
+    localStorage.setItem('refreshToken', data.data.refreshToken); // ⭐ NUEVO
     return data;
   } catch (error) {
     const errMsg = error.response?.data?.message || 'Error en el login';
     dispatch(loginFailure(errMsg));
     throw error;
   }
-};
-
-// Acción para hacer logout
+};// Acción para hacer logout
 export const logout = () => async (dispatch) => {
   try {
     dispatch(logoutRequest());
     const { data } = await api.post('/auth/logout');
     dispatch(logoutSuccess(data));
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken'); // ⭐ NUEVO
     return data;
   } catch (error) {
     const errMsg = error.response?.data?.message || 'Error en el logout';

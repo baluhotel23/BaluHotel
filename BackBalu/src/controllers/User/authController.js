@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { User } = require('../../data');
-const { generateToken } = require('../../middleware/isAuth');
+const { generateToken, generateRefreshToken } = require('../../middleware/isAuth');
 const { CustomError } = require('../../middleware/error');
 
 
@@ -37,6 +37,7 @@ const register = async (req, res, next) => {
 
     // Generar token JWT
     const token = generateToken(newUser);
+    const refreshToken = generateRefreshToken(newUser); // ⭐ NUEVO: Refresh token
 
     // Usar el método toJSON definido en el modelo
     const userResponse = newUser.toJSON();
@@ -44,7 +45,11 @@ const register = async (req, res, next) => {
     res.status(201).json({
       error: false,
       message: 'Usuario registrado exitosamente',
-      data: { token, user: userResponse }
+      data: { 
+        token, 
+        refreshToken, // ⭐ NUEVO
+        user: userResponse 
+      }
     });
 
   } catch (error) {
@@ -98,6 +103,7 @@ const login = async (req, res, next) => {
 
     // Generar token JWT
     const token = generateToken(user);
+    const refreshToken = generateRefreshToken(user); // ⭐ NUEVO: Refresh token
 
     // Usar el método toJSON definido en el modelo
     const userResponse = user.toJSON();
@@ -111,7 +117,11 @@ const login = async (req, res, next) => {
     res.json({
       error: false,
       message: 'Login exitoso',
-      data: { token, user: userResponse }
+      data: { 
+        token, 
+        refreshToken, // ⭐ NUEVO
+        user: userResponse 
+      }
     });
 
   } catch (error) {
@@ -131,6 +141,49 @@ const logout = async (req, res, next) => {
       error: false,
       message: 'Sesión cerrada exitosamente'
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ⭐ NUEVO: Endpoint para renovar token usando refresh token
+const refreshAccessToken = async (req, res, next) => {
+  try {
+    const { n_document } = req.user; // Viene del middleware verifyRefreshToken
+
+    console.log('🔄 [REFRESH-TOKEN] Renovando token para:', { n_document });
+
+    // Buscar usuario en la base de datos
+    const user = await User.findOne({
+      where: {
+        n_document,
+        isActive: true,
+        deletedAt: null
+      }
+    });
+
+    if (!user) {
+      console.log('❌ [REFRESH-TOKEN] Usuario no encontrado o inactivo:', { n_document });
+      throw new CustomError('Usuario no válido', 401);
+    }
+
+    // Generar nuevo access token
+    const token = generateToken(user);
+
+    console.log('✅ [REFRESH-TOKEN] Token renovado exitosamente:', {
+      n_document: user.n_document,
+      email: user.email
+    });
+
+    res.json({
+      error: false,
+      message: 'Token renovado exitosamente',
+      data: { 
+        token,
+        user: user.toJSON()
+      }
+    });
+
   } catch (error) {
     next(error);
   }
@@ -171,5 +224,6 @@ module.exports = {
   register,
   login,
   logout,
+  refreshAccessToken, // ⭐ NUEVO
   changePassword
 };

@@ -47,6 +47,7 @@ const authSlice = createSlice({
       state.loading = false;
       state.error = null;
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken'); // ⭐ NUEVO
     },
     logout: (state) => {
       state.user = null;
@@ -55,6 +56,7 @@ const authSlice = createSlice({
       state.loading = false;
       state.error = null;
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken'); // ⭐ NUEVO
     },
     logoutFailure: (state, action) => {
       state.loading = false;
