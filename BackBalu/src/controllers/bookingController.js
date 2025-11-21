@@ -3600,30 +3600,16 @@ const getAllBookings = async (req, res, next) => {
         passengersCompletedAt: bookingData.passengersCompletedAt,
         checkInProgress: bookingData.checkInProgress || false,
         checkInReadyAt: bookingData.checkInReadyAt,
-        // ⭐ ESTADO CALCULADO
-        allRequirementsMet:
-          (bookingData.inventoryDelivered || false) &&
-          (bookingData.passengersCompleted || false),
+        // ⭐ ESTADO CALCULADO - SOLO REQUIERE PASAJEROS
+        allRequirementsMet: (bookingData.passengersCompleted || false),
         // ⭐ PASOS COMPLETADOS
         completedSteps: [
-          ...(bookingData.inventoryVerified || false
-            ? ["Inventario verificado"]
-            : []),
-          ...(bookingData.inventoryDelivered || false
-            ? ["Inventario entregado"]
-            : []),
           ...(bookingData.passengersCompleted || false
             ? ["Pasajeros registrados"]
             : []),
         ],
         // ⭐ PASOS PENDIENTES
         pendingSteps: [
-          ...(!(bookingData.inventoryVerified || false)
-            ? ["Verificar inventario"]
-            : []),
-          ...(!(bookingData.inventoryDelivered || false)
-            ? ["Entregar inventario"]
-            : []),
           ...(!(bookingData.passengersCompleted || false)
             ? ["Completar registro de pasajeros"]
             : []),
