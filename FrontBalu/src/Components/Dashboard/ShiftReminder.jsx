@@ -71,31 +71,69 @@ const ShiftReminder = () => {
     // Verificar si hay un turno activo
     const checkShift = async () => {
       try {
-        await dispatch(getCurrentShift());
+        // ⭐ VERIFICAR LOCALSTORAGE PRIMERO (más confiable con mala conexión)
+        const cachedShift = localStorage.getItem('currentShift');
+        const lastSync = localStorage.getItem('shiftLastSync');
+        
+        if (cachedShift && lastSync) {
+          const timeSinceSync = Date.now() - parseInt(lastSync);
+          // Si hay turno en caché reciente (menos de 5 minutos), confiar en él
+          if (timeSinceSync < 300000) {
+            const shift = JSON.parse(cachedShift);
+            if (shift.status === 'open') {
+              console.log('✅ [SHIFT-REMINDER] Turno encontrado en caché, no mostrar recordatorio');
+              setHasChecked(true);
+              setReminderShown(true);
+              sessionStorage.setItem('shiftReminderShown', 'true');
+              return;
+            }
+          }
+        }
+
+        // ⭐ VERIFICAR CON BACKEND (con reintento)
+        const result = await dispatch(getCurrentShift());
         setHasChecked(true);
 
         // Esperar un momento para que el estado se actualice
         setTimeout(() => {
-          // Si ya hay un turno abierto, no mostrar recordatorio
-          if (currentShift && currentShift.status === 'open') {
-            console.log('✅ [SHIFT-REMINDER] Turno ya está abierto, no mostrar recordatorio');
+          // Si hay turno (de backend o caché), no mostrar recordatorio
+          if ((result?.shift && result.shift.status === 'open') || 
+              (currentShift && currentShift.status === 'open')) {
+            console.log('✅ [SHIFT-REMINDER] Turno abierto confirmado, no mostrar recordatorio');
             setReminderShown(true);
             sessionStorage.setItem('shiftReminderShown', 'true');
             return;
           }
 
-          // Si no hay turno, mostrar recordatorio
+          // Si definitivamente no hay turno, mostrar recordatorio
           console.log('⚠️ [SHIFT-REMINDER] No hay turno abierto, mostrando recordatorio');
           showReminderToast();
           setReminderShown(true);
           sessionStorage.setItem('shiftReminderShown', 'true');
         }, 500);
       } catch (error) {
-        console.log('📋 [SHIFT-REMINDER] Error al verificar turno (normal si no hay turno):', error);
+        console.log('📋 [SHIFT-REMINDER] Error al verificar turno:', error);
         setHasChecked(true);
+        
+        // ⭐ INTENTAR USAR CACHÉ COMO FALLBACK ANTES DE MOSTRAR ALARMA
+        const cachedShift = localStorage.getItem('currentShift');
+        if (cachedShift) {
+          try {
+            const shift = JSON.parse(cachedShift);
+            if (shift.status === 'open') {
+              console.log('📦 [SHIFT-REMINDER] Error de conexión pero hay turno en caché');
+              setReminderShown(true);
+              sessionStorage.setItem('shiftReminderShown', 'true');
+              return;
+            }
+          } catch (parseError) {
+            console.error('Error al parsear caché:', parseError);
+          }
+        }
+
+        // Solo mostrar recordatorio si no hay caché y hubo error
         setTimeout(() => {
-          // Mostrar recordatorio si hay error (probablemente no hay turno)
-          console.log('⚠️ [SHIFT-REMINDER] No se pudo verificar turno, mostrando recordatorio');
+          console.log('⚠️ [SHIFT-REMINDER] No se pudo verificar turno y no hay caché');
           showReminderToast();
           setReminderShown(true);
           sessionStorage.setItem('shiftReminderShown', 'true');

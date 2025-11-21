@@ -49,6 +49,11 @@ export const openShift = (shiftData) => async (dispatch) => {
     // ⭐ El backend devuelve { error: false, data: { shift, user } }
     const shift = response.data.data?.shift || response.data.shift;
 
+    // ⭐ PERSISTIR TURNO EN LOCALSTORAGE
+    localStorage.setItem('currentShift', JSON.stringify(shift));
+    localStorage.setItem('shiftLastSync', Date.now().toString());
+    console.log('💾 [OPEN-SHIFT] Turno guardado en localStorage:', shift.shiftId);
+
     dispatch({
       type: OPEN_SHIFT_SUCCESS,
       payload: shift,
@@ -79,40 +84,97 @@ export const openShift = (shiftData) => async (dispatch) => {
   }
 };
 
-// ⭐ OBTENER TURNO ACTUAL
-export const getCurrentShift = () => async (dispatch) => {
+// ⭐ OBTENER TURNO ACTUAL (con caché y reintento)
+export const getCurrentShift = (useCache = true) => async (dispatch) => {
   try {
     dispatch({ type: GET_CURRENT_SHIFT_REQUEST });
+
+    // ⭐ VERIFICAR CACHÉ LOCAL PRIMERO (si hay mala conexión)
+    if (useCache) {
+      const cachedShift = localStorage.getItem('currentShift');
+      const lastSync = localStorage.getItem('shiftLastSync');
+      
+      if (cachedShift && lastSync) {
+        const timeSinceSync = Date.now() - parseInt(lastSync);
+        // Si la última sincronización fue hace menos de 2 minutos, usar caché
+        if (timeSinceSync < 120000) {
+          console.log('📦 [GET-CURRENT-SHIFT] Usando turno en caché (última sync hace', Math.floor(timeSinceSync/1000), 'segundos)');
+          const shift = JSON.parse(cachedShift);
+          dispatch({
+            type: GET_CURRENT_SHIFT_SUCCESS,
+            payload: { shift, summary: null, fromCache: true },
+          });
+          
+          // Intentar actualizar en background sin bloquear
+          setTimeout(() => {
+            console.log('🔄 [GET-CURRENT-SHIFT] Actualizando turno en background...');
+            getCurrentShift(false)(dispatch).catch(() => {
+              console.log('⚠️ [GET-CURRENT-SHIFT] No se pudo actualizar en background, usando caché');
+            });
+          }, 1000);
+          
+          return { shift, summary: null, fromCache: true };
+        }
+      }
+    }
 
     const token = localStorage.getItem('token');
     const config = {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      timeout: 10000, // 10 segundos de timeout
     };
 
-    const response = await axios.get(`${API_URL}/shifts/current`, config);
+    // ⭐ REINTENTO CON BACKOFF EXPONENCIAL
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(`🔍 [GET-CURRENT-SHIFT] Intento ${attempt}/3...`);
+        const response = await axios.get(`${API_URL}/shifts/current`, config);
+        
+        console.log('✅ [GET-CURRENT-SHIFT] Response completo:', response.data);
+
+        // ⭐ El backend devuelve { error: false, data: { shift, summary } }
+        const responseData = response.data.data || response.data;
+        const shiftData = responseData.shift || response.data.shift;
+        const summary = responseData.summary || null;
+
+        console.log('📊 [GET-CURRENT-SHIFT] Shift:', shiftData);
+        console.log('📊 [GET-CURRENT-SHIFT] Summary:', summary);
+
+        // ⭐ PERSISTIR EN LOCALSTORAGE
+        if (shiftData) {
+          localStorage.setItem('currentShift', JSON.stringify(shiftData));
+          localStorage.setItem('shiftLastSync', Date.now().toString());
+          console.log('💾 [GET-CURRENT-SHIFT] Turno guardado en localStorage');
+        }
+
+        dispatch({
+          type: GET_CURRENT_SHIFT_SUCCESS,
+          payload: { shift: shiftData, summary },
+        });
+
+        return { shift: shiftData, summary };
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3 && (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !error.response)) {
+          const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+          console.log(`⚠️ [GET-CURRENT-SHIFT] Error de red, reintentando en ${delay/1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
+    }
     
-    console.log('✅ [GET-CURRENT-SHIFT] Response completo:', response.data);
-
-    // ⭐ El backend devuelve { error: false, data: { shift, summary } }
-    const responseData = response.data.data || response.data;
-    const shiftData = responseData.shift || response.data.shift;
-    const summary = responseData.summary || null;
-
-    console.log('📊 [GET-CURRENT-SHIFT] Shift:', shiftData);
-    console.log('📊 [GET-CURRENT-SHIFT] Summary:', summary);
-
-    dispatch({
-      type: GET_CURRENT_SHIFT_SUCCESS,
-      payload: { shift: shiftData, summary },
-    });
-
-    return { shift: shiftData, summary };
+    throw lastError;
   } catch (error) {
     // Si no hay turno activo, no es un error crítico
     if (error.response?.status === 404) {
       console.log('ℹ️ [GET-CURRENT-SHIFT] No hay turno activo (404)');
+      localStorage.removeItem('currentShift');
+      localStorage.removeItem('shiftLastSync');
       dispatch({
         type: GET_CURRENT_SHIFT_SUCCESS,
         payload: null,
@@ -120,7 +182,23 @@ export const getCurrentShift = () => async (dispatch) => {
       return null;
     }
 
+    // ⭐ SI ES ERROR DE RED, INTENTAR USAR CACHÉ COMO FALLBACK
+    if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !error.response) {
+      console.warn('⚠️ [GET-CURRENT-SHIFT] Error de conexión, verificando caché...');
+      const cachedShift = localStorage.getItem('currentShift');
+      if (cachedShift) {
+        console.log('📦 [GET-CURRENT-SHIFT] Usando turno en caché por error de conexión');
+        const shift = JSON.parse(cachedShift);
+        dispatch({
+          type: GET_CURRENT_SHIFT_SUCCESS,
+          payload: { shift, summary: null, fromCache: true, connectionError: true },
+        });
+        return { shift, summary: null, fromCache: true, connectionError: true };
+      }
+    }
+
     const errorMessage = error.response?.data?.error || 'Error al obtener turno';
+    console.error('❌ [GET-CURRENT-SHIFT] Error:', errorMessage);
     dispatch({
       type: GET_CURRENT_SHIFT_FAILURE,
       payload: errorMessage,
@@ -147,6 +225,11 @@ export const closeShift = (closingData) => async (dispatch) => {
       closingData,
       config
     );
+
+    // ⭐ LIMPIAR LOCALSTORAGE AL CERRAR TURNO
+    localStorage.removeItem('currentShift');
+    localStorage.removeItem('shiftLastSync');
+    console.log('🗑️ [CLOSE-SHIFT] Turno eliminado de localStorage');
 
     dispatch({
       type: CLOSE_SHIFT_SUCCESS,

@@ -14,6 +14,7 @@ const ShiftModal = ({ isOpen, onClose }) => {
   const [closingNotes, setClosingNotes] = useState('');
   const [showClosingForm, setShowClosingForm] = useState(false);
   const [pdfDownloaded, setPdfDownloaded] = useState(false); // ⭐ NUEVO: Controlar si se descargó el PDF
+  const [isFromCache, setIsFromCache] = useState(false); // ⭐ NUEVO: Indicar si viene de caché
 
   // ⭐ CALCULAR DIFERENCIA DE CAJA
   const cashDifference = summary && closingCash
@@ -28,6 +29,10 @@ const ShiftModal = ({ isOpen, onClose }) => {
       dispatch(getCurrentShift()).then((data) => {
         console.log('📊 [SHIFT-MODAL] Turno cargado:', data?.shift);
         console.log('📊 [SHIFT-MODAL] Summary cargado:', data?.summary);
+        // ⭐ Detectar si viene de caché
+        setIsFromCache(data?.fromCache === true);
+      }).catch((error) => {
+        console.error('❌ [SHIFT-MODAL] Error al cargar turno:', error);
       });
     } else {
       // Limpiar formularios al cerrar
@@ -37,6 +42,7 @@ const ShiftModal = ({ isOpen, onClose }) => {
       setClosingNotes('');
       setShowClosingForm(false);
       setPdfDownloaded(false); // ⭐ Resetear estado de PDF
+      setIsFromCache(false); // ⭐ Resetear indicador de caché
     }
   }, [isOpen, dispatch]);
 
@@ -210,6 +216,21 @@ const ShiftModal = ({ isOpen, onClose }) => {
           {/* ⭐ RESUMEN Y CIERRE DE TURNO */}
           {currentShift && !showClosingForm && (
             <div className="space-y-4">
+              {/* ⭐ INDICADOR DE MODO OFFLINE/CACHÉ */}
+              {isFromCache && (
+                <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3 flex items-center gap-2">
+                  <span className="text-2xl">📶</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-yellow-800">
+                      Modo sin conexión
+                    </p>
+                    <p className="text-xs text-yellow-700">
+                      Mostrando última información guardada. Los datos se sincronizarán cuando mejore la conexión.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* ⭐ Información del Recepcionista */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="font-semibold text-blue-800 mb-2">👤 Recepcionista</h3>
