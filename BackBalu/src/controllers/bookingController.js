@@ -731,8 +731,10 @@ const createBooking = async (req, res, next) => {
     // ⭐ ACTUALIZAR ESTADO DE LA HABITACIÓN CON LOGS
     console.log("🏨 [CREATE-BOOKING] Updating room status...");
 
+    // ✅ CORRECCIÓN: Reservas "confirmed" y "paid" marcan habitación como "Reservada"
+    // Solo se marca como "Ocupada" después del check-in
     const roomUpdateData = {
-      status: status === "confirmed" ? "Reservada" : "Ocupada",
+      status: ["confirmed", "paid"].includes(status) ? "Reservada" : status === "checked-in" ? "Ocupada" : null,
       available: false,
     };
 
@@ -4023,7 +4025,12 @@ const checkInGuest = async (req, res, next) => {
     }
 
     // ⭐ VALIDAR ESTADOS CORRECTOS SEGÚN TU MODELO ROOM
-    if (["Mantenimiento", "Ocupada"].includes(booking.room.status)) {
+    // Estados válidos para check-in: null (Disponible), "Limpia", "Reservada"
+    // Estados que impiden check-in: "Mantenimiento", "Ocupada"
+    const validStatesForCheckIn = [null, "Limpia", "Reservada"];
+    const invalidStatesForCheckIn = ["Mantenimiento", "Ocupada"];
+    
+    if (invalidStatesForCheckIn.includes(booking.room.status)) {
       console.log(
         "❌ [CHECK-IN-GUEST] Estado de habitación impide check-in:",
         booking.room.status
@@ -4035,7 +4042,10 @@ const checkInGuest = async (req, res, next) => {
       });
     }
 
-    console.log("✅ [CHECK-IN-GUEST] Habitación disponible para check-in");
+    console.log("✅ [CHECK-IN-GUEST] Habitación disponible para check-in:", {
+      roomStatus: booking.room.status,
+      isValidState: validStatesForCheckIn.includes(booking.room.status)
+    });
 
     // ⭐ PROCESAR INVENTARIO AUTOMÁTICO CON LOGS DETALLADOS
     console.log("📦 [CHECK-IN-GUEST] Iniciando asignación de inventario...");
