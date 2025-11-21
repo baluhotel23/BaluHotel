@@ -3859,18 +3859,25 @@ const checkInGuest = async (req, res, next) => {
     const checkInDate = toColombiaTime(booking.checkIn);
     const checkOutDate = toColombiaTime(booking.checkOut);
 
+    // ⭐ COMPARAR SOLO FECHAS (sin horas) para permitir check-in el mismo día
+    const nowDate = now.startOf('day');
+    const checkInDateOnly = checkInDate.startOf('day');
+    const checkOutDateOnly = checkOutDate.startOf('day');
+
     console.log("📅 [CHECK-IN-GUEST] Validación de fechas:", {
       now: formatForLogs(now),
       checkInDate: formatForLogs(checkInDate),
       checkOutDate: formatForLogs(checkOutDate),
-      canCheckInToday: now >= checkInDate,
-      isNotExpired: now < checkOutDate,
+      nowDate: nowDate.toISO(),
+      checkInDateOnly: checkInDateOnly.toISO(),
+      canCheckInToday: nowDate >= checkInDateOnly,
+      isNotExpired: nowDate < checkOutDateOnly,
     });
 
-    // ⭐ VALIDAR QUE ES EL DÍA CORRECTO PARA CHECK-IN
-    if (!forceCheckIn && now < checkInDate) {
+    // ⭐ VALIDAR QUE ES EL DÍA CORRECTO PARA CHECK-IN (comparando solo fechas)
+    if (!forceCheckIn && nowDate < checkInDateOnly) {
       const daysUntilCheckIn = Math.ceil(
-        (checkInDate - now) / (1000 * 60 * 60 * 24)
+        checkInDateOnly.diff(nowDate, 'days').days
       );
       console.log(
         "❌ [CHECK-IN-GUEST] Check-in anticipado:",
@@ -3891,8 +3898,8 @@ const checkInGuest = async (req, res, next) => {
       });
     }
 
-    // ⭐ VALIDAR QUE NO ESTÉ EXPIRADO
-    if (now > checkOutDate) {
+    // ⭐ VALIDAR QUE NO ESTÉ EXPIRADO (comparando solo fechas)
+    if (nowDate > checkOutDateOnly) {
       console.log("❌ [CHECK-IN-GUEST] Reserva expirada");
       return res.status(400).json({
         error: true,
