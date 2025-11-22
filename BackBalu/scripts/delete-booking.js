@@ -96,7 +96,7 @@ async function deleteBooking() {
       console.log(`ℹ️ [DELETE-BOOKING] Sin cargos extras o tabla no existe`);
     }
 
-    // ⭐ LIBERAR HABITACIÓN SI ESTABA OCUPADA
+    // ⭐ LIBERAR HABITACIÓN: Cambiar a NULL (Disponible) y available = true
     if (booking[0].roomNumber) {
       console.log(`\n🔓 [DELETE-BOOKING] Liberando habitación ${booking[0].roomNumber}...`);
       
@@ -104,13 +104,27 @@ async function deleteBooking() {
         UPDATE "Rooms"
         SET 
           status = NULL,
+          available = true,
           "updatedAt" = NOW()
         WHERE "roomNumber" = :roomNumber
       `, {
         replacements: { roomNumber: booking[0].roomNumber }
       });
 
-      console.log(`✅ [DELETE-BOOKING] Habitación ${booking[0].roomNumber} liberada`);
+      // Verificar estado final
+      const [roomAfter] = await sequelize.query(`
+        SELECT "roomNumber", status, available 
+        FROM "Rooms" 
+        WHERE "roomNumber" = :roomNumber
+      `, {
+        replacements: { roomNumber: booking[0].roomNumber }
+      });
+
+      console.log(`✅ [DELETE-BOOKING] Habitación liberada:`, {
+        roomNumber: roomAfter[0].roomNumber,
+        status: roomAfter[0].status === null ? 'NULL (Disponible)' : roomAfter[0].status,
+        available: roomAfter[0].available
+      });
     }
 
     // ⭐ ELIMINAR LA RESERVA
