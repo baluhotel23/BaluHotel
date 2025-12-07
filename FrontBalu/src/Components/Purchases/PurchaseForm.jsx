@@ -21,6 +21,7 @@ const PurchaseForm = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const inventory = useSelector((state) => state.inventory?.inventory || []);
+  const { user } = useSelector((state) => state.auth);
   const { loading } = useSelector((state) => state.purchase || {});
 
   const [showItemSelector, setShowItemSelector] = useState(false);
@@ -278,6 +279,11 @@ const PurchaseForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Bloquear admins de crear compras
+    if (user?.role === 'admin') {
+      toast.error('No tienes permisos para registrar compras');
+      return;
+    }
 
     if (!validateForm()) {
       return;
@@ -526,7 +532,7 @@ const PurchaseForm = () => {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || user?.role === 'admin'}
               className={`bg-green-500 text-white px-4 py-2 rounded-md flex items-center ${loading ? 'opacity-70' : 'hover:bg-green-600'}`}
             >
               <FaSave className="mr-2" /> 

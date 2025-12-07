@@ -9,6 +9,8 @@ const PurchasePanel = () => {
 
   // Verificar si el usuario tiene permisos para acceder
   const hasPermission = user && (user.role === 'owner' || user.role === 'admin');
+  // Verificar si el usuario puede crear compras
+  const canCreatePurchase = user && (user.role === 'owner' || user.role === 'recept' || user.role === 'receptionist');
 
   if (!hasPermission) {
     return (
@@ -44,11 +46,17 @@ const PurchasePanel = () => {
             </div>
             <FaShoppingCart className="text-3xl text-yellow-600" />
           </div>
-          <Link to="/purchaseForm">
-            <button className="bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded w-full">
-              NUEVA COMPRA
+          {canCreatePurchase ? (
+            <Link to="/purchaseForm">
+              <button className="bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded w-full">
+                NUEVA COMPRA
+              </button>
+            </Link>
+          ) : (
+            <button disabled className="bg-gray-300 text-white opacity-80 font-bold py-2 px-4 rounded w-full cursor-not-allowed">
+              NO AUTORIZADO
             </button>
-          </Link>
+          )}
         </div>
 
         {/* Card 2: Lista de Compras */}

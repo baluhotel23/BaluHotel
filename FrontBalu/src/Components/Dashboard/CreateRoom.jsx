@@ -18,6 +18,7 @@ const CreateRoom = () => {
   // ⭐ REDUX - SELECTORES CORREGIDOS
   const dispatch = useDispatch();
   const { loading, errors } = useSelector((state) => state.room);
+  const { user } = useSelector((state) => state.auth);
   const { services } = useSelector((state) => state.service);
   const inventory = useSelector((state) => state.inventory.inventory || []);
   
@@ -229,6 +230,16 @@ const CreateRoom = () => {
       console.log('🏁 [CREATE-ROOM] Proceso de creación finalizado');
     }
   };
+
+  if (!user || user.role !== 'owner') {
+    return (
+      <DashboardLayout>
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded mt-12">
+          <p>No tienes permisos para crear habitaciones. Solo el owner puede realizar esta acción.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

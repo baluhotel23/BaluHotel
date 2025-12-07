@@ -94,7 +94,7 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-        {(user.role === "owner" || user.role === "admin") && (
+        {user.role === "owner" && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">TAXXA</h2>
             <p className="text-gray-600 mb-4">FACTURACION</p>
@@ -132,7 +132,7 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-        {(user.role === "owner" || user.role === "admin") && (
+        {user.role === "owner" && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">
               CREAR/MODIFICAR HOTEL
@@ -147,7 +147,7 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-        {(user.role === "owner" || user.role === "admin") && (
+        {user.role === "owner" && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">GESTIONAR VOUCHERS</h2>
             <p className="text-gray-600 mb-4">CANCELACIONES</p>

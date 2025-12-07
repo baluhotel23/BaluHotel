@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon -L index.js",
-    "build": "node index.js"
+    "build": "node index.js",
+    "test": "jest --runInBand",
+    "check-admin-writes": "node scripts/check-admin-writes.js"
   },
   "keywords": [],
   "author": "",
@@ -36,5 +38,9 @@
     "sequelize": "^6.37.3",
     "sharp": "^0.33.4",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "supertest": "^6.3.0"
   }
 }

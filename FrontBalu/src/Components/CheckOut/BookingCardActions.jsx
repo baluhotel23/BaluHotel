@@ -251,6 +251,7 @@ const BookingCardActions = ({
           {/* Check-out Normal */}
           <ActionButton
             onClick={handleCheckOutClick}
+            disabled={userRole === 'admin'}
             icon={financials.isFullyPaid ? '✅' : '⚠️'}
             label={financials.isFullyPaid ? 'Realizar Check-out' : 'Check-out (Pagos pendientes)'}
             color={financials.isFullyPaid ? 'green' : 'orange'}
@@ -259,6 +260,7 @@ const BookingCardActions = ({
           {/* Check-out Anticipado */}
           <ActionButton
             onClick={handleEarlyCheckOutClick}
+            disabled={userRole === 'admin'}
             icon="⏩"
             label="Check-out Anticipado"
             color="blue"
@@ -357,6 +359,7 @@ export const BookingCardActionsCompact = ({
   financials,
   onCheckOut, 
   onExtraChargesClick,
+  userRole = 'admin',
   isLoading = false
 }) => {
   return (
@@ -372,13 +375,18 @@ export const BookingCardActionsCompact = ({
         className="px-2 py-1 text-xs font-medium rounded bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
       >
         🍽️ <span className="hidden sm:inline">Extras</span>
-      </button>
+      <button
 
       {/* Check-out */}
       <button
-        onClick={(e) => {
+          if (userRole === 'admin') { alert('No tienes permisos para realizar check-out'); return; }
+          onCheckOut?.(booking);
           e.preventDefault();
           e.stopPropagation();
+          if (userRole === 'admin') {
+            alert('No tienes permisos para realizar check-out');
+            return;
+          }
           onCheckOut?.(booking);
         }}
         disabled={isLoading}

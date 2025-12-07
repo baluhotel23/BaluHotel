@@ -8,8 +8,9 @@ const ConfiguracionHotel = () => {
   const { user } = useSelector((state) => state.auth);
 
   // Verificar si el usuario tiene permisos para acceder
-  const hasPermission =
-    user && (user.role === "owner" || user.role === "admin");
+  const hasPermission = user && (user.role === "owner" || user.role === "admin");
+  const canCreateRoom = user && user.role === 'owner';
+  const canManageServices = user && user.role === 'owner';
 
   if (!hasPermission) {
     return (
@@ -59,7 +60,7 @@ const ConfiguracionHotel = () => {
             </Link>
           </div>
         )}
-        {(user.role === "owner" || user.role === "admin") && (
+        {canCreateRoom && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2"> CREAR HABITACION</h2>
             <p className="text-gray-600 mb-4">Agregar habitaciones.</p>
@@ -70,7 +71,7 @@ const ConfiguracionHotel = () => {
             </Link>
           </div>
         )}
-        {(user.role === "owner" || user.role === "admin") && (
+        {canCreateRoom && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">LISTAR HABITACIONES</h2>
             <p className="text-gray-600 mb-4">Ver todas las habitaciones.</p>
@@ -82,7 +83,7 @@ const ConfiguracionHotel = () => {
           </div>
         )}
 
-        {(user.role === "owner" || user.role === "admin") && (
+        {canManageServices && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2">CARGAR SERVICIOS</h2>
             <p className="text-gray-600 mb-4">Cargar nuevos servicios.</p>

@@ -27,8 +27,8 @@ export const createPurchase = (purchaseData) => async (dispatch) => {
       payload: errorMessage 
     });
     
-    // ⭐ REMOVER TOAST AUTOMÁTICO PARA EVITAR DUPLICADOS
-    // toast.error(errorMessage);
+    // Mostrar toast en caso de error para que el usuario vea porqué falló
+    toast.error(errorMessage);
     
     return { success: false, error: errorMessage };
   }

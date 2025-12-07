@@ -2,6 +2,10 @@ const { Service, Room } = require('../data');
 
 const createService = async (req, res, next) => {
   try {
+    // Bloquear admin de crear servicios
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para crear servicios' });
+    }
     const { name } = req.body; // nombre del servicio
     const service = await Service.create({ name });
     res.status(201).json({
@@ -16,6 +20,10 @@ const createService = async (req, res, next) => {
 
 const updateService = async (req, res, next) => {
   try {
+    // Bloquear admin de actualizar servicios
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para actualizar servicios' });
+    }
     const { serviceId } = req.params;
     const { name, rooms } = req.body;
     const service = await Service.findByPk(serviceId);
@@ -55,6 +63,10 @@ const updateService = async (req, res, next) => {
 
 const deleteService = async (req, res, next) => {
   try {
+    // Bloquear admin de eliminar servicios
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para eliminar servicios' });
+    }
     const { serviceId } = req.params;
     const service = await Service.findByPk(serviceId);
     if (!service) {

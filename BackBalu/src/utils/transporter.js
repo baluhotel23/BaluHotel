@@ -12,13 +12,15 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Verificación de conexión a SMTP
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('Error en la configuración de Nodemailer:', error);
-  } else {
-    console.log('Servidor SMTP listo para enviar correos');
-  }
-});
+// Verificación de conexión a SMTP (se omite en entornos de prueba para evitar logs async)
+if (process.env.NODE_ENV !== 'test') {
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error('Error en la configuración de Nodemailer:', error);
+    } else {
+      console.log('Servidor SMTP listo para enviar correos');
+    }
+  });
+}
 
 module.exports = transporter;

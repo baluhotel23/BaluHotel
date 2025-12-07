@@ -43,18 +43,18 @@ router.post('/pricing/calculate-multiple', calculateMultipleRoomPrices);
 router.use(verifyToken);
 
 // GESTIÓN DE HABITACIONES
-router.post('/create', allowRoles(['owner', 'admin']), createRoom);
-router.put('/:roomNumber', allowRoles(['owner', 'admin']), updateRoom);
-router.delete('/:roomNumber', allowRoles(['owner', 'admin']), deleteRoom);
+router.post('/create', allowRoles(['owner']), createRoom);
+router.put('/:roomNumber', allowRoles(['owner']), updateRoom);
+router.delete('/:roomNumber', allowRoles(['owner']), deleteRoom);
 
 // MANTENIMIENTO Y ESTADO
-router.put('/status/:roomNumber', allowRoles(['owner', 'admin', 'receptionist', 'recept']), updateRoomStatus);
+router.put('/status/:roomNumber', allowRoles(['owner', 'recept', 'receptionist']), updateRoomStatus);
 
 // AMENITIES Y SERVICIOS
 router.get('/:roomNumber/amenities', allowRoles(['owner', 'admin', 'receptionist', 'recept']), getRoomAmenities);
-router.put('/:roomNumber/amenities', allowRoles(['owner', 'admin']), updateRoomAmenities);
+router.put('/:roomNumber/amenities', allowRoles(['owner']), updateRoomAmenities);
 router.get('/:roomNumber/services', allowRoles(['owner', 'admin', 'receptionist', 'recept']), getRoomServices);
-router.put('/:roomNumber/services', allowRoles(['owner', 'admin']), updateRoomServices);
+router.put('/:roomNumber/services', allowRoles(['owner']), updateRoomServices);
 
 // BÁSICOS DE HABITACIÓN E INVENTARIO
 router.get('/basicos/:roomNumber', allowRoles(['owner', 'admin', 'receptionist', 'recept']), getRoomBasics);

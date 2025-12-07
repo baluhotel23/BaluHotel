@@ -115,6 +115,10 @@ const getInventoryByType = async (req, res) => {
 
 const createPurchase = async (req, res) => {
   console.log('🔍 === INICIO createPurchase ===');
+  // Bloquear admin para crear compras
+  if (req.user && req.user.role === 'admin') {
+    return res.status(403).json({ error: true, message: 'No tienes permisos para crear compras' });
+  }
   console.log('📄 req.file:', req.file);
   console.log('📋 req.body:', req.body);
   
@@ -296,6 +300,10 @@ const createPurchase = async (req, res) => {
 };
 
 const updateInventory = async (req, res) => {
+    // Bloquear admin de actualizar inventario
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para actualizar inventario' });
+    }
     const { id } = req.params;
     const { name, description, minStock, unitPrice } = req.body;
 
@@ -407,6 +415,10 @@ const getAllItems = async (req, res) => {
   
   // Crea un nuevo item en el inventario
 const createItem = async (req, res) => {
+    // Bloquear admin de crear ítems de inventario
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para crear ítems de inventario' });
+    }
     const { 
         name, description, category, inventoryType,
         currentStock, cleanStock, dirtyStock, totalReusableStock,
@@ -460,6 +472,10 @@ const createItem = async (req, res) => {
 
 
 const updateItem = async (req, res) => {
+    // Bloquear admin de actualizar ítems de inventario
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para actualizar ítems de inventario' });
+    }
     const { id } = req.params;
     const updateData = req.body;
 
@@ -778,6 +794,10 @@ const markAsDirty = async (req, res) => {
   };
 
   const createSupplier = async (req, res) => {
+    // Bloquear admin de crear proveedores
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para crear proveedores' });
+    }
     const { name, email, phone, address } = req.body;
     const newSupplier = await Purchase.create({
       name,
@@ -806,6 +826,10 @@ const markAsDirty = async (req, res) => {
   }
 
   const createCategory = async (req, res) => {
+    // Bloquear admin de crear categorías
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para crear categorías' });
+    }
     const { name } = req.body;
     const newCategory = await BasicInventory.create({
       name

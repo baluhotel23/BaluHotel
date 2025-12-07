@@ -40,8 +40,8 @@ router.use(verifyToken);
 
 // // Gestión de gastos (owner y admin)
  router.get('/expenses', allowRoles(['owner', 'admin']), getAllExpenses);
- router.post('/expenses', allowRoles(['owner', 'admin']), createExpense);
- router.put('/expenses/:id', allowRoles(['owner', 'admin']), updateExpense);
+ router.post('/expenses', allowRoles(['owner', 'recept', 'receptionist']), createExpense);
+ router.put('/expenses/:id', allowRoles(['owner', 'recept', 'receptionist']), updateExpense);
  router.delete('/expenses/:id', isOwner, deleteExpense);
  router.get('/expenses/categories', allowRoles(['owner', 'admin']), getExpenseCategories);
 

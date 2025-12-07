@@ -37,7 +37,7 @@ export const registerLocalPayment = (paymentData) => {
       dispatch(registerLocalPaymentFailure(error.response?.data || error));
       
       // ⭐ ELIMINAMOS EL TOAST AUTOMÁTICO PARA EVITAR DUPLICADOS
-      // toast.error(errorMessage);
+      toast.error(errorMessage);
       
       // ⭐ RETORNAR ERROR TAMBIÉN
       return {

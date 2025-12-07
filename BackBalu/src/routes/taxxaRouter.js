@@ -93,10 +93,10 @@ router.use((req, res, next) => {
 });
 
 // RUTAS PROTEGIDAS EXISTENTES
-router.post('/sendInvoice', allowRoles(["owner", "admin"]), createInvoice);
-router.post('/sendCreditNote', allowRoles(["owner", "admin"]), createCreditNote);
-router.post('/sellerData', allowRoles(["owner", "admin"]), getOrCreateSellerData);
-router.put('/sellerData/:sdocno', allowRoles(["owner", "admin"]), updateSellerData);
+router.post('/sendInvoice', allowRoles(["owner", "recept", "receptionist"]), createInvoice);
+router.post('/sendCreditNote', allowRoles(["owner", "recept", "receptionist"]), createCreditNote);
+router.post('/sellerData', allowRoles(["owner"]), getOrCreateSellerData);
+router.put('/sellerData/:sdocno', allowRoles(["owner"]), updateSellerData);
 router.get('/sellerData/:sdocno', allowRoles(["owner", "admin"]), getSellerDataBySdocno);
 
 // 🆕 NUEVAS RUTAS DE GESTIÓN DE FACTURAS EMITIDAS
@@ -104,7 +104,7 @@ router.get('/invoices', allowRoles(["owner", "admin", "staff"]), getAllInvoices)
 router.get('/invoices/search', allowRoles(["owner", "admin", "staff"]), searchInvoices);
 router.get('/invoices/stats', allowRoles(["owner", "admin"]), getNumberingStats);
 router.get('/invoices/:invoiceId', allowRoles(["owner", "admin", "staff"]), getInvoiceById);
-router.post('/invoices/:invoiceId/resend', allowRoles(["owner", "admin"]), resendInvoice);
+router.post('/invoices/:invoiceId/resend', allowRoles(["owner", "recept", "receptionist"]), resendInvoice);
 
 // ⭐ NUEVAS RUTAS PARA FACTURACIÓN MANUAL
 console.log('🔧 Registrando rutas de facturación manual...');
@@ -140,7 +140,7 @@ router.get('/manual-buyer/:document', allowRoles(["owner", "admin", "staff"]), (
 });
 
 // Crear factura manual
-router.post('/manual-invoice', allowRoles(["owner", "admin"]), (req, res) => {
+router.post('/manual-invoice', allowRoles(["owner", "recept", "receptionist"]), (req, res) => {
   console.log('\n🎯 === RUTA /manual-invoice EJECUTÁNDOSE ===');
   console.log('  - User ID:', req.user?.id);
   console.log('  - User role:', req.user?.role);
@@ -164,10 +164,10 @@ router.post('/manual-invoice', allowRoles(["owner", "admin"]), (req, res) => {
 console.log('✅ Rutas de facturación manual registradas exitosamente');
 
 // 🆕 RUTA ALTERNATIVA PARA CREAR FACTURAS (manteniendo compatibilidad)
-router.post('/invoice', allowRoles(["owner", "admin"]), createInvoice);
+router.post('/invoice', allowRoles(["owner", "recept", "receptionist"]), createInvoice);
 
 // 🔧 RUTA DE PRUEBA SIMPLE PRIMERO
-router.post('/test-credit', allowRoles(["owner", "admin"]), (req, res) => {
+router.post('/test-credit', allowRoles(["owner", "recept", "receptionist"]), (req, res) => {
   console.log('🧪 [TEST-CREDIT] Ruta de prueba funcionando!');
   res.json({ 
     success: true, 
@@ -182,7 +182,7 @@ router.post('/test-credit', allowRoles(["owner", "admin"]), (req, res) => {
 console.log('🔧 Registrando ruta /credit-note...');
 console.log('  - createCreditNote type:', typeof createCreditNote);
 
-router.post('/credit-note', allowRoles(["owner", "admin"]), (req, res) => {
+router.post('/credit-note', allowRoles(["owner", "recept", "receptionist"]), (req, res) => {
   console.log('\n🎯 === RUTA /credit-note EJECUTÁNDOSE ===');
   console.log('  - User ID:', req.user?.id);
   console.log('  - User role:', req.user?.role);

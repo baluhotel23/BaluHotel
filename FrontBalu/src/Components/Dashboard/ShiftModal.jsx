@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 const ShiftModal = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
   const { loading, currentShift, summary } = useSelector(state => state.shift); // ⭐ Agregar summary
+  const { user } = useSelector((state) => state.auth);
   
   // ⭐ ESTADOS PARA FORMULARIOS
   const [openingCash, setOpeningCash] = useState('');
@@ -203,18 +204,18 @@ const ShiftModal = ({ isOpen, onClose }) => {
               <div className="flex gap-3 mt-6">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || user?.role === 'admin'}
                   className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-semibold py-3 rounded transition-colors"
                 >
                   {loading ? 'Abriendo...' : '✅ Abrir Turno'}
                 </button>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 rounded transition-colors"
-                >
-                  Cancelar
-                </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 rounded transition-colors"
+                  >
+                    Cancelar
+                  </button>
               </div>
             </form>
           )}
@@ -541,7 +542,7 @@ const ShiftModal = ({ isOpen, onClose }) => {
               <div className="flex gap-3 mt-6">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || user?.role === 'admin'}
                   className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-semibold py-3 rounded transition-colors"
                 >
                   {loading ? 'Cerrando...' : '🔒 Confirmar Cierre'}

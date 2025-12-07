@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
+    ,"cypress:run": "npx wait-on http://localhost:5173 && npx cypress run"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
@@ -52,5 +53,8 @@
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "vite": "^6.1.0"
+  ,
+    "cypress": "^12.8.1",
+    "wait-on": "^7.0.1"
   }
 }

@@ -45,7 +45,7 @@ router.use(isStaff);
 // Gestión de inventario básico
 router.get('/', getInventory);
 router.get('/items', getAllItems);
-router.post('/', validateInventoryItem, createItem);
+router.post('/', validateInventoryItem, allowRoles(['owner', 'recept', 'receptionist']), createItem);
 
 // ⭐ NUEVAS RUTAS POR TIPO DE INVENTARIO
 router.get('/type/:type', getInventoryByType); // consumable, reusable, sellable
@@ -56,15 +56,15 @@ router.get('/low-stock', getLowStockItems);
 
 // Compras y proveedores
 router.get('/purchases', getAllPurchases);
-router.post('/purchase', upload.single('file'), allowRoles(['owner', 'admin']), createPurchase);
+router.post('/purchase', upload.single('file'), allowRoles(['owner', 'recept', 'receptionist']), createPurchase);
 router.get('/purchases/:id', getPurchaseDetails);
 router.get('/suppliers', getAllSuppliers);
-router.post('/suppliers', allowRoles(['owner', 'admin']), createSupplier);
+router.post('/suppliers', allowRoles(['owner']), createSupplier);
 
 // Categorías y tipos
 router.get('/categories', getCategories);
-router.post('/categories', allowRoles(['owner', 'admin']), createCategory);
-router.put('/categories/:id', allowRoles(['owner', 'admin']), updateCategory);
+router.post('/categories', allowRoles(['owner']), createCategory);
+router.put('/categories/:id', allowRoles(['owner']), updateCategory);
 
 // Reportes de inventario
 router.get('/reports/consumption', allowRoles(['owner', 'admin']), getConsumptionReport);
@@ -73,24 +73,24 @@ router.get('/reports/movements', allowRoles(['owner', 'admin']), getInventoryMov
 
 // Asignación a habitaciones
 router.get('/room-assignments/:roomId', getRoomAssignments);
-router.post('/room-assignments', createRoomAssignment);
+router.post('/room-assignments', allowRoles(['owner', 'recept', 'receptionist']), createRoomAssignment);
 //router.get('/room-assignments/:roomId', getRoomAssignmentDetails);
 
 // === RUTAS CON PARÁMETROS ===
 
 // Rutas específicas para un ítem de inventario
 router.get('/:id', getItemById);
-router.put('/:id/general', updateInventory);
-router.put('/:id', validateInventoryItem, updateItem);
-router.delete('/:id', allowRoles(['owner', 'admin']), deleteItem);
+router.put('/:id/general', allowRoles(['owner', 'recept', 'receptionist']), updateInventory);
+router.put('/:id', validateInventoryItem, allowRoles(['owner', 'recept', 'receptionist']), updateItem);
+router.delete('/:id', allowRoles(['owner']), deleteItem);
 
 // Control de stock para un ítem específico
-router.post('/:id/stock/add', addStock);
-router.post('/:id/stock/remove', removeStock);
+router.post('/:id/stock/add', allowRoles(['owner', 'recept', 'receptionist']), addStock);
+router.post('/:id/stock/remove', allowRoles(['owner', 'recept', 'receptionist']), removeStock);
 router.get('/:id/stock/history', getStockHistory);
 
 // ⭐ NUEVAS RUTAS PARA REUTILIZABLES
-router.post('/:id/transfer-clean', transferDirtyToClean); // Transferir sucio → limpio
-router.post('/:id/mark-dirty', markAsDirty); // Marcar como sucio
+router.post('/:id/transfer-clean', allowRoles(['owner', 'recept', 'receptionist']), transferDirtyToClean); // Transferir sucio → limpio
+router.post('/:id/mark-dirty', allowRoles(['owner', 'recept', 'receptionist']), markAsDirty); // Marcar como sucio
 
 module.exports = router;

@@ -239,6 +239,10 @@ const checkAvailability = async (req, res, next) => {
 
 const createRoom = async (req, res, next) => {
   try {
+    // Bloquear admin de crear habitaciones
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para crear habitaciones' });
+    }
     console.log('📥 Datos recibidos en createRoom:', JSON.stringify(req.body, null, 2));
     
     const {
@@ -384,6 +388,10 @@ const createRoom = async (req, res, next) => {
 // Actualizar una habitación
 const updateRoom = async (req, res, next) => {
   try {
+    // Bloquear admin de actualizar habitaciones
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para actualizar habitaciones' });
+    }
     const { roomNumber } = req.params;
     const { services, basicInventories, ...roomData } = req.body;
 
@@ -461,6 +469,10 @@ const updateRoom = async (req, res, next) => {
 // Eliminar habitación
 const deleteRoom = async (req, res, next) => {
   try {
+    // Bloquear admin de eliminar habitaciones
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para eliminar habitaciones' });
+    }
     const { roomNumber } = req.params;
     
     console.log('🗑️ [DELETE-ROOM] Intentando eliminar habitación:', roomNumber);

@@ -25,12 +25,12 @@ router.get('/pending', getPendingLaundry);
 router.get('/history', allowRoles(['owner', 'admin']), getLaundryHistory);
 
 // Enviar items a lavandería
-router.post('/send', allowRoles(['owner', 'admin', 'receptionist', 'recept']), sendToLaundry);
+router.post('/send', allowRoles(['owner', 'recept', 'receptionist']), sendToLaundry);
 
 // Recibir items de lavandería
-router.post('/receive', allowRoles(['owner', 'admin', 'receptionist', 'recept']), receiveFromLaundry);
+router.post('/receive', allowRoles(['owner', 'recept', 'receptionist']), receiveFromLaundry);
 
 // Marcar items como sucios
-router.post('/mark-dirty', allowRoles(['owner', 'admin', 'receptionist', 'recept']), markAsDirty);
+router.post('/mark-dirty', allowRoles(['owner', 'recept', 'receptionist']), markAsDirty);
 
 module.exports = router;

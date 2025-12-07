@@ -9,6 +9,7 @@ const PanelTaxxa = () => {
 
   // Verificar si el usuario tiene permisos para acceder
   const hasPermission = user && (user.role === 'owner' || user.role === 'admin');
+  const canCreateManualInvoice = user && (user.role === 'owner' || user.role === 'recept' || user.role === 'receptionist');
 
   if (!hasPermission) {
     return (
@@ -80,11 +81,17 @@ const PanelTaxxa = () => {
             </div>
             <FaListAlt className="text-3xl text-blue-600" />
           </div>
-          <Link to="/facturaManual">
-            <button className="bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded w-full">
-              FACTURACION MANUAL
+          {canCreateManualInvoice ? (
+            <Link to="/facturaManual">
+              <button className="bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded w-full">
+                FACTURACION MANUAL
+              </button>
+            </Link>
+          ) : (
+            <button disabled className="bg-gray-300 text-white opacity-80 font-bold py-2 px-4 rounded w-full cursor-not-allowed">
+              NO AUTORIZADO
             </button>
-          </Link>
+          )}
         </div>
 
        </div>

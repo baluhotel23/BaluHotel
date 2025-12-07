@@ -526,6 +526,10 @@ const getAllExpenses = async (req, res, next) => {
 
 const createExpense = async (req, res, next) => {
   try {
+    // Bloquear admins de crear gastos
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para crear gastos' });
+    }
     const expenseData = req.body;
     
     // Asignar el usuario autenticado como creador
@@ -573,6 +577,10 @@ const createExpense = async (req, res, next) => {
 
 const updateExpense = async (req, res, next) => {
   try {
+    // Bloquear admins de actualizar gastos
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para actualizar gastos' });
+    }
     const { id } = req.params;
     const expenseData = req.body;
     

@@ -16,6 +16,8 @@ const FacturaManual = () => {
     buyer,
     manualInvoice: { data: invoiceData, loading: loadingData, creating, created }
   } = useSelector(state => state.taxxa);
+  const { user } = useSelector(state => state.auth);
+  const canCreateManualInvoice = user && (user.role === 'owner' || user.role === 'recept' || user.role === 'receptionist');
 
   // Estados locales
   const [documentInput, setDocumentInput] = useState('');
@@ -245,8 +247,6 @@ const FacturaManual = () => {
           ))}
         </nav>
       </div>
-
-      {/* Contenido de la Pestaña Activa */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         {activeTab === 'buyer' && (
           <div>
@@ -295,9 +295,10 @@ const FacturaManual = () => {
                 <div className="text-right mt-4">
                   <button 
                     onClick={handleCreateBuyer} 
-                    className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                    className={`px-6 py-2 rounded-md transition-colors ${canCreateManualInvoice ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-700 cursor-not-allowed'}`}
+                    disabled={!canCreateManualInvoice}
                   >
-                    💾 Guardar Comprador
+                    {canCreateManualInvoice ? '💾 Guardar Comprador' : 'No autorizado'}
                   </button>
                 </div>
               </div>
@@ -311,9 +312,10 @@ const FacturaManual = () => {
               <h3 className="text-lg font-semibold">🛒 Items a Facturar</h3>
               <button
                 onClick={addItem}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                className={`px-4 py-2 rounded transition-colors ${canCreateManualInvoice ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-700 cursor-not-allowed'}`}
+                disabled={!canCreateManualInvoice}
               >
-                ➕ Agregar Item
+                {canCreateManualInvoice ? '➕ Agregar Item' : 'No autorizado'}
               </button>
             </div>
 
@@ -352,8 +354,9 @@ const FacturaManual = () => {
                 <div className="col-span-4 md:col-span-2">
                   <button 
                     onClick={() => removeItem(index)} 
-                    className="w-full bg-red-500 text-white p-2 rounded hover:bg-red-600 transition-colors disabled:bg-gray-300" 
-                    disabled={items.length <= 1}
+                    className={`w-full p-2 rounded transition-colors ${canCreateManualInvoice ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-gray-300 text-gray-700 cursor-not-allowed'}`}
+                    disabled={items.length <= 1 || !canCreateManualInvoice}
+                    title={!canCreateManualInvoice ? 'No autorizado' : ''}
                   >
                     🗑️
                   </button>
@@ -444,12 +447,13 @@ const FacturaManual = () => {
             <div className="text-center mt-8">
               <button 
                 onClick={handleSubmitInvoice} 
-                disabled={creating} 
+                disabled={creating || !canCreateManualInvoice} 
                 className={`px-8 py-3 rounded-lg text-lg font-semibold transition-colors ${
-                  creating 
+                  creating || !canCreateManualInvoice
                     ? 'bg-gray-400 text-gray-700 cursor-not-allowed' 
                     : 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl'
                 }`}
+                title={!canCreateManualInvoice ? 'No tiene permiso para crear facturas manuales' : ''}
               >
                 {creating ? (
                   <span className="flex items-center">
@@ -457,7 +461,7 @@ const FacturaManual = () => {
                     Enviando a Taxxa...
                   </span>
                 ) : (
-                  '📤 Crear y Enviar Factura'
+                  (canCreateManualInvoice ? '📤 Crear y Enviar Factura' : 'No autorizado')
                 )}
               </button>
             </div>
@@ -487,6 +491,7 @@ const FacturaManual = () => {
         </div>
       )}
     </div>
+    
   );
 };
 

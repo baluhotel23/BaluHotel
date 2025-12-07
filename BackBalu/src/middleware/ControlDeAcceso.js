@@ -17,12 +17,16 @@ const permisos = {
   admin: {
       nombre: 'Administrativo',
       permisos: [
-          'viewDashboard',
-          'manageInventory',
-          'manageExpenses',
-          'managePurchases',
-          'viewReports',
-          'manageBookings'
+        // Admin solo puede ver - no gestionar
+        'viewDashboard',
+        'viewInventory',
+        'viewExpenses',
+        'viewPurchases',
+        'viewReports',
+        'viewBookings',
+        'viewPayments',
+        'viewShifts',
+        'viewBalance',
       ]
   },
   receptionist: {

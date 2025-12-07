@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { toast } from "react-toastify";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import jsPDF from "jspdf";
 import { registerLocalPayment } from "../../Redux/Actions/paymentActions";
 
@@ -67,6 +67,8 @@ const PaymentAndReceipt = ({
     };
     return methods[method] || `📄 ${method}`;
   };
+
+  const { user } = useSelector(state => state.auth);
 
   // ✅ FUNCIÓN MEJORADA PARA OBTENER DATOS FINANCIEROS - PRIORIZAR BACKEND
   const getFinancialData = () => {
@@ -164,6 +166,11 @@ const PaymentAndReceipt = ({
 
   // ✅ FUNCIÓN PRINCIPAL DE PAGO MEJORADA
   const handlePayment = async () => {
+    // ❌ Bloquear acción de pago para admin (solo visualiza)
+    if (user?.role === 'admin') {
+      toast.error('No tienes permisos para procesar pagos desde esta cuenta');
+      return;
+    }
     // 🛡️ VALIDACIONES EXHAUSTIVAS
     if (!paymentAmount || paymentAmount <= 0) {
       toast.error("El monto del pago debe ser mayor a 0");
@@ -872,21 +879,23 @@ const PaymentAndReceipt = ({
             </button>
             <button
               onClick={handlePayment}
-              disabled={isProcessing || !paymentAmount || paymentAmount <= 0}
+              disabled={isProcessing || !paymentAmount || paymentAmount <= 0 || user?.role === 'admin'}
               className={`flex-1 px-4 py-2 rounded-md text-white font-medium transition-colors ${
                 isProcessing || !paymentAmount || paymentAmount <= 0
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-green-600 hover:bg-green-700"
               }`}
             >
-              {isProcessing ? (
+                {isProcessing ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   Procesando...
                 </div>
-              ) : (
-                `💰 Pagar $${parseFloat(paymentAmount || 0).toLocaleString()}`
-              )}
+                ) : user?.role === 'admin' ? (
+                  'No tienes permisos para procesar pagos'
+                ) : (
+                  `💰 Pagar $${parseFloat(paymentAmount || 0).toLocaleString()}`
+                )}
             </button>
           </div>
         </div>

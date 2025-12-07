@@ -27,7 +27,7 @@ router.get('/by-code/:code', getVoucherByCode);
 router.use(isStaff);
 
 router.get('/', getAllVouchers);
-router.put('/:voucherId/use', useVoucher);
+router.put('/:voucherId/use', allowRoles(['owner', 'recept', 'receptionist']), useVoucher);
 router.get('/statistics', getVoucherStatistics);
 
 // ═══════════════════════════════════════════════════════════════

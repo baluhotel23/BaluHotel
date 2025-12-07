@@ -137,7 +137,7 @@ const AppContent = () => {
           <Route
             path="/admin/create-room"
             element={
-              <PrivateRoute allowedRoles={["owner", "admin"]}>
+              <PrivateRoute allowedRoles={["owner"]}>
                 <CreateRoom />
               </PrivateRoute>
             }

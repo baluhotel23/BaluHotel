@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 // Crear instancia de axios con la URL base
 const api = axios.create({
@@ -143,6 +144,18 @@ api.interceptors.response.use(
           return Promise.reject(refreshError);
         }
       }
+    }
+
+    // ⭐ MANEJO GLOBAL DE 403 (NO AUTORIZADO) - Mejor práctica: mostrar mensaje y no redirigir de forma agresiva
+    if (error.response?.status === 403) {
+      const msg = error.response?.data?.message || 'No estás autorizado para realizar esta acción';
+      try {
+        toast.error(msg);
+      } catch (e) {
+        // Si el toast falla por alguna razón, no queremos romper la app
+        console.error('Error mostrando toast para 403:', e);
+      }
+      return Promise.reject(error);
     }
 
     return Promise.reject(error);

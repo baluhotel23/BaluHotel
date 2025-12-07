@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { createBooking } from "../../Redux/Actions/bookingActions";
 import { calculateRoomPrice } from "../../Redux/Actions/roomActions"; // ⭐ NUEVA IMPORTACIÓN
 import Calendar from "react-calendar";
@@ -11,6 +11,7 @@ import DashboardLayout from "../Dashboard/DashboardLayout";
 
 const RoomReservation = ({ room }) => {
   const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   const [checkIn, setCheckIn] = useState(null);
@@ -94,6 +95,10 @@ const RoomReservation = ({ room }) => {
   };
 
   const handleBooking = async () => {
+    if (user?.role === 'admin') {
+      toast.error('No tienes permisos para crear reservas locales');
+      return;
+    }
     if (!checkIn || !checkOut) {
       toast.error("Por favor selecciona las fechas de check-in y check-out.");
       return;
@@ -328,10 +333,10 @@ const RoomReservation = ({ room }) => {
               
               <button
                 onClick={handleBooking}
-                disabled={priceLoading || totalAmount <= 0}
+                disabled={priceLoading || totalAmount <= 0 || user?.role === 'admin'}
                 className="w-full bg-boton text-white py-2 px-4 rounded-md hover:bg-Hover disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {priceLoading ? 'Calculando...' : 'Confirmar Reserva'}
+                {priceLoading ? 'Calculando...' : user?.role === 'admin' ? 'No autorizado' : 'Confirmar Reserva'}
               </button>
             </div>
           )}

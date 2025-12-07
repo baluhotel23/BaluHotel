@@ -676,6 +676,13 @@ const createBooking = async (req, res, next) => {
       createdBy: req.user?.n_document || null,
     };
 
+    // ⭐ RESTRICCIÓN: Los admins NO pueden crear reservas 'Local' desde panel staff.
+    // Solo owner y recepcionistas deben poder crear reservas desde la interfaz administrativa.
+    if (bookingData.pointOfSale === 'Local' && req.user && req.user.role === 'admin') {
+      console.warn(`🚫 [CREATE-BOOKING] Admin ${req.user.n_document} intentó crear una reserva Local - prohibido.`);
+      return res.status(403).json({ error: true, message: 'No tienes permisos para crear reservas desde el panel administrativo' });
+    }
+
     console.log(
       "📝 [CREATE-BOOKING] Booking data to create:",
       JSON.stringify(bookingData, null, 2)

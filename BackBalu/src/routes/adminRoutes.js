@@ -52,8 +52,8 @@ router.delete("/users/:n_document", isOwner, deactivateUser);
 
 // Rutas de gestión de inventario (owner y admin)
 router.get("/", allowRoles(["owner", "admin"]), getInventory);
-router.post("/purchase", allowRoles(["owner", "admin"]), createPurchase);
-router.put("/:id", allowRoles(["owner", "admin"]), updateInventory);
+router.post("/purchase", allowRoles(["owner", "recept", "receptionist"]), createPurchase);
+router.put("/:id", allowRoles(["owner", "recept", "receptionist"]), updateInventory);
 router.get("/low-stock", allowRoles(["owner", "admin"]), getLowStockItems);
 
 //Rutas de gestión financiera (solo owner)
@@ -63,8 +63,8 @@ router.post("/expenses", isOwner, createExpense);
 
 // Rutas de configuración del hotel (owner y admin)
 router.get("/settings/hotel-settings", allowRoles(["owner", "admin"]), getHotelSettings);
-router.put("/settings/hotel-settings", allowRoles(["owner", "admin"]), updateHotelSettings);
-router.post("/settings/hotel-settings", allowRoles(["owner", "admin"]), updateHotelSettings);
+router.put("/settings/hotel-settings", allowRoles(["owner"]), updateHotelSettings);
+router.post("/settings/hotel-settings", allowRoles(["owner"]), updateHotelSettings);
 
 
 
@@ -73,13 +73,14 @@ router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyRep
  router.get('/reports/revenue', isOwner, getRevenueReport);
  router.get('/reports/inventory-usage', allowRoles(['owner', 'admin']), getInventoryUsageReport);
 router.get('/reports/combined', allowRoles(['owner', 'admin']),getCombinedReport);
-router.post("/paymentLocal", allowRoles(["owner", "admin", "recept"]), registerLocalPayment);
+// Registrar pago local: solo owner y recepcionistas (no admin)
+router.post("/paymentLocal", allowRoles(["owner", "recept", "receptionist"]), registerLocalPayment);
 
 // Rutas para la gestión de servicios (solo owner y admin)
-router.post("/services", allowRoles(["owner", "admin"]), createService);
-router.put("/services/:serviceId", allowRoles(["owner", "admin"]), updateService);
+router.post("/services", allowRoles(["owner"]), createService);
+router.put("/services/:serviceId", allowRoles(["owner"]), updateService);
 router.get("/services", allowRoles(["owner", "admin"]), getAllServices);
-router.delete("/services/:serviceId", allowRoles(["owner", "admin"]), deleteService);
+router.delete("/services/:serviceId", allowRoles(["owner"]), deleteService);
 
 
 module.exports = router;

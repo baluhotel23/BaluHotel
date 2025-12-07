@@ -73,30 +73,30 @@ router.get('/reservas/all', getAllBookings);
 router.get('/:bookingId', getBookingById);
 
 // ⭐ CHECK-IN/CHECK-OUT
-router.put('/:bookingId/check-in', checkInGuest);
-router.put('/:bookingId/check-out', checkOut);
+router.put('/:bookingId/check-in', allowRoles(['owner', 'recept', 'receptionist']), checkInGuest);
+router.put('/:bookingId/check-out', allowRoles(['owner', 'recept', 'receptionist']), checkOut);
 router.get('/:bookingId/checkin-status', getCheckInStatus);
-router.put('/:bookingId/checkin-progress', updateCheckInProgress);
+router.put('/:bookingId/checkin-progress', allowRoles(['owner', 'recept', 'receptionist']), updateCheckInProgress);
 
 // ⭐ GESTIÓN DE INVENTARIO
 router.get('/:bookingId/inventory/status', getBookingInventoryStatus);
-router.put('/:bookingId/inventory-status', updateInventoryStatus);
-router.put('/:bookingId/passengers-status', updatePassengersStatus);
+router.put('/:bookingId/inventory-status', allowRoles(['owner', 'recept', 'receptionist']), updateInventoryStatus);
+router.put('/:bookingId/passengers-status', allowRoles(['owner', 'recept', 'receptionist']), updatePassengersStatus);
 
 // ⭐ CARGOS ADICIONALES Y FACTURACIÓN
-router.post('/:bookingId/extra-charges', addExtraCharge);
+router.post('/:bookingId/extra-charges', allowRoles(['owner', 'recept', 'receptionist']), addExtraCharge);
 router.get('/:bookingId/bill', generateBill);
 
 // ⭐ ACTUALIZACIÓN DE ESTADO
-router.put('/:bookingId/status', updateBookingStatus);
+router.put('/:bookingId/status', allowRoles(['owner', 'recept', 'receptionist']), updateBookingStatus);
 
 // ═══════════════════════════════════════════════════════════════
 // 👑 RUTAS ADMINISTRATIVAS (solo owner y admin)
 // ═══════════════════════════════════════════════════════════════
 
 // ⭐ CANCELACIONES ADMINISTRATIVAS
-// Los administradores pueden cancelar cualquier reserva con permisos especiales
-router.delete('/:bookingId', allowRoles(['owner', 'admin']), cancelBooking);
+// Solo owner y recepcionistas pueden cancelar reservas (admin solo puede ver)
+router.delete('/:bookingId', allowRoles(['owner', 'recept', 'receptionist']), cancelBooking);
 
 // ⭐ REPORTES
 router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyReport);

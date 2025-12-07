@@ -78,6 +78,10 @@ const getTodayCheckOuts = async (req, res) => {
 
 // Check-in/Check-out Controllers
 const processCheckIn = async (req, res) => {
+        // Bloquear admin de procesar check-in
+        if (req.user && req.user.role === 'admin') {
+            throw new CustomError('No tienes permisos para procesar check-in', 403);
+        }
     const { bookingId } = req.params;
     const { guestDetails } = req.body;
 
@@ -111,6 +115,10 @@ const processCheckIn = async (req, res) => {
 };
 
 const processCheckOut = async (req, res) => {
+        // Bloquear admin de procesar check-out
+        if (req.user && req.user.role === 'admin') {
+            throw new CustomError('No tienes permisos para procesar check-out', 403);
+        }
     const { bookingId } = req.params;
     const booking = await Booking.findByPk(bookingId, {
         include: [
@@ -353,6 +361,10 @@ const updateGuestInfo = async (req, res) => {
 
 // Extra Charges and Services Controllers
 const addExtraCharge = async (req, res) => {
+        // Bloquear admin de agregar cargos
+        if (req.user && req.user.role === 'admin') {
+            throw new CustomError('No tienes permisos para agregar cargos', 403);
+        }
     const { bookingId } = req.params;
     const { description, amount } = req.body;
 
@@ -394,6 +406,10 @@ const getBookingCharges = async (req, res) => {
 };
 
 const requestService = async (req, res) => {
+        // Bloquear admin de solicitar servicios
+        if (req.user && req.user.role === 'admin') {
+            throw new CustomError('No tienes permisos para solicitar servicios', 403);
+        }
     const { bookingId } = req.params;
     const { serviceType, notes } = req.body;
 
@@ -447,6 +463,10 @@ const getPaymentDetails = async (req, res) => {
 };
 
 const processPayment = async (req, res) => {
+        // Bloquear admin de procesar pagos
+        if (req.user && req.user.role === 'admin') {
+            throw new CustomError('No tienes permisos para procesar pagos', 403);
+        }
     const { bookingId } = req.params;
     const { amount, method } = req.body;
 

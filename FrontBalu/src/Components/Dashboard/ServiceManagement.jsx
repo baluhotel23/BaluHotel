@@ -6,6 +6,8 @@ import DashboardLayout from './DashboardLayout';
 const ServiceManagement = () => {
   const dispatch = useDispatch();
   const { services, loading, error } = useSelector((state) => state.service);
+  const { user } = useSelector((state) => state.auth);
+  const canManageServices = user && user.role === 'owner';
   const [name, setName] = useState('');
   const [editingServiceId, setEditingServiceId] = useState(null);
 
@@ -50,6 +52,11 @@ const ServiceManagement = () => {
 
       {/* Service Form */}
       <form onSubmit={editingServiceId ? handleUpdateService : handleCreateService} className="mb-4">
+        {!canManageServices && (
+          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded mb-4">
+            <p className="text-yellow-700">Solo el owner puede crear, editar o eliminar servicios.</p>
+          </div>
+        )}
         <div className="flex items-center">
           <input
             type="text"
@@ -60,7 +67,8 @@ const ServiceManagement = () => {
           />
           <button
             type="submit"
-            className="ml-2 bg-degrade text-white hover:bg-yellow-700 opacity-80 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            className={`ml-2 ${canManageServices ? 'bg-degrade hover:bg-yellow-700' : 'bg-gray-300 cursor-not-allowed'} text-white opacity-80 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline`}
+            disabled={!canManageServices}
           >
             {editingServiceId ? 'Actualizar Servicio' : 'Crear Servicio'}
           </button>
@@ -97,13 +105,15 @@ const ServiceManagement = () => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <button
                     onClick={() => handleEditService(service)}
-                    className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:shadow-outline"
+                    className={`bg-green-500 ${canManageServices ? 'hover:bg-green-700' : 'opacity-50 cursor-not-allowed'} text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:shadow-outline`}
+                    disabled={!canManageServices}
                   >
                     Editar
                   </button>
                   <button
                     onClick={() => handleDeleteService(service.serviceId)} // Asegúrate de usar service.serviceId
-                    className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                    className={`bg-red-500 ${canManageServices ? 'hover:bg-red-700' : 'opacity-50 cursor-not-allowed'} text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline`}
+                    disabled={!canManageServices}
                   >
                     Eliminar
                   </button>

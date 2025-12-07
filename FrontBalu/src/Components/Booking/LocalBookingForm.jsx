@@ -472,6 +472,7 @@ const BuyerRegistrationForm = ({
 };
 
 const LocalBookingForm = () => {
+  const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -715,6 +716,11 @@ const LocalBookingForm = () => {
   }, []);
 
   const handleCreateBooking = useCallback(async () => {
+    // ❌ Bloquear creación de reservas Local para admin (solo visualiza)
+    if (user?.role === 'admin') {
+      toast.error('No tienes permisos para crear reservas desde el panel administrativo');
+      return;
+    }
     // Validaciones
     if (
       !selectedRoom ||
@@ -834,6 +840,11 @@ const LocalBookingForm = () => {
   ]);
 
   const handleProcessPayment = useCallback(async () => {
+    // Bloquear admins de procesar pagos en UI
+    if (user?.role === 'admin') {
+      toast.error('No tienes permisos para procesar pagos');
+      return;
+    }
     if (!bookingState.createdBookingId || paymentState.amount <= 0) {
       toast.error("Datos de pago incompletos.");
       return;
@@ -1640,7 +1651,7 @@ const LocalBookingForm = () => {
                 </button>
                 <button
                   onClick={handleProcessPayment}
-                  disabled={paymentState.processing || !paymentState.amount || paymentState.amount <= 0}
+                  disabled={paymentState.processing || !paymentState.amount || paymentState.amount <= 0 || user?.role === 'admin'}
                   className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 transform hover:-translate-y-0.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {paymentState.processing ? (

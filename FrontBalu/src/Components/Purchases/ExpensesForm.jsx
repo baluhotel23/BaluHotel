@@ -101,6 +101,11 @@ const ExpenseForm = () => {
   // Manejar envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Bloquear admins de crear gastos desde UI: deben ser owner o staff responsable
+    if (user?.role === 'admin') {
+      toast.error('No tienes permisos para registrar gastos');
+      return;
+    }
     
     if (!validateForm()) {
       return;
@@ -269,7 +274,7 @@ const ExpenseForm = () => {
           <button
             type="submit"
             className="bg-degrade text-white px-4 py-2 rounded flex items-center hover:bg-yellow-700 opacity-80"
-            disabled={loading}
+            disabled={loading || user?.role === 'admin'}
           >
             <FaSave className="mr-2" /> {loading ? 'Guardando...' : 'Guardar Gasto'}
           </button>

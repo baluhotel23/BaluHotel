@@ -28,6 +28,10 @@ const getHotelSettings = async (req, res) => {
 // PUT /settings - Crea o actualiza la configuración del hotel
 const updateHotelSettings = async (req, res) => {
   try {
+    // Bloquear admin de actualizar settings
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para actualizar la configuración del hotel' });
+    }
     console.log('--- Inicio updateHotelSettings ---');
     console.log('Body recibido:', req.body);
     

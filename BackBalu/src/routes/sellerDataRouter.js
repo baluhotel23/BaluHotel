@@ -11,7 +11,7 @@ const {
 
 // 🔒 APLICAR MIDDLEWARE DE AUTENTICACIÓN Y AUTORIZACIÓN
 router.use(verifyToken);
-router.use(allowRoles(["owner", "admin"]));
+router.use(allowRoles(["owner"]));
 
 // 🆕 RUTAS PARA GESTIÓN DE DATOS DEL HOTEL/SELLER
 router.post('/', createOrUpdateSellerData);           // Crear o actualizar

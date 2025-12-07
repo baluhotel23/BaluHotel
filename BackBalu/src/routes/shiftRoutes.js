@@ -21,14 +21,14 @@ router.use(isStaff);
 // GESTIÓN DE TURNOS
 // =====================================
 
-// ABRIR TURNO
-router.post('/open', openShift);
+// ABRIR TURNO - Solo recepcionistas y owner pueden abrir turno (no admin)
+router.post('/open', allowRoles(['owner', 'recept', 'receptionist']), openShift);
 
 // OBTENER TURNO ACTUAL DEL USUARIO LOGUEADO
 router.get('/current', getCurrentShift);
 
-// CERRAR TURNO
-router.post('/close', closeShift);
+// CERRAR TURNO - Solo recepcionistas y owner pueden cerrar turno (no admin)
+router.post('/close', allowRoles(['owner', 'recept', 'receptionist']), closeShift);
 
 // OBTENER HISTORIAL DE TURNOS (Solo owner y admin)
 router.get('/history', allowRoles(['owner', 'admin']), getShiftHistory);

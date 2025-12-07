@@ -65,6 +65,10 @@ const mapPaymentType = (type) => {
 // ⭐ FUNCIÓN PRINCIPAL PARA REGISTRAR PAGOS LOCALES
 const registerLocalPayment = async (req, res, next) => {
   try {
+    // Bloquear admins de registrar pagos locales
+    if (req.user && req.user.role === 'admin') {
+      return res.status(403).json({ error: true, message: 'No tienes permisos para registrar pagos locales' });
+    }
     console.log("💳 [REGISTER-LOCAL-PAYMENT] ⭐ INICIANDO PROCESO");
     console.log("🕐 [REGISTER-LOCAL-PAYMENT] Hora Colombia:", formatForLogs(getColombiaTime()));
     console.log("📥 [REGISTER-LOCAL-PAYMENT] Request body:", JSON.stringify(req.body, null, 2));

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/isAuth');
-const { isStaff, allowRoles } = require('../middleware/byRol');
+const { isStaff, isOwner, allowRoles } = require('../middleware/byRol');
 
 const {
     createRegistrationPass,
@@ -22,11 +22,11 @@ router.use(verifyToken);
 router.use(isStaff);
 
 // Rutas para RegistrationPass
-router.post("/", allowRoles(['owner', 'admin', 'receptionist', 'recept']), createRegistrationPass); // Crear un nuevo registro - ⭐ Recepcionista puede crear
+router.post("/", allowRoles(['owner', 'receptionist', 'recept']), createRegistrationPass); // Crear un nuevo registro - ⭐ Recepcionista puede crear
 router.get("/", allowRoles(['owner', 'admin', 'receptionist', 'recept']), getAllRegistrationPasses); // Obtener todos los registros - ⭐ Recepcionista puede ver
 router.get("/:bookingId", allowRoles(['owner', 'admin', 'receptionist', 'recept']), getRegistrationPassesByBooking); // Obtener registros por bookingId - ⭐ Recepcionista puede ver
-router.put("/:registrationNumber", allowRoles(['owner', 'admin', 'receptionist', 'recept']), updateRegistrationPass); // Actualizar un registro - ⭐ Recepcionista puede actualizar
-router.delete("/:registrationNumber", allowRoles(['owner', 'admin']), deleteRegistrationPass); // Eliminar un registro - Solo admin/owner
+router.put("/:registrationNumber", allowRoles(['owner', 'receptionist', 'recept']), updateRegistrationPass); // Actualizar un registro - ⭐ Recepcionista puede actualizar
+router.delete("/:registrationNumber", isOwner, deleteRegistrationPass); // Eliminar un registro - Solo owner
 
 
 

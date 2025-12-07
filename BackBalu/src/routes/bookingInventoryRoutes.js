@@ -15,13 +15,13 @@ router.use(isStaff);
 
 // Asignar inventario a reserva (check-in)
 router.post('/booking/:bookingId/assign', 
-  allowRoles(['owner', 'admin', 'receptionist', 'recept']), 
+  allowRoles(['owner', 'receptionist', 'recept']), 
   assignInventoryToBooking
 );
 
 // Procesar devolución de inventario (check-out)
 router.post('/booking/:bookingId/checkout', 
-  allowRoles(['owner', 'admin', 'receptionist', 'recept']), 
+  allowRoles(['owner', 'receptionist', 'recept']), 
   processCheckoutInventory
 );
 
