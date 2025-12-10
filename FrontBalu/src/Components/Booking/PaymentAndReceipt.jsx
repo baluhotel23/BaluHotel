@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import  { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
@@ -162,6 +162,7 @@ const PaymentAndReceipt = ({
       amountToPay,
       finalAmount: amountToSet
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingData, amountToPay]);
 
   // ✅ FUNCIÓN PRINCIPAL DE PAGO MEJORADA
@@ -463,7 +464,7 @@ const PaymentAndReceipt = ({
         
         financialData.allPayments.forEach((payment, index) => {
           const paymentDate = formatDateTime(payment.paymentDate).split(' ')[0];
-          const method = getPaymentMethodLabel(payment.paymentMethod).replace(/[^\w\s\-]/g, '').trim();
+          const method = getPaymentMethodLabel(payment.paymentMethod).replace(/[^\w\s-]/g, '').trim();
           
           doc.text(`  ${index + 1}. ${paymentDate} - ${method}`, 15, currentY);
           doc.text(`$${parseFloat(payment.amount).toLocaleString()}`, pageWidth - 15, currentY, { align: "right" });
@@ -488,7 +489,7 @@ const PaymentAndReceipt = ({
 
       // Método de pago actual
       doc.setFont(undefined, 'normal');
-      const methodLabel = getPaymentMethodLabel(paymentMethod).replace(/[^\w\s\-]/g, '').trim();
+      const methodLabel = getPaymentMethodLabel(paymentMethod).replace(/[^\w\s-]/g, '').trim();
       doc.text(`Metodo: ${methodLabel}`, 15, currentY);
       currentY += 15;
 

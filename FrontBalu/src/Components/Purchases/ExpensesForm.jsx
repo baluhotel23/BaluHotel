@@ -273,10 +273,14 @@ const ExpenseForm = () => {
           </button>
           <button
             type="submit"
-            className="bg-degrade text-white px-4 py-2 rounded flex items-center hover:bg-yellow-700 opacity-80"
             disabled={loading || user?.role === 'admin'}
+            className="bg-degrade text-white px-4 py-2 rounded flex items-center hover:bg-yellow-700 opacity-80"
+            title={user?.role === 'admin' ? 'No tienes permisos para registrar gastos' : ''}
           >
-            <FaSave className="mr-2" /> {loading ? 'Guardando...' : 'Guardar Gasto'}
+            <span className="flex items-center">
+              <FaSave className="mr-2" />
+              {loading ? 'Guardando...' : (user?.role === 'admin' ? 'No autorizado' : 'Guardar Gasto')}
+            </span>
           </button>
         </div>
       </form>

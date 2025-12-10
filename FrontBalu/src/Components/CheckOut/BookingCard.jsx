@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import React, { useMemo } from 'react';
 import { getRealPaymentSummary } from '../../utils/paymentUtils';
 import { formatCurrency, formatDate } from '../../utils/checkOutUtils';

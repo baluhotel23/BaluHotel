@@ -1,3 +1,6 @@
+/* eslint-env mocha, cypress */
+/* global cy, describe, it, beforeEach */
+
 describe('Admin unauthorized behavior', () => {
   beforeEach(() => {
     // Reset localStorage and set tokens/user for admin or owner
@@ -52,5 +55,24 @@ describe('Admin unauthorized behavior', () => {
 
     // Assert toast is visible with the message
     cy.get('.Toastify__toast').should('contain.text', 'No tienes permisos para crear compras');
+  });
+
+  it('Admin can view Balance Financiero page but should not see edit-only controls', () => {
+    // Setup admin user
+    cy.window().then((win) => {
+      win.localStorage.setItem('user', JSON.stringify({ role: 'admin' }));
+      win.localStorage.setItem('token', 'test-token-admin');
+    });
+    cy.visit('/balance');
+
+    // Should see main header
+    cy.contains('Balance Financiero').should('exist');
+
+    // Download button should exist and be enabled (read-only action)
+    cy.get('button').contains(/Descargar Excel|Descargar/).should('exist').and('not.be.disabled');
+
+    // There should be no owner-only edit buttons (example: 'Guardar' or 'Editar' labels)
+    cy.contains('Guardar').should('not.exist');
+    cy.contains('Editar').should('not.exist');
   });
 });
