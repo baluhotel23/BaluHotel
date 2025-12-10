@@ -1,8 +1,10 @@
-import React from 'react';
+
+import { useSelector } from 'react-redux';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const RoomStatusGrid = ({ rooms = [], checkIn, checkOut, onRoomSelect, selectedRoom }) => {
+  const { user } = useSelector(state => state.auth);
   console.log('🏨 rooms recibidas en RoomStatusGrid:', rooms);
   console.log('📊 Cantidad de rooms en Grid:', rooms?.length || 0);
 
@@ -236,7 +238,7 @@ const RoomStatusGrid = ({ rooms = [], checkIn, checkOut, onRoomSelect, selectedR
 
                 {/* Action Button */}
                 <div className="flex gap-2">
-                  {!statusConfig.disabled ? (
+                  {!statusConfig.disabled && user?.role !== 'admin' ? (
                     <button 
                       className={`
                         w-full py-2 px-4 rounded-lg font-semibold text-sm uppercase tracking-wide transition-all duration-200
@@ -251,6 +253,14 @@ const RoomStatusGrid = ({ rooms = [], checkIn, checkOut, onRoomSelect, selectedR
                       }}
                     >
                       {isSelected ? '✓ Seleccionada' : 'Seleccionar'}
+                    </button>
+                  ) : user?.role === 'admin' ? (
+                    <button 
+                      className="w-full py-2 px-4 rounded-lg font-semibold text-sm uppercase tracking-wide bg-slate-200 text-slate-400 cursor-not-allowed"
+                      disabled
+                      title="No tienes permisos para seleccionar habitaciones"
+                    >
+                      No Autorizado
                     </button>
                   ) : (
                     <button 
