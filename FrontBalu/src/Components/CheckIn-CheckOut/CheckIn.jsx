@@ -596,7 +596,7 @@ const CheckIn = () => {
           </div>
         </div>
 
-        {/* ⭐ AGREGAR USEEFFECT DE DEBUG */}
+        {/* ⭐ AGREGAR USEEFFECT DE DEBUG
         {import.meta.env.DEV && (
           <div className="bg-gray-100 p-4 rounded-lg mb-6 text-xs">
             <h4 className="font-bold mb-2">🔍 Debug Info:</h4>
@@ -622,7 +622,7 @@ const CheckIn = () => {
               </pre>
             </details>
           </div>
-        )}
+        )} */}
 
         {/* Grid de reservas */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -698,6 +698,22 @@ const CheckIn = () => {
                       </span>
                       <span className="text-sm text-gray-800 font-medium">
                         {booking.guest?.scostumername || "Sin información"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-600">
+                        📄 Documento:
+                      </span>
+                      <span className="text-sm text-gray-800">
+                        {booking.guest?.sdocno || "Sin información"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-600">
+                        📞 Teléfono:
+                      </span>
+                      <span className="text-sm text-gray-800">
+                        {booking.guest?.stelephone || "Sin información"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
