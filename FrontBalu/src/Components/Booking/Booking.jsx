@@ -627,6 +627,9 @@ const Booking = () => {
       const bookingId = createResponse.data.booking.bookingId;
 
       // ⭐ ACTUALIZAR PAGO ONLINE - ESTO AHORA CAMBIARÁ EL STATUS A 'paid' O 'confirmed'
+      // ⭐ ACTUALIZAR PAGO ONLINE - CON MANEJO DE ERRORES MEJORADO
+      console.log("💳 [BOOKING] Actualizando pago online para reserva:", bookingId);
+      
       const paymentPayload = {
         bookingId,
         amount: amountToPay,
@@ -638,7 +641,16 @@ const Booking = () => {
         wompiStatus: transaction.status
       };
 
-      await dispatch(updateOnlinePayment(paymentPayload));
+      const paymentUpdateResult = await dispatch(updateOnlinePayment(paymentPayload));
+
+      // ⭐ VERIFICAR QUE EL PAGO SE ACTUALIZÓ CORRECTAMENTE
+      if (!paymentUpdateResult?.success) {
+        console.error("❌ [BOOKING] Error al actualizar pago:", paymentUpdateResult);
+        toast.error("Reserva creada pero hubo un problema al registrar el pago. Contacte al hotel con su ID de reserva: " + bookingId);
+        // Aún así continuamos para que el usuario tenga su número de reserva
+      } else {
+        console.log("✅ [BOOKING] Pago actualizado exitosamente");
+      }
 
       // ⭐ PREPARAR DATOS PARA PÁGINA DE AGRADECIMIENTO
       const reservationData = {
@@ -661,6 +673,7 @@ const Booking = () => {
           // ⭐ NUEVOS CAMPOS PARA INDICAR ESTADO
           isPaidInFull: paymentOption === "total",
           isReadyForCheckIn: paymentOption === "total", // Si pagó completo, está listo para check-in físico
+          paymentRegistered: paymentUpdateResult?.success || false, // ⭐ NUEVO: Indicar si el pago se registró
         },
         guestInfo: currentBuyerData,
         priceBreakdown,

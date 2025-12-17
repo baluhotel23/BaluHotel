@@ -10,7 +10,7 @@ const roomRoutes = require('./roomRoutes');
 const bookingRoutes = require('./bookingRoutes');
 const clientRoutes = require('./clientRoutes');
 const taxxaRouter = require('./taxxaRouter');
-const webhookRouter = require('../controllers/webhook');
+const webhookRouter = require('./webhookRouter'); // ⭐ CORREGIDO: Importar el router, no el controlador
 const voucherRoutes = require('./voucherRoutes'); // ⭐ AGREGAR ESTA LÍNEA
 //const { registerLocalPayment } = require('../controllers/paymentController');
 const registrationPassRoutes = require('./registrationPassRoutes');
@@ -23,7 +23,7 @@ const shiftRoutes = require('./shiftRoutes'); // ⭐ NUEVO
 // Rutas públicas
 router.use('/auth', authRoutes);
 router.use('/client', clientRoutes);
-router.use("/eventos", webhookRouter); 
+router.use("/webhooks", webhookRouter); // ⭐ CORREGIDO: Usar /webhooks como prefijo estándar 
 
 // Rutas protegidas
 router.use('/admin', adminRoutes);

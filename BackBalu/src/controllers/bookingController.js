@@ -663,6 +663,17 @@ const createBooking = async (req, res, next) => {
     // ⭐ PREPARAR DATOS PARA CREAR LA RESERVA CON LOGS
     console.log("📝 [CREATE-BOOKING] Preparing booking data...");
 
+    // ⭐ GENERAR trackingToken PARA RESERVAS ONLINE
+    let trackingToken = null;
+    if (pointOfSale === "Online") {
+      trackingToken = jwt.sign(
+        { guestId, roomNumber, timestamp: Date.now() },
+        process.env.JWT_SECRET || 'secret-key',
+        { expiresIn: '30d' }
+      );
+      console.log("🔑 [CREATE-BOOKING] Generated trackingToken for online booking");
+    }
+
     const bookingData = {
       guestId,
       roomNumber,
@@ -674,6 +685,7 @@ const createBooking = async (req, res, next) => {
       notes: notes || "",
       pointOfSale: pointOfSale,
       createdBy: req.user?.n_document || null,
+      trackingToken: trackingToken,
     };
 
     // ⭐ RESTRICCIÓN: Los admins NO pueden crear reservas 'Local' desde panel staff.
@@ -714,8 +726,28 @@ const createBooking = async (req, res, next) => {
       console.log("✅ [CREATE-BOOKING] Booking created successfully:", {
         bookingId: newBooking.bookingId,
         id: newBooking.id,
+        trackingToken: trackingToken ? 'Generated' : 'N/A',
         createdAt: formatForLogs(newBooking.createdAt),
       });
+
+      // ⭐ CREAR VOUCHER PARA RESERVAS ONLINE
+      if (pointOfSale === "Online" && trackingToken) {
+        try {
+          const voucherCode = generateVoucherCode();
+          await Voucher.create({
+            bookingId: newBooking.bookingId,
+            voucherCode,
+            guestId,
+            validFrom: checkInDate,
+            validUntil: checkOutDate,
+            isUsed: false,
+          });
+          console.log("✅ [CREATE-BOOKING] Voucher created:", voucherCode);
+        } catch (voucherError) {
+          console.error("⚠️ [CREATE-BOOKING] Error creating voucher:", voucherError);
+          // No fallar la reserva por esto
+        }
+      }
     } catch (createError) {
       console.error(
         "❌ [CREATE-BOOKING] Error creating booking at:",
@@ -739,10 +771,29 @@ const createBooking = async (req, res, next) => {
     console.log("🏨 [CREATE-BOOKING] Updating room status...");
 
     // ✅ CORRECCIÓN: Reservas "confirmed" y "paid" marcan habitación como "Reservada"
+    // Reservas "pending" (online sin pagar) NO marcan como reservada hasta pago
     // Solo se marca como "Ocupada" después del check-in
+    let roomStatus = null;
+    let roomAvailable = room.available;
+
+    if (["confirmed", "paid"].includes(status)) {
+      roomStatus = "Reservada";
+      roomAvailable = false;
+      console.log("🏨 [CREATE-BOOKING] Marking room as 'Reservada' (confirmed/paid)");
+    } else if (status === "checked-in") {
+      roomStatus = "Ocupada";
+      roomAvailable = false;
+      console.log("🏨 [CREATE-BOOKING] Marking room as 'Ocupada' (checked-in)");
+    } else if (status === "pending" && pointOfSale === "Online") {
+      // No cambiar estado hasta que se confirme el pago
+      roomStatus = room.status; // Mantener estado actual
+      roomAvailable = true; // Mantener disponible
+      console.log("🏨 [CREATE-BOOKING] Keeping room available (pending online payment)");
+    }
+
     const roomUpdateData = {
-      status: ["confirmed", "paid"].includes(status) ? "Reservada" : status === "checked-in" ? "Ocupada" : null,
-      available: false,
+      status: roomStatus,
+      available: roomAvailable,
     };
 
     console.log("🏨 [CREATE-BOOKING] Room update data:", roomUpdateData);
