@@ -33,8 +33,8 @@ console.log('Resumen financiero:', revenueByPeriod);
   // Estados para filtros
   const [period, setPeriod] = useState('month');
   const [dateRange, setDateRange] = useState({
-    startDate: format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd'),
-    endDate: format(endOfMonth(subMonths(new Date(), 0)), 'yyyy-MM-dd')
+    startDate: format(startOfMonth(new Date()), 'yyyy-MM-dd'), // ⭐ Primer día del mes actual
+    endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd')      // ⭐ Último día del mes actual
   });
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'revenue', 'expenses'
 
