@@ -105,87 +105,53 @@ const getSummary = async (req, res, next) => {
     }
 
     // Diferenciar entre pagos online y locales
+    // ⭐ ESTRATEGIA: Usar paymentMethod="wompi" como indicador de pago online
     let onlineRevenue = 0;
     let localRevenue = 0;
+    
     try {
-      // ⭐ USAR paymentType EN LUGAR DE source O Booking.pointOfSale
-      if (paymentAttributes && paymentAttributes.includes("paymentType")) {
-        console.log("✅ Usando campo paymentType para clasificar ingresos");
-        
-        onlineRevenue =
-          (await Payment.sum("amount", {
-            where: {
-              paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
-              paymentDate: { [Op.between]: [startDate, endDate] },
-              paymentType: "online",
-            },
-          })) || 0;
+      console.log("🔍 [FINANCIAL] Clasificando ingresos por paymentMethod...");
+      
+      // ⭐ USAR paymentMethod="wompi" para identificar pagos online
+      onlineRevenue =
+        (await Payment.sum("amount", {
+          where: {
+            paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
+            paymentDate: { [Op.between]: [startDate, endDate] },
+            paymentMethod: "wompi", // ⭐ Wompi es exclusivo de pagos online
+          },
+        })) || 0;
 
-        // ⭐ CORRECCIÓN: Usar [Op.ne] para todos los que NO son online
-        localRevenue =
-          (await Payment.sum("amount", {
-            where: {
-              paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
-              paymentDate: { [Op.between]: [startDate, endDate] },
-              paymentType: { [Op.ne]: "online" }, // Todos los tipos que NO son online
-            },
-          })) || 0;
+      // También intentar con paymentType="online" por si existen
+      const onlineByType =
+        (await Payment.sum("amount", {
+          where: {
+            paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
+            paymentDate: { [Op.between]: [startDate, endDate] },
+            paymentType: "online",
+            paymentMethod: { [Op.ne]: "wompi" }, // Excluir wompi para no duplicar
+          },
+        })) || 0;
 
-        console.log("📊 Ingresos calculados por paymentType:", { onlineRevenue, localRevenue });
-      } else {
-        // Alternativa: usar Booking.pointOfSale con case-insensitive
-        console.log("⚠️ paymentType no disponible, usando Booking.pointOfSale");
-        try {
-          const onlinePayments =
-            (await Payment.sum("amount", {
-              include: [
-                {
-                  model: Booking,
-                  where: { 
-                    pointOfSale: { [Op.iLike]: "Online" } // ⭐ Case-insensitive
-                  },
-                  required: true,
-                },
-              ],
-              where: {
-                paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
-                paymentDate: { [Op.between]: [startDate, endDate] },
-              },
-            })) || 0;
+      onlineRevenue += onlineByType;
 
-          const localPayments =
-            (await Payment.sum("amount", {
-              include: [
-                {
-                  model: Booking,
-                  where: { 
-                    pointOfSale: { [Op.iLike]: "Local" } // ⭐ Case-insensitive
-                  },
-                  required: true,
-                },
-              ],
-              where: {
-                paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
-                paymentDate: { [Op.between]: [startDate, endDate] },
-              },
-            })) || 0;
+      // Calcular local como la diferencia del total
+      localRevenue = totalRevenue - onlineRevenue;
 
-          onlineRevenue = onlinePayments;
-          localRevenue = localPayments;
-          console.log("📊 Ingresos calculados por Booking.pointOfSale:", { onlineRevenue, localRevenue });
-        } catch (err) {
-          console.log("❌ Error al relacionar Payment con Booking:", err.message);
-          localRevenue = totalRevenue;
-        }
-      }
-      console.log("✅ Distribución final de ingresos:", {
-        online: onlineRevenue,
+      console.log("✅ [FINANCIAL] Distribución de ingresos:", {
+        total: totalRevenue,
+        onlineWompi: onlineRevenue - onlineByType,
+        onlineOtros: onlineByType,
+        onlineTotal: onlineRevenue,
         local: localRevenue,
-        total: totalRevenue
+        porcentajeOnline: totalRevenue > 0 ? ((onlineRevenue / totalRevenue) * 100).toFixed(2) + '%' : '0%'
       });
     } catch (err) {
-      console.log("❌ Error al calcular distribución online/local:", err.message);
+      console.error("❌ [FINANCIAL] Error al calcular distribución online/local:", err.message);
+      console.error(err);
+      // En caso de error, asumir todo como local
       localRevenue = totalRevenue;
+      onlineRevenue = 0;
     }
 
     // Gastos totales
