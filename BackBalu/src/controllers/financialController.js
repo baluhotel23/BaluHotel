@@ -121,12 +121,13 @@ const getSummary = async (req, res, next) => {
             },
           })) || 0;
 
+        // ⭐ CORRECCIÓN: Usar [Op.ne] para todos los que NO son online
         localRevenue =
           (await Payment.sum("amount", {
             where: {
               paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
               paymentDate: { [Op.between]: [startDate, endDate] },
-              paymentType: { [Op.in]: ["cash", "card", "reservation", "checkout"] }, // Todos los tipos que no son online
+              paymentType: { [Op.ne]: "online" }, // Todos los tipos que NO son online
             },
           })) || 0;
 
