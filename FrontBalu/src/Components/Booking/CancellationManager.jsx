@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
@@ -25,6 +26,7 @@ const CancellationManager = ({
   // Estados locales
   const [showModal, setShowModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [customReason, setCustomReason] = useState(''); // ⭐ NUEVO: para texto personalizado
   const [step, setStep] = useState('confirm'); // 'confirm', 'policies', 'processing'
   const [validation, setValidation] = useState(null);
 
@@ -45,6 +47,7 @@ const CancellationManager = ({
     setShowModal(true);
     setStep('confirm');
     setCancelReason('');
+    setCustomReason(''); // ⭐ Limpiar texto personalizado
     
     // Obtener políticas de cancelación
     try {
@@ -64,11 +67,20 @@ const CancellationManager = ({
       return;
     }
 
+    // ⭐ Validar que si es "Otro", tenga texto personalizado
+    if (cancelReason === 'Otro' && !customReason.trim()) {
+      toast.error('Debe especificar el motivo de la cancelación');
+      return;
+    }
+
     setStep('policies');
+    
+    // ⭐ Usar customReason si está seleccionado "Otro"
+    const finalReason = cancelReason === 'Otro' ? customReason : cancelReason;
     
     try {
       const result = await dispatch(validateCancellation(booking.bookingId, {
-        reason: cancelReason,
+        reason: finalReason,
         validateRefund: true
       }));
       
@@ -87,13 +99,16 @@ const CancellationManager = ({
   const handleConfirmCancellation = async () => {
     setStep('processing');
     
+    // ⭐ Usar customReason si está seleccionado "Otro"
+    const finalReason = cancelReason === 'Otro' ? customReason : cancelReason;
+    
     try {
       const cancelData = {
-        reason: cancelReason,
+        reason: finalReason,
         cancelledBy: 'staff', // O el usuario actual
         refundRequested: true,
         generateCreditVoucher: cancellation.policies?.refundType === 'credit_voucher',
-        notes: `Cancelación desde check-in: ${cancelReason}`
+        notes: `Cancelación desde check-in: ${finalReason}`
       };
 
       const result = await dispatch(cancelBooking(booking.bookingId, cancelData));
@@ -120,6 +135,7 @@ const CancellationManager = ({
 
   // ⭐ CERRAR MODAL Y LIMPIAR ESTADO
   const handleCloseModal = () => {
+    setCustomReason(''); // ⭐ Limpiar texto personalizado
     setShowModal(false);
     setStep('confirm');
     setCancelReason('');
@@ -239,14 +255,15 @@ const CancellationManager = ({
             {cancelReason === 'Otro' && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Especificar razón
+                  Especificar razón *
                 </label>
                 <textarea
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={3}
                   placeholder="Describir la razón específica..."
+                  autoFocus
                 />
               </div>
             )}
@@ -261,7 +278,7 @@ const CancellationManager = ({
               </button>
               <button
                 onClick={handleValidateCancellation}
-                disabled={!cancelReason.trim()}
+                disabled={!cancelReason.trim() || (cancelReason === 'Otro' && !customReason.trim())}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Continuar
