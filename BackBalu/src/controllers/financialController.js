@@ -108,13 +108,16 @@ const getSummary = async (req, res, next) => {
     let onlineRevenue = 0;
     let localRevenue = 0;
     try {
-      if (paymentAttributes && paymentAttributes.includes("source")) {
+      // ⭐ USAR paymentType EN LUGAR DE source O Booking.pointOfSale
+      if (paymentAttributes && paymentAttributes.includes("paymentType")) {
+        console.log("✅ Usando campo paymentType para clasificar ingresos");
+        
         onlineRevenue =
           (await Payment.sum("amount", {
             where: {
               paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
               paymentDate: { [Op.between]: [startDate, endDate] },
-              source: "online",
+              paymentType: "online",
             },
           })) || 0;
 
@@ -123,18 +126,23 @@ const getSummary = async (req, res, next) => {
             where: {
               paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
               paymentDate: { [Op.between]: [startDate, endDate] },
-              source: "local",
+              paymentType: { [Op.in]: ["cash", "card", "reservation", "checkout"] }, // Todos los tipos que no son online
             },
           })) || 0;
+
+        console.log("📊 Ingresos calculados por paymentType:", { onlineRevenue, localRevenue });
       } else {
-        // Alternativa: usar Booking.pointOfSale
+        // Alternativa: usar Booking.pointOfSale con case-insensitive
+        console.log("⚠️ paymentType no disponible, usando Booking.pointOfSale");
         try {
           const onlinePayments =
             (await Payment.sum("amount", {
               include: [
                 {
                   model: Booking,
-                  where: { pointOfSale: "online" },
+                  where: { 
+                    pointOfSale: { [Op.iLike]: "Online" } // ⭐ Case-insensitive
+                  },
                   required: true,
                 },
               ],
@@ -149,7 +157,9 @@ const getSummary = async (req, res, next) => {
               include: [
                 {
                   model: Booking,
-                  where: { pointOfSale: "local" },
+                  where: { 
+                    pointOfSale: { [Op.iLike]: "Local" } // ⭐ Case-insensitive
+                  },
                   required: true,
                 },
               ],
@@ -161,17 +171,19 @@ const getSummary = async (req, res, next) => {
 
           onlineRevenue = onlinePayments;
           localRevenue = localPayments;
+          console.log("📊 Ingresos calculados por Booking.pointOfSale:", { onlineRevenue, localRevenue });
         } catch (err) {
-          console.log("Error al relacionar Payment con Booking:", err.message);
+          console.log("❌ Error al relacionar Payment con Booking:", err.message);
           localRevenue = totalRevenue;
         }
       }
-      console.log("Distribución de ingresos:", {
+      console.log("✅ Distribución final de ingresos:", {
         online: onlineRevenue,
         local: localRevenue,
+        total: totalRevenue
       });
     } catch (err) {
-      console.log("Error al calcular distribución online/local:", err.message);
+      console.log("❌ Error al calcular distribución online/local:", err.message);
       localRevenue = totalRevenue;
     }
 
@@ -448,6 +460,20 @@ const getRevenueByPeriod = async (req, res, next) => {
       };
     }
 
+    // ⭐ NUEVO: Obtener facturas individuales del período para el gráfico de tendencias
+    const bills = await Bill.findAll({
+      where: {
+        createdAt: { [Op.between]: [start, end] }
+      },
+      attributes: [
+        'billId',
+        'reservationAmount', 
+        'extraChargesAmount',
+        'createdAt'
+      ],
+      order: [['createdAt', 'ASC']]
+    });
+
     // Calcular totales y promedios
     const totalExpenses = months.reduce((sum, m) => sum + m.expenses, 0);
     const balance = totalRevenue - totalExpenses;
@@ -458,32 +484,31 @@ const getRevenueByPeriod = async (req, res, next) => {
 
     res.status(200).json({
       error: false,
-      data: {
-        months,
-        summary: {
-          totalRevenue,
-          totalExpenses,
-          balance,
-          averageMonthlyRevenue,
-          averageMonthlyExpenses,
-          periodStart: start,
-          periodEnd: end,
-          monthCount: months.length,
-          paymentMethods: months.reduce((acc, m) => {
-            Object.entries(m.paymentMethods).forEach(([method, amount]) => {
-              acc[method] = (acc[method] || 0) + amount;
+      data: bills, // ⭐ CAMBIO: Retornar las facturas directamente como array principal
+      months, // ⭐ Mantener months por si se necesita
+      summary: {
+        totalRevenue,
+        totalExpenses,
+        balance,
+        averageMonthlyRevenue,
+        averageMonthlyExpenses,
+        periodStart: start,
+        periodEnd: end,
+        monthCount: months.length,
+        paymentMethods: months.reduce((acc, m) => {
+          Object.entries(m.paymentMethods).forEach(([method, amount]) => {
+            acc[method] = (acc[method] || 0) + amount;
+          });
+          return acc;
+        }, {}),
+        expensesByCategory: months.reduce((acc, m) => {
+          if (m.expensesDetail && m.expensesDetail.categories) {
+            Object.entries(m.expensesDetail.categories).forEach(([cat, amount]) => {
+              acc[cat] = (acc[cat] || 0) + amount;
             });
-            return acc;
-          }, {}),
-          expensesByCategory: months.reduce((acc, m) => {
-            if (m.expensesDetail && m.expensesDetail.categories) {
-              Object.entries(m.expensesDetail.categories).forEach(([cat, amount]) => {
-                acc[cat] = (acc[cat] || 0) + amount;
-              });
-            }
-            return acc;
-          }, {})
-        }
+          }
+          return acc;
+        }, {})
       },
       message: "Ingresos por periodo obtenidos correctamente",
     });

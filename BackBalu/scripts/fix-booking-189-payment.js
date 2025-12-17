@@ -65,7 +65,7 @@ async function fixBooking189() {
         paymentDate: new Date(),
         transactionId: `SIMULATED-TEST-${Date.now()}`,
         paymentReference: `BALU-189-${Date.now()}`,
-        processedBy: 'manual_script',
+        processedBy: null, // NULL porque es pago automático de Wompi
         includesExtras: false,
         isReservationPayment: true,
         isCheckoutPayment: false,
@@ -101,19 +101,24 @@ async function fixBooking189() {
 
     // 6. CREAR VOUCHER SI NO EXISTE
     const existingVoucher = await Voucher.findOne({
-      where: { bookingId: 189 }
+      where: { originalBookingId: 189 }
     });
 
     if (!existingVoucher) {
       const voucherCode = `BLU${Date.now().toString().slice(-6)}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      const crypto = require('crypto');
+      const voucherId = crypto.randomUUID();
       
       await Voucher.create({
+        voucherId,
         voucherCode,
-        bookingId: 189,
+        amount: parseFloat(booking.totalAmount),
+        status: 'active',
         guestId: booking.guestId,
-        validFrom: booking.checkIn,
-        validUntil: booking.checkOut,
-        isUsed: false
+        originalBookingId: 189,
+        validUntil: new Date(booking.checkOut),
+        createdBy: 'system',
+        notes: 'Voucher generado por script de corrección'
       });
 
       console.log('✅ Voucher creado:', voucherCode);
@@ -126,14 +131,15 @@ async function fixBooking189() {
     const updatedBooking = await Booking.findByPk(189, {
       include: [
         { model: Room, as: 'room' },
-        { model: Payment, as: 'payments' },
-        { model: Voucher, as: 'vouchers' }
+        { model: Payment, as: 'payments' }
       ]
     });
 
     const totalPaid = updatedBooking.payments
       ?.filter(p => p.paymentStatus === 'completed')
       .reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
+
+    const vouchersCount = await Voucher.count({ where: { originalBookingId: 189 } });
 
     console.log({
       bookingId: updatedBooking.bookingId,
@@ -145,7 +151,7 @@ async function fixBooking189() {
       roomStatus: updatedBooking.room?.status,
       roomAvailable: updatedBooking.room?.available,
       paymentsCount: updatedBooking.payments?.length || 0,
-      vouchersCount: updatedBooking.vouchers?.length || 0
+      vouchersCount
     });
 
     console.log('\n✅ ¡PROCESO COMPLETADO EXITOSAMENTE!');
