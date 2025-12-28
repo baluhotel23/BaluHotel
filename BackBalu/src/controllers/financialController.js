@@ -524,6 +524,33 @@ const createExpense = async (req, res, next) => {
     }
     const expenseData = req.body;
     
+    // Validar campos obligatorios
+    if (!expenseData.destinatario || !expenseData.destinatario.trim()) {
+      return res.status(400).json({ error: true, message: 'El destinatario es obligatorio' });
+    }
+    
+    if (!expenseData.amount || isNaN(expenseData.amount) || parseFloat(expenseData.amount) <= 0) {
+      return res.status(400).json({ error: true, message: 'El monto debe ser un número positivo' });
+    }
+    
+    // Validar categoría
+    const validCategories = ['maintenance', 'utilities', 'salaries', 'marketing', 'supplies', 'other'];
+    if (!expenseData.category || !validCategories.includes(expenseData.category)) {
+      return res.status(400).json({ 
+        error: true, 
+        message: 'Debe seleccionar una categoría válida' 
+      });
+    }
+    
+    // Validar método de pago
+    const validPaymentMethods = ['cash', 'credit_card', 'transfer', 'credit'];
+    if (!expenseData.paymentMethod || !validPaymentMethods.includes(expenseData.paymentMethod)) {
+      return res.status(400).json({ 
+        error: true, 
+        message: 'Debe seleccionar un método de pago válido' 
+      });
+    }
+    
     // Asignar el usuario autenticado como creador
     expenseData.createdBy = req.user.n_document;
     

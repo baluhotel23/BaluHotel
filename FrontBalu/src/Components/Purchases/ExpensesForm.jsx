@@ -2,10 +2,11 @@ import  { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { FaSave, FaTimes, FaMoneyBillWave } from 'react-icons/fa';
+import { FaSave, FaTimes, FaMoneyBillWave, FaFilePdf } from 'react-icons/fa';
 import { createExpense } from '../../Redux/Actions/financialActions';
 import DashboardLayout from '../Dashboard/DashboardLayout';
 import ExpensesList from './ExpensesList';
+import { openCloudinaryWidget } from '../../cloudinaryConfig';
 import { 
   getCurrentDate, 
   formatDateForBackend, 
@@ -20,13 +21,14 @@ const ExpenseForm = () => {
   const navigate = useNavigate();
   const { user } = useSelector(state => state.auth);
   const [loading, setLoading] = useState(false);
+  const [receipt, setReceipt] = useState(null);
 
   // Estado inicial del formulario
   const [expense, setExpense] = useState({
     destinatario: '',
     amount: '',
     expenseDate: getCurrentDate(), // ⭐ Usar utilidad de fecha
-    category: 'other',
+    category: '',
     paymentMethod: 'cash',
     notes: ''
   });
@@ -122,6 +124,7 @@ const ExpenseForm = () => {
         category: expense.category,
         paymentMethod: expense.paymentMethod,
         notes: expense.notes || null,
+        receiptUrl: receipt || null,
         createdBy: user.n_document
       };
       
@@ -144,6 +147,67 @@ const ExpenseForm = () => {
   // Cancelar y volver atrás
   const handleCancel = () => {
     navigate('/financial/expenses');
+  };
+
+  // Función para cargar comprobante
+  const handleUploadReceipt = () => {
+    openCloudinaryWidget((url) => {
+      console.log('📎 URL recibida de Cloudinary:', url);
+      setReceipt(url);
+      toast.success('Comprobante cargado exitosamente');
+    });
+  };
+
+  // Función para renderizar preview del comprobante
+  const renderReceiptPreview = () => {
+    if (!receipt) {
+      return (
+        <div className="mt-2 p-4 border-2 border-dashed border-gray-300 rounded-lg text-center">
+          <p className="text-gray-500">No se ha cargado ningún comprobante.</p>
+          <p className="text-sm text-gray-400 mt-1">El comprobante es opcional pero recomendado</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-2">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-green-600">✅ Comprobante cargado exitosamente</p>
+          <button
+            type="button"
+            onClick={() => setReceipt(null)}
+            className="text-red-500 hover:text-red-700 text-sm"
+          >
+            Remover
+          </button>
+        </div>
+        
+        <div className="border rounded-lg overflow-hidden">
+          <div className="bg-gray-50 px-3 py-2 border-b flex items-center justify-between">
+            <span className="text-sm font-medium">Vista previa del comprobante</span>
+            <a
+              href={receipt}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:text-blue-700 text-sm"
+            >
+              Abrir en nueva pestaña ↗
+            </a>
+          </div>
+          <iframe
+            src={receipt}
+            width="100%"
+            height="400px"
+            className="border-0"
+            title="Comprobante de Gasto"
+          />
+        </div>
+        
+        <p className="text-gray-500 text-sm mt-2">
+          Si deseas reemplazar el comprobante, vuelve a cargar uno nuevo.
+        </p>
+      </div>
+    );
   };
 
   return (
@@ -219,6 +283,7 @@ const ExpenseForm = () => {
               className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             >
+              <option value="">-- Seleccione una categoría --</option>
               {expenseCategories.map((category) => (
                 <option key={category.value} value={category.value}>
                   {category.label}
@@ -259,6 +324,33 @@ const ExpenseForm = () => {
               className="w-full border border-gray-300 rounded px-3 py-2 h-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Información adicional sobre el gasto..."
             />
+          </div>
+
+          {/* Comprobante */}
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Comprobante del Gasto (Opcional)
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleUploadReceipt}
+                className="bg-blue-500 text-white px-4 py-2 rounded-md flex items-center text-sm hover:bg-blue-600 transition-colors"
+              >
+                <FaFilePdf className="mr-2" />
+                {receipt ? 'Cambiar Comprobante' : 'Cargar Comprobante'}
+              </button>
+              {receipt && (
+                <button
+                  type="button"
+                  onClick={() => setReceipt(null)}
+                  className="bg-red-500 text-white px-4 py-2 rounded-md text-sm hover:bg-red-600 transition-colors"
+                >
+                  🗑️ Remover
+                </button>
+              )}
+            </div>
+            {renderReceiptPreview()}
           </div>
         </div>
 

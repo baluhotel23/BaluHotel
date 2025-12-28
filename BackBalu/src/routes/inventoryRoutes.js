@@ -55,9 +55,9 @@ router.get('/summary', getInventorySummary); // Resumen general
 router.get('/low-stock', getLowStockItems);
 
 // Compras y proveedores
-router.get('/purchases', getAllPurchases);
+router.get('/purchases', allowRoles(['owner', 'admin']), getAllPurchases);
 router.post('/purchase', upload.single('file'), allowRoles(['owner', 'recept', 'receptionist']), createPurchase);
-router.get('/purchases/:id', getPurchaseDetails);
+router.get('/purchases/:id', allowRoles(['owner', 'admin']), getPurchaseDetails);
 router.get('/suppliers', getAllSuppliers);
 router.post('/suppliers', allowRoles(['owner']), createSupplier);
 

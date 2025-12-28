@@ -291,7 +291,7 @@ const AppContent = () => {
           <Route
             path="/purchaseList"
             element={
-              <PrivateRoute allowedRoles={["owner"]}>
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <PurchaseList />
               </PrivateRoute>
             }
@@ -362,15 +362,7 @@ const AppContent = () => {
           <Route
             path="/expensesList"
             element={
-              <PrivateRoute allowedRoles={["owner"]}>
-                <ExpensesList />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/expensesList"
-            element={
-              <PrivateRoute allowedRoles={["owner"]}>
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <ExpensesList />
               </PrivateRoute>
             }
@@ -378,7 +370,7 @@ const AppContent = () => {
           <Route
             path="/balance"
             element={
-              <PrivateRoute allowedRoles={["owner", "admin"]}>
+              <PrivateRoute allowedRoles={["owner"]}>
                 <FinancialBalance />
               </PrivateRoute>
             }

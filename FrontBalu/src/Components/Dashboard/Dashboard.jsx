@@ -105,7 +105,7 @@ const Dashboard = () => {
             </Link>
           </div>
         )}
-        {(user.role === "owner" || user.role === "admin") && (
+        {user.role === "owner" && (
           <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
             <h2 className="text-xl font-semibold mb-2"> BALANCE FINANCIERO</h2>
             <p className="text-gray-600 mb-4"> BALANCE FINANCIERO</p>
@@ -114,6 +114,24 @@ const Dashboard = () => {
                 BALANCE FINANCIERO
               </button>
             </Link>
+          </div>
+        )}
+        {user.role === "admin" && (
+          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+            <h2 className="text-xl font-semibold mb-2">📊 REPORTES</h2>
+            <p className="text-gray-600 mb-4">Ver compras y gastos del hotel</p>
+            <div className="flex flex-col gap-2">
+              <Link to="/purchaseList">
+                <button className="w-full bg-blue-500 text-white hover:bg-blue-600 font-bold py-2 px-4 rounded">
+                  VER COMPRAS
+                </button>
+              </Link>
+              <Link to="/expensesList">
+                <button className="w-full bg-green-500 text-white hover:bg-green-600 font-bold py-2 px-4 rounded">
+                  VER GASTOS
+                </button>
+              </Link>
+            </div>
           </div>
         )}
         {(user.role === "owner" ||

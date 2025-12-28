@@ -2,15 +2,17 @@ import  { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { getAllExpenses, updateExpense, deleteExpense } from '../../Redux/Actions/financialActions';
 import { Link } from 'react-router-dom';
-import { FaEye, FaSearch, FaPlus, FaFilePdf, FaEdit, FaSave, FaTimes, FaTrash } from 'react-icons/fa';
+import { FaEye, FaSearch, FaPlus, FaFilePdf, FaEdit, FaSave, FaTimes, FaTrash, FaFileExcel, FaExternalLinkAlt, FaFileAlt } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'react-toastify';
 import DashboardLayout from '../Dashboard/DashboardLayout';
+import * as XLSX from 'xlsx';
 
 const ExpensesList = () => {
   const dispatch = useDispatch();
   const { expenses = [], loading } = useSelector(state => state.financial || {});
+  const { user } = useSelector(state => state.auth);
   
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({
@@ -181,17 +183,87 @@ const ExpensesList = () => {
     }
   };
 
+  // Función para exportar a Excel
+  const handleExcelDownload = () => {
+    // Define los encabezados
+    const data = [
+      ['Fecha', 'Destinatario', 'Categoría', 'Método de Pago', 'Monto', 'Comprobante']
+    ];
+    
+    // Agrega las filas
+    filteredExpenses.forEach(expense => {
+      data.push([
+        formatDate(expense.expenseDate),
+        expense.destinatario || '-',
+        renderCategory(expense.category),
+        renderPaymentMethod(expense.paymentMethod),
+        parseFloat(expense.amount || 0).toFixed(2),
+        expense.receiptUrl || 'Sin comprobante'
+      ]);
+    });
+    
+    // Crea y descarga el archivo
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Gastos');
+    XLSX.writeFile(wb, `gastos-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast.success('Archivo Excel descargado correctamente');
+  };
+
+  // Función para renderizar el comprobante
+  const renderReceipt = (receiptUrl) => {
+    if (!receiptUrl) {
+      return (
+        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs flex items-center justify-center">
+          <FaFileAlt className="mr-1" />
+          Sin comprobante
+        </span>
+      );
+    }
+
+    return (
+      <div className="flex items-center space-x-1 justify-center">
+        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs flex items-center">
+          <FaFilePdf className="mr-1" />
+          Disponible
+        </span>
+        <a
+          href={receiptUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:text-blue-700 p-1"
+          title="Ver comprobante"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <FaExternalLinkAlt className="text-xs" />
+        </a>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="bg-white shadow-md rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-700">Registro de Gastos</h2>
-          <Link 
-            to="/financial/expenses/new" 
-            className="bg-degrade text-white px-4 py-2 rounded-md flex items-center hover:bg-yellow-700 opacity-80"
-          >
-            <FaPlus className="mr-2" /> Nuevo Gasto
-          </Link>
+          <div className="flex gap-2">
+            <button
+              onClick={handleExcelDownload}
+              className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center hover:bg-green-700"
+              title="Exportar a Excel"
+              disabled={filteredExpenses.length === 0}
+            >
+              <FaFileExcel className="mr-2" /> Exportar Excel
+            </button>
+            {user?.role !== 'admin' && (
+              <Link 
+                to="/financial/expenses/new" 
+                className="bg-degrade text-white px-4 py-2 rounded-md flex items-center hover:bg-yellow-700 opacity-80"
+              >
+                <FaPlus className="mr-2" /> Nuevo Gasto
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Barra de búsqueda */}
@@ -289,6 +361,7 @@ const ExpensesList = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Método de Pago</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Comprobante</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
@@ -363,6 +436,9 @@ const ExpensesList = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {renderReceipt(expense.receiptUrl)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex justify-center space-x-2">
                         {editableExpenseId === expense.id ? (
                           <>
@@ -383,33 +459,36 @@ const ExpensesList = () => {
                           </>
                         ) : (
                           <>
-                            <button 
-                              onClick={() => handleEdit(expense)}
-                              className="text-blue-500 hover:text-blue-700"
-                              title="Editar gasto"
-                            >
-                              <FaEdit />
-                            </button>
-                            <Link 
-                              to={`/financial/expenses/${expense.id}`} 
-                              className="text-blue-500 hover:text-blue-700"
-                              title="Ver detalles"
-                            >
-                              <FaEye />
-                            </Link>
-                            <button
-                              className="text-green-500 hover:text-green-700"
-                              title="Exportar a PDF"
-                            >
-                              <FaFilePdf />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(expense.id)}
-                              className="text-red-500 hover:text-red-700"
-                              title="Eliminar gasto"
-                            >
-                              <FaTrash />
-                            </button>
+                            {user?.role !== 'admin' && (
+                              <button 
+                                onClick={() => handleEdit(expense)}
+                                className="text-blue-500 hover:text-blue-700"
+                                title="Editar gasto"
+                              >
+                                <FaEdit />
+                              </button>
+                            )}
+                            {expense.receiptUrl && (
+                              <a
+                                href={expense.receiptUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-500 hover:text-blue-700"
+                                title="Ver comprobante"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <FaEye />
+                              </a>
+                            )}
+                            {user?.role !== 'admin' && (
+                              <button
+                                onClick={() => handleDelete(expense.id)}
+                                className="text-red-500 hover:text-red-700"
+                                title="Eliminar gasto"
+                              >
+                                <FaTrash />
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

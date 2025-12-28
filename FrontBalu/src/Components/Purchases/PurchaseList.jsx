@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 const PurchaseList = () => {
   const dispatch = useDispatch();
   const { purchases = [], loading } = useSelector(state => state.purchase || {});
+  const { user } = useSelector(state => state.auth);
   
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({
@@ -242,12 +243,14 @@ const PurchaseList = () => {
 </button>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-700">Historial de Compras</h2>
-        <Link 
-          to="/purchaseForm" 
-          className="bg-blue-500 text-white px-4 py-2 rounded-md flex items-center hover:bg-blue-600"
-        >
-          <FaPlus className="mr-2" /> Nueva Compra
-        </Link>
+        {user?.role !== 'admin' && (
+          <Link 
+            to="/purchaseForm" 
+            className="bg-blue-500 text-white px-4 py-2 rounded-md flex items-center hover:bg-blue-600"
+          >
+            <FaPlus className="mr-2" /> Nueva Compra
+          </Link>
+        )}
       </div>
 
       {/* Barra de búsqueda */}
