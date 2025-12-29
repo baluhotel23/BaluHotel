@@ -104,6 +104,11 @@ const prepareExpensesByCategoryData = () => {
 
   // Datos para la tendencia mensual
 const prepareMonthlyTrendData = () => {
+  // No mostrar warnings si los datos están cargando
+  if (loading) {
+    return [];
+  }
+  
   if (!revenueByPeriod || !Array.isArray(revenueByPeriod) || revenueByPeriod.length === 0) {
     console.warn('⚠️ [FINANCIAL] No hay datos de revenue por período');
     return [];
