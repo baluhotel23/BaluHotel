@@ -428,18 +428,25 @@ const getRevenueByPeriod = async (req, res, next) => {
     }
 
     // ⭐ NUEVO: Obtener facturas individuales del período para el gráfico de tendencias
-    const bills = await Bill.findAll({
-      where: {
-        createdAt: { [Op.between]: [start, end] }
-      },
-      attributes: [
-        'billId',
-        'reservationAmount', 
-        'extraChargesAmount',
-        'createdAt'
-      ],
-      order: [['createdAt', 'ASC']]
-    });
+    let bills = [];
+    try {
+      bills = await Bill.findAll({
+        where: {
+          createdAt: { [Op.between]: [start, end] }
+        },
+        attributes: [
+          'idBill',
+          'reservationAmount', 
+          'extraChargesAmount',
+          'createdAt'
+        ],
+        order: [['createdAt', 'ASC']]
+      });
+    } catch (billError) {
+      console.error("Error al obtener facturas para el gráfico:", billError.message);
+      // Si falla, usamos los datos agregados de months
+      bills = [];
+    }
 
     // Calcular totales y promedios
     const totalExpenses = months.reduce((sum, m) => sum + m.expenses, 0);
@@ -451,7 +458,7 @@ const getRevenueByPeriod = async (req, res, next) => {
 
     res.status(200).json({
       error: false,
-      data: bills, // ⭐ CAMBIO: Retornar las facturas directamente como array principal
+      data: bills.length > 0 ? bills : months, // ⭐ Si hay facturas, retornarlas; si no, retornar months
       months, // ⭐ Mantener months por si se necesita
       summary: {
         totalRevenue,

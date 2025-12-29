@@ -194,11 +194,18 @@ export const getFinancialDashboard = () => async (dispatch) => {
   }
 };
 
-export const getFinancialSummary = (period) => async (dispatch) => {
+export const getFinancialSummary = (period, startDate, endDate) => async (dispatch) => {
   dispatch({ type: 'FETCH_FINANCIAL_SUMMARY_REQUEST' });
   
   try {
-    const { data } = await api.get(`/financial/summary?period=${period || 'month'}`);
+    let url = `/financial/summary?period=${period || 'month'}`;
+    
+    // Si el período es custom y tenemos fechas, agregarlas a la URL
+    if (period === 'custom' && startDate && endDate) {
+      url += `&startDate=${startDate}&endDate=${endDate}`;
+    }
+    
+    const { data } = await api.get(url);
     
     dispatch({
       type: 'FETCH_FINANCIAL_SUMMARY_SUCCESS',
@@ -243,7 +250,7 @@ export const getRevenueByPeriod = (startDate, endDate) => async (dispatch) => {
   try {
     console.log('Solicitando ingresos por período:', { startDate: formattedStartDate, endDate: formattedEndDate });
     
-    const { data } = await api.get(`/financial/revenue?startDate=${formattedStartDate}&endDate=${formattedEndDate}`);
+    const { data } = await api.get(`/financial/revenue/by-period?startDate=${formattedStartDate}&endDate=${formattedEndDate}`);
     
     dispatch({
       type: 'FETCH_REVENUE_BY_PERIOD_SUCCESS',

@@ -41,12 +41,18 @@ console.log('Resumen financiero:', revenueByPeriod);
   useEffect(() => {
     // Cargar datos iniciales
     dispatch(getFinancialDashboard());
-    dispatch(getFinancialSummary(period));
+    
+    // Solo pasar fechas personalizadas si el período es custom
+    if (period === 'custom') {
+      dispatch(getFinancialSummary(period, dateRange.startDate, dateRange.endDate));
+    } else {
+      dispatch(getFinancialSummary(period));
+    }
     
     const { startDate, endDate } = dateRange;
     dispatch(getRevenueByPeriod(startDate, endDate));
     dispatch(getProfitLossReport(period));
-  }, [dispatch, period, dateRange]);
+  }, [dispatch, period]);
 
   // Formateo de datos para gráficos
   const formatCurrency = (value) => {
@@ -198,6 +204,16 @@ const prepareMonthlyTrendData = () => {
       [field]: value
     }));
   };
+
+  // Nueva función para aplicar filtro de fechas personalizadas
+  const handleApplyCustomDates = () => {
+    if (period === 'custom') {
+      const { startDate, endDate } = dateRange;
+      dispatch(getFinancialSummary(period, startDate, endDate));
+      dispatch(getRevenueByPeriod(startDate, endDate));
+      dispatch(getProfitLossReport(period));
+    }
+  };
 const handleExcelDownload = () => {
   const data = getCSVData(); // Tu función que genera los datos (array de arrays)
   const ws = XLSX.utils.aoa_to_sheet(data);
@@ -308,6 +324,14 @@ const handleExcelDownload = () => {
                     onChange={(e) => handleDateRangeChange('endDate', e.target.value)}
                     className="border border-gray-300 rounded-md py-1 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    onClick={handleApplyCustomDates}
+                    className="bg-blue-600 text-white px-4 py-1.5 rounded-md flex items-center hover:bg-blue-700 transition-colors"
+                  >
+                    <FaFilter className="mr-2" /> Aplicar Filtro
+                  </button>
                 </div>
               </>
             )}
