@@ -18,6 +18,7 @@ const {
     generateBill,
     updateBookingStatus,
     cancelBooking,
+    deleteBookingPermanently,
     getCancellationPolicies,
     validateCancellation,
     downloadBookingPdf,
@@ -96,7 +97,10 @@ router.put('/:bookingId/status', allowRoles(['owner', 'recept', 'receptionist'])
 
 // ⭐ CANCELACIONES ADMINISTRATIVAS
 // Solo owner y recepcionistas pueden cancelar reservas (admin solo puede ver)
-router.delete('/:bookingId', allowRoles(['owner', 'recept', 'receptionist']), cancelBooking);
+router.put('/:bookingId/cancel', allowRoles(['owner', 'recept', 'receptionist']), cancelBooking);
+
+// ⭐ ELIMINACIÓN PERMANENTE (Solo Owner)
+router.delete('/:bookingId/permanent', allowRoles(['owner']), deleteBookingPermanently);
 
 // ⭐ REPORTES
 router.get('/reports/occupancy', allowRoles(['owner', 'admin']), getOccupancyReport);

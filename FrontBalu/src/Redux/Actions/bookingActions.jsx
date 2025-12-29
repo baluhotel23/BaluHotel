@@ -562,6 +562,46 @@ export const clearCancellationState = () => (dispatch) => {
   dispatch({ type: 'CLEAR_CANCELLATION_STATE' });
 };
 
+// ═══════════════════════════════════════════════════════════════
+// 🗑️ ELIMINAR RESERVA PERMANENTEMENTE (Solo Owner)
+// ═══════════════════════════════════════════════════════════════
+export const deleteBookingPermanently = (bookingId) => async (dispatch) => {
+  dispatch({ type: 'DELETE_BOOKING_PERMANENTLY_REQUEST' });
+  
+  try {
+    console.log(`🗑️ [DELETE-BOOKING-PERMANENTLY] Eliminando reserva: ${bookingId}`);
+    
+    if (!bookingId) {
+      throw new Error('bookingId es requerido');
+    }
+    
+    const { data } = await api.delete(`/bookings/${bookingId}/permanent`);
+    
+    console.log('✅ [DELETE-BOOKING-PERMANENTLY] Reserva eliminada:', data.data);
+    
+    dispatch({ 
+      type: 'DELETE_BOOKING_PERMANENTLY_SUCCESS', 
+      payload: { bookingId, ...data.data }
+    });
+    
+    toast.success('Reserva eliminada permanentemente');
+    return { success: true, data: data.data };
+    
+  } catch (error) {
+    console.error('❌ [DELETE-BOOKING-PERMANENTLY] Error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Error al eliminar la reserva permanentemente';
+    
+    dispatch({ 
+      type: 'DELETE_BOOKING_PERMANENTLY_FAILURE', 
+      payload: errorMessage 
+    });
+    
+    toast.error(`❌ ${errorMessage}`);
+    return { success: false, error: errorMessage };
+  }
+};
+
 // ⭐ NUEVAS FUNCIONES ADICIONALES PARA CANCELACIÓN
 
 // VALIDATE CANCELLATION (POST /bookings/:id/validate-cancellation)

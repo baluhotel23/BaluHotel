@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import { getAllBookings, generateBill, getAllBills } from "../../Redux/Actions/bookingActions";
+import { getAllBookings, generateBill, getAllBills, deleteBookingPermanently } from "../../Redux/Actions/bookingActions";
 
 const CompletedBookings = () => {
   const dispatch = useDispatch();
@@ -10,6 +10,9 @@ const CompletedBookings = () => {
     bookings: allBookings = [],
     loading = {},
   } = useSelector((state) => state.booking || {});
+
+  const { user } = useSelector((state) => state.auth);
+  const isOwner = user?.role === 'owner';
 
   const [isLoading, setIsLoading] = useState(false);
   const [showBillModal, setShowBillModal] = useState(false);
@@ -178,6 +181,43 @@ const CompletedBookings = () => {
       totalPagadoFormatted: `$${totalPagado.toLocaleString()}`,
       extraChargesCount: booking.extraCharges?.length || 0,
     };
+  };
+
+  const handleDeleteBooking = async (bookingId) => {
+    const confirmDelete = window.confirm(
+      `⚠️ ¿Estás seguro de eliminar PERMANENTEMENTE la reserva #${bookingId}?\n\n` +
+      `Esta acción NO se puede deshacer y eliminará:\n` +
+      `• La reserva\n` +
+      `• Todos los pagos asociados\n` +
+      `• Cargos extras\n` +
+      `• Facturas generadas\n` +
+      `• Liberará la habitación\n\n` +
+      `Solo hazlo si la reserva fue cargada incorrectamente.`
+    );
+
+    if (!confirmDelete) return;
+
+    const doubleConfirm = window.confirm(
+      `🚨 ÚLTIMA ADVERTENCIA\n\n` +
+      `Esta es una acción IRREVERSIBLE.\n` +
+      `¿Confirmas que deseas eliminar permanentemente la reserva #${bookingId}?`
+    );
+
+    if (!doubleConfirm) return;
+
+    setIsLoading(true);
+    try {
+      const result = await dispatch(deleteBookingPermanently(bookingId));
+      
+      if (result.success) {
+        toast.success(`✅ Reserva #${bookingId} eliminada permanentemente`);
+        loadBookings(); // Recargar la lista
+      }
+    } catch (error) {
+      console.error('Error eliminando reserva:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const statistics = useMemo(() => {
@@ -506,6 +546,26 @@ const CompletedBookings = () => {
                         <span>👁️</span>
                         Ver Detalles
                       </button>
+
+                      {isOwner && (
+                        <button
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                          onClick={() => handleDeleteBooking(booking.bookingId)}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Eliminando...
+                            </>
+                          ) : (
+                            <>
+                              <span>🗑️</span>
+                              Eliminar
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

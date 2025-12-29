@@ -8515,6 +8515,135 @@ const validateCancellation = async (req, res) => {
   }
 };
 
+// ═══════════════════════════════════════════════════════════════
+// 🗑️ ELIMINAR RESERVA COMPLETAMENTE (Solo Owner)
+// ═══════════════════════════════════════════════════════════════
+const deleteBookingPermanently = async (req, res) => {
+  const transaction = await Booking.sequelize.transaction();
+  
+  try {
+    const { bookingId } = req.params;
+    console.log('🗑️ [DELETE-BOOKING] Iniciando eliminación permanente de reserva:', bookingId);
+
+    // ⭐ VALIDACIÓN: Solo owner puede eliminar
+    if (req.user?.role !== 'owner') {
+      await transaction.rollback();
+      return res.status(403).json({
+        error: true,
+        message: 'Solo el dueño del hotel puede eliminar reservas permanentemente',
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    // ⭐ BUSCAR LA RESERVA
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: Room,
+          as: 'room',
+          attributes: ['roomNumber', 'status', 'available']
+        },
+        {
+          model: Payment,
+          as: 'payments'
+        }
+      ],
+      transaction
+    });
+
+    if (!booking) {
+      await transaction.rollback();
+      return res.status(404).json({
+        error: true,
+        message: `Reserva ${bookingId} no encontrada`,
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    console.log('📋 [DELETE-BOOKING] Reserva encontrada:', {
+      bookingId: booking.bookingId,
+      roomNumber: booking.roomNumber,
+      status: booking.status,
+      totalAmount: booking.totalAmount,
+      payments: booking.payments?.length || 0
+    });
+
+    // ⭐ ELIMINAR PAGOS ASOCIADOS
+    const paymentsDeleted = await Payment.destroy({
+      where: { bookingId },
+      transaction
+    });
+
+    console.log(`✅ [DELETE-BOOKING] ${paymentsDeleted} pago(s) eliminado(s)`);
+
+    // ⭐ ELIMINAR CARGOS EXTRAS (si existen)
+    const extraChargesDeleted = await ExtraCharge.destroy({
+      where: { bookingId },
+      transaction
+    });
+
+    console.log(`✅ [DELETE-BOOKING] ${extraChargesDeleted} cargo(s) extra(s) eliminado(s)`);
+
+    // ⭐ ELIMINAR BILL ASOCIADO (si existe)
+    const billsDeleted = await Bill.destroy({
+      where: { bookingId },
+      transaction
+    });
+
+    console.log(`✅ [DELETE-BOOKING] ${billsDeleted} factura(s) eliminada(s)`);
+
+    // ⭐ LIBERAR HABITACIÓN
+    if (booking.roomNumber) {
+      await Room.update(
+        {
+          status: null,
+          available: true,
+          updatedAt: new Date()
+        },
+        {
+          where: { roomNumber: booking.roomNumber },
+          transaction
+        }
+      );
+
+      console.log(`🔓 [DELETE-BOOKING] Habitación ${booking.roomNumber} liberada`);
+    }
+
+    // ⭐ ELIMINAR LA RESERVA
+    await booking.destroy({ transaction });
+
+    console.log(`✅ [DELETE-BOOKING] Reserva ${bookingId} eliminada exitosamente`);
+
+    // ⭐ CONFIRMAR TRANSACCIÓN
+    await transaction.commit();
+
+    res.json({
+      error: false,
+      message: 'Reserva eliminada permanentemente con éxito',
+      data: {
+        bookingId,
+        roomNumber: booking.roomNumber,
+        paymentsDeleted,
+        extraChargesDeleted,
+        billsDeleted,
+        roomLiberated: !!booking.roomNumber
+      },
+      timestamp: formatForLogs(getColombiaTime()),
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('❌ [DELETE-BOOKING] Error:', error);
+    
+    res.status(500).json({
+      error: true,
+      message: 'Error al eliminar la reserva permanentemente',
+      details: error.message,
+      timestamp: formatForLogs(getColombiaTime()),
+    });
+  }
+};
+
 module.exports = {
   checkAvailability,
   getRoomTypes,
@@ -8531,6 +8660,7 @@ module.exports = {
   generateBill,
   updateBookingStatus,
   cancelBooking,
+  deleteBookingPermanently,
   getCancellationPolicies,
   validateCancellation,
   getOccupancyReport,
