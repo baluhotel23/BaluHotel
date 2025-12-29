@@ -50,16 +50,16 @@ router.use(verifyToken);
  router.get('/bills/:idBill', allowRoles(['owner', 'admin']), getBillDetails);
  router.post('/bills/:idBill/void', isOwner, voidBill);
 
-// // Reportes financieros (solo owner)
- router.get('/reports/profit-loss', isOwner, getProfitLossReport);
- router.get('/reports/cash-flow', isOwner, getCashFlowReport);
- router.get('/reports/tax', isOwner, getTaxReport);
- router.get('/reports/annual', isOwner, getAnnualReport);
+// // Reportes financieros (owner y admin)
+ router.get('/reports/profit-loss', allowRoles(['owner', 'admin']), getProfitLossReport);
+ router.get('/reports/cash-flow', allowRoles(['owner', 'admin']), getCashFlowReport);
+ router.get('/reports/tax', allowRoles(['owner', 'admin']), getTaxReport);
+ router.get('/reports/annual', allowRoles(['owner', 'admin']), getAnnualReport);
 
-// // Análisis y proyecciones (solo owner)
- router.get('/analytics/trends', isOwner, getFinancialTrends);
- router.get('/analytics/forecasts', isOwner, getFinancialForecasts);
- router.get('/analytics/comparisons', isOwner, getPeriodComparisons);
+// // Análisis y proyecciones (owner y admin)
+ router.get('/analytics/trends', allowRoles(['owner', 'admin']), getFinancialTrends);
+ router.get('/analytics/forecasts', allowRoles(['owner', 'admin']), getFinancialForecasts);
+ router.get('/analytics/comparisons', allowRoles(['owner', 'admin']), getPeriodComparisons);
 
 // // Configuración financiera (solo owner)
  router.get('/settings', isOwner, getFinancialSettings);

@@ -370,7 +370,7 @@ const AppContent = () => {
           <Route
             path="/balance"
             element={
-              <PrivateRoute allowedRoles={["owner"]}>
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <FinancialBalance />
               </PrivateRoute>
             }
