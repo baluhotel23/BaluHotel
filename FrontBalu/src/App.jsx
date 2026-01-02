@@ -50,6 +50,9 @@ import FacturaManual from "./Components/Taxxa/FacturaManual";
 import VoucherManager from "./Components/Booking/VoucherManager";
 import RoomStatusDashboard from "./Components/Dashboard/RoomStatusDashboard"; // ⭐ NUEVO: Dashboard de habitaciones con gestión de turnos
 import ShiftReminder from "./Components/Dashboard/ShiftReminder"; // ⭐ NUEVO: Recordatorio de turno para recepcionistas
+import PrivacyPolicy from "./Components/PrivacyPolicy";
+import DataTreatment from "./Components/DataTreatment";
+import TermsConditions from "./Components/TermsConditions";
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -67,6 +70,9 @@ const AppContent = () => {
       "/buyerForm",
       "/registro-comprador",
       "/unauthorized",
+      "/privacy-policy",
+      "/data-treatment",
+      "/terms-conditions",
     ];
 
     // Si la ruta actual es pública, omite la verificación de token
@@ -113,6 +119,9 @@ const AppContent = () => {
           <Route path="/booking" element={<Booking />} />
           <Route path="/login" element={<Login />} />
           <Route path="/thankyou" element={<ThankYouPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/data-treatment" element={<DataTreatment />} />
+          <Route path="/terms-conditions" element={<TermsConditions />} />
           {/* <Route path="/buyerForm" element={<BuyerRegistrationForm />} />
           <Route path="/registro-comprador" element={<ParentBuyerRegistration />} /> */}
           <Route path="/unauthorized" element={<Unauthorized />} />
