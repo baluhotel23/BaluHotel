@@ -401,6 +401,7 @@ const Booking = () => {
   const [lastSearchedSdocno, setLastSearchedSdocno] = useState("");
   const [priceBreakdown, setPriceBreakdown] = useState(null);
   const [priceLoading, setPriceLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // ⭐ COMPUTED VALUES
   const isLoadingAvailability = loading.availability;
@@ -1113,15 +1114,68 @@ const Booking = () => {
               )}
             </div>
 
-            <WompiPayment
-              booking={{
-                bookingId: `reserva-${selectedRoom.roomNumber}-${Date.now()}`,
-                totalAmount: amountToPay,
-                currency: "COP",
-                customer_email: currentBuyerData.selectronicmail,
-              }}
-              onPaymentComplete={handlePaymentSuccess}
-            />
+            {/* ⭐ ACEPTACIÓN DE TÉRMINOS Y CONDICIONES */}
+            <div className="mb-6 p-6 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl">
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="acceptTerms"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-1 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                />
+                <label htmlFor="acceptTerms" className="text-sm text-gray-700 cursor-pointer">
+                  <span className="font-semibold">Acepto los </span>
+                  <a
+                    href="/terms-conditions"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline font-semibold"
+                  >
+                    Términos y Condiciones
+                  </a>
+                  <span className="font-semibold"> y la </span>
+                  <a
+                    href="/privacy-policy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline font-semibold"
+                  >
+                    Política de Privacidad
+                  </a>
+                  <span className="font-semibold"> de Hotel Balú.</span>
+                </label>
+              </div>
+              {!acceptedTerms && (
+                <p className="mt-3 text-xs text-red-600 flex items-center">
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  Debe aceptar los términos y condiciones para continuar con el pago
+                </p>
+              )}
+            </div>
+
+            {/* ⭐ COMPONENTE DE PAGO - Solo se muestra si aceptó términos */}
+            {acceptedTerms ? (
+              <WompiPayment
+                booking={{
+                  bookingId: `reserva-${selectedRoom.roomNumber}-${Date.now()}`,
+                  totalAmount: amountToPay,
+                  currency: "COP",
+                  customer_email: currentBuyerData.selectronicmail,
+                }}
+                onPaymentComplete={handlePaymentSuccess}
+              />
+            ) : (
+              <div className="p-6 bg-gray-100 border-2 border-gray-300 rounded-xl text-center">
+                <svg className="w-16 h-16 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <p className="text-gray-600 font-medium">🔒 Pago bloqueado</p>
+                <p className="text-sm text-gray-500 mt-2">Debe aceptar los términos y condiciones para continuar</p>
+              </div>
+            )}
 
             <button
               onClick={() => setStep(3)}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import  { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import jsPDF from "jspdf";
@@ -434,92 +434,164 @@ const ThankYouPage = () => {
                 </div>
               </div>
 
+              {/* ⭐ MENSAJE DESTACADO - PRESENTAR EN CHECK-IN */}
+              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl p-6 mb-6 text-center border-4 border-yellow-600 shadow-2xl">
+                <div className="flex items-center justify-center mb-3">
+                  <svg className="w-12 h-12 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold mb-2">
+                  ⚠️ IMPORTANTE: PRESENTAR EN EL CHECK-IN ⚠️
+                </h3>
+                <p className="text-lg font-semibold">
+                  Debe presentar este comprobante impreso o en formato digital al momento de su llegada
+                </p>
+                <p className="text-sm mt-2 opacity-90">
+                  Guarde este documento en un lugar seguro
+                </p>
+              </div>
+
               {/* ⭐ INFORMACIÓN IMPORTANTE */}
-              <div className="bg-gray-100 rounded-xl p-6">
-                <h4 className="text-lg font-bold text-gray-800 mb-3">
-                  📋 Información Importante
+              <div className="bg-blue-50 rounded-xl p-6 border-2 border-blue-200 mb-6">
+                <h4 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                  <span className="mr-2">📋</span> Información Importante
                 </h4>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li>
-                    • Por favor, presente este comprobante al momento del
-                    check-in
-                  </li>
-                  <li>• Check-in disponible a partir de las 3:00 PM</li>
-                  <li>• Check-out antes de las 11:00 PM</li>
-                  <li>• Para cancelaciones, consulte nuestras políticas</li>
-                  <li>
-                    • Cualquier consulta, contáctenos al: +57 (311) 061-010
-                  </li>
-                </ul>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white p-4 rounded-lg">
+                    <p className="font-semibold text-green-700 mb-1">✅ Check-in</p>
+                    <p className="text-sm text-gray-700">A partir de las 3:00 PM</p>
+                    <p className="text-xs text-gray-500">Llegadas tempranas pueden generar costo adicional</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg">
+                    <p className="font-semibold text-orange-700 mb-1">📤 Check-out</p>
+                    <p className="text-sm text-gray-700">Antes de las 11:00 AM</p>
+                    <p className="text-xs text-gray-500">Salidas tardías pueden generar costo adicional</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg">
+                    <p className="font-semibold text-blue-700 mb-1">📞 Contacto</p>
+                    <p className="text-sm text-gray-700">+57 (311) 061-010</p>
+                    <p className="text-xs text-gray-500">servicioalcliente@hotelbalu.com.co</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg">
+                    <p className="font-semibold text-purple-700 mb-1">📍 Dirección</p>
+                    <p className="text-sm text-gray-700">Cl. 8 #8-57, Centro</p>
+                    <p className="text-xs text-gray-500">Restrepo, Meta</p>
+                  </div>
+                </div>
+                <div className="mt-4 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">🆔 Documentos requeridos:</span> Todos los visitantes deben presentar documento de identidad original al momento del check-in.
+                  </p>
+                </div>
               </div>
               {/* ⭐ TÉRMINOS Y CONDICIONES */}
-              <div className="bg-white rounded-xl border border-gray-300 p-6 mt-8">
-                <h4 className="text-lg font-bold text-gray-800 mb-3">
-                  📑 Términos y condiciones
+              <div className="bg-white rounded-xl border-2 border-gray-300 p-6 mt-6">
+                <h4 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                  <span className="mr-2">📑</span> Términos y Condiciones de Reserva
                 </h4>
-                <ul className="space-y-2 text-sm text-gray-700 list-disc pl-5">
-                  <li>
-                    Hotel Balú informa a sus clientes que para modificación de
-                    fechas debe realizarse con un mínimo de 5 días a la fecha
-                    programada de la reserva.
-                  </li>
-                  <li>
-                    Hotel Balú se abstiene de realizar devoluciones de dinero
-                    por tal motivo de no poder asistir a tomar la reserva
-                    realizada el Hotel da un plazo 30 días calendario para hacer
-                    uso de la reserva solicitada.
-                  </li>
-                  <li>
-                    De no asistir y no realizar la respectiva cancelación o
-                    modificación de fecha el HOTEL BALÚ, tendrá derecho a
-                    quedarse con el anticipo realizado por el huésped.
-                  </li>
-                  <li>
-                    Habitaciones asignadas previa disponibilidad del Hotel.
-                  </li>
-                  <li>Reserva sin abono no se hará efectiva.</li>
-                  <li>Todo niño mayor de 5 años cancela tarifa.</li>
-                  <li>
-                    En caso de presentarse con acompañante, para reservas
-                    realizadas para persona sola o en acomodación múltiple, se
-                    realiza el cobro adicional.
-                  </li>
-                  <li>
-                    Se acepta el ingreso de mascotas siempre y cuando el dueño
-                    traiga equipaje para la comodidad del animal, y se haga
-                    responsable de daños o perjuicios ocasionados por el mismo.
-                  </li>
-                  <li>
-                    CHECK IN 3 PM, de lo contrario puede generar costo
-                    adicional.
-                  </li>
-                  <li>
-                    CHECK OUT 11 AM, de lo contrario puede generar costo
-                    adicional.
-                  </li>
-                  <li>
-                    Presentar siempre documento de identidad original de los
-                    visitantes.
-                  </li>
-                  <li>
-                    En caso de presentarse con menores de edad es necesario
-                    presentar el Registro civil del menor.
-                  </li>
-                  <li>
-                    El servicio de parqueadero aplica para los huéspedes hasta
-                    la 11 AM, si el huésped entrega la habitación y deja el
-                    carro en el parqueadero debe cancelar la tarifa con el
-                    encargado del Parqueadero.
-                  </li>
-                  <li>
-                    En Hotel Balú somos amigables con las mascotas, prepárate te
-                    esperamos con su camita y elementos de aseo. Gracias.
-                  </li>
-                  <li>
-                    Todo daño ocasionado en la habitación será cargado a su
-                    cuenta.
-                  </li>
-                </ul>
+                <div className="space-y-4">
+                  <div>
+                    <h5 className="font-semibold text-gray-700 mb-2">Reservas y Pagos:</h5>
+                    <ul className="space-y-1 text-sm text-gray-600 list-disc pl-5">
+                      <li>Reserva sin abono no se hará efectiva.</li>
+                      <li>Habitaciones asignadas previa disponibilidad del Hotel.</li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h5 className="font-semibold text-gray-700 mb-2">Modificaciones y Cancelaciones:</h5>
+                    <ul className="space-y-1 text-sm text-gray-600 list-disc pl-5">
+                      <li>Las modificaciones de fecha deben realizarse con un mínimo de 5 días calendario antes de la fecha programada.</li>
+                      <li>Hotel Balú <strong>no realiza devoluciones de dinero</strong>.</li>
+                      <li>En caso de no poder asistir, el hotel otorgará un plazo máximo de 30 días calendario para hacer uso de la reserva.</li>
+                      <li>Si el huésped no se presenta y no realiza cancelación o modificación, Hotel Balú podrá retener el anticipo realizado.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h5 className="font-semibold text-gray-700 mb-2">Tarifas y Ocupación:</h5>
+                    <ul className="space-y-1 text-sm text-gray-600 list-disc pl-5">
+                      <li>Todo niño mayor de 5 años paga tarifa completa.</li>
+                      <li>En caso de presentarse con acompañante adicional no registrado, se realizará el cobro correspondiente.</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h5 className="font-semibold text-gray-700 mb-2">Check-in y Check-out:</h5>
+                    <ul className="space-y-1 text-sm text-gray-700 list-disc pl-5">
+                      <li><strong>Check-in: 3:00 PM</strong> (ingresos antes de esta hora pueden generar costos adicionales)</li>
+                      <li><strong>Check-out: 11:00 AM</strong> (salidas posteriores pueden generar costos adicionales)</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h5 className="font-semibold text-gray-700 mb-2">Documentación:</h5>
+                    <ul className="space-y-1 text-sm text-gray-600 list-disc pl-5">
+                      <li>Todos los visitantes deben presentar documento de identidad original al momento del check-in.</li>
+                      <li>En caso de presentarse con menores de edad es necesario presentar el Registro Civil del menor.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h5 className="font-semibold text-gray-700 mb-2">Parqueadero:</h5>
+                    <ul className="space-y-1 text-sm text-gray-600 list-disc pl-5">
+                      <li>El servicio de parqueadero aplica hasta las 11:00 AM.</li>
+                      <li>Si el huésped entrega la habitación y deja el vehículo en el parqueadero, deberá cancelar la tarifa correspondiente directamente con el encargado.</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                    <h5 className="font-semibold text-purple-700 mb-2 flex items-center">
+                      <span className="mr-2">🐾</span> Hotel Pet Friendly
+                    </h5>
+                    <ul className="space-y-1 text-sm text-gray-700 list-disc pl-5">
+                      <li>El huésped deberá traer los elementos necesarios para la comodidad de su mascota.</li>
+                      <li>El propietario será responsable por cualquier daño o perjuicio ocasionado por el animal.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h5 className="font-semibold text-gray-700 mb-2">Responsabilidad por Daños:</h5>
+                    <ul className="space-y-1 text-sm text-gray-600 list-disc pl-5">
+                      <li>Todo daño ocasionado en la habitación o áreas comunes será cargado a la cuenta del huésped.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* ⭐ POLÍTICA DE PROTECCIÓN DE MENORES */}
+              <div className="bg-red-50 rounded-xl border-2 border-red-300 p-6 mt-6">
+                <h4 className="text-xl font-bold text-red-800 mb-4 flex items-center">
+                  <span className="mr-2">⚠️</span> Política de Protección de Niños, Niñas y Adolescentes
+                </h4>
+                <div className="space-y-3 text-sm text-gray-700">
+                  <p className="font-semibold text-red-700">
+                    Hotel Balú cumple estrictamente con la Ley 1098 de 2006 (Código de la Infancia y la Adolescencia), 
+                    la Ley 679 de 2001 y la Ley 704 de 2001, orientadas a la prevención de la explotación sexual y 
+                    comercial de menores de edad.
+                  </p>
+                  <ul className="space-y-2 list-disc pl-5">
+                    <li>Todo huésped que se presente con menores de edad deberá acreditar el parentesco o autorización legal, presentando el Registro Civil del menor.</li>
+                    <li>El hotel reportará a las autoridades competentes cualquier situación sospechosa que atente contra los derechos de los menores.</li>
+                  </ul>
+                  <div className="bg-red-100 border-l-4 border-red-500 p-3 mt-3 rounded">
+                    <p className="font-bold text-red-800">
+                      TOLERANCIA CERO: Hotel Balú rechaza y denuncia cualquier forma de explotación, abuso o turismo sexual que involucre a niños, niñas y adolescentes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ⭐ FOOTER DEL COMPROBANTE */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-xl p-6 mt-6 text-center">
+                <p className="text-2xl font-bold mb-2">🏨 Hotel Balú</p>
+                <p className="text-blue-100 mb-2">Tu descanso con elegancia en el corazón del Llano</p>
+                <p className="text-sm text-blue-200">Cl. 8 #8-57, Centro, Restrepo, Meta</p>
+                <p className="text-sm text-blue-200">+57 (311) 061-010 | servicioalcliente@hotelbalu.com.co</p>
+                <p className="text-xs text-blue-300 mt-3">
+                  © {new Date().getFullYear()} Hotel Balú. Todos los derechos reservados.
+                </p>
               </div>
             </div>
           </div>
