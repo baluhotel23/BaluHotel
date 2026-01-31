@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { createRegistrationPass } from "../../Redux/Actions/registerActions";
-import { getBuyerByDocument } from "../../Redux/Actions/taxxaActions";
+import { fetchBuyerByDocument } from "../../Redux/Actions/taxxaActions";
 import { toast } from "react-toastify";
 import DashboardLayout from "./DashboardLayout"; // ⭐ NUEVO
 
@@ -86,22 +86,22 @@ function Registration({
     try {
       console.log('🔍 Verificando si el cliente existe:', idNumber);
       
-      const result = await dispatch(getBuyerByDocument(idNumber));
+      const buyer = await dispatch(fetchBuyerByDocument(idNumber));
       
-      if (result.success && result.data) {
-        console.log('✅ Cliente encontrado:', result.data);
+      if (buyer) {
+        console.log('✅ Cliente encontrado:', buyer);
         
         // ⭐ AUTO-COMPLETAR DATOS DEL CLIENTE
         setFormData(prev => ({
           ...prev,
-          name: result.data.scostumername || prev.name,
-          phoneNumber: result.data.stelephone || prev.phoneNumber,
-          address: result.data.saddressline1 || prev.address,
-          idIssuingPlace: result.data.scityname || prev.idIssuingPlace,
+          name: buyer.scostumername || prev.name,
+          phoneNumber: buyer.stelephone || prev.phoneNumber,
+          address: buyer.saddressline1 || prev.address,
+          idIssuingPlace: buyer.scityname || prev.idIssuingPlace,
         }));
         
         setBuyerFound(true);
-        toast.success(`✅ Cliente encontrado: ${result.data.scostumername}`);
+        toast.success(`✅ Cliente encontrado: ${buyer.scostumername}`);
       } else {
         console.log('ℹ️ Cliente no encontrado, puede continuar con el registro');
         setBuyerFound(false);

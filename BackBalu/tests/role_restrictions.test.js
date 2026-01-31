@@ -1,8 +1,9 @@
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 
-// Set a stable test secret for verifying tokens in test environment
+// Configure env vars for test environment BEFORE loading the app
 process.env.JWT_SECRET_KEY = process.env.JWT_SECRET_KEY || 'test_secret_key';
+process.env.DB_DEPLOY = process.env.DB_DEPLOY || 'postgresql://test:test@localhost:5432/test_db';
 
 const app = require('../src/app');
 
