@@ -2,7 +2,7 @@ const { SellerData, User, Buyer, Booking, Bill, Invoice, CreditNote } = require(
 const { generateToken, sendDocument } = require('./taxxaUtils');
 const { createInvoiceWithNumber, cancelInvoice, getNextInvoiceNumber } = require('./invoiceNumberController');
 const { Op } = require('sequelize');
-const { getColombiaDate, formatColombiaDate, getColombiaDateTime } = require('../../utils/dateUtils');
+const { getColombiaDate, formatColombiaDate, getColombiaTime } = require('../../utils/dateUtils');
 
 
 const createInvoice = async (req, res) => {
@@ -168,7 +168,7 @@ const createInvoice = async (req, res) => {
     };
 
     // 🔧 USAR HORA DE COLOMBIA (UTC-5) EN LUGAR DE UTC
-    const colombiaDateTime = getColombiaDateTime();
+    const colombiaDateTime = getColombiaTime();
     const currentDate = formatColombiaDate(getColombiaDate()); // "2025-10-15"
     const currentTime = colombiaDateTime.toFormat('HH:mm:ss'); // "20:36:51"
 

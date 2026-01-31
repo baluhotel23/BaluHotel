@@ -309,3 +309,45 @@ export const getProfitLossReport = (period) => async (dispatch) => {
   }
 };
 
+// ⭐ NUEVA ACCIÓN: Obtener todos los pagos con filtros
+export const getAllPayments = (filters = {}) => async (dispatch) => {
+  dispatch({ type: 'FETCH_ALL_PAYMENTS_REQUEST' });
+  
+  try {
+    // Construir query params
+    const queryParams = new URLSearchParams();
+    
+    if (filters.startDate) queryParams.append('startDate', filters.startDate);
+    if (filters.endDate) queryParams.append('endDate', filters.endDate);
+    if (filters.paymentMethod) queryParams.append('paymentMethod', filters.paymentMethod);
+    if (filters.paymentStatus) queryParams.append('paymentStatus', filters.paymentStatus);
+    if (filters.paymentType) queryParams.append('paymentType', filters.paymentType);
+    if (filters.bookingId) queryParams.append('bookingId', filters.bookingId);
+    if (filters.page) queryParams.append('page', filters.page);
+    if (filters.limit) queryParams.append('limit', filters.limit);
+    
+    const queryString = queryParams.toString();
+    const url = `/financial/payments${queryString ? `?${queryString}` : ''}`;
+    
+    console.log('📥 Obteniendo pagos con filtros:', filters);
+    
+    const { data } = await api.get(url);
+    
+    dispatch({
+      type: 'FETCH_ALL_PAYMENTS_SUCCESS',
+      payload: data.data
+    });
+    
+    return { success: true, data: data.data };
+  } catch (error) {
+    const errorMessage = handleRequestError(error, 'Error al obtener los pagos');
+    
+    dispatch({
+      type: 'FETCH_ALL_PAYMENTS_FAILURE',
+      payload: errorMessage
+    });
+    
+    toast.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+};

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { createRegistrationPass } from "../../Redux/Actions/registerActions";
+import { getBuyerByDocument } from "../../Redux/Actions/taxxaActions";
 import { toast } from "react-toastify";
 import DashboardLayout from "./DashboardLayout"; // ⭐ NUEVO
 
@@ -32,6 +33,11 @@ function Registration({
 
   const [passengers, setPassengers] = useState([]);
   const [formData, setFormData] = useState(initialPassengerState);
+  
+  // ⭐ NUEVOS ESTADOS PARA VALIDACIÓN DE DNI
+  const [isCheckingBuyer, setIsCheckingBuyer] = useState(false);
+  const [buyerFound, setBuyerFound] = useState(false);
+  const [lastCheckedIdNumber, setLastCheckedIdNumber] = useState("");
 
   // ⭐ OBTENER PASAJEROS YA REGISTRADOS DESDE PROPS O REDUX
   const reduxRegisteredPassengers = useSelector((state) => state.registrationPass?.registrationsByBooking?.[bookingId] || []);
@@ -53,6 +59,68 @@ function Registration({
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+    
+    // ⭐ Si cambió el número de identificación, limpiar estado de búsqueda
+    if (name === 'idNumber') {
+      setBuyerFound(false);
+      setLastCheckedIdNumber("");
+    }
+  };
+  
+  // ⭐ NUEVA FUNCIÓN PARA VALIDAR DNI AUTOMÁTICAMENTE
+  const handleCheckBuyer = async () => {
+    const idNumber = formData.idNumber?.trim();
+    
+    if (!idNumber || idNumber === lastCheckedIdNumber) {
+      return;
+    }
+    
+    if (idNumber.length < 6) {
+      toast.warning("El número de identificación debe tener al menos 6 caracteres");
+      return;
+    }
+    
+    setIsCheckingBuyer(true);
+    setLastCheckedIdNumber(idNumber);
+    
+    try {
+      console.log('🔍 Verificando si el cliente existe:', idNumber);
+      
+      const result = await dispatch(getBuyerByDocument(idNumber));
+      
+      if (result.success && result.data) {
+        console.log('✅ Cliente encontrado:', result.data);
+        
+        // ⭐ AUTO-COMPLETAR DATOS DEL CLIENTE
+        setFormData(prev => ({
+          ...prev,
+          name: result.data.scostumername || prev.name,
+          phoneNumber: result.data.stelephone || prev.phoneNumber,
+          address: result.data.saddressline1 || prev.address,
+          idIssuingPlace: result.data.scityname || prev.idIssuingPlace,
+        }));
+        
+        setBuyerFound(true);
+        toast.success(`✅ Cliente encontrado: ${result.data.scostumername}`);
+      } else {
+        console.log('ℹ️ Cliente no encontrado, puede continuar con el registro');
+        setBuyerFound(false);
+        toast.info('Cliente no registrado, puedes completar los datos manualmente');
+      }
+    } catch (error) {
+      console.error('❌ Error al verificar cliente:', error);
+      setBuyerFound(false);
+    } finally {
+      setIsCheckingBuyer(false);
+    }
+  };
+  
+  // ⭐ MANEJAR ENTER EN CAMPO DE DNI
+  const handleIdNumberKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCheckBuyer();
+    }
   };
 
   const handleAddPassenger = () => {
@@ -76,6 +144,11 @@ function Registration({
     const passengerWithBookingId = { ...formData, bookingId };
     setPassengers([...passengers, passengerWithBookingId]);
     setFormData(initialPassengerState);
+    
+    // ⭐ LIMPIAR ESTADOS DE VERIFICACIÓN
+    setBuyerFound(false);
+    setLastCheckedIdNumber("");
+    
     toast.success("Pasajero agregado.");
   };
 
@@ -202,18 +275,41 @@ function Registration({
             👤 Agregar Nuevo Pasajero ({pasajerosDisponibles} disponible{pasajerosDisponibles !== 1 ? 's' : ''}):
           </h3>
           
+          {/* ⭐ MENSAJE CUANDO SE ENCUENTRA UN CLIENTE REGISTRADO */}
+          {buyerFound && (
+            <div className="mb-4 p-4 bg-green-50 border-l-4 border-green-500 rounded-r-lg">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">✅</span>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-green-800 mb-1">Cliente Registrado Encontrado</h4>
+                  <p className="text-sm text-green-700">
+                    Los datos del cliente se han completado automáticamente. Puedes modificar cualquier campo si es necesario.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
             {/* Campos del formulario organizados en grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre *
+                  {buyerFound && formData.name && (
+                    <span className="ml-2 text-xs text-green-600">✓ Auto-completado</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    buyerFound && formData.name ? 'bg-green-50 border-green-300' : 'border-gray-300'
+                  }`}
                   required
+                  placeholder="Nombre completo"
                 />
               </div>
               
@@ -230,15 +326,53 @@ function Registration({
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Número de Identificación *</label>
-                <input
-                  type="text"
-                  name="idNumber"
-                  value={formData.idNumber}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Número de Identificación *
+                  {buyerFound && (
+                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                      ✓ Cliente registrado
+                    </span>
+                  )}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    name="idNumber"
+                    value={formData.idNumber}
+                    onChange={handleChange}
+                    onBlur={handleCheckBuyer}
+                    onKeyPress={handleIdNumberKeyPress}
+                    className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      buyerFound 
+                        ? 'border-green-500 bg-green-50' 
+                        : 'border-gray-300'
+                    }`}
+                    required
+                    placeholder="Ingrese el documento y presione Enter"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCheckBuyer}
+                    disabled={isCheckingBuyer || !formData.idNumber || formData.idNumber.length < 6}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    title="Verificar si el cliente existe"
+                  >
+                    {isCheckingBuyer ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Verificando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🔍</span>
+                        <span>Verificar</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  💡 Ingrese el documento y presione <kbd className="px-2 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Enter</kbd> o haga clic en "Verificar"
+                </p>
               </div>
               
               <div>
@@ -340,25 +474,41 @@ function Registration({
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Teléfono
+                  {buyerFound && formData.phoneNumber && (
+                    <span className="ml-2 text-xs text-green-600">✓ Auto-completado</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   name="phoneNumber"
                   value={formData.phoneNumber}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    buyerFound && formData.phoneNumber ? 'bg-green-50 border-green-300' : 'border-gray-300'
+                  }`}
+                  placeholder="Número de teléfono"
                 />
               </div>
             </div>
             
             <div className="col-span-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Dirección
+                {buyerFound && formData.address && (
+                  <span className="ml-2 text-xs text-green-600">✓ Auto-completado</span>
+                )}
+              </label>
               <textarea
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
                 rows="2"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  buyerFound && formData.address ? 'bg-green-50 border-green-300' : 'border-gray-300'
+                }`}
+                placeholder="Dirección completa"
               />
             </div>
             

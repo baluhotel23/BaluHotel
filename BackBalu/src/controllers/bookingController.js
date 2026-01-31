@@ -8516,7 +8516,268 @@ const validateCancellation = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// 🗑️ ELIMINAR RESERVA COMPLETAMENTE (Solo Owner)
+// � CANCELAR RESERVA CON REEMBOLSO - CASOS EXCEPCIONALES (Solo Owner)
+// ═══════════════════════════════════════════════════════════════
+const cancelBookingWithRefund = async (req, res) => {
+  const transaction = await Booking.sequelize.transaction();
+  
+  try {
+    const { bookingId } = req.params;
+    const { refundReason, refundMethod = 'transfer', notes } = req.body;
+    
+    console.log('💸 [CANCEL-WITH-REFUND] ⭐ CASO EXCEPCIONAL - Cancelación con reembolso');
+    console.log('🕐 [CANCEL-WITH-REFUND] Hora Colombia:', formatForLogs(getColombiaTime()));
+    console.log('📥 [CANCEL-WITH-REFUND] Request:', {
+      bookingId,
+      refundReason,
+      refundMethod,
+      user: req.user?.n_document,
+      role: req.user?.role
+    });
+
+    // ⭐ VALIDACIÓN #1: Solo owner puede ejecutar reembolsos
+    if (req.user?.role !== 'owner') {
+      await transaction.rollback();
+      return res.status(403).json({
+        error: true,
+        message: '🚫 ACCESO DENEGADO: Solo el dueño del hotel puede autorizar reembolsos por fuerza mayor',
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    // ⭐ VALIDACIÓN #2: Debe incluir razón del reembolso
+    if (!refundReason || refundReason.trim() === '') {
+      await transaction.rollback();
+      return res.status(400).json({
+        error: true,
+        message: 'Debe especificar la razón del reembolso (fuerza mayor, emergencia, etc.)',
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    // ⭐ BUSCAR LA RESERVA CON DATOS COMPLETOS
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: Room,
+          as: 'room',
+          attributes: ['roomNumber', 'status', 'available', 'type']
+        },
+        {
+          model: Buyer,
+          as: 'guest',
+          attributes: ['scostumername', 'sdocno', 'semail', 'sphone']
+        },
+        {
+          model: Payment,
+          as: 'payments',
+          attributes: ['paymentId', 'amount', 'paymentMethod', 'paymentStatus', 'paymentType', 'paymentDate']
+        },
+        {
+          model: ExtraCharge,
+          as: 'extraCharges',
+          attributes: ['id', 'amount', 'description']
+        }
+      ],
+      transaction
+    });
+
+    if (!booking) {
+      await transaction.rollback();
+      return res.status(404).json({
+        error: true,
+        message: `Reserva ${bookingId} no encontrada`,
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    console.log('📋 [CANCEL-WITH-REFUND] Reserva encontrada:', {
+      bookingId: booking.bookingId,
+      roomNumber: booking.roomNumber,
+      status: booking.status,
+      totalAmount: booking.totalAmount,
+      guest: booking.guest?.scostumername,
+      checkIn: formatForLogs(toColombiaTime(booking.checkIn)),
+      checkOut: formatForLogs(toColombiaTime(booking.checkOut))
+    });
+
+    // ⭐ VALIDACIÓN #3: No se puede cancelar si ya está checked-in o completed
+    if (booking.status === 'checked-in') {
+      await transaction.rollback();
+      return res.status(400).json({
+        error: true,
+        message: '❌ No se puede cancelar una reserva cuando el huésped ya está hospedado (checked-in)',
+        data: {
+          suggestion: 'Debe hacer checkout primero o esperar a que el huésped se retire',
+          currentStatus: booking.status
+        },
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    if (booking.status === 'completed') {
+      await transaction.rollback();
+      return res.status(400).json({
+        error: true,
+        message: '❌ No se puede cancelar una reserva ya completada',
+        data: {
+          suggestion: 'Esta reserva ya fue finalizada. Contacte con el administrador del sistema',
+          currentStatus: booking.status
+        },
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    // ⭐ CALCULAR PAGOS REALIZADOS
+    const completedPayments = booking.payments?.filter(p => 
+      p.paymentStatus === 'authorized' || p.paymentStatus === 'completed'
+    ) || [];
+
+    const totalPaid = completedPayments.reduce((sum, p) => 
+      sum + parseFloat(p.amount || 0), 0
+    );
+
+    console.log('💰 [CANCEL-WITH-REFUND] Cálculo de pagos:', {
+      totalPaid,
+      paymentsCount: completedPayments.length,
+      totalAmount: booking.totalAmount
+    });
+
+    // ⭐ VALIDACIÓN #4: Debe haber pagos para reembolsar
+    if (totalPaid <= 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        error: true,
+        message: '❌ No hay pagos que reembolsar en esta reserva',
+        data: {
+          totalPaid,
+          suggestion: 'Use la cancelación normal para reservas sin pago'
+        },
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+
+    // ⭐ REGISTRAR EL REEMBOLSO COMO PAGO NEGATIVO
+    const refundPayment = await Payment.create({
+      bookingId,
+      amount: -totalPaid, // ⭐ MONTO NEGATIVO para indicar salida de dinero
+      paymentMethod: refundMethod,
+      paymentType: 'refund',
+      paymentStatus: 'completed',
+      paymentDate: getColombiaTime().toJSDate(),
+      transactionId: `REFUND-${bookingId}-${Date.now()}`,
+      paymentReference: `REEMBOLSO FUERZA MAYOR - ${refundReason}`,
+      notes: `
+🚨 CASO EXCEPCIONAL - REEMBOLSO POR FUERZA MAYOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Razón: ${refundReason}
+Monto reembolsado: $${totalPaid.toLocaleString('es-CO')}
+Autorizado por: ${req.user?.n_document} (Owner)
+Método: ${refundMethod}
+${notes ? `Notas adicionales: ${notes}` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      `.trim(),
+      processedBy: req.user?.n_document,
+      isReservationPayment: false,
+      isCheckoutPayment: false,
+      includesExtras: false
+    }, { transaction });
+
+    console.log('✅ [CANCEL-WITH-REFUND] Reembolso registrado:', {
+      paymentId: refundPayment.paymentId,
+      amount: refundPayment.amount,
+      method: refundMethod
+    });
+
+    // ⭐ ACTUALIZAR ESTADO DE LA RESERVA A CANCELLED
+    await booking.update({
+      status: 'cancelled',
+      notes: `
+${booking.notes || ''}
+
+🚨 CANCELACIÓN EXCEPCIONAL CON REEMBOLSO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Fecha: ${formatForLogs(getColombiaTime())}
+Razón: ${refundReason}
+Monto reembolsado: $${totalPaid.toLocaleString('es-CO')}
+Autorizado por: ${req.user?.n_document} (Owner)
+${notes ? `Notas: ${notes}` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      `.trim()
+    }, { transaction });
+
+    console.log('✅ [CANCEL-WITH-REFUND] Reserva actualizada a cancelled');
+
+    // ⭐ LIBERAR HABITACIÓN
+    if (booking.roomNumber) {
+      await Room.update(
+        {
+          status: null,
+          available: true,
+          updatedAt: new Date()
+        },
+        {
+          where: { roomNumber: booking.roomNumber },
+          transaction
+        }
+      );
+
+      console.log(`🔓 [CANCEL-WITH-REFUND] Habitación ${booking.roomNumber} liberada`);
+    }
+
+    // ⭐ CONFIRMAR TRANSACCIÓN
+    await transaction.commit();
+
+    console.log('🎉 [CANCEL-WITH-REFUND] Proceso completado exitosamente');
+
+    res.json({
+      error: false,
+      success: true,
+      message: '✅ Reserva cancelada y reembolso registrado exitosamente',
+      data: {
+        booking: {
+          bookingId: booking.bookingId,
+          roomNumber: booking.roomNumber,
+          guest: booking.guest?.scostumername,
+          previousStatus: booking.status,
+          newStatus: 'cancelled'
+        },
+        refund: {
+          paymentId: refundPayment.paymentId,
+          amount: totalPaid,
+          method: refundMethod,
+          reason: refundReason,
+          transactionId: refundPayment.transactionId
+        },
+        financial: {
+          originalPayments: completedPayments.length,
+          totalRefunded: totalPaid,
+          refundMethod: refundMethod
+        },
+        room: {
+          number: booking.roomNumber,
+          status: 'Disponible',
+          liberated: true
+        }
+      },
+      timestamp: formatForLogs(getColombiaTime()),
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('❌ [CANCEL-WITH-REFUND] Error:', error);
+    
+    res.status(500).json({
+      error: true,
+      message: 'Error al procesar la cancelación con reembolso',
+      details: error.message,
+      timestamp: formatForLogs(getColombiaTime()),
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// �🗑️ ELIMINAR RESERVA COMPLETAMENTE (Solo Owner)
 // ═══════════════════════════════════════════════════════════════
 const deleteBookingPermanently = async (req, res) => {
   const transaction = await Booking.sequelize.transaction();
@@ -8660,6 +8921,7 @@ module.exports = {
   generateBill,
   updateBookingStatus,
   cancelBooking,
+  cancelBookingWithRefund, // ⭐ NUEVO: Cancelación con reembolso excepcional
   deleteBookingPermanently,
   getCancellationPolicies,
   validateCancellation,

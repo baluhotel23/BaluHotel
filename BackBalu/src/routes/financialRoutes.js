@@ -24,7 +24,8 @@ const {
   getFinancialForecasts,
   getPeriodComparisons,
   getFinancialSettings,
-  updateFinancialSettings
+  updateFinancialSettings,
+  getAllPayments
   } = require("../controllers/financialController");
 // Todas las rutas requieren autenticación
 router.use(verifyToken);
@@ -37,6 +38,9 @@ router.use(verifyToken);
  router.get('/revenue', allowRoles(['owner', 'admin']), getRevenue);
  router.get('/revenue/by-period', allowRoles(['owner', 'admin']), getRevenueByPeriod);
  router.get('/revenue/by-room-type', allowRoles(['owner', 'admin']), getRevenueByRoomType);
+
+// // Gestión de pagos (owner y admin)
+ router.get('/payments', allowRoles(['owner', 'admin']), getAllPayments);
 
 // // Gestión de gastos (owner y admin)
  router.get('/expenses', allowRoles(['owner', 'admin']), getAllExpenses);

@@ -10,6 +10,11 @@ const initialState = {
   revenueByPeriod: null,
   profitLossReport: null,
   
+  // ⭐ NUEVO: Estado para pagos
+  payments: [],
+  paymentsPagination: null,
+  paymentsSummary: null,
+  
   // Estados de UI
   loading: false,
   error: null
@@ -216,6 +221,28 @@ export const financialReducer = (state = initialState, action) => {
         loading: false
       };
     case 'FETCH_PROFIT_LOSS_REPORT_FAILURE':
+      return {
+        ...state,
+        loading: false,
+        error: action.payload
+      };
+    
+    // ⭐ OBTENER TODOS LOS PAGOS CON FILTROS
+    case 'FETCH_ALL_PAYMENTS_REQUEST':
+      return {
+        ...state,
+        loading: true,
+        error: null
+      };
+    case 'FETCH_ALL_PAYMENTS_SUCCESS':
+      return {
+        ...state,
+        payments: action.payload.payments || [],
+        paymentsPagination: action.payload.pagination || null,
+        paymentsSummary: action.payload.summary || null,
+        loading: false
+      };
+    case 'FETCH_ALL_PAYMENTS_FAILURE':
       return {
         ...state,
         loading: false,

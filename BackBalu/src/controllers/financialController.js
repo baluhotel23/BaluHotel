@@ -1,11 +1,13 @@
-const { Expense, Payment, Booking, Bill } = require("../data");
+const { Expense, Payment, Booking, Bill, Buyer, Room } = require("../data");
 const { Op } = require("sequelize");
 const { CustomError } = require("../middleware/error");
 const { 
   parseDate, 
   toJSDate, 
   formatColombiaDate,
-  getColombiaDate 
+  getColombiaDate,
+  formatForLogs,
+  getColombiaTime
 } = require('../utils/dateUtils');
 
 // Dashboard financiero (owner y admin)
@@ -64,16 +66,35 @@ const getSummary = async (req, res, next) => {
 
     console.log("Calculando ingresos para el período:", { startDate, endDate });
 
-    // Obtener ingresos totales
+    // ⭐ CALCULAR INGRESOS BRUTOS (solo pagos positivos - excluir reembolsos)
     const totalRevenue =
       (await Payment.sum("amount", {
         where: {
           paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
           paymentDate: { [Op.between]: [startDate, endDate] },
+          amount: { [Op.gt]: 0 } // ⭐ Solo pagos positivos
         },
       })) || 0;
 
-    console.log("Total de ingresos encontrados:", totalRevenue);
+    // ⭐ CALCULAR REEMBOLSOS TOTALES (pagos negativos por fuerza mayor)
+    const totalRefunds = Math.abs(
+      (await Payment.sum("amount", {
+        where: {
+          paymentStatus: 'completed',
+          paymentDate: { [Op.between]: [startDate, endDate] },
+          amount: { [Op.lt]: 0 } // ⭐ Solo reembolsos (negativos)
+        },
+      })) || 0
+    );
+
+    // ⭐ INGRESOS NETOS = Ingresos brutos - Reembolsos
+    const netRevenue = totalRevenue - totalRefunds;
+
+    console.log("📊 Resumen de ingresos:", { 
+      totalRevenue, 
+      totalRefunds,
+      netRevenue 
+    });
 
     // Métodos de pago
     let paymentMethodsData = {};
@@ -90,6 +111,7 @@ const getSummary = async (req, res, next) => {
           where: {
             paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
             paymentDate: { [Op.between]: [startDate, endDate] },
+            amount: { [Op.gt]: 0 } // ⭐ Excluir reembolsos del desglose por método
           },
           group: ["paymentMethod"],
         });
@@ -119,6 +141,7 @@ const getSummary = async (req, res, next) => {
             paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
             paymentDate: { [Op.between]: [startDate, endDate] },
             paymentMethod: "wompi", // ⭐ Wompi es exclusivo de pagos online
+            amount: { [Op.gt]: 0 } // ⭐ Excluir reembolsos
           },
         })) || 0;
 
@@ -130,6 +153,7 @@ const getSummary = async (req, res, next) => {
             paymentDate: { [Op.between]: [startDate, endDate] },
             paymentType: "online",
             paymentMethod: { [Op.ne]: "wompi" }, // Excluir wompi para no duplicar
+            amount: { [Op.gt]: 0 } // ⭐ Excluir reembolsos
           },
         })) || 0;
 
@@ -206,7 +230,9 @@ const getSummary = async (req, res, next) => {
         period,
         dateRange: { startDate, endDate },
         revenue: {
-          total: totalRevenue,
+          gross: totalRevenue, // ⭐ Ingresos brutos
+          refunds: totalRefunds, // ⭐ Reembolsos realizados
+          net: netRevenue, // ⭐ Ingresos netos (bruto - reembolsos)
           online: onlineRevenue,
           local: localRevenue,
         },
@@ -264,14 +290,28 @@ const getRevenueByPeriod = async (req, res, next) => {
       );
     }
 
-    // Obtener ingresos totales del período usando Payment
+    // ⭐ CALCULAR INGRESOS BRUTOS (excluir reembolsos)
     const totalRevenue =
       (await Payment.sum("amount", {
         where: {
           paymentStatus: { [Op.in]: ['completed', 'authorized', 'partial'] },
           paymentDate: { [Op.between]: [start, end] },
+          amount: { [Op.gt]: 0 } // ⭐ Solo pagos positivos
         },
       })) || 0;
+
+    // ⭐ CALCULAR REEMBOLSOS DEL PERÍODO
+    const totalRefunds = Math.abs(
+      (await Payment.sum("amount", {
+        where: {
+          paymentStatus: 'completed',
+          paymentDate: { [Op.between]: [start, end] },
+          amount: { [Op.lt]: 0 } // ⭐ Solo reembolsos
+        },
+      })) || 0
+    );
+
+    const netRevenue = totalRevenue - totalRefunds;
 
     // Generar array de meses entre las fechas
     const months = [];
@@ -288,14 +328,28 @@ const getRevenueByPeriod = async (req, res, next) => {
       const lastDay = new Date(year, month + 1, 0);
       lastDay.setHours(23, 59, 59, 999);
 
-      // Obtener ingresos del mes usando Payment
+      // ⭐ OBTENER INGRESOS DEL MES (excluir reembolsos)
       const monthRevenue =
         (await Payment.sum("amount", {
           where: {
             paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
             paymentDate: { [Op.between]: [firstDay, lastDay] },
+            amount: { [Op.gt]: 0 } // ⭐ Solo pagos positivos
           },
         })) || 0;
+
+      // ⭐ OBTENER REEMBOLSOS DEL MES
+      const monthRefunds = Math.abs(
+        (await Payment.sum("amount", {
+          where: {
+            paymentStatus: 'completed',
+            paymentDate: { [Op.between]: [firstDay, lastDay] },
+            amount: { [Op.lt]: 0 } // ⭐ Solo reembolsos
+          },
+        })) || 0
+      );
+
+      const monthNetRevenue = monthRevenue - monthRefunds;
 
       // Obtener gastos del mes (gastos + compras)
       const monthExpenses =
@@ -370,12 +424,13 @@ const getRevenueByPeriod = async (req, res, next) => {
 
       // Calcular balance del mes
       const totalMonthExpenses = monthExpenses + monthPurchases;
-      const monthBalance = monthRevenue - totalMonthExpenses;
+      const monthBalance = monthNetRevenue - totalMonthExpenses; // ⭐ Usar ingresos netos
 
       // Obtener número de facturas/pagos procesados
       const paymentCount = await Payment.count({
         where: {
           paymentDate: { [Op.between]: [firstDay, lastDay] },
+          amount: { [Op.gt]: 0 } // ⭐ Excluir reembolsos del conteo
         },
       });
 
@@ -384,6 +439,16 @@ const getRevenueByPeriod = async (req, res, next) => {
         where: {
           paymentStatus: { [Op.in]: ["completed", "authorized", "partial"] },
           paymentDate: { [Op.between]: [firstDay, lastDay] },
+          amount: { [Op.gt]: 0 } // ⭐ Excluir reembolsos del conteo
+        },
+      });
+
+      // ⭐ Conteo de reembolsos del mes
+      const refundCount = await Payment.count({
+        where: {
+          paymentStatus: 'completed',
+          paymentDate: { [Op.between]: [firstDay, lastDay] },
+          amount: { [Op.lt]: 0 }
         },
       });
 
@@ -392,7 +457,9 @@ const getRevenueByPeriod = async (req, res, next) => {
         year,
         month,
         name: new Intl.DateTimeFormat("es", { month: "long" }).format(firstDay),
-        revenue: monthRevenue,
+        revenue: monthRevenue, // ⭐ Ingresos brutos
+        refunds: monthRefunds, // ⭐ Reembolsos del mes
+        netRevenue: monthNetRevenue, // ⭐ Ingresos netos
         expenses: totalMonthExpenses,
         expensesDetail: {
           operationalExpenses: monthExpenses,
@@ -404,6 +471,7 @@ const getRevenueByPeriod = async (req, res, next) => {
         stats: {
           paymentCount,
           completedPaymentCount,
+          refundCount, // ⭐ Número de reembolsos
           completionRate:
             paymentCount > 0 ? (completedPaymentCount / paymentCount) * 100 : 0,
         },
@@ -450,9 +518,11 @@ const getRevenueByPeriod = async (req, res, next) => {
 
     // Calcular totales y promedios
     const totalExpenses = months.reduce((sum, m) => sum + m.expenses, 0);
-    const balance = totalRevenue - totalExpenses;
+    const balance = netRevenue - totalExpenses; // ⭐ Usar ingresos netos
     const averageMonthlyRevenue =
       months.length > 0 ? totalRevenue / months.length : 0;
+    const averageMonthlyNetRevenue =
+      months.length > 0 ? netRevenue / months.length : 0;
     const averageMonthlyExpenses =
       months.length > 0 ? totalExpenses / months.length : 0;
 
@@ -461,10 +531,13 @@ const getRevenueByPeriod = async (req, res, next) => {
       data: bills.length > 0 ? bills : months, // ⭐ Si hay facturas, retornarlas; si no, retornar months
       months, // ⭐ Mantener months por si se necesita
       summary: {
-        totalRevenue,
+        totalRevenue, // ⭐ Ingresos brutos
+        totalRefunds, // ⭐ Total de reembolsos
+        netRevenue, // ⭐ Ingresos netos (bruto - reembolsos)
         totalExpenses,
         balance,
         averageMonthlyRevenue,
+        averageMonthlyNetRevenue, // ⭐ Promedio neto mensual
         averageMonthlyExpenses,
         periodStart: start,
         periodEnd: end,
@@ -882,6 +955,176 @@ const updateFinancialSettings = async (req, res, next) => {
   }
 };
 
+// ⭐ OBTENER TODOS LOS PAGOS CON FILTROS
+const getAllPayments = async (req, res, next) => {
+  try {
+    console.log('💰 [GET-ALL-PAYMENTS] Iniciando consulta');
+    console.log('🕐 [GET-ALL-PAYMENTS] Hora Colombia:', formatForLogs(getColombiaTime()));
+    console.log('📥 [GET-ALL-PAYMENTS] Query params:', req.query);
+
+    const { 
+      startDate, 
+      endDate, 
+      paymentMethod,
+      paymentStatus,
+      paymentType,
+      bookingId,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    // Construir filtros
+    const whereConditions = {};
+
+    // Filtro por rango de fechas
+    if (startDate && endDate) {
+      const start = parseDate(startDate);
+      const end = parseDate(endDate);
+      
+      if (start && end) {
+        whereConditions.paymentDate = {
+          [Op.between]: [toJSDate(start), toJSDate(end)]
+        };
+      }
+    } else if (startDate) {
+      const start = parseDate(startDate);
+      if (start) {
+        whereConditions.paymentDate = {
+          [Op.gte]: toJSDate(start)
+        };
+      }
+    } else if (endDate) {
+      const end = parseDate(endDate);
+      if (end) {
+        whereConditions.paymentDate = {
+          [Op.lte]: toJSDate(end)
+        };
+      }
+    }
+
+    // Filtro por método de pago
+    if (paymentMethod) {
+      whereConditions.paymentMethod = paymentMethod;
+    }
+
+    // Filtro por estado de pago
+    if (paymentStatus) {
+      whereConditions.paymentStatus = paymentStatus;
+    } else {
+      // Por defecto, solo mostrar pagos completados y autorizados
+      whereConditions.paymentStatus = {
+        [Op.in]: ['completed', 'authorized']
+      };
+    }
+
+    // Filtro por tipo de pago
+    if (paymentType) {
+      whereConditions.paymentType = paymentType;
+    }
+
+    // Filtro por reserva específica
+    if (bookingId) {
+      whereConditions.bookingId = bookingId;
+    }
+
+    // Solo pagos positivos (excluir reembolsos negativos)
+    whereConditions.amount = { [Op.gt]: 0 };
+
+    console.log('🔍 [GET-ALL-PAYMENTS] Filtros aplicados:', whereConditions);
+
+    // Calcular offset para paginación
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    // Obtener pagos con información relacionada
+    const { count, rows: payments } = await Payment.findAndCountAll({
+      where: whereConditions,
+      include: [
+        {
+          model: Booking,
+          as: 'booking',
+          attributes: ['bookingId', 'status', 'roomNumber', 'checkIn', 'checkOut'],
+          include: [
+            {
+              model: Room,
+              as: 'room',
+              attributes: ['roomNumber', 'type']
+            },
+            {
+              model: Buyer,
+              as: 'guest',
+              attributes: ['scostumername', 'sdocno', 'selectronicmail']
+            }
+          ]
+        }
+      ],
+      order: [['paymentDate', 'DESC']],
+      limit: parseInt(limit),
+      offset: offset
+    });
+
+    console.log(`✅ [GET-ALL-PAYMENTS] Encontrados ${count} pagos, mostrando ${payments.length}`);
+
+    // Calcular totales
+    const totalAmount = payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+    // Formatear datos para el frontend
+    const formattedPayments = payments.map(payment => ({
+      paymentId: payment.paymentId,
+      amount: parseFloat(payment.amount),
+      paymentMethod: payment.paymentMethod,
+      paymentStatus: payment.paymentStatus,
+      paymentType: payment.paymentType,
+      paymentDate: payment.paymentDate,
+      transactionId: payment.transactionId,
+      paymentReference: payment.paymentReference,
+      processedBy: payment.processedBy,
+      includesExtras: payment.includesExtras,
+      isReservationPayment: payment.isReservationPayment,
+      isCheckoutPayment: payment.isCheckoutPayment,
+      notes: payment.notes,
+      booking: payment.booking ? {
+        bookingId: payment.booking.bookingId,
+        status: payment.booking.status,
+        roomNumber: payment.booking.roomNumber,
+        checkIn: payment.booking.checkIn,
+        checkOut: payment.booking.checkOut,
+        roomType: payment.booking.room?.type,
+        guestName: payment.booking.guest?.scostumername,
+        guestDocument: payment.booking.guest?.sdocno
+      } : null
+    }));
+
+    // Calcular información de paginación
+    const totalPages = Math.ceil(count / parseInt(limit));
+
+    res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Pagos obtenidos exitosamente',
+      data: {
+        payments: formattedPayments,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: totalPages,
+          hasMore: parseInt(page) < totalPages
+        },
+        summary: {
+          totalAmount,
+          count: payments.length,
+          totalCount: count
+        }
+      },
+      timestamp: formatForLogs(getColombiaTime())
+    });
+
+  } catch (error) {
+    console.error('❌ [GET-ALL-PAYMENTS] Error:', error);
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboard,
   getSummary,
@@ -905,4 +1148,5 @@ module.exports = {
   getPeriodComparisons,
   getFinancialSettings,
   updateFinancialSettings,
+  getAllPayments,
 };

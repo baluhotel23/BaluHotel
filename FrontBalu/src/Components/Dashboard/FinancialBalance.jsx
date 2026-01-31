@@ -4,7 +4,8 @@ import {
   getFinancialDashboard, 
   getFinancialSummary,
   getRevenueByPeriod,
-  getProfitLossReport 
+  getProfitLossReport,
+  getAllPayments 
 } from '../../Redux/Actions/financialActions';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { es, } from 'date-fns/locale';
@@ -26,6 +27,9 @@ const FinancialBalance = () => {
     summary, 
     revenueByPeriod, 
     profitLossReport,
+    payments,
+    paymentsPagination,
+    paymentsSummary,
     loading 
   } = useSelector(state => state.financial || {});
 console.log('Resumen financiero:', summary);
@@ -37,6 +41,16 @@ console.log('Resumen financiero:', revenueByPeriod);
     endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd')      // ⭐ Último día del mes actual
   });
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'revenue', 'expenses'
+  
+  // ⭐ NUEVOS ESTADOS PARA FILTROS DE PAGOS
+  const [paymentFilters, setPaymentFilters] = useState({
+    startDate: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+    endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+    paymentMethod: '',
+    bookingId: '',
+    page: 1,
+    limit: 20
+  });
 
   useEffect(() => {
     // Cargar datos iniciales
@@ -53,6 +67,50 @@ console.log('Resumen financiero:', revenueByPeriod);
     dispatch(getRevenueByPeriod(startDate, endDate));
     dispatch(getProfitLossReport(period));
   }, [dispatch, period]);
+  
+  // ⭐ NUEVO: Cargar pagos cuando se selecciona la pestaña de ingresos
+  useEffect(() => {
+    if (activeTab === 'revenue') {
+      dispatch(getAllPayments(paymentFilters));
+    }
+  }, [activeTab, dispatch]);
+  
+  // ⭐ FUNCIÓN PARA APLICAR FILTROS DE PAGOS
+  const handleApplyPaymentFilters = () => {
+    dispatch(getAllPayments(paymentFilters));
+  };
+  
+  // ⭐ FUNCIÓN PARA CAMBIAR PÁGINA DE PAGOS
+  const handlePaymentPageChange = (newPage) => {
+    setPaymentFilters(prev => ({ ...prev, page: newPage }));
+    dispatch(getAllPayments({ ...paymentFilters, page: newPage }));
+  };
+  
+  // ⭐ FUNCIÓN PARA FORMATEAR MÉTODO DE PAGO
+  const formatPaymentMethodLabel = (method) => {
+    const methods = {
+      'cash': 'Efectivo',
+      'credit_card': 'Tarjeta de Crédito',
+      'debit_card': 'Tarjeta de Débito',
+      'transfer': 'Transferencia',
+      'wompi': 'Wompi (Online)',
+      'wompi_checkout': 'Wompi Checkout'
+    };
+    return methods[method] || method;
+  };
+  
+  // ⭐ FUNCIÓN PARA FORMATEAR TIPO DE PAGO
+  const formatPaymentTypeLabel = (type) => {
+    const types = {
+      'full': 'Completo',
+      'partial': 'Parcial',
+      'deposit': 'Anticipo',
+      'final': 'Final',
+      'online': 'Online',
+      'extra_charge': 'Cargo Extra'
+    };
+    return types[type] || type;
+  };
 
   // Formateo de datos para gráficos
   const formatCurrency = (value) => {
@@ -522,74 +580,277 @@ const handleExcelDownload = () => {
 
             {/* Ingresos */}
             {activeTab === 'revenue' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white p-4 rounded-lg shadow-md">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Ingresos: Online vs Local</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart
-                      data={prepareRevenueData()}
-                      margin={{
-                        top: 20,
-                        right: 30,
-                        left: 20,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(value)} />
-                      <Legend />
-                      <Bar dataKey="value" name="Monto" fill="#8884d8" />
-                    </BarChart>
-                  </ResponsiveContainer>
+              <div className="space-y-6">
+                {/* Gráficos existentes */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white p-4 rounded-lg shadow-md">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4">Ingresos: Online vs Local</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart
+                        data={prepareRevenueData()}
+                        margin={{
+                          top: 20,
+                          right: 30,
+                          left: 20,
+                          bottom: 5,
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => formatCurrency(value)} />
+                        <Legend />
+                        <Bar dataKey="value" name="Monto" fill="#8884d8" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg shadow-md">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4">Ingresos por Método de Pago</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={preparePaymentMethodData()}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                          nameKey="name"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {preparePaymentMethodData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatCurrency(value)} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  
+                  <div className="bg-white p-4 rounded-lg shadow-md md:col-span-2">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4">Evolución de Ingresos</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart
+                        data={prepareMonthlyTrendData()}
+                        margin={{
+                          top: 5,
+                          right: 30,
+                          left: 20,
+                          bottom: 5,
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => formatCurrency(value)} />
+                        <Legend />
+                        <Line type="monotone" dataKey="ingresos" stroke="#8884d8" activeDot={{ r: 8 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-lg shadow-md">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Ingresos por Método de Pago</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={preparePaymentMethodData()}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                        nameKey="name"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                {/* ⭐ NUEVA SECCIÓN: LISTADO DE PAGOS */}
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">💳 Listado de Pagos Recibidos</h3>
+                  
+                  {/* Filtros de pagos */}
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio</label>
+                        <input 
+                          type="date" 
+                          value={paymentFilters.startDate}
+                          onChange={(e) => setPaymentFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Fin</label>
+                        <input 
+                          type="date" 
+                          value={paymentFilters.endDate}
+                          onChange={(e) => setPaymentFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pago</label>
+                        <select 
+                          value={paymentFilters.paymentMethod}
+                          onChange={(e) => setPaymentFilters(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Todos</option>
+                          <option value="cash">Efectivo</option>
+                          <option value="credit_card">Tarjeta de Crédito</option>
+                          <option value="debit_card">Tarjeta de Débito</option>
+                          <option value="transfer">Transferencia</option>
+                          <option value="wompi">Wompi</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Reserva ID</label>
+                        <input 
+                          type="text" 
+                          placeholder="Ej: 123"
+                          value={paymentFilters.bookingId}
+                          onChange={(e) => setPaymentFilters(prev => ({ ...prev, bookingId: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={handleApplyPaymentFilters}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center"
                       >
-                        {preparePaymentMethodData().map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => formatCurrency(value)} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                
-                <div className="bg-white p-4 rounded-lg shadow-md md:col-span-2">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Evolución de Ingresos</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart
-                      data={prepareMonthlyTrendData()}
-                      margin={{
-                        top: 5,
-                        right: 30,
-                        left: 20,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(value)} />
-                      <Legend />
-                      <Line type="monotone" dataKey="ingresos" stroke="#8884d8" activeDot={{ r: 8 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                        <FaFilter className="mr-2" /> Aplicar Filtros
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPaymentFilters({
+                            startDate: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+                            endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+                            paymentMethod: '',
+                            bookingId: '',
+                            page: 1,
+                            limit: 20
+                          });
+                          dispatch(getAllPayments({
+                            startDate: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+                            endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+                            page: 1,
+                            limit: 20
+                          }));
+                        }}
+                        className="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600 transition-colors"
+                      >
+                        Limpiar
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Resumen de pagos */}
+                  {paymentsSummary && (
+                    <div className="mb-4 p-3 bg-blue-50 rounded-lg flex justify-between items-center">
+                      <div>
+                        <span className="text-sm text-gray-600">Total de Pagos: </span>
+                        <span className="font-semibold text-gray-800">{paymentsSummary.totalCount || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Monto Total: </span>
+                        <span className="font-semibold text-green-600">{formatCurrency(paymentsSummary.totalAmount || 0)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tabla de pagos */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Fecha
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Reserva
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Huésped
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Habitación
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Método
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Tipo
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Monto
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {payments && payments.length > 0 ? (
+                          payments.map((payment) => (
+                            <tr key={payment.paymentId} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                {format(new Date(payment.paymentDate), 'dd/MM/yyyy HH:mm')}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                <span className="font-medium">#{payment.booking?.bookingId || 'N/A'}</span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-900">
+                                {payment.booking?.guestName || 'N/A'}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {payment.booking?.roomNumber || 'N/A'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                  payment.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' :
+                                  payment.paymentMethod === 'credit_card' || payment.paymentMethod === 'debit_card' ? 'bg-blue-100 text-blue-800' :
+                                  payment.paymentMethod === 'transfer' ? 'bg-purple-100 text-purple-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {formatPaymentMethodLabel(payment.paymentMethod)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                {formatPaymentTypeLabel(payment.paymentType)}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-green-600">
+                                {formatCurrency(payment.amount)}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                              {loading ? 'Cargando pagos...' : 'No se encontraron pagos en el período seleccionado'}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Paginación */}
+                  {paymentsPagination && paymentsPagination.totalPages > 1 && (
+                    <div className="mt-4 flex justify-between items-center">
+                      <div className="text-sm text-gray-600">
+                        Mostrando {payments?.length || 0} de {paymentsPagination.total} pagos
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handlePaymentPageChange(paymentsPagination.page - 1)}
+                          disabled={paymentsPagination.page === 1}
+                          className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Anterior
+                        </button>
+                        <span className="px-4 py-2 text-sm text-gray-700">
+                          Página {paymentsPagination.page} de {paymentsPagination.totalPages}
+                        </span>
+                        <button
+                          onClick={() => handlePaymentPageChange(paymentsPagination.page + 1)}
+                          disabled={!paymentsPagination.hasMore}
+                          className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Siguiente
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

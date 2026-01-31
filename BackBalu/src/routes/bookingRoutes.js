@@ -18,6 +18,7 @@ const {
     generateBill,
     updateBookingStatus,
     cancelBooking,
+    cancelBookingWithRefund, // ⭐ NUEVO: Cancelación con reembolso excepcional
     deleteBookingPermanently,
     getCancellationPolicies,
     validateCancellation,
@@ -98,6 +99,10 @@ router.put('/:bookingId/status', allowRoles(['owner', 'recept', 'receptionist'])
 // ⭐ CANCELACIONES ADMINISTRATIVAS
 // Solo owner y recepcionistas pueden cancelar reservas (admin solo puede ver)
 router.put('/:bookingId/cancel', allowRoles(['owner', 'recept', 'receptionist']), cancelBooking);
+
+// ⭐ CANCELACIÓN CON REEMBOLSO - CASOS EXCEPCIONALES (Solo Owner)
+// Esta ruta maneja situaciones de fuerza mayor donde se debe devolver el dinero
+router.post('/:bookingId/cancel-with-refund', allowRoles(['owner']), cancelBookingWithRefund);
 
 // ⭐ ELIMINACIÓN PERMANENTE (Solo Owner)
 router.delete('/:bookingId/permanent', allowRoles(['owner']), deleteBookingPermanently);
