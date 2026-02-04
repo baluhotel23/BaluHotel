@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   getFinancialDashboard, 
@@ -7,7 +7,7 @@ import {
   getProfitLossReport,
   getAllPayments 
 } from '../../Redux/Actions/financialActions';
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format,  startOfMonth, endOfMonth } from 'date-fns';
 import { es, } from 'date-fns/locale';
 import { parseISO, isValid } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -16,24 +16,30 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Area, AreaChart
 } from 'recharts';
-import { FaDownload, FaFilter, FaChartLine } from 'react-icons/fa';
+import { FaDownload, FaFilter } from 'react-icons/fa';
 import DashboardLayout from '../Dashboard/DashboardLayout';
-import { CSVLink } from 'react-csv';
+
 
 const FinancialBalance = () => {
   const dispatch = useDispatch();
   const { 
-    dashboard, 
+     
     summary, 
     revenueByPeriod, 
-    profitLossReport,
+    
     payments,
     paymentsPagination,
     paymentsSummary,
     loading 
   } = useSelector(state => state.financial || {});
-console.log('Resumen financiero:', summary);
-console.log('Resumen financiero:', revenueByPeriod);
+console.log('📊 [FINANCIAL-COMPONENT] Resumen financiero completo:', summary);
+console.log('📊 [FINANCIAL-COMPONENT] Revenue structure:', {
+  revenue: summary?.revenue,
+  hasTotal: summary?.revenue?.total !== undefined,
+  hasNet: summary?.revenue?.net !== undefined,
+  hasGross: summary?.revenue?.gross !== undefined
+});
+console.log('📊 [FINANCIAL-COMPONENT] Revenue by period:', revenueByPeriod);
   // Estados para filtros
   const [period, setPeriod] = useState('month');
   const [dateRange, setDateRange] = useState({
@@ -292,7 +298,7 @@ const handleExcelDownload = () => {
     data.push(['Período', 'Ingresos Totales', 'Gastos Totales', 'Balance']);
     
     // Añadir datos de resumen
-    const totalRevenue = summary?.revenue?.total || 0;
+    const totalRevenue = summary?.revenue?.net || summary?.revenue?.gross || 0;
     const totalExpenses = (summary?.expenses?.total || 0) + (summary?.purchases?.total || 0);
     const balance = totalRevenue - totalExpenses;
     
@@ -415,7 +421,7 @@ const handleExcelDownload = () => {
             <div className="bg-white p-4 rounded-lg shadow-md">
               <h2 className="text-lg font-semibold text-gray-700 mb-4">Ingresos Totales</h2>
               <div className="text-3xl font-bold text-green-600">
-                {formatCurrency(summary.revenue?.total || 0)}
+                {formatCurrency(summary.revenue?.net || summary.revenue?.gross || 0)}
               </div>
               <div className="mt-2 text-sm text-gray-500">
                 Online: {formatCurrency(summary.revenue?.online || 0)}
@@ -438,11 +444,11 @@ const handleExcelDownload = () => {
             </div>
             <div className="bg-white p-4 rounded-lg shadow-md">
               <h2 className="text-lg font-semibold text-gray-700 mb-4">Balance</h2>
-              <div className={`text-3xl font-bold ${(summary.revenue?.total || 0) - ((summary.expenses?.total || 0) + (summary.purchases?.total || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency((summary.revenue?.total || 0) - ((summary.expenses?.total || 0) + (summary.purchases?.total || 0)))}
+              <div className={`text-3xl font-bold ${((summary.revenue?.net || summary.revenue?.gross || 0) - ((summary.expenses?.total || 0) + (summary.purchases?.total || 0))) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency((summary.revenue?.net || summary.revenue?.gross || 0) - ((summary.expenses?.total || 0) + (summary.purchases?.total || 0)))}
               </div>
               <div className="mt-2 text-sm text-gray-500">
-                Margen: {(((summary.revenue?.total || 0) / Math.max(1, (summary.expenses?.total || 0) + (summary.purchases?.total || 0))) * 100).toFixed(2)}%
+                Margen: {((((summary.revenue?.net || summary.revenue?.gross || 0)) / Math.max(1, (summary.expenses?.total || 0) + (summary.purchases?.total || 0))) * 100).toFixed(2)}%
               </div>
             </div>
           </div>
