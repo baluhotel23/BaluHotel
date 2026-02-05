@@ -529,6 +529,7 @@ const LocalBookingForm = () => {
     showBuyerPopup: false,
     showBookingModal: false, // ⭐ NUEVO: Modal de detalles de reserva
     currentStep: "search", // search, booking, payment
+    creatingBooking: false, // ⭐ PROTECCIÓN CONTRA MÚLTIPLES CLICKS
   });
 
   // ⭐ VALORES COMPUTADOS
@@ -716,6 +717,12 @@ const LocalBookingForm = () => {
   }, []);
 
   const handleCreateBooking = useCallback(async () => {
+    // ⭐ PROTECCIÓN: Prevenir múltiples clicks
+    if (uiState.creatingBooking) {
+      toast.warning('⏳ Ya se está procesando la reserva, por favor espere...');
+      return;
+    }
+
     // ❌ Bloquear creación de reservas Local para admin (solo visualiza)
     if (user?.role === 'admin') {
       toast.error('No tienes permisos para crear reservas desde el panel administrativo');
@@ -784,6 +791,9 @@ const LocalBookingForm = () => {
           }
         : null,
     };
+    // ⭐ INICIAR PROCESAMIENTO
+    setUiState((prev) => ({ ...prev, creatingBooking: true }));
+
     try {
       const result = await dispatch(createBooking(bookingData));
 
@@ -829,6 +839,9 @@ const LocalBookingForm = () => {
     } catch (error) {
       console.error("Error creating booking:", error);
       toast.error("Error al crear la reserva.");
+    } finally {
+      // ⭐ FINALIZAR PROCESAMIENTO (siempre, incluso si hay error)
+      setUiState((prev) => ({ ...prev, creatingBooking: false }));
     }
   }, [
     selectedRoom,
@@ -837,6 +850,7 @@ const LocalBookingForm = () => {
     searchParams,
     totalGuests,
     dispatch,
+    uiState.creatingBooking,
   ]);
 
   const handleProcessPayment = useCallback(async () => {
@@ -1103,6 +1117,7 @@ const LocalBookingForm = () => {
       showBuyerPopup: false,
       showBookingModal: false, // ⭐ CERRAR MODAL
       currentStep: "search",
+      creatingBooking: false, // ⭐ RESETEAR ESTADO
     });
 
     const today = new Date();
@@ -1509,11 +1524,19 @@ const LocalBookingForm = () => {
                     !guestInfo.buyerSdocno ||
                     bookingState.totalAmount <= 0 ||
                     totalGuests === 0 ||
-                    guestInfo.adults < 1
+                    guestInfo.adults < 1 ||
+                    uiState.creatingBooking
                   }
                   className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 transform hover:-translate-y-0.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  ✅ Confirmar y Crear Reserva
+                  {uiState.creatingBooking ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Creando Reserva...
+                    </div>
+                  ) : (
+                    "✅ Confirmar y Crear Reserva"
+                  )}
                 </button>
               </div>
             </div>
