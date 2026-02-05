@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import  { useEffect } from "react";
 import { useCheckOutLogic } from "../../hooks/useCheckOutLogic";
 import CheckOutHeader from "./CheckOutHeader";
 import CheckOutFilters from "./CheckOutFilters";
@@ -55,8 +55,8 @@ const CheckOut = () => {
     handleOpenExtraCharges,
     handleExtraChargeSuccess,
     findBookingById,
-    processPaymentResult,
-    reloadSpecificBooking,
+    processPaymentResult
+    
   } = useCheckOutLogic();
 
   // ✅ LOG BÁSICO DEL ESTADO

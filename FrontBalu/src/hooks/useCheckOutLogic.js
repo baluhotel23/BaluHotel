@@ -191,7 +191,13 @@ export const useCheckOutLogic = () => {
     console.log("🔄 [CHECK-OUT] Cargando reservas...");
     setIsLoading(true);
     try {
-      const result = await dispatch(getAllBookings({ includeInventory: false }));
+      // ⭐ NO ENVIAR FILTROS DE FECHA - Necesitamos TODAS las reservas activas
+      // para poder mostrar checkout anticipado de reservas con estado "checked-in"
+      // independientemente de su fecha de checkout programada
+      const result = await dispatch(getAllBookings({ 
+        includeInventory: false,
+        // Sin fromDate/toDate para obtener TODAS las reservas
+      }));
       console.log("✅ [CHECK-OUT] Reservas cargadas desde Redux:", result);
     } catch (error) {
       console.error("❌ [CHECK-OUT] Error loading bookings:", error);

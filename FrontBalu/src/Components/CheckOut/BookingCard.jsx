@@ -337,33 +337,7 @@ const BookingCard = ({
             </div>
           )}
         </div>
-        {/* Debug info en desarrollo */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-            <details>
-              <summary className="cursor-pointer hover:text-gray-800 font-medium">
-                🔧 Debug Info - Booking #{booking.bookingId}
-              </summary>
-              <div className="mt-2 space-y-1">
-                <div><strong>Estado:</strong> {booking.status}</div>
-                <div><strong>Días hasta checkout:</strong> {daysUntilCheckOut}</div>
-                <div><strong>Pago completo:</strong> {financials.isFullyPaid ? '✅' : '❌'}</div>
-                <div><strong>Total final:</strong> {formatCurrency(financials.totalFinal)}</div>
-                <div><strong>Total pagado:</strong> {formatCurrency(financials.totalPagado)}</div>
-                <div><strong>Pendiente:</strong> {formatCurrency(financials.totalPendiente)}</div>
-                <div><strong>Acción principal:</strong> {financials.isFullyPaid ? 'CHECK-OUT' : 'PAGO'}</div>
-                <div><strong>Handlers disponibles:</strong></div>
-                <div className="ml-4">
-                  <div>• onPaymentClick: {typeof onPaymentClick}</div>
-                  <div>• onExtraChargesClick: {typeof onExtraChargesClick}</div>
-                  <div>• onCheckOut: {typeof onCheckOut}</div>
-                  <div>• onEarlyCheckOut: {typeof onEarlyCheckOut}</div>
-                  <div>• onGenerateBill: {typeof onGenerateBill}</div>
-                </div>
-              </div>
-            </details>
-          </div>
-        )}
+       
       </div>
     </div>
   );
