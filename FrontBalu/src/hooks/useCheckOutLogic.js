@@ -458,15 +458,9 @@ export const useCheckOutLogic = () => {
     try {
       console.log("🧾 [GENERATE-BILL] Iniciando:", booking.bookingId);
 
-      const billData = {
-        bookingId: booking.bookingId,
-        includeExtras: true,
-        paymentMethod: financials.isFullyPaid ? "mixed" : "pending",
-        generatePDF: true,
-        applyDiscounts: true
-      };
-
-      const result = await dispatch(generateBill(billData));
+      // ⭐ CORREGIR: La acción generateBill solo necesita el bookingId (número)
+      // El backend ya maneja automáticamente extras, descuentos, etc.
+      const result = await dispatch(generateBill(booking.bookingId));
       
       if (result?.error) {
         throw new Error(result.message || "Error al generar factura");
