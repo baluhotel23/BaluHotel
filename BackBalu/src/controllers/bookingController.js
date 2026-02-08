@@ -4133,13 +4133,9 @@ const checkInGuest = async (req, res, next) => {
     // ⭐ VALIDAR ESTADOS CORRECTOS SEGÚN TU MODELO ROOM
     // Estados válidos para check-in: null (Disponible), "Limpia", "Reservada"
     // Estados que impiden check-in: "Mantenimiento"
-    // "Ocupada" es permitida SOLO si ya está checked-in (re-check-in/completar check-in)
-    const validStatesForCheckIn = [null, "Limpia", "Reservada"];
     const invalidStatesForCheckIn = ["Mantenimiento"];
     
     // ⭐ PERMITIR CHECK-IN IDEMPOTENTE
-    // Si la habitación está "Ocupada" pero la reserva ya está "checked-in", permitir (re-check-in)
-    const isAlreadyCheckedIn = booking.status === "checked-in";
     const isRoomOccupied = booking.room.status === "Ocupada";
     
     if (invalidStatesForCheckIn.includes(booking.room.status)) {
@@ -4154,19 +4150,84 @@ const checkInGuest = async (req, res, next) => {
       });
     }
     
-    // ⭐ SI LA HABITACIÓN ESTÁ OCUPADA, SOLO PERMITIR SI ES RE-CHECK-IN DE LA MISMA RESERVA
-    if (isRoomOccupied && !isAlreadyCheckedIn) {
-      console.log(
-        "❌ [CHECK-IN-GUEST] Habitación ocupada por otra reserva"
-      );
-      return res.status(400).json({
-        error: true,
-        message: `La habitación no está disponible para check-in. Estado actual: ${booking.room.status}`,
-        timestamp: formatForLogs(getColombiaTime()),
+    // ⭐ SI LA HABITACIÓN ESTÁ OCUPADA, VERIFICAR SI ES POR ESTA MISMA RESERVA
+    if (isRoomOccupied && !forceCheckIn) {
+      console.log("⚠️ [CHECK-IN-GUEST] Habitación ocupada, verificando si es por esta reserva...");
+      
+      // Buscar reserva activa en esta habitación con detalles completos
+      const activeBookingInRoom = await Booking.findOne({
+        where: {
+          roomNumber: booking.roomNumber,
+          status: "checked-in",
+          bookingId: { [Op.ne]: bookingId } // Que NO sea esta misma reserva
+        },
+        include: [
+          {
+            model: Buyer,
+            as: "guest",
+            attributes: ["scostumername", "sdocno"]
+          }
+        ]
       });
+      
+      if (activeBookingInRoom) {
+        // Hay OTRA reserva ocupando esta habitación
+        console.log(
+          "❌ [CHECK-IN-GUEST] Habitación ocupada por otra reserva:",
+          {
+            conflictBookingId: activeBookingInRoom.bookingId,
+            conflictGuest: activeBookingInRoom.guest?.scostumername,
+            conflictCheckIn: formatColombiaDate(activeBookingInRoom.checkIn),
+            conflictCheckOut: formatColombiaDate(activeBookingInRoom.checkOut),
+            currentBookingId: bookingId,
+            currentCheckIn: formatColombiaDate(booking.checkIn)
+          }
+        );
+        
+        const now = getColombiaTime();
+        const conflictCheckOut = toColombiaTime(activeBookingInRoom.checkOut);
+        const isConflictOverdue = now > conflictCheckOut;
+        
+        return res.status(400).json({
+          error: true,
+          message: `La habitación ${booking.roomNumber} está ocupada por otra reserva activa.`,
+          data: {
+            currentRoomStatus: booking.room.status,
+            conflictingBooking: {
+              bookingId: activeBookingInRoom.bookingId,
+              guestName: activeBookingInRoom.guest?.scostumername || "Desconocido",
+              checkIn: formatColombiaDate(activeBookingInRoom.checkIn),
+              checkOut: formatColombiaDate(activeBookingInRoom.checkOut),
+              isOverdue: isConflictOverdue,
+              daysOverdue: isConflictOverdue ? Math.ceil(now.diff(conflictCheckOut, 'days').days) : 0
+            },
+            requestedBooking: {
+              bookingId: booking.bookingId,
+              guestName: booking.guest?.scostumername || "Desconocido",
+              checkIn: formatColombiaDate(booking.checkIn),
+              checkOut: formatColombiaDate(booking.checkOut)
+            },
+            solution: isConflictOverdue 
+              ? `La reserva ${activeBookingInRoom.bookingId} está vencida (debió hacer checkout el ${formatColombiaDate(activeBookingInRoom.checkOut)}). Procese el checkout primero.`
+              : `Complete el checkout de la reserva ${activeBookingInRoom.bookingId} antes de hacer este check-in.`,
+            alternatives: [
+              `1. Hacer checkout de reserva ${activeBookingInRoom.bookingId}`,
+              `2. Cambiar habitación de reserva ${bookingId}`,
+              `3. Usar forceCheckIn: true (solo en casos excepcionales)`
+            ]
+          },
+          timestamp: formatForLogs(getColombiaTime()),
+        });
+      }
+      
+      // La habitación está ocupada pero no hay otra reserva checked-in
+      // Probablemente se marcó manualmente - PERMITIR check-in
+      console.log(
+        "ℹ️ [CHECK-IN-GUEST] Habitación marcada como ocupada pero sin reserva activa - permitiendo check-in"
+      );
     }
     
-    if (isAlreadyCheckedIn) {
+    if (isReCheckIn) {
       console.log(
         "ℹ️ [CHECK-IN-GUEST] Reserva ya tiene check-in, permitiendo re-check-in/completar check-in"
       );
@@ -4174,7 +4235,8 @@ const checkInGuest = async (req, res, next) => {
 
     console.log("✅ [CHECK-IN-GUEST] Habitación disponible para check-in:", {
       roomStatus: booking.room.status,
-      isValidState: validStatesForCheckIn.includes(booking.room.status)
+      bookingStatus: booking.status,
+      isReCheckIn
     });
 
     // ⭐ PROCESAR INVENTARIO AUTOMÁTICO CON LOGS DETALLADOS
