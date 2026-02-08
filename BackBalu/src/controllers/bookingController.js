@@ -3902,16 +3902,25 @@ const checkInGuest = async (req, res, next) => {
     });
 
     // ⭐ VALIDACIONES DE ESTADO CON LOGS DETALLADOS
-    if (!["confirmed", "paid"].includes(booking.status)) {
+    // Permitir check-in para: confirmed, paid, Y TAMBIÉN checked-in (re-check-in/completar)
+    if (!["confirmed", "paid", "checked-in"].includes(booking.status)) {
       console.log(
         "❌ [CHECK-IN-GUEST] Estado de reserva inválido:",
         booking.status
       );
       return res.status(400).json({
         error: true,
-        message: `Solo se pueden hacer check-in a reservas confirmadas o pagadas. Estado actual: ${booking.status}`,
+        message: `Solo se pueden hacer check-in a reservas confirmadas, pagadas o para completar check-in. Estado actual: ${booking.status}`,
         timestamp: formatForLogs(getColombiaTime()),
       });
+    }
+    
+    const isReCheckIn = booking.status === "checked-in";
+    if (isReCheckIn) {
+      console.log(
+        "ℹ️ [CHECK-IN-GUEST] Completando check-in existente para reserva:",
+        bookingId
+      );
     }
 
     // ⭐ VALIDAR FECHAS DE CHECK-IN CON UTILIDADES DE COLOMBIA
@@ -4048,6 +4057,45 @@ const checkInGuest = async (req, res, next) => {
     });
 
     if (existingInventory) {
+      // ⭐ SI ES RE-CHECK-IN, PERMITIR CONTINUAR SIN ASIGNAR MÁS INVENTARIO
+      if (isReCheckIn) {
+        console.log("ℹ️ [CHECK-IN-GUEST] Re-check-in: Ya tiene inventario asignado, continuando sin asignar más");
+        // Actualizar datos de check-in sin tocar inventario
+        await booking.update({
+          status: "checked-in",
+          actualCheckIn: booking.actualCheckIn || getColombiaTime().toJSDate(),
+          inventoryVerified: true,
+          inventoryVerifiedAt: getColombiaTime().toJSDate(),
+        });
+        
+        console.log("✅ [CHECK-IN-GUEST] Re-check-in completado exitosamente");
+        
+        return res.json({
+          error: false,
+          message: "Check-in completado exitosamente (reserva ya tenía check-in previo)",
+          data: {
+            booking: {
+              bookingId: booking.bookingId,
+              status: "checked-in",
+              actualCheckIn: formatForLogs(booking.actualCheckIn || getColombiaTime()),
+              roomNumber: booking.room?.roomNumber || booking.roomNumber,
+              guestName: booking.guest?.scostumername,
+            },
+            room: {
+              roomNumber: booking.room.roomNumber,
+              status: booking.room.status,
+            },
+            inventory: {
+              hasInventoryAssigned: true,
+              note: "Inventario previamente asignado"
+            },
+            isReCheckIn: true
+          },
+          timestamp: formatForLogs(getColombiaTime()),
+        });
+      }
+      
+      // Si NO es re-check-in y ya tiene inventario, rechazar
       console.log("⚠️ [CHECK-IN-GUEST] Ya tiene inventario asignado");
       return res.status(400).json({
         error: true,
@@ -4084,9 +4132,15 @@ const checkInGuest = async (req, res, next) => {
 
     // ⭐ VALIDAR ESTADOS CORRECTOS SEGÚN TU MODELO ROOM
     // Estados válidos para check-in: null (Disponible), "Limpia", "Reservada"
-    // Estados que impiden check-in: "Mantenimiento", "Ocupada"
+    // Estados que impiden check-in: "Mantenimiento"
+    // "Ocupada" es permitida SOLO si ya está checked-in (re-check-in/completar check-in)
     const validStatesForCheckIn = [null, "Limpia", "Reservada"];
-    const invalidStatesForCheckIn = ["Mantenimiento", "Ocupada"];
+    const invalidStatesForCheckIn = ["Mantenimiento"];
+    
+    // ⭐ PERMITIR CHECK-IN IDEMPOTENTE
+    // Si la habitación está "Ocupada" pero la reserva ya está "checked-in", permitir (re-check-in)
+    const isAlreadyCheckedIn = booking.status === "checked-in";
+    const isRoomOccupied = booking.room.status === "Ocupada";
     
     if (invalidStatesForCheckIn.includes(booking.room.status)) {
       console.log(
@@ -4098,6 +4152,24 @@ const checkInGuest = async (req, res, next) => {
         message: `La habitación no está disponible para check-in. Estado actual: ${booking.room.status}`,
         timestamp: formatForLogs(getColombiaTime()),
       });
+    }
+    
+    // ⭐ SI LA HABITACIÓN ESTÁ OCUPADA, SOLO PERMITIR SI ES RE-CHECK-IN DE LA MISMA RESERVA
+    if (isRoomOccupied && !isAlreadyCheckedIn) {
+      console.log(
+        "❌ [CHECK-IN-GUEST] Habitación ocupada por otra reserva"
+      );
+      return res.status(400).json({
+        error: true,
+        message: `La habitación no está disponible para check-in. Estado actual: ${booking.room.status}`,
+        timestamp: formatForLogs(getColombiaTime()),
+      });
+    }
+    
+    if (isAlreadyCheckedIn) {
+      console.log(
+        "ℹ️ [CHECK-IN-GUEST] Reserva ya tiene check-in, permitiendo re-check-in/completar check-in"
+      );
     }
 
     console.log("✅ [CHECK-IN-GUEST] Habitación disponible para check-in:", {
