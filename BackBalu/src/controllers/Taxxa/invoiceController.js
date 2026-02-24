@@ -94,10 +94,24 @@ const getAllInvoices = async (req, res) => {
     const {
       page = 1,
       limit = 10,
-      status = 'sent'
+      status = 'sent',
+      search = ''
     } = req.query;
 
     const offset = (page - 1) * limit;
+    
+    // 🔍 CONSTRUIR WHERE CLAUSE CON BÚSQUEDA
+    const whereClause = { status };
+    
+    if (search && search.trim() !== '') {
+      console.log(`🔍 Búsqueda activada: "${search}"`);
+      whereClause[Op.or] = [
+        { invoiceSequentialNumber: { [Op.iLike]: `%${search}%` } },
+        { prefix: { [Op.iLike]: `%${search}%` } },
+        { buyerName: { [Op.iLike]: `%${search}%` } },
+        { buyerEmail: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
     
     // 🔧 VERIFICAR ASOCIACIONES DISPONIBLES
     console.log('🔍 Verificando asociaciones disponibles:');
@@ -172,7 +186,7 @@ const getAllInvoices = async (req, res) => {
     console.log(`🔧 Usando ${includes.length} includes en la consulta`);
 
     const { count, rows: invoices } = await Invoice.findAndCountAll({
-      where: { status },
+      where: whereClause,
       include: includes,
       order: [['sentToTaxxaAt', 'DESC']],
       limit: parseInt(limit),

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { getAllInvoices, createCreditNote } from '../../Redux/Actions/taxxaActions';
 import { toast } from 'react-toastify';
+import { FaSearch, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import DashboardLayout from '../Dashboard/DashboardLayout';
 
 const InvoiceList = () => {
@@ -9,6 +10,11 @@ const InvoiceList = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
   const [retryAttempts, setRetryAttempts] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit] = useState(12); // Facturas por página
+  const [totalInvoices, setTotalInvoices] = useState(0);
+  
   const [creditNoteData, setCreditNoteData] = useState({
     creditReason: '1',
     amount: '',
@@ -20,9 +26,29 @@ const InvoiceList = () => {
   const loading = useSelector((state) => state.taxxa?.loadingInvoices || false);
   const error = useSelector((state) => state.taxxa?.invoicesError || null);
 
-  const loadInvoices = async () => {
+  const loadInvoices = async (page = currentPage, search = searchTerm) => {
     try {
-      await dispatch(getAllInvoices());
+      const params = {
+        page,
+        limit,
+        status: 'sent'
+      };
+      
+      // ⭐ Agregar búsqueda si existe
+      if (search && search.trim() !== '') {
+        params.search = search.trim();
+      }
+      
+      const result = await dispatch(getAllInvoices(params));
+      
+      // ⭐ El action retorna { data, pagination, success, message }
+      if (result?.pagination) {
+        setTotalInvoices(result.pagination.totalItems || 0);
+      } else {
+        // Fallback si no hay paginación (lista completa)
+        setTotalInvoices(invoices.length);
+      }
+      
       setRetryAttempts(0); // Reset en éxito
     } catch (error) {
       console.error('Error cargando facturas:', error);
@@ -30,7 +56,7 @@ const InvoiceList = () => {
         setRetryAttempts(prev => prev + 1);
         setTimeout(() => {
           console.log(`🔄 Reintentando cargar facturas (intento ${retryAttempts + 1}/3)`);
-          loadInvoices();
+          loadInvoices(page, search);
         }, 2000);
       } else {
         toast.error('Error al cargar las facturas después de varios intentos');
@@ -39,8 +65,28 @@ const InvoiceList = () => {
   };
 
   useEffect(() => {
-    loadInvoices();
-  }, [dispatch]);
+    loadInvoices(currentPage, searchTerm);
+  }, [currentPage]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setCurrentPage(1); // Volver a la primera página al buscar
+    loadInvoices(1, searchTerm);
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setCurrentPage(1);
+    loadInvoices(1, '');
+  };
+
+  const totalPages = Math.ceil(totalInvoices / limit);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
 
 
   const handleCreateCreditNote = async () => {
@@ -61,7 +107,7 @@ const InvoiceList = () => {
         setShowCreditNoteModal(false);
         setSelectedInvoice(null);
         setCreditNoteData({ creditReason: '1', amount: '', description: '' });
-        dispatch(getAllInvoices()); // Recargar lista
+        loadInvoices(); // Recargar lista con parámetros actuales
       }
     } catch (error) {
       console.error('Error creando nota de crédito:', error);
@@ -121,6 +167,52 @@ const InvoiceList = () => {
           <p className="text-gray-600 mt-2">
             Listado de facturas enviadas exitosamente a Taxxa
           </p>
+        </div>
+
+        {/* 🔍 BUSCADOR Y FILTROS */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <form onSubmit={handleSearch} className="flex gap-3">
+            <div className="flex-1 relative">
+              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por número de factura (ej: SETT1, 001, 123)..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              {loading ? '⏳ Buscando...' : '🔍 Buscar'}
+            </button>
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                ✕ Limpiar
+              </button>
+            )}
+          </form>
+
+          {/* CONTADOR */}
+          <div className="mt-3 text-sm text-gray-600 flex justify-between items-center">
+            <span>
+              {searchTerm ? (
+                <>Resultados encontrados: <strong>{totalInvoices}</strong></>
+              ) : (
+                <>Total de facturas: <strong>{totalInvoices}</strong></>
+              )}
+            </span>
+            <span>
+              Página {currentPage} de {totalPages || 1}
+            </span>
+          </div>
         </div>
 
         {invoices.length === 0 ? (
@@ -247,6 +339,51 @@ const InvoiceList = () => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* 📄 PAGINACIÓN */}
+        {!loading && invoices.length > 0 && (
+          <div className="mt-6 bg-white rounded-lg shadow-md p-4">
+            <div className="flex justify-between items-center">
+              {/* Botón Anterior */}
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  currentPage === 1
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                <FaChevronLeft />
+                <span>Anterior</span>
+              </button>
+
+              {/* Indicador de página */}
+              <div className="text-center">
+                <p className="text-lg font-semibold text-gray-800">
+                  Página {currentPage} de {totalPages || 1}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Mostrando {invoices.length} de {totalInvoices} facturas
+                </p>
+              </div>
+
+              {/* Botón Siguiente */}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  currentPage >= totalPages
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                <span>Siguiente</span>
+                <FaChevronRight />
+              </button>
+            </div>
           </div>
         )}
 
