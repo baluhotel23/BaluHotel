@@ -272,6 +272,22 @@ const BuyerRegistrationForm = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Registrar Nuevo Huésped">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Tipo de Organización *
+          </label>
+          <select
+            name="wlegalorganizationtype"
+            value={formData.wlegalorganizationtype}
+            onChange={handleInputChange}
+            className={inputClassName}
+            required
+          >
+            <option value="person">👤 Persona Natural</option>
+            <option value="company">🏢 Empresa</option>
+          </select>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

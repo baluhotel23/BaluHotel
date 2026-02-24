@@ -778,6 +778,15 @@ const taxxaReducer = (state = initialState, action) => {
         }
       };
 
+    // 🧹 LIMPIAR BUYER DEL ESTADO
+    case 'CLEAR_BUYER':
+      return {
+        ...state,
+        buyer: null,
+        error: null,
+        message: null
+      };
+
 
     default:
       return state;

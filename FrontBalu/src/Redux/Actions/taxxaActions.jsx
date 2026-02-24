@@ -853,3 +853,8 @@ export const clearManualInvoiceData = () => ({
 export const clearManualBuyerSearch = () => ({
   type: 'CLEAR_MANUAL_BUYER_SEARCH'
 });
+
+// 🧹 LIMPIAR BUYER DEL ESTADO
+export const clearBuyer = () => ({
+  type: 'CLEAR_BUYER'
+});

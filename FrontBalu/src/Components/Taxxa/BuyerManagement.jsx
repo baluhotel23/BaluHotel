@@ -9,6 +9,7 @@ import {
   updateBuyer,
   fetchDepartments,
   fetchMunicipalities,
+  clearBuyer,
 } from '../../Redux/Actions/taxxaActions';
 
 const BuyerManagement = () => {
@@ -245,6 +246,9 @@ const BuyerManagement = () => {
   };
 
   const handleReset = () => {
+    // 🧹 Limpiar buyer del estado de Redux
+    dispatch(clearBuyer());
+    
     setSearchDocument('');
     setMode('search');
     setFormData({
@@ -357,7 +361,24 @@ const BuyerManagement = () => {
               {/* Basic Information */}
               <div className="border-b pb-6">
                 <h3 className="text-lg font-medium text-gray-700 mb-4">📋 Información Básica</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de Organización *
+                    </label>
+                    <select
+                      name="wlegalorganizationtype"
+                      value={formData.wlegalorganizationtype}
+                      onChange={handleInputChange}
+                      className={inputClassName}
+                      required
+                    >
+                      <option value="person">👤 Persona Natural</option>
+                      <option value="company">🏢 Empresa</option>
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Documento *
