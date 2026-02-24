@@ -47,6 +47,7 @@ import InvoiceList from "./Components/Taxxa/InvoiceList";
 import ConfiguracionHotel from "./Components/Dashboard/ConfiguracionHotel";
 import CompletedBookings from "./Components/CheckOut/CompletedBookings";
 import FacturaManual from "./Components/Taxxa/FacturaManual";
+import BuyerManagement from "./Components/Taxxa/BuyerManagement";
 import VoucherManager from "./Components/Booking/VoucherManager";
 import RoomStatusDashboard from "./Components/Dashboard/RoomStatusDashboard"; // ⭐ NUEVO: Dashboard de habitaciones con gestión de turnos
 import ShiftReminder from "./Components/Dashboard/ShiftReminder"; // ⭐ NUEVO: Recordatorio de turno para recepcionistas
@@ -338,6 +339,15 @@ const AppContent = () => {
             element={
               <PrivateRoute allowedRoles={["owner", "admin"]}>
                 <FacturaManual />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/buyerManagement"
+            element={
+              <PrivateRoute allowedRoles={["owner", "admin"]}>
+                <BuyerManagement />
               </PrivateRoute>
             }
           />

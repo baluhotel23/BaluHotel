@@ -11,7 +11,7 @@ const {
 const { verifyToken } = require("../middleware/isAuth");
 const { allowRoles } = require("../middleware/byRol");
 const {getOrCreateSellerData, updateSellerData, getSellerDataBySdocno} = require('../controllers/Taxxa/sellerDataControllers');
-const {createBuyer, getBuyerByDocument} = require('../controllers/Taxxa/buyerController');
+const {createBuyer, getBuyerByDocument, updateBuyer} = require('../controllers/Taxxa/buyerController');
 
 const {
   getCountries,
@@ -70,6 +70,7 @@ router.get('/dian/stats', getCatalogStats);
 // RUTAS PÚBLICAS EXISTENTES
 router.post('/buyer', createBuyer);
 router.get('/buyer/:sdocno', getBuyerByDocument);
+router.put('/buyer/:sdocno', verifyToken, allowRoles(["owner", "admin"]), updateBuyer); // 🆕 Actualizar buyer
 
 // 🔧 DEBUG ANTES DEL MIDDLEWARE DE AUTENTICACIÓN
 router.use((req, res, next) => {

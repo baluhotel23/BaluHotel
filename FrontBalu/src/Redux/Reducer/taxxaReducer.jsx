@@ -177,6 +177,29 @@ const taxxaReducer = (state = initialState, action) => {
         error: null,
         message: 'Comprador creado exitosamente',
       };
+    
+    // 🆕 UPDATE BUYER
+    case 'UPDATE_BUYER_REQUEST':
+      return {
+        ...state,
+        loading: true,
+        error: null,
+      };
+    case 'UPDATE_BUYER_SUCCESS':
+      return {
+        ...state,
+        loading: false,
+        buyer: action.payload,
+        error: null,
+        message: 'Comprador actualizado exitosamente',
+      };
+    case 'UPDATE_BUYER_FAILURE':
+      return {
+        ...state,
+        loading: false,
+        error: action.payload,
+      };
+    
     case 'FETCH_SELLER_SUCCESS':
       return {
         ...state,

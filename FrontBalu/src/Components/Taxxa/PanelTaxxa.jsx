@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import {  FaListAlt, FaClock } from 'react-icons/fa';
+import {  FaListAlt, FaClock, FaUserEdit } from 'react-icons/fa';
 import DashboardLayout from '../Dashboard/DashboardLayout';
 
 const PanelTaxxa = () => {
@@ -92,6 +92,24 @@ const PanelTaxxa = () => {
               NO AUTORIZADO
             </button>
           )}
+        </div>
+
+        {/* Card 3: Gestión de Huéspedes */}
+        <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300 border-2 border-green-200">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-semibold mb-2">Gestión de Huéspedes</h2>
+              <p className="text-gray-600 mb-4">
+                Crear, editar y consultar información de huéspedes
+              </p>
+            </div>
+            <FaUserEdit className="text-3xl text-green-600" />
+          </div>
+          <Link to="/buyerManagement">
+            <button className="bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 font-bold py-2 px-4 rounded w-full transition-all">
+              GESTIONAR HUÉSPEDES
+            </button>
+          </Link>
         </div>
 
        </div>

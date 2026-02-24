@@ -297,6 +297,47 @@ export const sendInvoice = (invoiceData) => async (dispatch) => {
     };
 };
 
+// 🆕 ACTUALIZAR BUYER
+export const updateBuyer = (sdocno, buyerData) => {
+  return async (dispatch) => {
+    dispatch({ type: 'UPDATE_BUYER_REQUEST' });
+    
+    try {
+      console.log('📝 Actualizando comprador:', sdocno, buyerData);
+      
+      const response = await api.put(`/taxxa/buyer/${sdocno}`, buyerData);
+      console.log('📥 Respuesta del servidor:', response.data);
+      
+      if (response.data.error) {
+        dispatch({
+          type: 'UPDATE_BUYER_FAILURE',
+          payload: response.data.message
+        });
+        toast.error(response.data.message);
+        return { success: false, error: true, message: response.data.message };
+      }
+
+      dispatch({
+        type: 'UPDATE_BUYER_SUCCESS',
+        payload: response.data.data
+      });
+      toast.success('Huésped actualizado exitosamente');
+
+      return { success: true, data: response.data.data };
+      
+    } catch (error) {
+      console.error('❌ Error actualizando buyer:', error);
+      const errorMsg = error.response?.data?.message || error.message;
+      dispatch({
+        type: 'UPDATE_BUYER_FAILURE',
+        payload: errorMsg
+      });
+      toast.error(errorMsg);
+      return { success: false, error: true, message: errorMsg };
+    }
+  };
+};
+
 export const fetchCountries = () => async (dispatch, getState) => {
   // Verificar si ya están en cache
   const { countries } = getState().taxxa;
